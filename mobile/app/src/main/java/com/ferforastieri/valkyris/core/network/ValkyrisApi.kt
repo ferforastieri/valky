@@ -1,18 +1,25 @@
 package com.ferforastieri.valkyris.core.network
 
 import android.net.Uri
+import com.ferforastieri.valkyris.BuildConfig
 import com.ferforastieri.valkyris.core.model.*
 import com.ferforastieri.valkyris.core.security.Session
 import io.ktor.client.HttpClient
-import io.ktor.client.call.body
 import io.ktor.client.engine.okhttp.OkHttp
 import io.ktor.client.plugins.contentnegotiation.ContentNegotiation
 import io.ktor.client.request.*
+import io.ktor.client.statement.HttpResponse
+import io.ktor.client.statement.bodyAsText
 import io.ktor.http.*
 import io.ktor.serialization.kotlinx.json.json
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonElement
 import java.security.MessageDigest
 import java.security.cert.X509Certificate
+import java.util.concurrent.TimeUnit
 import javax.net.ssl.SSLContext
 import javax.net.ssl.X509TrustManager
 import okhttp3.Request
@@ -20,40 +27,239 @@ import okhttp3.Response
 import okhttp3.WebSocket
 import okhttp3.WebSocketListener
 
-class ValkyrisApi(private val session:()->Session?) {
-    private val json=Json{ignoreUnknownKeys=true;explicitNulls=false}
-    fun mediaHttpClient()=pinnedClient(requireNotNull(session()).fingerprint)
-    private fun pinnedClient(fingerprint:String)=okhttp3.OkHttpClient.Builder().apply{if(fingerprint.isNotBlank()){val trust=PinnedTrustManager(fingerprint);val ssl=SSLContext.getInstance("TLS").apply{init(null,arrayOf(trust),null)};sslSocketFactory(ssl.socketFactory,trust);hostnameVerifier { _, _ -> true }}}.build()
-    private fun client(fingerprint:String)=HttpClient(OkHttp){expectSuccess=true;engine{preconfigured=pinnedClient(fingerprint)};install(ContentNegotiation){json(json)}}
-    private fun base()=requireNotNull(session()){ "Valkyris is not paired" }.baseUrl+"/api/v1"
-    private suspend inline fun <reified T> get(path:String):T=client(requireNotNull(session()).fingerprint).use{it.get(base()+path){bearerAuth(requireNotNull(session()).token)}.body()}
-    private suspend inline fun <reified T,reified B> post(path:String,body:B):T=client(requireNotNull(session()).fingerprint).use{it.post(base()+path){bearerAuth(requireNotNull(session()).token);contentType(ContentType.Application.Json);setBody(body)}.body()}
-    suspend fun authStatus(baseUrl:String):AuthStatus=client("").use{it.get(baseUrl.trimEnd('/')+"/api/v1/auth/status").body()}
-    suspend fun login(baseUrl:String,request:LoginRequest,bootstrap:Boolean=false):PairResponse=client("").use{it.post(baseUrl.trimEnd('/')+if(bootstrap)"/api/v1/admin/bootstrap" else "/api/v1/login"){contentType(ContentType.Application.Json);setBody(request)}.body()}
-    suspend fun pair(baseUrl:String,fingerprint:String,request:PairRequest):PairResponse=client(fingerprint).use{it.post(baseUrl.trimEnd('/')+"/api/v1/pair"){contentType(ContentType.Application.Json);setBody(request)}.body()}
-    suspend fun createPairingSession():PairingSession=client(requireNotNull(session()).fingerprint).use{it.post(base()+"/pairing-sessions"){bearerAuth(requireNotNull(session()).token)}.body()}
-    fun invitationUri(pairing:PairingSession):String {val current=requireNotNull(session());return Uri.Builder().scheme("valkyris").authority("pair").appendQueryParameter("url",current.baseUrl).appendQueryParameter("code",pairing.code).apply{if(current.fingerprint.isNotBlank())appendQueryParameter("fingerprint",current.fingerprint)}.build().toString()}
-    suspend fun cameras():List<Camera> = get("/cameras")
-    suspend fun createCamera(camera:CreateCameraRequest):Camera = post("/cameras",camera)
-    suspend fun events():List<ValkyrisEvent> = get("/events?limit=100")
-    suspend fun event(id:String):ValkyrisEvent = get("/events/$id")
-    suspend fun rules():List<Rule> = get("/rules")
-    suspend fun detectors():List<DetectorKind> = get("/detectors")
-    suspend fun createRule(rule:Rule):Rule = post("/rules",rule)
-    suspend fun acknowledge(id:String){client(requireNotNull(session()).fingerprint).use{it.post(base()+"/events/$id/acknowledge"){bearerAuth(requireNotNull(session()).token)}}}
-    suspend fun ptz(cameraId:String,command:PTZCommand){client(requireNotNull(session()).fingerprint).use{it.post(base()+"/cameras/$cameraId/ptz"){bearerAuth(requireNotNull(session()).token);contentType(ContentType.Application.Json);setBody(command)}}}
-    suspend fun registerPush(registration:PushRegistration){client(requireNotNull(session()).fingerprint).use{it.post(base()+"/devices/push"){bearerAuth(requireNotNull(session()).token);contentType(ContentType.Application.Json);setBody(registration)}}}
-    fun snapshotUrl(cameraId:String)=base()+"/cameras/$cameraId/snapshot"
-    fun liveUrl(cameraId:String)=base()+"/cameras/$cameraId/live/index.m3u8"
-    fun clipUrl(eventId:String)=base()+"/events/$eventId/clip"
-    fun eventSnapshotUrl(eventId:String)=base()+"/events/$eventId/snapshot"
-    fun token()=requireNotNull(session()).token
-    fun realtime(onMessage:()->Unit,onDisconnect:()->Unit={}):WebSocket {val current=requireNotNull(session());val wsUrl=current.baseUrl.replaceFirst("https://","wss://").replaceFirst("http://","ws://").trimEnd('/')+"/api/v1/realtime";val request=Request.Builder().url(wsUrl).header("Authorization","Bearer ${current.token}").build();return pinnedClient(current.fingerprint).newWebSocket(request,object:WebSocketListener(){override fun onMessage(webSocket:WebSocket,text:String){onMessage()};override fun onFailure(webSocket:WebSocket,t:Throwable,response:Response?){onDisconnect()};override fun onClosed(webSocket:WebSocket,code:Int,reason:String){onDisconnect()}})}
+data class ApiNotice(val message: String, val success: Boolean)
+
+class ValkyrisApi(private val session: () -> Session?) {
+    private val json = Json { ignoreUnknownKeys = true; explicitNulls = false }
+    private val _notices = MutableSharedFlow<ApiNotice>(extraBufferCapacity = 32)
+    val notices = _notices.asSharedFlow()
+
+    fun mediaHttpClient() = pinnedClient(requireNotNull(session()).fingerprint)
+
+    private fun pinnedClient(fingerprint: String) = okhttp3.OkHttpClient.Builder()
+        .connectTimeout(20, TimeUnit.SECONDS)
+        .readTimeout(60, TimeUnit.SECONDS)
+        .writeTimeout(30, TimeUnit.SECONDS)
+        .callTimeout(90, TimeUnit.SECONDS)
+        .pingInterval(20, TimeUnit.SECONDS)
+        .apply {
+            if (fingerprint.isNotBlank()) {
+                val trust = PinnedTrustManager(fingerprint)
+                val ssl = SSLContext.getInstance("TLS").apply { init(null, arrayOf(trust), null) }
+                sslSocketFactory(ssl.socketFactory, trust)
+                hostnameVerifier { _, _ -> true }
+            }
+        }
+        .build()
+
+    private fun client(fingerprint: String) = HttpClient(OkHttp) {
+        expectSuccess = false
+        engine { preconfigured = pinnedClient(fingerprint) }
+        install(ContentNegotiation) { json(json) }
+    }
+
+    private fun base() = requireNotNull(session()) { "Valkyris is not paired" }.baseUrl + "/api/v1"
+
+    private suspend inline fun <reified T> execute(
+        fingerprint: String,
+        announce: Boolean = true,
+        crossinline request: suspend (HttpClient) -> HttpResponse,
+    ): T {
+        try {
+            return client(fingerprint).use { http ->
+                val response = request(http)
+                val raw = response.bodyAsText()
+                val envelope = runCatching { json.decodeFromString<ApiEnvelope<T>>(raw) }.getOrElse { decodeError ->
+                    val fallback = response.headers[HEADER_MESSAGE].orEmpty().ifBlank {
+                        raw.ifBlank { "${response.status.value} ${response.status.description}" }
+                    }
+                    if (!response.status.isSuccess()) throw ApiException(fallback, response.status.value, decodeError)
+                    throw ApiException("Invalid Valkyris response: $fallback", response.status.value, decodeError)
+                }
+                val message = envelope.message.ifBlank {
+                    response.headers[HEADER_MESSAGE].orEmpty().ifBlank { response.status.description }
+                }
+                if (!response.status.isSuccess() || !envelope.success) {
+                    val complete = envelope.error?.takeIf { it.isNotBlank() } ?: message
+                    throw ApiException(complete, response.status.value)
+                }
+                if (announce && message.isNotBlank()) publish(message, true)
+                envelope.data ?: throw ApiException("Valkyris response did not include data: $message", response.status.value)
+            }
+        } catch (error: Throwable) {
+            if (error is ApiException) {
+                publish(error.message.orEmpty(), false)
+                throw error
+            }
+            val complete = buildString {
+                append(error::class.simpleName ?: "Network error")
+                error.message?.takeIf { it.isNotBlank() }?.let { append(": ").append(it) }
+            }
+            publish(complete, false)
+            throw ApiException(complete, cause = error)
+        }
+    }
+
+    private suspend fun executeUnit(
+        fingerprint: String,
+        request: suspend (HttpClient) -> HttpResponse,
+    ) {
+        execute<JsonElement>(fingerprint, request = request)
+    }
+
+    private suspend inline fun <reified T> get(path: String, announce: Boolean = true): T {
+        val current = requireNotNull(session())
+        return execute(current.fingerprint, announce) {
+            it.get(base() + path) { bearerAuth(current.token) }
+        }
+    }
+
+    private suspend inline fun <reified T, reified B> post(path: String, body: B): T {
+        val current = requireNotNull(session())
+        return execute(current.fingerprint) {
+            it.post(base() + path) {
+                bearerAuth(current.token)
+                contentType(ContentType.Application.Json)
+                setBody(body)
+            }
+        }
+    }
+
+    suspend fun authStatus(baseUrl: String): AuthStatus = execute("") {
+        it.get(baseUrl.trimEnd('/') + "/api/v1/auth/status")
+    }
+
+    suspend fun login(baseUrl: String, request: LoginRequest, bootstrap: Boolean = false): PairResponse = execute("") {
+        it.post(baseUrl.trimEnd('/') + if (bootstrap) "/api/v1/admin/bootstrap" else "/api/v1/login") {
+            contentType(ContentType.Application.Json)
+            setBody(request)
+        }
+    }
+
+    suspend fun pair(baseUrl: String, fingerprint: String, request: PairRequest): PairResponse = execute(fingerprint) {
+        it.post(baseUrl.trimEnd('/') + "/api/v1/pair") {
+            contentType(ContentType.Application.Json)
+            setBody(request)
+        }
+    }
+
+    suspend fun createPairingSession(): PairingSession {
+        val current = requireNotNull(session())
+        return execute(current.fingerprint) {
+            it.post(base() + "/pairing-sessions") { bearerAuth(current.token) }
+        }
+    }
+
+    fun invitationUri(pairing: PairingSession): String {
+        val current = requireNotNull(session())
+        return Uri.Builder().scheme("valkyris").authority("pair")
+            .appendQueryParameter("url", current.baseUrl)
+            .appendQueryParameter("code", pairing.code)
+            .apply { if (current.fingerprint.isNotBlank()) appendQueryParameter("fingerprint", current.fingerprint) }
+            .build().toString()
+    }
+
+    suspend fun cameras(): List<Camera> = get("/cameras")
+
+    suspend fun createCamera(camera: CreateCameraRequest): Camera {
+        val started: CameraOperation = post("/cameras", camera)
+        repeat(120) {
+            delay(1_000)
+            val operation: CameraOperation = get("/camera-operations/${started.id}", announce = false)
+            when (operation.status) {
+                "completed" -> {
+                    publish(operation.message, true)
+                    return requireNotNull(operation.camera)
+                }
+                "failed" -> {
+                    publish(operation.message, false)
+                    throw ApiException(operation.message, 422)
+                }
+            }
+        }
+        val message = "Camera validation did not finish within two minutes"
+        publish(message, false)
+        throw ApiException(message)
+    }
+
+    suspend fun updateInfo(): UpdateInfo = get("/system/update?clientVersion=${BuildConfig.VERSION_NAME.encodeURLParameter()}", announce = false)
+
+    suspend fun startUpdate(): UpdateInfo = post("/system/update", UpdateRequest(BuildConfig.VERSION_NAME))
+
+    suspend fun events(): List<ValkyrisEvent> = get("/events?limit=100")
+    suspend fun event(id: String): ValkyrisEvent = get("/events/$id")
+    suspend fun rules(): List<Rule> = get("/rules")
+    suspend fun detectors(): List<DetectorKind> = get("/detectors")
+    suspend fun createRule(rule: Rule): Rule = post("/rules", rule)
+
+    suspend fun acknowledge(id: String) {
+        val current = requireNotNull(session())
+        executeUnit(current.fingerprint) {
+            it.post(base() + "/events/$id/acknowledge") { bearerAuth(current.token) }
+        }
+    }
+
+    suspend fun ptz(cameraId: String, command: PTZCommand) {
+        val current = requireNotNull(session())
+        executeUnit(current.fingerprint) {
+            it.post(base() + "/cameras/$cameraId/ptz") {
+                bearerAuth(current.token)
+                contentType(ContentType.Application.Json)
+                setBody(command)
+            }
+        }
+    }
+
+    suspend fun registerPush(registration: PushRegistration) {
+        val current = requireNotNull(session())
+        executeUnit(current.fingerprint) {
+            it.post(base() + "/devices/push") {
+                bearerAuth(current.token)
+                contentType(ContentType.Application.Json)
+                setBody(registration)
+            }
+        }
+    }
+
+    fun snapshotUrl(cameraId: String) = base() + "/cameras/$cameraId/snapshot"
+    fun liveUrl(cameraId: String) = base() + "/cameras/$cameraId/live/index.m3u8"
+    fun clipUrl(eventId: String) = base() + "/events/$eventId/clip"
+    fun eventSnapshotUrl(eventId: String) = base() + "/events/$eventId/snapshot"
+    fun token() = requireNotNull(session()).token
+
+    fun realtime(onMessage: () -> Unit, onDisconnect: () -> Unit = {}): WebSocket {
+        val current = requireNotNull(session())
+        val wsUrl = current.baseUrl.replaceFirst("https://", "wss://").replaceFirst("http://", "ws://")
+            .trimEnd('/') + "/api/v1/realtime"
+        val request = Request.Builder().url(wsUrl).header("Authorization", "Bearer ${current.token}").build()
+        return pinnedClient(current.fingerprint).newWebSocket(request, object : WebSocketListener() {
+            override fun onMessage(webSocket: WebSocket, text: String) = onMessage()
+            override fun onFailure(webSocket: WebSocket, t: Throwable, response: Response?) {
+                publish("${t::class.simpleName}: ${t.message.orEmpty()}", false)
+                onDisconnect()
+            }
+            override fun onClosed(webSocket: WebSocket, code: Int, reason: String) = onDisconnect()
+        })
+    }
+
+    private fun publish(message: String, success: Boolean) {
+        if (message.isNotBlank()) _notices.tryEmit(ApiNotice(message, success))
+    }
+
+    companion object {
+        private const val HEADER_MESSAGE = "X-Valkyris-Message"
+    }
 }
 
-private class PinnedTrustManager(fingerprint:String):X509TrustManager{
-    private val expected=fingerprint.replace(":","").uppercase()
-    override fun checkClientTrusted(chain:Array<out X509Certificate>?,authType:String?)=Unit
-    override fun checkServerTrusted(chain:Array<out X509Certificate>?,authType:String?){val certificate=chain?.firstOrNull()?:throw java.security.cert.CertificateException("Server sent no certificate");val actual=MessageDigest.getInstance("SHA-256").digest(certificate.encoded).joinToString(""){"%02X".format(it)};if(actual!=expected)throw java.security.cert.CertificateException("Valkyris certificate fingerprint does not match")}
-    override fun getAcceptedIssuers():Array<X509Certificate> = emptyArray()
+class ApiException(message: String, val status: Int? = null, cause: Throwable? = null) : Exception(message, cause)
+
+private class PinnedTrustManager(fingerprint: String) : X509TrustManager {
+    private val expected = fingerprint.replace(":", "").uppercase()
+    override fun checkClientTrusted(chain: Array<out X509Certificate>?, authType: String?) = Unit
+    override fun checkServerTrusted(chain: Array<out X509Certificate>?, authType: String?) {
+        val certificate = chain?.firstOrNull() ?: throw java.security.cert.CertificateException("Server sent no certificate")
+        val actual = MessageDigest.getInstance("SHA-256").digest(certificate.encoded).joinToString("") { "%02X".format(it) }
+        if (actual != expected) throw java.security.cert.CertificateException("Valkyris certificate fingerprint does not match")
+    }
+    override fun getAcceptedIssuers(): Array<X509Certificate> = emptyArray()
 }

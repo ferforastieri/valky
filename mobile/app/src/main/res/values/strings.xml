@@ -37,6 +37,10 @@
     <string name="notification_channel_events">Alertas da casa</string>
     <string name="notification_channel_alarm">Alarmes críticos</string>
     <string name="notification_ready">Notificações prontas</string>
+    <string name="alert_readiness_title">Deixe os alertas prontos</string>
+    <string name="alert_readiness_body">O Valkyris precisa destes acessos para avisar mesmo com a tela bloqueada ou o celular em modo silencioso.</string>
+    <string name="configure_permission">Configurar %1$s</string>
+    <string name="not_now">Agora não</string>
     <string name="notification_setup">Configurar notificações</string>
     <string name="notification_permission">Permissão de notificações</string>
     <string name="language">Idioma</string>
@@ -47,6 +51,7 @@
     <string name="save">Salvar</string>
     <string name="cancel">Cancelar</string>
     <string name="add_camera">Adicionar câmera</string>
+    <string name="validating_camera">Validando ONVIF e preparando a transmissão. Você pode continuar usando o app.</string>
     <string name="camera_name">Nome da câmera</string>
     <string name="camera_ip">IP ou hostname</string>
     <string name="onvif_port">Porta ONVIF</string>
@@ -84,4 +89,19 @@
     <string name="schedule_end">Agenda: fim HH:mm (opcional)</string>
     <string name="media_retention">Retenção de mídia</string>
     <string name="media_retention_value">7 dias ou 5 GB, o que ocorrer primeiro</string>
+    <string name="monitoring_local">Monitoramento local</string>
+    <string name="connected_status">conectadas</string>
+    <string name="recent_activity">Atividade recente</string>
+    <string name="unread_status">não reconhecidos</string>
+    <string name="automation_status">Automação residencial</string>
+    <string name="active_status">ativas</string>
+    <string name="home_preferences">Casa e preferências</string>
+    <string name="ready_status">prontos</string>
+    <string name="update_available">Atualização disponível</string>
+    <string name="update_event_admin_body">O Valkyris atualizará o backend com segurança e baixará o APK assinado desta release. Seus dados e câmeras permanecem no volume local.</string>
+    <string name="update_event_member_body">Uma nova versão do aplicativo está disponível. Baixe o APK assinado diretamente da release oficial.</string>
+    <string name="update_now">Atualizar</string>
+    <string name="download_apk">Baixar APK</string>
+    <string name="later">Depois</string>
+    <string name="downloading_update">Baixando a atualização assinada do aplicativo</string>
 </resources>

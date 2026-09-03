@@ -1,25 +1,8 @@
 package com.ferforastieri.valkyris.navigation
 
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.WindowInsets
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.imePadding
-import androidx.compose.foundation.layout.navigationBarsPadding
-import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.rounded.Notifications
-import androidx.compose.material.icons.rounded.Settings
-import androidx.compose.material.icons.rounded.Tune
-import androidx.compose.material.icons.rounded.Videocam
-import androidx.compose.material3.Icon
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.NavigationBar
-import androidx.compose.material3.NavigationBarItem
-import androidx.compose.material3.NavigationBarItemDefaults
-import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Surface
-import androidx.compose.material3.Text
+import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -42,24 +25,64 @@ import com.ferforastieri.valkyris.feature.events.EventsScreen
 import com.ferforastieri.valkyris.feature.onboarding.OnboardingScreen
 import com.ferforastieri.valkyris.feature.rules.RulesScreen
 import com.ferforastieri.valkyris.feature.settings.SettingsScreen
+import com.ferforastieri.valkyris.feature.settings.StartupAlertPermissions
+import com.ferforastieri.valkyris.core.design.ToastMessageHost
+import com.ferforastieri.valkyris.core.design.UpdateEventDialog
+import com.composables.icons.lucide.Bell
+import com.composables.icons.lucide.Lucide
+import com.composables.icons.lucide.Settings
+import com.composables.icons.lucide.SlidersHorizontal
+import com.composables.icons.lucide.Video
 
-private data class Destination(val route: String, val label: Int, val icon: ImageVector)
+private data class Destination(val route: String, val label: Int)
 
 private val destinations = listOf(
-    Destination("cameras", R.string.cameras, Icons.Rounded.Videocam),
-    Destination("events", R.string.events, Icons.Rounded.Notifications),
-    Destination("rules", R.string.rules, Icons.Rounded.Tune),
-    Destination("settings", R.string.settings, Icons.Rounded.Settings),
+    Destination("cameras", R.string.cameras),
+    Destination("events", R.string.events),
+    Destination("rules", R.string.rules),
+    Destination("settings", R.string.settings),
 )
+
+@Composable
+private fun Destination.icon(): ImageVector = when (route) {
+    "cameras" -> Lucide.Video
+    "events" -> Lucide.Bell
+    "rules" -> Lucide.SlidersHorizontal
+    else -> Lucide.Settings
+}
 
 @Composable
 fun ValkyrisApp(main: MainViewModel) {
     val paired by main.paired.collectAsStateWithLifecycle()
-    if (!paired) {
-        OnboardingScreen(main)
-        return
+    val admin by main.admin.collectAsStateWithLifecycle()
+    val update by main.updateInfo.collectAsStateWithLifecycle()
+    val updating by main.updating.collectAsStateWithLifecycle()
+    Box(Modifier.fillMaxSize()) {
+        if (!paired) {
+            OnboardingScreen(main)
+        } else {
+            ConnectedValkyrisApp(main)
+        }
+        ToastMessageHost(
+            notices = main.notices,
+            modifier = Modifier.align(androidx.compose.ui.Alignment.TopCenter).statusBarsPadding().padding(14.dp),
+        )
+        update?.let {
+            UpdateEventDialog(
+                update = it,
+                admin = admin,
+                updating = updating,
+                onUpdate = main::startUpdate,
+                onDismiss = main::dismissUpdate,
+            )
+        }
     }
+}
+
+@Composable
+private fun ConnectedValkyrisApp(main: MainViewModel) {
     val nav = rememberNavController()
+    StartupAlertPermissions()
     val entry by nav.currentBackStackEntryAsState()
     val showBottomBar = destinations.any { it.route == entry?.destination?.route }
     val pendingEvent by main.pendingEvent.collectAsStateWithLifecycle()
@@ -81,9 +104,10 @@ fun ValkyrisApp(main: MainViewModel) {
             ) {
                 Surface(
                     modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(24.dp),
+                    shape = RoundedCornerShape(22.dp),
                     color = MaterialTheme.colorScheme.surface,
-                    shadowElevation = 12.dp,
+                    border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+                    shadowElevation = 10.dp,
                     tonalElevation = 1.dp,
                 ) {
                     NavigationBar(
@@ -101,11 +125,18 @@ fun ValkyrisApp(main: MainViewModel) {
                                         restoreState = true
                                     }
                                 },
-                                icon = { Icon(destination.icon, null) },
-                                label = { Text(stringResource(destination.label)) },
+                                icon = {
+                                    Icon(
+                                        destination.icon(),
+                                        contentDescription = stringResource(destination.label),
+                                        modifier = Modifier.size(21.dp),
+                                    )
+                                },
+                                alwaysShowLabel = false,
                                 colors = NavigationBarItemDefaults.colors(
                                     indicatorColor = MaterialTheme.colorScheme.secondary,
                                     selectedIconColor = MaterialTheme.colorScheme.onSecondary,
+                                    unselectedIconColor = MaterialTheme.colorScheme.onSurfaceVariant,
                                 ),
                             )
                         }

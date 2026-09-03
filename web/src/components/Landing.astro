@@ -1,5 +1,5 @@
 ---
-import { ArrowRight, BadgeCheck, BellRing, Check, ChevronDown, CodeXml, Download, House, Languages, LockKeyhole, Moon, Server, ShieldCheck, Sun, Video, Waypoints, Wifi } from '@lucide/astro';
+import { ArrowRight, BadgeCheck, BellRing, Check, ChevronDown, CodeXml, Download, House, Languages, LockKeyhole, Moon, Server, Settings, ShieldCheck, SlidersHorizontal, Sun, Video, Waypoints, Wifi } from '@lucide/astro';
 import { copy, type Locale } from '../content/copy';
 import BaseLayout from '../layouts/BaseLayout.astro';
 import Signal from './Signal.astro';
@@ -10,8 +10,13 @@ const other = locale === 'pt-BR' ? '/en' : '/pt-BR';
 const command = 'curl -fsSL https://valkyris.vercel.app/install.sh | sh';
 ---
 <BaseLayout locale={locale} title={t.metaTitle} description={t.metaDescription}>
-  <main>
+  <main class="landing-shell">
     <section class="hero" id="overview">
+      <div class="overview-strip" aria-label={locale === 'pt-BR' ? 'Resumo do sistema' : 'System summary'}>
+        <article><span class="overview-icon"><Server size={20}/></span><div><small>{locale === 'pt-BR' ? 'Processamento' : 'Processing'}</small><strong>{locale === 'pt-BR' ? 'Dentro de casa' : 'At home'}</strong></div><em>{locale === 'pt-BR' ? 'local' : 'local'}</em></article>
+        <article><span class="overview-icon"><Wifi size={20}/></span><div><small>{locale === 'pt-BR' ? 'Acesso seguro' : 'Secure access'}</small><strong>LAN / VPN</strong></div><em>{locale === 'pt-BR' ? 'privado' : 'private'}</em></article>
+        <article><span class="overview-icon"><BellRing size={20}/></span><div><small>{locale === 'pt-BR' ? 'Alertas' : 'Alerts'}</small><strong>{locale === 'pt-BR' ? 'No seu Android' : 'On Android'}</strong></div><em>{locale === 'pt-BR' ? 'ativos' : 'active'}</em></article>
+      </div>
       <div class="hero-copy reveal">
         <p class="eyebrow"><span></span>{t.heroEyebrow}</p>
         <h1>{t.heroTitle.split('\n').map((line) => <span>{line}</span>)}</h1>
@@ -58,7 +63,7 @@ const command = 'curl -fsSL https://valkyris.vercel.app/install.sh | sh';
     <section class="app-section section">
       <div class="phone-stage">
         <div class="phone phone-back"><div class="phone-screen"><div class="phone-title">Timeline</div>{['Baby cry','Motion','Doorbell'].map((v,i)=><div class="mini-event"><span class={i===0?'danger':''}></span><div><strong>{v}</strong><small>{i===0?'Now · 91%':'Today · 18:2'+i}</small></div></div>)}</div></div>
-        <div class="phone phone-front"><div class="phone-screen live-screen"><div class="phone-top"><b>{t.camera}</b><span></span></div><div class="phone-video"><div class="door"></div><Signal /></div><div class="ptz"><button>↑</button><div><button>←</button><button>●</button><button>→</button></div><button>↓</button></div><div class="phone-nav"><span class="active"></span><span></span><span></span><span></span></div></div></div>
+        <div class="phone phone-front"><div class="phone-screen live-screen"><div class="phone-top"><b>{t.camera}</b><span></span></div><div class="phone-video"><div class="door"></div><Signal /></div><div class="ptz"><button>↑</button><div><button>←</button><button>●</button><button>→</button></div><button>↓</button></div><div class="phone-nav"><Video class="active" size={17}/><BellRing size={17}/><SlidersHorizontal size={17}/><Settings size={17}/></div></div></div>
       </div>
       <div class="app-copy"><p class="eyebrow"><span></span>ANDROID NATIVE</p><h2>{t.appTitle.split('\n').map((line)=><span>{line}</span>)}</h2><p>{t.appBody}</p><ul><li><Check size={16}/>Kotlin + Jetpack Compose</li><li><Check size={16}/>UnifiedPush / ntfy</li><li><Check size={16}/>LL-HLS authenticated</li></ul></div>
     </section>

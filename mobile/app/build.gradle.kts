@@ -15,8 +15,8 @@ android {
         applicationId = "com.ferforastieri.valkyris"
         minSdk = 26
         targetSdk = 36
-        versionCode = 5
-        versionName = "0.5.0"
+        versionCode = 6
+        versionName = "0.6.0"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables.useSupportLibrary = true
     }
@@ -61,7 +61,7 @@ dependencies {
     implementation("androidx.compose.ui:ui")
     implementation("androidx.compose.ui:ui-tooling-preview")
     implementation("androidx.compose.material3:material3")
-    implementation("androidx.compose.material:material-icons-extended")
+    implementation("com.composables:icons-lucide-cmp:2.2.1")
     implementation("androidx.navigation:navigation-compose:2.9.6")
     debugImplementation("androidx.compose.ui:ui-tooling")
 

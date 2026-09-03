@@ -6,8 +6,6 @@ import android.view.ViewGroup
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -26,13 +24,15 @@ import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.exoplayer.source.ProgressiveMediaSource
 import androidx.media3.ui.PlayerView
 import com.ferforastieri.valkyris.R
+import com.composables.icons.lucide.ArrowLeft
+import com.composables.icons.lucide.Lucide
 
 @Composable fun EventDetailScreen(onBack:()->Unit,vm:EventDetailViewModel=hiltViewModel()){
     val event by vm.event.collectAsStateWithLifecycle();val snapshot by vm.snapshot.collectAsStateWithLifecycle();val context=androidx.compose.ui.platform.LocalContext.current
     val player=remember(event?.clipPath){if(event?.clipPath==null)null else{val data=OkHttpDataSource.Factory(vm.httpClient()).setDefaultRequestProperties(mapOf("Authorization" to "Bearer ${vm.token()}"));ExoPlayer.Builder(context).build().apply{setMediaSource(ProgressiveMediaSource.Factory(data).createMediaSource(MediaItem.fromUri(vm.clipUrl())));prepare()}}}
     DisposableEffect(player){onDispose{player?.release()}}
     Column(Modifier.fillMaxSize()){
-        Row(Modifier.fillMaxWidth().padding(12.dp),verticalAlignment=Alignment.CenterVertically){IconButton(onBack){Icon(Icons.AutoMirrored.Rounded.ArrowBack,null)};Text(stringResource(R.string.event_detail),style=MaterialTheme.typography.titleLarge,fontWeight=FontWeight.SemiBold)}
+        Row(Modifier.fillMaxWidth().padding(12.dp),verticalAlignment=Alignment.CenterVertically){IconButton(onBack){Icon(Lucide.ArrowLeft,null)};Text(stringResource(R.string.event_detail),style=MaterialTheme.typography.titleLarge,fontWeight=FontWeight.SemiBold)}
         val value=event
         if(value==null){Box(Modifier.fillMaxSize()){CircularProgressIndicator(Modifier.align(Alignment.Center))};return@Column}
         Column(Modifier.fillMaxSize().padding(horizontal=18.dp),verticalArrangement=Arrangement.spacedBy(14.dp)){

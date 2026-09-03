@@ -5,9 +5,6 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.rounded.Add
-import androidx.compose.material.icons.rounded.Tune
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -18,6 +15,7 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.ferforastieri.valkyris.R
+import com.ferforastieri.valkyris.core.design.OperationalHeader
 import com.ferforastieri.valkyris.core.model.Camera
 import com.ferforastieri.valkyris.core.model.DetectorKind
 import com.ferforastieri.valkyris.core.model.Rule
@@ -25,6 +23,9 @@ import com.ferforastieri.valkyris.core.model.RuleActions
 import com.ferforastieri.valkyris.core.model.RuleSchedule
 import java.time.ZoneId
 import kotlin.math.roundToInt
+import com.composables.icons.lucide.Lucide
+import com.composables.icons.lucide.Plus
+import com.composables.icons.lucide.SlidersHorizontal
 
 @Composable
 fun RulesScreen(vm: RulesViewModel = hiltViewModel()) {
@@ -34,27 +35,38 @@ fun RulesScreen(vm: RulesViewModel = hiltViewModel()) {
     var show by remember { mutableStateOf(false) }
 
     Column(Modifier.fillMaxSize().padding(horizontal = 18.dp)) {
-        Row(Modifier.fillMaxWidth().padding(top = 18.dp), verticalAlignment = Alignment.CenterVertically) {
-            Column(Modifier.weight(1f)) {
-                Text(stringResource(R.string.rules), style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.SemiBold)
-                Text(stringResource(R.string.rule_subtitle), style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Spacer(Modifier.height(18.dp))
+        OperationalHeader(
+            icon = Lucide.SlidersHorizontal,
+            eyebrow = stringResource(R.string.automation_status),
+            title = stringResource(R.string.rules),
+            metric = rules.size.toString(),
+            status = stringResource(R.string.active_status),
+            action = {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Column(horizontalAlignment = Alignment.End) {
+                        Text(rules.size.toString(), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+                        Text(stringResource(R.string.active_status), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                    Spacer(Modifier.width(8.dp))
+                    FilledIconButton(onClick = { show = true }, enabled = cameras.isNotEmpty() && detectors.isNotEmpty()) {
+                        Icon(Lucide.Plus, contentDescription = stringResource(R.string.add_rule))
+                    }
+                }
             }
-            FilledIconButton(onClick = { show = true }, enabled = cameras.isNotEmpty() && detectors.isNotEmpty()) {
-                Icon(Icons.Rounded.Add, contentDescription = stringResource(R.string.add_rule))
-            }
-        }
+        )
         Spacer(Modifier.height(18.dp))
         if (rules.isEmpty()) {
             Box(Modifier.fillMaxSize()) {
                 Column(Modifier.align(Alignment.Center), horizontalAlignment = Alignment.CenterHorizontally) {
-                    Icon(Icons.Rounded.Tune, null, Modifier.size(42.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Icon(Lucide.SlidersHorizontal, null, Modifier.size(42.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
                     Text(stringResource(R.string.no_rules), fontWeight = FontWeight.SemiBold)
                 }
             }
         } else {
             LazyColumn(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 items(rules, key = { it.id }) { rule ->
-                    Card(Modifier.fillMaxWidth(), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface), elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)) {
+                    Card(Modifier.fillMaxWidth(), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface), border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant), elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)) {
                         Column(Modifier.padding(16.dp)) {
                             Text(rule.name, fontWeight = FontWeight.SemiBold)
                             Text(rule.detectorTypes.replace(",", " · "), color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodySmall)

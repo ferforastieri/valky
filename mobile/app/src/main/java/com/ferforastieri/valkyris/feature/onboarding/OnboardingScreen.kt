@@ -14,9 +14,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.rounded.Login
-import androidx.compose.material.icons.rounded.QrCodeScanner
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
@@ -42,6 +39,9 @@ import com.ferforastieri.valkyris.MainViewModel
 import com.ferforastieri.valkyris.R
 import com.ferforastieri.valkyris.core.design.SignalLine
 import com.ferforastieri.valkyris.core.design.ValkyrisMark
+import com.composables.icons.lucide.LogIn
+import com.composables.icons.lucide.Lucide
+import com.composables.icons.lucide.ScanQrCode
 import com.journeyapps.barcodescanner.ScanContract
 import com.journeyapps.barcodescanner.ScanOptions
 
@@ -74,16 +74,31 @@ fun OnboardingScreen(viewModel: MainViewModel) {
                 border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
             ) {
                 Column(Modifier.padding(24.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
-                    ValkyrisMark(Modifier.size(78.dp))
-                    Text(stringResource(R.string.login_title), style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.SemiBold)
-                    Text(stringResource(R.string.login_body), color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Column(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.spacedBy(12.dp),
+                    ) {
+                        ValkyrisMark(Modifier.size(82.dp))
+                        Text(
+                            stringResource(R.string.login_title),
+                            style = MaterialTheme.typography.headlineMedium,
+                            fontWeight = FontWeight.SemiBold,
+                        )
+                        Text(
+                            stringResource(R.string.login_body),
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            style = MaterialTheme.typography.bodyMedium,
+                            textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                        )
+                    }
                     SignalLine(Modifier.fillMaxWidth().height(52.dp))
                     OutlinedTextField(
                         url,
                         { url = it; viewModel.resetAuthStatus() },
                         Modifier.fillMaxWidth(),
                         label = { Text(stringResource(R.string.server_url)) },
-                        placeholder = { Text("https://valkyris.example.com") },
+                        placeholder = { Text("https://valkyris.home.example.com") },
                         enabled = initialized == null && !connecting,
                         singleLine = true,
                     )
@@ -125,7 +140,7 @@ fun OnboardingScreen(viewModel: MainViewModel) {
                         ),
                     ) {
                         if (connecting) CircularProgressIndicator(Modifier.size(20.dp), strokeWidth = 2.dp)
-                        else Icon(Icons.AutoMirrored.Rounded.Login, null)
+                        else Icon(Lucide.LogIn, null)
                         Text(
                             stringResource(
                                 when (initialized) {
@@ -158,7 +173,7 @@ fun OnboardingScreen(viewModel: MainViewModel) {
                         modifier = Modifier.fillMaxWidth(),
                         enabled = !connecting,
                     ) {
-                        Icon(Icons.Rounded.QrCodeScanner, null)
+                        Icon(Lucide.ScanQrCode, null)
                         Text(stringResource(R.string.scan_invite), Modifier.padding(start = 8.dp))
                     }
                 }

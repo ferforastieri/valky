@@ -37,6 +37,10 @@
     <string name="notification_channel_events">Home alerts</string>
     <string name="notification_channel_alarm">Critical alarms</string>
     <string name="notification_ready">Notifications ready</string>
+    <string name="alert_readiness_title">Get alerts ready</string>
+    <string name="alert_readiness_body">Valkyris needs these permissions to alert you while the screen is locked or the phone is in silent mode.</string>
+    <string name="configure_permission">Configure %1$s</string>
+    <string name="not_now">Not now</string>
     <string name="notification_setup">Set up notifications</string>
     <string name="notification_permission">Notification permission</string>
     <string name="language">Language</string>
@@ -47,6 +51,7 @@
     <string name="save">Save</string>
     <string name="cancel">Cancel</string>
     <string name="add_camera">Add camera</string>
+    <string name="validating_camera">Validating ONVIF and preparing the stream. You can keep using the app.</string>
     <string name="camera_name">Camera name</string>
     <string name="camera_ip">IP or hostname</string>
     <string name="onvif_port">ONVIF port</string>
@@ -84,4 +89,19 @@
     <string name="schedule_end">Schedule: end HH:mm (optional)</string>
     <string name="media_retention">Media retention</string>
     <string name="media_retention_value">7 days or 5 GB, whichever comes first</string>
+    <string name="monitoring_local">Local monitoring</string>
+    <string name="connected_status">connected</string>
+    <string name="recent_activity">Recent activity</string>
+    <string name="unread_status">unacknowledged</string>
+    <string name="automation_status">Home automation</string>
+    <string name="active_status">active</string>
+    <string name="home_preferences">Home and preferences</string>
+    <string name="ready_status">ready</string>
+    <string name="update_available">Update available</string>
+    <string name="update_event_admin_body">Valkyris will safely update the backend and download this release’s signed APK. Your data and cameras remain in the local volume.</string>
+    <string name="update_event_member_body">A new app version is available. Download the signed APK directly from the official release.</string>
+    <string name="update_now">Update</string>
+    <string name="download_apk">Download APK</string>
+    <string name="later">Later</string>
+    <string name="downloading_update">Downloading the signed application update</string>
 </resources>

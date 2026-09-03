@@ -35,14 +35,28 @@ func TestFirstUserCreatesAdministratorAndInvites(t *testing.T) {
 	if created.Code != http.StatusCreated {
 		t.Fatalf("bootstrap returned %d: %s", created.Code, created.Body.String())
 	}
-	var session auth.PairResponse
-	if err = json.NewDecoder(created.Body).Decode(&session); err != nil || !session.Admin || session.Token == "" {
+	var response struct {
+		Success bool              `json:"success"`
+		Message string            `json:"message"`
+		Data    auth.PairResponse `json:"data"`
+	}
+	if err = json.NewDecoder(created.Body).Decode(&response); err != nil || !response.Success || !response.Data.Admin || response.Data.Token == "" {
+		t.Fatalf("unexpected administrator response: %+v err=%v", response, err)
+	}
+	if created.Header().Get(messageHeader) == "" || created.Header().Get(successHeader) != "true" {
+		t.Fatalf("missing outcome headers: %v", created.Header())
+	}
+	session := response.Data
+	if !session.Admin || session.Token == "" {
 		t.Fatalf("unexpected administrator session: %+v err=%v", session, err)
 	}
 
 	duplicate := performJSON(t, handler, http.MethodPost, "/api/v1/admin/bootstrap", "", credentials)
 	if duplicate.Code != http.StatusConflict {
 		t.Fatalf("second bootstrap returned %d", duplicate.Code)
+	}
+	if !bytes.Contains(duplicate.Body.Bytes(), []byte(`"success":false`)) || !bytes.Contains(duplicate.Body.Bytes(), []byte(`"message"`)) {
+		t.Fatalf("error response has no complete message envelope: %s", duplicate.Body.String())
 	}
 	invite := performJSON(t, handler, http.MethodPost, "/api/v1/pairing-sessions", session.Token, nil)
 	if invite.Code != http.StatusCreated || !bytes.Contains(invite.Body.Bytes(), []byte(`"code"`)) {

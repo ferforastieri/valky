@@ -17,6 +17,8 @@ type Hub struct {
 
 func NewHub() *Hub { return &Hub{clients: map[*websocket.Conn]struct{}{}} }
 func (h *Hub) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("X-Valkyris-Message", "Realtime connection established")
+	w.Header().Set("X-Valkyris-Success", "true")
 	conn, err := websocket.Accept(w, r, &websocket.AcceptOptions{OriginPatterns: []string{"*"}})
 	if err != nil {
 		return

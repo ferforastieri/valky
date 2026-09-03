@@ -12,8 +12,10 @@ import (
 	"net/http"
 	"net/http/httputil"
 	"net/url"
+	"os"
 	"path/filepath"
 	"strconv"
+	"sync"
 	"time"
 
 	"github.com/ferforastieri/valkyris/backend/internal/auth"
@@ -23,6 +25,8 @@ import (
 	"github.com/ferforastieri/valkyris/backend/internal/media"
 	"github.com/ferforastieri/valkyris/backend/internal/notify"
 	"github.com/ferforastieri/valkyris/backend/internal/rules"
+	"github.com/ferforastieri/valkyris/backend/internal/updates"
+	"github.com/google/uuid"
 )
 
 //go:embed openapi.yaml
@@ -32,22 +36,35 @@ type DetectionSubmitter interface {
 	Submit(context.Context, rules.Detection) ([]event.Event, error)
 }
 type Server struct {
-	auth      *auth.Manager
-	cameras   *camera.Repository
-	onvif     *camera.ONVIFClient
-	media     *media.Manager
-	rules     *rules.Service
-	events    *event.Service
-	notify    *notify.Service
-	hub       *Hub
-	submitter DetectionSubmitter
-	logger    *slog.Logger
+	auth         *auth.Manager
+	cameras      *camera.Repository
+	onvif        *camera.ONVIFClient
+	media        *media.Manager
+	rules        *rules.Service
+	events       *event.Service
+	notify       *notify.Service
+	hub          *Hub
+	submitter    DetectionSubmitter
+	logger       *slog.Logger
+	operationsMu sync.RWMutex
+	operations   map[string]CameraOperation
+	updates      *updates.Service
+}
+
+type CameraOperation struct {
+	ID        string         `json:"id"`
+	Status    string         `json:"status"`
+	Message   string         `json:"message"`
+	Camera    *camera.Camera `json:"camera,omitempty"`
+	CreatedAt time.Time      `json:"createdAt"`
+	UpdatedAt time.Time      `json:"updatedAt"`
 }
 
 func NewServer(a *auth.Manager, c *camera.Repository, o *camera.ONVIFClient, m *media.Manager, r *rules.Service, e *event.Service, n *notify.Service, h *Hub, logger *slog.Logger) *Server {
-	return &Server{auth: a, cameras: c, onvif: o, media: m, rules: r, events: e, notify: n, hub: h, logger: logger}
+	return &Server{auth: a, cameras: c, onvif: o, media: m, rules: r, events: e, notify: n, hub: h, logger: logger, operations: make(map[string]CameraOperation)}
 }
 func (s *Server) SetSubmitter(sub DetectionSubmitter) { s.submitter = sub }
+func (s *Server) SetUpdates(service *updates.Service) { s.updates = service }
 func (s *Server) Handler() http.Handler {
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /{$}", s.health)
@@ -61,6 +78,7 @@ func (s *Server) Handler() http.Handler {
 	protected.Handle("POST /pairing-sessions", s.auth.RequireAdmin(http.HandlerFunc(s.pairingSession)))
 	protected.HandleFunc("GET /cameras", s.listCameras)
 	protected.HandleFunc("POST /cameras", s.createCamera)
+	protected.HandleFunc("GET /camera-operations/{id}", s.cameraOperation)
 	protected.HandleFunc("DELETE /cameras/{id}", s.deleteCamera)
 	protected.HandleFunc("POST /cameras/{id}/ptz", s.ptz)
 	protected.HandleFunc("GET /cameras/{id}/snapshot", s.snapshot)
@@ -76,15 +94,18 @@ func (s *Server) Handler() http.Handler {
 	protected.HandleFunc("GET /events/{id}/clip", s.eventClip)
 	protected.HandleFunc("POST /devices/push", s.push)
 	protected.HandleFunc("POST /detections", s.submitDetection)
+	protected.HandleFunc("GET /system/update", s.systemUpdate)
+	protected.Handle("POST /system/update", s.auth.RequireAdmin(http.HandlerFunc(s.startSystemUpdate)))
 	protected.Handle("/realtime", s.hub)
 	mux.Handle("/api/v1/", http.StripPrefix("/api/v1", s.auth.Middleware(protected)))
-	return requestLog(s.logger, securityHeaders(mux))
+	return requestLog(s.logger, securityHeaders(outcomeHeaders(mux)))
 }
 func (s *Server) health(w http.ResponseWriter, r *http.Request) {
-	writeJSON(w, 200, map[string]any{"status": "ok", "service": "valkyris", "time": time.Now().UTC()})
+	writeSuccess(w, http.StatusOK, "Valkyris is healthy", map[string]any{"status": "ok", "service": "valkyris", "time": time.Now().UTC()})
 }
 func (s *Server) openapi(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/yaml")
+	setOutcomeHeaders(w, http.StatusOK, "OpenAPI contract loaded")
 	_, _ = w.Write(openAPI)
 }
 func (s *Server) authStatus(w http.ResponseWriter, r *http.Request) {
@@ -93,7 +114,7 @@ func (s *Server) authStatus(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusInternalServerError, err)
 		return
 	}
-	writeJSON(w, http.StatusOK, map[string]bool{"initialized": initialized})
+	writeSuccess(w, http.StatusOK, "Authentication status loaded", map[string]bool{"initialized": initialized})
 }
 func (s *Server) bootstrapAdmin(w http.ResponseWriter, r *http.Request) {
 	initialized, err := s.auth.AdminInitialized(r.Context())
@@ -114,7 +135,7 @@ func (s *Server) bootstrapAdmin(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, err)
 		return
 	}
-	writeJSON(w, http.StatusCreated, out)
+	writeSuccess(w, http.StatusCreated, "Administrator created successfully", out)
 }
 func (s *Server) login(w http.ResponseWriter, r *http.Request) {
 	var in auth.LoginRequest
@@ -126,7 +147,7 @@ func (s *Server) login(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusUnauthorized, err)
 		return
 	}
-	writeJSON(w, http.StatusCreated, out)
+	writeSuccess(w, http.StatusCreated, "Login completed successfully", out)
 }
 func (s *Server) pair(w http.ResponseWriter, r *http.Request) {
 	var in auth.PairRequest
@@ -138,7 +159,7 @@ func (s *Server) pair(w http.ResponseWriter, r *http.Request) {
 		writeError(w, 401, err)
 		return
 	}
-	writeJSON(w, 201, out)
+	writeSuccess(w, http.StatusCreated, "Device paired successfully", out)
 }
 func (s *Server) pairingSession(w http.ResponseWriter, r *http.Request) {
 	session, err := s.auth.CreatePairing(r.Context())
@@ -146,40 +167,88 @@ func (s *Server) pairingSession(w http.ResponseWriter, r *http.Request) {
 		writeError(w, 500, err)
 		return
 	}
-	writeJSON(w, 201, session)
+	writeSuccess(w, http.StatusCreated, "Temporary invitation created successfully", session)
 }
 func (s *Server) listCameras(w http.ResponseWriter, r *http.Request) {
 	out, err := s.cameras.List(r.Context())
-	respond(w, out, err)
+	respondWithMessage(w, out, err, "Cameras loaded successfully")
 }
 func (s *Server) createCamera(w http.ResponseWriter, r *http.Request) {
 	var in camera.CreateInput
 	if !decode(w, r, &in) {
 		return
 	}
-	caps, profile, services, err := s.onvif.Probe(r.Context(), in.Host, defaultPort(in.Port), in.Username, in.Password)
+	now := time.Now().UTC()
+	operation := CameraOperation{
+		ID:        uuid.NewString(),
+		Status:    "pending",
+		Message:   "Camera validation started; ONVIF capabilities are being discovered",
+		CreatedAt: now,
+		UpdatedAt: now,
+	}
+	s.operationsMu.Lock()
+	s.operations[operation.ID] = operation
+	for id, candidate := range s.operations {
+		if now.Sub(candidate.UpdatedAt) > 15*time.Minute {
+			delete(s.operations, id)
+		}
+	}
+	s.operationsMu.Unlock()
+	go s.completeCameraCreation(operation.ID, in)
+	writeSuccess(w, http.StatusAccepted, operation.Message, operation)
+}
+
+func (s *Server) cameraOperation(w http.ResponseWriter, r *http.Request) {
+	s.operationsMu.RLock()
+	operation, ok := s.operations[r.PathValue("id")]
+	s.operationsMu.RUnlock()
+	if !ok {
+		writeError(w, http.StatusNotFound, fmt.Errorf("camera operation not found or expired"))
+		return
+	}
+	writeSuccess(w, http.StatusOK, operation.Message, operation)
+}
+
+func (s *Server) completeCameraCreation(operationID string, in camera.CreateInput) {
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
+	defer cancel()
+	caps, profile, services, err := s.onvif.Probe(ctx, in.Host, defaultPort(in.Port), in.Username, in.Password)
 	if err != nil {
-		writeError(w, 422, err)
+		s.finishCameraOperation(operationID, CameraOperation{Status: "failed", Message: "Camera was not added: " + err.Error()})
 		return
 	}
-	cam, err := s.cameras.Create(r.Context(), in, caps, profile, services)
+	cam, err := s.cameras.Create(ctx, in, caps, profile, services)
 	if err != nil {
-		writeError(w, 400, err)
+		s.finishCameraOperation(operationID, CameraOperation{Status: "failed", Message: "Camera was not added: " + err.Error()})
 		return
 	}
-	if err = s.media.ConfigureCamera(r.Context(), cam.ID, in.RTSPURI); err != nil {
-		_ = s.cameras.Delete(r.Context(), cam.ID)
-		writeError(w, 502, err)
+	if err = s.media.ConfigureCamera(ctx, cam.ID, in.RTSPURI); err != nil {
+		_ = s.cameras.Delete(context.Background(), cam.ID)
+		s.finishCameraOperation(operationID, CameraOperation{Status: "failed", Message: "Camera was not added: " + err.Error()})
 		return
 	}
-	writeJSON(w, 201, cam)
+	s.finishCameraOperation(operationID, CameraOperation{Status: "completed", Message: "Camera added and ONVIF capabilities discovered successfully", Camera: &cam})
+}
+
+func (s *Server) finishCameraOperation(id string, result CameraOperation) {
+	s.operationsMu.Lock()
+	defer s.operationsMu.Unlock()
+	operation, ok := s.operations[id]
+	if !ok {
+		return
+	}
+	operation.Status = result.Status
+	operation.Message = result.Message
+	operation.Camera = result.Camera
+	operation.UpdatedAt = time.Now().UTC()
+	s.operations[id] = operation
 }
 func (s *Server) deleteCamera(w http.ResponseWriter, r *http.Request) {
 	id := r.PathValue("id")
 	err := s.cameras.Delete(r.Context(), id)
 	if err == nil {
 		_ = s.media.RemoveCamera(r.Context(), id)
-		w.WriteHeader(204)
+		writeSuccess(w, http.StatusOK, "Camera removed successfully", nil)
 		return
 	}
 	respond(w, nil, err)
@@ -202,7 +271,7 @@ func (s *Server) ptz(w http.ResponseWriter, r *http.Request) {
 		writeError(w, 502, err)
 		return
 	}
-	w.WriteHeader(204)
+	writeSuccess(w, http.StatusOK, "PTZ command accepted", nil)
 }
 func (s *Server) snapshot(w http.ResponseWriter, r *http.Request) {
 	cam, cred, err := s.cameras.Get(r.Context(), r.PathValue("id"))
@@ -225,6 +294,11 @@ func (s *Server) snapshot(w http.ResponseWriter, r *http.Request) {
 	defer resp.Body.Close()
 	w.Header().Set("Content-Type", resp.Header.Get("Content-Type"))
 	w.Header().Set("Cache-Control", "no-store")
+	message := "Camera snapshot loaded"
+	if resp.StatusCode >= http.StatusBadRequest {
+		message = "Camera snapshot request failed: " + resp.Status
+	}
+	setOutcomeHeaders(w, resp.StatusCode, message)
 	w.WriteHeader(resp.StatusCode)
 	_, _ = io.Copy(w, io.LimitReader(resp.Body, 12<<20))
 }
@@ -243,14 +317,22 @@ func (s *Server) live(w http.ResponseWriter, r *http.Request) {
 		req.Host = target.Host
 		req.Header.Del("Authorization")
 	}
+	proxy.ModifyResponse = func(response *http.Response) error {
+		response.Header.Set(messageHeader, "Authenticated live stream asset loaded")
+		response.Header.Set(successHeader, strconv.FormatBool(response.StatusCode < http.StatusBadRequest))
+		return nil
+	}
+	proxy.ErrorHandler = func(writer http.ResponseWriter, _ *http.Request, err error) {
+		writeError(writer, http.StatusBadGateway, fmt.Errorf("live stream unavailable: %w", err))
+	}
 	proxy.ServeHTTP(w, r)
 }
 func (s *Server) detectors(w http.ResponseWriter, r *http.Request) {
-	writeJSON(w, 200, detector.Catalog)
+	writeSuccess(w, http.StatusOK, "Detector catalog loaded successfully", detector.Catalog)
 }
 func (s *Server) listRules(w http.ResponseWriter, r *http.Request) {
 	out, err := s.rules.List(r.Context(), r.URL.Query().Get("cameraId"))
-	respond(w, out, err)
+	respondWithMessage(w, out, err, "Rules loaded successfully")
 }
 func (s *Server) createRule(w http.ResponseWriter, r *http.Request) {
 	var in rules.Rule
@@ -262,7 +344,7 @@ func (s *Server) createRule(w http.ResponseWriter, r *http.Request) {
 		writeError(w, 400, err)
 		return
 	}
-	writeJSON(w, 201, out)
+	writeSuccess(w, http.StatusCreated, "Rule created successfully", out)
 }
 func (s *Server) deleteRule(w http.ResponseWriter, r *http.Request) {
 	err := s.rules.Delete(r.Context(), r.PathValue("id"))
@@ -270,16 +352,16 @@ func (s *Server) deleteRule(w http.ResponseWriter, r *http.Request) {
 		respond(w, nil, err)
 		return
 	}
-	w.WriteHeader(204)
+	writeSuccess(w, http.StatusOK, "Rule removed successfully", nil)
 }
 func (s *Server) listEvents(w http.ResponseWriter, r *http.Request) {
 	limit, _ := strconv.Atoi(r.URL.Query().Get("limit"))
 	out, err := s.events.List(r.Context(), r.URL.Query().Get("cameraId"), limit)
-	respond(w, out, err)
+	respondWithMessage(w, out, err, "Events loaded successfully")
 }
 func (s *Server) getEvent(w http.ResponseWriter, r *http.Request) {
 	out, err := s.events.Get(r.Context(), r.PathValue("id"))
-	respond(w, out, err)
+	respondWithMessage(w, out, err, "Event loaded successfully")
 }
 func (s *Server) ackEvent(w http.ResponseWriter, r *http.Request) {
 	err := s.events.Acknowledge(r.Context(), r.PathValue("id"), auth.DeviceID(r.Context()))
@@ -288,7 +370,7 @@ func (s *Server) ackEvent(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	s.hub.Broadcast(map[string]any{"type": "event.acknowledged", "eventId": r.PathValue("id")})
-	w.WriteHeader(204)
+	writeSuccess(w, http.StatusOK, "Event acknowledged successfully", nil)
 }
 func (s *Server) eventClip(w http.ResponseWriter, r *http.Request) {
 	e, err := s.events.Get(r.Context(), r.PathValue("id"))
@@ -300,8 +382,13 @@ func (s *Server) eventClip(w http.ResponseWriter, r *http.Request) {
 		writeError(w, 404, fmt.Errorf("clip is not ready"))
 		return
 	}
+	if _, err = os.Stat(filepath.Clean(e.ClipPath)); err != nil {
+		writeError(w, http.StatusNotFound, fmt.Errorf("event clip file is unavailable: %w", err))
+		return
+	}
 	w.Header().Set("Content-Type", "video/mp4")
 	w.Header().Set("Cache-Control", "private, max-age=3600")
+	setOutcomeHeaders(w, http.StatusOK, "Event clip loaded")
 	http.ServeFile(w, r, filepath.Clean(e.ClipPath))
 }
 func (s *Server) eventSnapshot(w http.ResponseWriter, r *http.Request) {
@@ -314,7 +401,12 @@ func (s *Server) eventSnapshot(w http.ResponseWriter, r *http.Request) {
 		writeError(w, 404, fmt.Errorf("event snapshot is not ready"))
 		return
 	}
+	if _, err = os.Stat(filepath.Clean(e.SnapshotPath)); err != nil {
+		writeError(w, http.StatusNotFound, fmt.Errorf("event snapshot file is unavailable: %w", err))
+		return
+	}
 	w.Header().Set("Cache-Control", "private, max-age=86400")
+	setOutcomeHeaders(w, http.StatusOK, "Event snapshot loaded")
 	http.ServeFile(w, r, filepath.Clean(e.SnapshotPath))
 }
 func (s *Server) push(w http.ResponseWriter, r *http.Request) {
@@ -326,7 +418,7 @@ func (s *Server) push(w http.ResponseWriter, r *http.Request) {
 		writeError(w, 400, err)
 		return
 	}
-	w.WriteHeader(204)
+	writeSuccess(w, http.StatusOK, "Push device registered successfully", nil)
 }
 func (s *Server) submitDetection(w http.ResponseWriter, r *http.Request) {
 	if s.submitter == nil {
@@ -343,7 +435,36 @@ func (s *Server) submitDetection(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	out, err := s.submitter.Submit(r.Context(), rules.Detection{CameraID: in.CameraID, Type: in.Type, Confidence: in.Confidence, OccurredAt: time.Now().UTC(), Metadata: in.Metadata})
-	respond(w, out, err)
+	respondWithMessage(w, out, err, "Detection processed successfully")
+}
+
+func (s *Server) systemUpdate(w http.ResponseWriter, r *http.Request) {
+	if s.updates == nil {
+		writeError(w, http.StatusServiceUnavailable, fmt.Errorf("automatic updater is not configured"))
+		return
+	}
+	info, err := s.updates.Check(r.Context(), r.URL.Query().Get("clientVersion"))
+	respondWithMessage(w, info, err, info.Message)
+}
+
+func (s *Server) startSystemUpdate(w http.ResponseWriter, r *http.Request) {
+	if s.updates == nil {
+		writeError(w, http.StatusServiceUnavailable, fmt.Errorf("automatic updater is not configured"))
+		return
+	}
+	var in struct {
+		ClientVersion string `json:"clientVersion"`
+	}
+	if !decode(w, r, &in) {
+		return
+	}
+	info, err := s.updates.Start(r.Context(), in.ClientVersion)
+	if err != nil {
+		writeError(w, http.StatusBadGateway, err)
+		return
+	}
+	s.hub.Broadcast(map[string]any{"type": "system.update.started", "version": info.LatestVersion})
+	writeSuccess(w, http.StatusAccepted, info.Message, info)
 }
 
 func decode(w http.ResponseWriter, r *http.Request, out any) bool {
@@ -357,8 +478,11 @@ func decode(w http.ResponseWriter, r *http.Request, out any) bool {
 	return true
 }
 func respond(w http.ResponseWriter, value any, err error) {
+	respondWithMessage(w, value, err, "Request completed successfully")
+}
+func respondWithMessage(w http.ResponseWriter, value any, err error, message string) {
 	if err == nil {
-		writeJSON(w, 200, value)
+		writeSuccess(w, http.StatusOK, message, value)
 		return
 	}
 	if errors.Is(err, sql.ErrNoRows) {
@@ -368,12 +492,66 @@ func respond(w http.ResponseWriter, value any, err error) {
 	writeError(w, 500, err)
 }
 func writeJSON(w http.ResponseWriter, status int, value any) {
+	writeSuccess(w, status, defaultSuccessMessage(status), value)
+}
+func writeSuccess(w http.ResponseWriter, status int, message string, value any) {
 	w.Header().Set("Content-Type", "application/json")
+	setOutcomeHeaders(w, status, message)
 	w.WriteHeader(status)
-	_ = json.NewEncoder(w).Encode(value)
+	if value == nil {
+		value = map[string]any{}
+	}
+	_ = json.NewEncoder(w).Encode(map[string]any{"success": true, "message": message, "data": value})
 }
 func writeError(w http.ResponseWriter, status int, err error) {
-	writeJSON(w, status, map[string]string{"error": err.Error()})
+	message := err.Error()
+	w.Header().Set("Content-Type", "application/json")
+	setOutcomeHeaders(w, status, message)
+	w.WriteHeader(status)
+	_ = json.NewEncoder(w).Encode(map[string]any{"success": false, "message": message, "error": message})
+}
+
+const messageHeader = "X-Valkyris-Message"
+const successHeader = "X-Valkyris-Success"
+
+func setOutcomeHeaders(w http.ResponseWriter, status int, message string) {
+	w.Header().Set(messageHeader, message)
+	w.Header().Set(successHeader, strconv.FormatBool(status < http.StatusBadRequest))
+}
+
+func defaultSuccessMessage(status int) string {
+	if status == http.StatusCreated {
+		return "Resource created successfully"
+	}
+	return "Request completed successfully"
+}
+
+type outcomeWriter struct {
+	http.ResponseWriter
+}
+
+func (w *outcomeWriter) Unwrap() http.ResponseWriter { return w.ResponseWriter }
+func (w *outcomeWriter) WriteHeader(status int) {
+	if w.Header().Get(messageHeader) == "" {
+		message := http.StatusText(status)
+		if message == "" {
+			message = "Request completed"
+		}
+		setOutcomeHeaders(w, status, message)
+	}
+	w.ResponseWriter.WriteHeader(status)
+}
+func (w *outcomeWriter) Write(body []byte) (int, error) {
+	if w.Header().Get(messageHeader) == "" {
+		w.WriteHeader(http.StatusOK)
+	}
+	return w.ResponseWriter.Write(body)
+}
+
+func outcomeHeaders(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		next.ServeHTTP(&outcomeWriter{ResponseWriter: w}, r)
+	})
 }
 func securityHeaders(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

@@ -2,7 +2,7 @@ openapi: 3.1.0
 info:
   title: Valkyris API
   version: 1.0.0
-  description: Local-first home camera monitoring API.
+  description: Local-first home camera monitoring API. JSON responses use a success/message/data envelope; every response also includes X-Valkyris-Success and X-Valkyris-Message headers.
 servers:
   - url: https://valkyris.local:8443/api/v1
 security:
@@ -13,7 +13,7 @@ paths:
       security: []
       summary: Check whether the first administrator has been created
       responses:
-        '200': {description: Bootstrap status, content: {application/json: {schema: {$ref: '#/components/schemas/AuthStatus'}}}}
+        '200': {description: Bootstrap status, content: {application/json: {schema: {$ref: '#/components/schemas/APIResponse'}}}}
   /admin/bootstrap:
     post:
       security: []
@@ -24,7 +24,7 @@ paths:
           application/json:
             schema: {$ref: '#/components/schemas/LoginRequest'}
       responses:
-        '201': {description: Administrator created, content: {application/json: {schema: {$ref: '#/components/schemas/PairResponse'}}}}
+        '201': {description: Administrator created, content: {application/json: {schema: {$ref: '#/components/schemas/APIResponse'}}}}
         '409': {description: Administrator already configured}
   /login:
     post:
@@ -36,7 +36,7 @@ paths:
           application/json:
             schema: {$ref: '#/components/schemas/LoginRequest'}
       responses:
-        '201': {description: Authenticated, content: {application/json: {schema: {$ref: '#/components/schemas/PairResponse'}}}}
+        '201': {description: Authenticated, content: {application/json: {schema: {$ref: '#/components/schemas/APIResponse'}}}}
         '401': {description: Invalid credentials}
   /pair:
     post:
@@ -48,30 +48,37 @@ paths:
           application/json:
             schema: {$ref: '#/components/schemas/PairRequest'}
       responses:
-        '201': {description: Paired, content: {application/json: {schema: {$ref: '#/components/schemas/PairResponse'}}}}
+        '201': {description: Paired, content: {application/json: {schema: {$ref: '#/components/schemas/APIResponse'}}}}
   /pairing-sessions:
     post:
       summary: Create a short-lived, administrator-only invitation
-      responses: {'201': {description: Created, content: {application/json: {schema: {$ref: '#/components/schemas/PairingSession'}}}}}
+      responses: {'201': {description: Created, content: {application/json: {schema: {$ref: '#/components/schemas/APIResponse'}}}}}
   /cameras:
     get:
       summary: List cameras and discovered capabilities
-      responses: {'200': {description: Cameras, content: {application/json: {schema: {type: array, items: {$ref: '#/components/schemas/Camera'}}}}}}
+      responses: {'200': {description: Cameras in APIResponse.data, content: {application/json: {schema: {$ref: '#/components/schemas/APIResponse'}}}}}
     post:
-      summary: Probe and add an ONVIF camera
+      summary: Start an asynchronous ONVIF probe and camera creation
       requestBody: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/CameraInput'}}}}
-      responses: {'201': {description: Added, content: {application/json: {schema: {$ref: '#/components/schemas/Camera'}}}}}
+      responses: {'202': {description: Validation started, content: {application/json: {schema: {$ref: '#/components/schemas/CameraOperationResponse'}}}}}
+  /camera-operations/{id}:
+    get:
+      summary: Read the result of an asynchronous camera creation
+      parameters: [{$ref: '#/components/parameters/id'}]
+      responses:
+        '200': {description: Current operation state, content: {application/json: {schema: {$ref: '#/components/schemas/CameraOperationResponse'}}}}
+        '404': {description: Operation not found or expired, content: {application/json: {schema: {$ref: '#/components/schemas/APIError'}}}}
   /cameras/{id}:
     delete:
       summary: Remove a camera
       parameters: [{$ref: '#/components/parameters/id'}]
-      responses: {'204': {description: Removed}}
+      responses: {'200': {description: Removed with message envelope, content: {application/json: {schema: {$ref: '#/components/schemas/APIResponse'}}}}}
   /cameras/{id}/ptz:
     post:
       summary: Move or stop a PTZ camera
       parameters: [{$ref: '#/components/parameters/id'}]
       requestBody: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/PTZCommand'}}}}
-      responses: {'204': {description: Command accepted}}
+      responses: {'200': {description: Command accepted with message envelope, content: {application/json: {schema: {$ref: '#/components/schemas/APIResponse'}}}}}
   /cameras/{id}/snapshot:
     get:
       summary: Get a current authenticated snapshot
@@ -85,34 +92,34 @@ paths:
   /detectors:
     get:
       summary: List normalized detector types
-      responses: {'200': {description: Detector catalog}}
+      responses: {'200': {description: Detector catalog in APIResponse.data, content: {application/json: {schema: {$ref: '#/components/schemas/APIResponse'}}}}}
   /rules:
     get:
       summary: List automation rules
-      responses: {'200': {description: Rules, content: {application/json: {schema: {type: array, items: {$ref: '#/components/schemas/Rule'}}}}}}
+      responses: {'200': {description: Rules in APIResponse.data, content: {application/json: {schema: {$ref: '#/components/schemas/APIResponse'}}}}}
     post:
       summary: Create an automation rule
       requestBody: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/Rule'}}}}
-      responses: {'201': {description: Created}}
+      responses: {'201': {description: Created, content: {application/json: {schema: {$ref: '#/components/schemas/APIResponse'}}}}}
   /rules/{id}:
     delete:
       summary: Delete an automation rule
       parameters: [{$ref: '#/components/parameters/id'}]
-      responses: {'204': {description: Deleted}}
+      responses: {'200': {description: Deleted with message envelope, content: {application/json: {schema: {$ref: '#/components/schemas/APIResponse'}}}}}
   /events:
     get:
       summary: List recent events
-      responses: {'200': {description: Events, content: {application/json: {schema: {type: array, items: {$ref: '#/components/schemas/Event'}}}}}}
+      responses: {'200': {description: Events in APIResponse.data, content: {application/json: {schema: {$ref: '#/components/schemas/APIResponse'}}}}}
   /events/{id}:
     get:
       summary: Get event metadata
       parameters: [{$ref: '#/components/parameters/id'}]
-      responses: {'200': {description: Event, content: {application/json: {schema: {$ref: '#/components/schemas/Event'}}}}}
+      responses: {'200': {description: Event in APIResponse.data, content: {application/json: {schema: {$ref: '#/components/schemas/APIResponse'}}}}}
   /events/{id}/acknowledge:
     post:
       summary: Acknowledge and stop an event alarm
       parameters: [{$ref: '#/components/parameters/id'}]
-      responses: {'204': {description: Acknowledged}}
+      responses: {'200': {description: Acknowledged with message envelope, content: {application/json: {schema: {$ref: '#/components/schemas/APIResponse'}}}}}
   /events/{id}/clip:
     get:
       summary: Stream the event MP4 clip
@@ -127,12 +134,32 @@ paths:
     post:
       summary: Register a UnifiedPush endpoint and encryption secret
       requestBody: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/PushDevice'}}}}
-      responses: {'204': {description: Registered}}
+      responses: {'200': {description: Registered with message envelope, content: {application/json: {schema: {$ref: '#/components/schemas/APIResponse'}}}}}
   /detections:
     post:
       summary: Submit a normalized detection from a trusted local integration
       requestBody: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/Detection'}}}}
       responses: {'200': {description: Events created by matching rules}}
+  /system/update:
+    get:
+      summary: Check the latest stable backend and Android release
+      parameters:
+        - {name: clientVersion, in: query, required: false, schema: {type: string}}
+      responses:
+        '200': {description: Update state, content: {application/json: {schema: {$ref: '#/components/schemas/UpdateInfoResponse'}}}}
+    post:
+      summary: Start an administrator-authorized backend update and return the signed APK URL
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [clientVersion]
+              properties: {clientVersion: {type: string}}
+      responses:
+        '202': {description: Update accepted, content: {application/json: {schema: {$ref: '#/components/schemas/UpdateInfoResponse'}}}}
+        '403': {description: Administrator access required, content: {application/json: {schema: {$ref: '#/components/schemas/APIError'}}}}
   /realtime:
     get:
       summary: WebSocket stream for event changes
@@ -143,6 +170,20 @@ components:
   parameters:
     id: {name: id, in: path, required: true, schema: {type: string, format: uuid}}
   schemas:
+    APIResponse:
+      type: object
+      required: [success, message, data]
+      properties:
+        success: {type: boolean, const: true}
+        message: {type: string}
+        data: {}
+    APIError:
+      type: object
+      required: [success, message, error]
+      properties:
+        success: {type: boolean, const: false}
+        message: {type: string}
+        error: {type: string}
     CapabilitySet:
       type: object
       required: [snapshot, events, ptz, zoom, presets, audio]
@@ -174,6 +215,44 @@ components:
         username: {type: string}
         password: {type: string, format: password}
         rtspUri: {type: string, format: uri}
+    CameraOperation:
+      type: object
+      required: [id, status, message, createdAt, updatedAt]
+      properties:
+        id: {type: string, format: uuid}
+        status: {type: string, enum: [pending, completed, failed]}
+        message: {type: string}
+        camera: {$ref: '#/components/schemas/Camera'}
+        createdAt: {type: string, format: date-time}
+        updatedAt: {type: string, format: date-time}
+    CameraOperationResponse:
+      type: object
+      required: [success, message, data]
+      properties:
+        success: {type: boolean, const: true}
+        message: {type: string}
+        data: {$ref: '#/components/schemas/CameraOperation'}
+    UpdateInfo:
+      type: object
+      required: [currentVersion, latestVersion, available, serverUpdateAvailable, apkUpdateAvailable, releaseUrl, message]
+      properties:
+        currentVersion: {type: string}
+        clientVersion: {type: string}
+        latestVersion: {type: string}
+        available: {type: boolean}
+        serverUpdateAvailable: {type: boolean}
+        apkUpdateAvailable: {type: boolean}
+        releaseUrl: {type: string, format: uri}
+        apkUrl: {type: string, format: uri}
+        publishedAt: {type: string, format: date-time}
+        message: {type: string}
+    UpdateInfoResponse:
+      type: object
+      required: [success, message, data]
+      properties:
+        success: {type: boolean, const: true}
+        message: {type: string}
+        data: {$ref: '#/components/schemas/UpdateInfo'}
     PTZCommand:
       type: object
       required: [action]

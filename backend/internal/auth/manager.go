@@ -251,8 +251,10 @@ func (m *Manager) RequireAdmin(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if !IsAdmin(r.Context()) {
 			w.Header().Set("Content-Type", "application/json")
+			w.Header().Set("X-Valkyris-Message", "administrator access required")
+			w.Header().Set("X-Valkyris-Success", "false")
 			w.WriteHeader(http.StatusForbidden)
-			_ = json.NewEncoder(w).Encode(map[string]string{"error": "administrator access required"})
+			_ = json.NewEncoder(w).Encode(map[string]any{"success": false, "message": "administrator access required", "error": "administrator access required"})
 			return
 		}
 		next.ServeHTTP(w, r)
@@ -264,8 +266,10 @@ func IsAdmin(ctx context.Context) bool    { v, _ := ctx.Value(adminKey).(bool); 
 
 func writeUnauthorized(w http.ResponseWriter) {
 	w.Header().Set("Content-Type", "application/json")
+	w.Header().Set("X-Valkyris-Message", "authentication required")
+	w.Header().Set("X-Valkyris-Success", "false")
 	w.WriteHeader(http.StatusUnauthorized)
-	_ = json.NewEncoder(w).Encode(map[string]string{"error": "authentication required"})
+	_ = json.NewEncoder(w).Encode(map[string]any{"success": false, "message": "authentication required", "error": "authentication required"})
 }
 
 func IsNotFound(err error) bool { return err == sql.ErrNoRows }
