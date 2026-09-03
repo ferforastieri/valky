@@ -10,6 +10,7 @@ data/
 dist/
 coverage/
 backend/valkyris
+updater/updater
 backend/models/*.onnx
 backend/models/class_labels_indices.csv
 mobile/.gradle/
