@@ -16,6 +16,14 @@ fail() {
   exit 1
 }
 
+generate_secret() {
+  if command -v openssl >/dev/null 2>&1; then
+    openssl rand -hex 32
+  else
+    od -An -N32 -tx1 /dev/urandom | tr -d ' \n'
+  fi
+}
+
 command -v curl >/dev/null 2>&1 || fail "curl não foi encontrado."
 command -v docker >/dev/null 2>&1 || fail "Docker não foi encontrado. Instale-o antes de continuar."
 docker compose version >/dev/null 2>&1 || fail "Docker Compose v2 não foi encontrado."
@@ -66,6 +74,7 @@ if [ ! -f "$ENV_FILE" ]; then
   {
     printf 'VALKYRIS_VERSION=%s\n' "$RELEASE_VERSION"
     printf 'VALKYRIS_PORT=8443\n'
+    printf 'VALKYRIS_UPDATER_TOKEN=%s\n' "$(generate_secret)"
   } > "$ENV_FILE"
 else
   sed '/^VALKYRIS_PUBLIC_URL=/d; /^VALKYRIS_SETUP_TOKEN=/d' "$ENV_FILE" > "${TEMP_ROOT}/env-clean"
@@ -75,6 +84,11 @@ else
     mv "${TEMP_ROOT}/env" "$ENV_FILE"
   else
     printf '\nVALKYRIS_VERSION=%s\n' "$RELEASE_VERSION" >> "$ENV_FILE"
+  fi
+  if ! grep -Eq '^VALKYRIS_UPDATER_TOKEN=[^[:space:]]+$' "$ENV_FILE"; then
+    sed '/^VALKYRIS_UPDATER_TOKEN=/d' "$ENV_FILE" > "${TEMP_ROOT}/env-token"
+    mv "${TEMP_ROOT}/env-token" "$ENV_FILE"
+    printf 'VALKYRIS_UPDATER_TOKEN=%s\n' "$(generate_secret)" >> "$ENV_FILE"
   fi
 fi
 chmod 600 "$ENV_FILE"

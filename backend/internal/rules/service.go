@@ -64,7 +64,7 @@ func (s *Service) List(ctx context.Context, cameraID string) ([]Rule, error) {
 		return nil, err
 	}
 	defer rows.Close()
-	var out []Rule
+	out := make([]Rule, 0)
 	for rows.Next() {
 		r, e := scanRule(rows)
 		if e != nil {
@@ -92,7 +92,7 @@ func (s *Service) Match(ctx context.Context, d Detection) ([]Rule, error) {
 	if err != nil {
 		return nil, err
 	}
-	var matched []Rule
+	matched := make([]Rule, 0)
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	for _, r := range all {

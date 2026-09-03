@@ -70,7 +70,7 @@ func (s *Service) List(ctx context.Context, cameraID string, limit int) ([]Event
 		return nil, err
 	}
 	defer rows.Close()
-	var out []Event
+	out := make([]Event, 0)
 	for rows.Next() {
 		e, er := scan(rows)
 		if er != nil {

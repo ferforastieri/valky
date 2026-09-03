@@ -30,6 +30,7 @@ import (
 	"github.com/ferforastieri/valkyris/backend/internal/notify"
 	"github.com/ferforastieri/valkyris/backend/internal/rules"
 	"github.com/ferforastieri/valkyris/backend/internal/store"
+	"github.com/ferforastieri/valkyris/backend/internal/updates"
 )
 
 var version = "dev"
@@ -67,6 +68,7 @@ func main() {
 	application := &app.Service{Rules: rulesService, Events: eventService, Cameras: cameraRepo, Media: mediaManager, Notify: notifyService, Hub: hub, DataDir: cfg.DataDir, Logger: logger}
 	apiServer := api.NewServer(authManager, cameraRepo, onvif, mediaManager, rulesService, eventService, notifyService, hub, logger)
 	apiServer.SetSubmitter(application)
+	apiServer.SetUpdates(updates.New(version, cfg.ReleaseAPI, cfg.UpdaterURL, cfg.UpdaterToken))
 	ctx, cancel := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer cancel()
 	go notifyService.Run(ctx)

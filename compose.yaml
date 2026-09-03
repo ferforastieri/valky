@@ -20,6 +20,8 @@ services:
       VALKYRIS_MEDIA_URL: http://mediamtx:8888
       VALKYRIS_MEDIA_API: http://mediamtx:9997
       VALKYRIS_MEDIA_RECORDINGS: /data/recordings
+      VALKYRIS_UPDATER_URL: http://updater:8080
+      VALKYRIS_UPDATER_TOKEN: ${VALKYRIS_UPDATER_TOKEN:-}
     ports:
       - "${VALKYRIS_PORT:-8443}:8443"
     volumes:
@@ -32,6 +34,32 @@ services:
       retries: 10
     security_opt:
       - no-new-privileges:true
+
+  updater:
+    image: ghcr.io/ferforastieri/valkyris-updater:${VALKYRIS_VERSION:-latest}
+    build:
+      context: ./updater
+    restart: unless-stopped
+    init: true
+    read_only: true
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,size=16m
+    environment:
+      VALKYRIS_UPDATER_TOKEN: ${VALKYRIS_UPDATER_TOKEN:-}
+      VALKYRIS_INSTALL_DIR: /workspace
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - ./:/workspace:rw
+    networks: [valkyris]
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:8080/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
 
   mediamtx:
     image: bluenviron/mediamtx:1.15.4-ffmpeg

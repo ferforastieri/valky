@@ -54,7 +54,7 @@ func (r *Repository) List(ctx context.Context) ([]Camera, error) {
 		return nil, err
 	}
 	defer rows.Close()
-	var out []Camera
+	out := make([]Camera, 0)
 	for rows.Next() {
 		c, err := scanCamera(rows)
 		if err != nil {

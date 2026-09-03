@@ -16,6 +16,7 @@ permissions:
 
 env:
   IMAGE: ghcr.io/ferforastieri/valkyris
+  UPDATER_IMAGE: ghcr.io/ferforastieri/valkyris-updater
 
 jobs:
   image:
@@ -47,10 +48,23 @@ jobs:
           platforms: ${{ matrix.platform }}
           push: true
           tags: ${{ env.IMAGE }}:${{ github.ref_name }}-${{ matrix.arch }}
+          build-args: BUILD_VERSION=${{ github.ref_name }}
           provenance: mode=min
           sbom: true
           cache-from: type=gha,scope=release-${{ matrix.arch }}
           cache-to: type=gha,mode=max,scope=release-${{ matrix.arch }}
+      - name: Compilar e publicar atualizador nativo
+        uses: docker/build-push-action@v6
+        with:
+          context: updater
+          file: updater/Dockerfile
+          platforms: ${{ matrix.platform }}
+          push: true
+          tags: ${{ env.UPDATER_IMAGE }}:${{ github.ref_name }}-${{ matrix.arch }}
+          provenance: mode=min
+          sbom: true
+          cache-from: type=gha,scope=release-updater-${{ matrix.arch }}
+          cache-to: type=gha,mode=max,scope=release-updater-${{ matrix.arch }}
 
   manifest:
     name: Manifesto multiarch
@@ -70,7 +84,13 @@ jobs:
             --tag "$IMAGE:latest" \
             "$IMAGE:${GITHUB_REF_NAME}-amd64" \
             "$IMAGE:${GITHUB_REF_NAME}-arm64"
+          docker buildx imagetools create \
+            --tag "$UPDATER_IMAGE:${GITHUB_REF_NAME}" \
+            --tag "$UPDATER_IMAGE:latest" \
+            "$UPDATER_IMAGE:${GITHUB_REF_NAME}-amd64" \
+            "$UPDATER_IMAGE:${GITHUB_REF_NAME}-arm64"
           docker buildx imagetools inspect "$IMAGE:${GITHUB_REF_NAME}"
+          docker buildx imagetools inspect "$UPDATER_IMAGE:${GITHUB_REF_NAME}"
 
   android:
     name: APK assinado

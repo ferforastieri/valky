@@ -18,6 +18,9 @@ type Config struct {
 	MediaAPI        string
 	RecordingsDir   string
 	ModelsDir       string
+	UpdaterURL      string
+	UpdaterToken    string
+	ReleaseAPI      string
 	RetentionAge    time.Duration
 	RetentionBytes  int64
 	PairingLifetime time.Duration
@@ -36,6 +39,9 @@ func Load() Config {
 		MediaAPI:        env("VALKYRIS_MEDIA_API", "http://localhost:9997"),
 		RecordingsDir:   env("VALKYRIS_MEDIA_RECORDINGS", filepath.Join(data, "recordings")),
 		ModelsDir:       env("VALKYRIS_MODELS_DIR", "./models"),
+		UpdaterURL:      env("VALKYRIS_UPDATER_URL", "http://updater:8080"),
+		UpdaterToken:    os.Getenv("VALKYRIS_UPDATER_TOKEN"),
+		ReleaseAPI:      env("VALKYRIS_RELEASE_API", "https://api.github.com/repos/ferforastieri/valkyris/releases/latest"),
 		RetentionAge:    7 * 24 * time.Hour,
 		RetentionBytes:  5 * 1024 * 1024 * 1024,
 		PairingLifetime: 10 * time.Minute,

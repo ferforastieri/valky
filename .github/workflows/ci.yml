@@ -34,6 +34,9 @@ jobs:
         run: go test -race -coverprofile=coverage.out ./...
       - name: Compilação
         run: CGO_ENABLED=1 go build -trimpath ./cmd/valkyris
+      - name: Atualizador
+        working-directory: updater
+        run: go test ./... && go build ./...
 
   web:
     name: Web · Astro
@@ -91,6 +94,8 @@ jobs:
           cache-to: type=gha,mode=max
       - name: Validar Compose
         run: docker compose config --quiet
+      - name: Build do atualizador
+        run: docker build -t valkyris-updater:ci updater
       - name: Smoke test HTTPS
         run: |
           docker run -d --rm --name valkyris-ci -p 127.0.0.1:18443:8443 valkyris:ci
