@@ -23,12 +23,14 @@ import (
 )
 
 func TestCameraCreationContinuesAsynchronously(t *testing.T) {
+	probeCompleted := make(chan struct{})
 	var onvifServer *httptest.Server
 	onvifServer = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		body, _ := io.ReadAll(r.Body)
 		switch {
 		case strings.Contains(string(body), "GetCapabilities"):
 			time.Sleep(350 * time.Millisecond)
+			close(probeCompleted)
 			fmt.Fprintf(w, `<s:Envelope><s:Body><GetCapabilitiesResponse><Capabilities><Media><tt:XAddr>%s/onvif/media</tt:XAddr></Media></Capabilities></GetCapabilitiesResponse></s:Body></s:Envelope>`, onvifServer.URL)
 		case strings.Contains(string(body), "GetProfiles"):
 			fmt.Fprint(w, `<s:Envelope><s:Body><GetProfilesResponse><Profiles token="main"><AudioEncoderConfiguration/></Profiles></GetProfilesResponse></s:Body></s:Envelope>`)
@@ -72,15 +74,16 @@ func TestCameraCreationContinuesAsynchronously(t *testing.T) {
 	)
 	handler := server.Handler()
 	host, port := splitServerAddress(t, onvifServer.URL)
-	startedAt := time.Now()
 	created := performJSON(t, handler, http.MethodPost, "/api/v1/cameras", session.Token, camera.CreateInput{
 		Name: "Entrance", Host: host, Port: port, Username: "camera", Password: "secret", RTSPURI: "rtsp://camera.local/stream",
 	})
 	if created.Code != http.StatusAccepted {
 		t.Fatalf("camera creation returned %d: %s", created.Code, created.Body.String())
 	}
-	if time.Since(startedAt) >= 200*time.Millisecond {
-		t.Fatalf("camera creation blocked on ONVIF probe for %s", time.Since(startedAt))
+	select {
+	case <-probeCompleted:
+		t.Fatal("camera creation blocked until the ONVIF probe completed")
+	default:
 	}
 	var started struct {
 		Success bool            `json:"success"`
