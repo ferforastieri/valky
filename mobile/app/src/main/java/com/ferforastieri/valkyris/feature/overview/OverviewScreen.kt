@@ -94,7 +94,7 @@ fun OverviewScreen(
         val camera = state.cameras.firstOrNull { it.id == id }
         if (camera?.setupStatus == "failed") failedCameraId = id else onCamera(id)
     }, onEvent = onEvent)
-    failedCamera?.let { CameraFailureSheet(it) { failedCameraId = null } }
+    failedCamera?.let { CameraFailureSheet(it, onDismiss = { failedCameraId = null }) }
 }
 
 @Composable

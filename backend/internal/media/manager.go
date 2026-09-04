@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 	"net/url"
 	"os"
@@ -27,28 +28,71 @@ func New(api, hls, recordings string) *Manager {
 }
 
 func (m *Manager) ConfigureCamera(ctx context.Context, id, rtspURI string) error {
-	payload, _ := json.Marshal(map[string]any{"source": rtspURI, "sourceOnDemand": false, "record": true, "recordPath": "/data/recordings/camera-" + id + "/%Y-%m-%d_%H-%M-%S-%f", "recordFormat": "fmp4", "recordPartDuration": "1s", "recordSegmentDuration": "2s", "recordDeleteAfter": "10m"})
+	// MediaMTX requires recordPath to contain %path. For a path named
+	// camera-<id>, this still materializes under /data/recordings/camera-<id>,
+	// which is the directory consumed by MaterializeClipWindow.
+	payload, err := json.Marshal(map[string]any{"source": rtspURI, "sourceOnDemand": false, "record": true, "recordPath": "/data/recordings/%path/%Y-%m-%d_%H-%M-%S-%f", "recordFormat": "fmp4", "recordPartDuration": "1s", "recordSegmentDuration": "2s", "recordDeleteAfter": "10m"})
+	if err != nil {
+		return fmt.Errorf("encode media path configuration: %w", err)
+	}
 	endpoint := m.api + "/v3/config/paths/add/" + url.PathEscape("camera-"+id)
-	req, _ := http.NewRequestWithContext(ctx, http.MethodPost, endpoint, bytes.NewReader(payload))
-	req.Header.Set("Content-Type", "application/json")
-	resp, err := m.http.Do(req)
+	resp, body, err := m.configurePath(ctx, http.MethodPost, endpoint, payload)
 	if err != nil {
 		return fmt.Errorf("configure media path: %w", err)
 	}
-	defer resp.Body.Close()
 	if resp.StatusCode == http.StatusConflict {
-		req, _ = http.NewRequestWithContext(ctx, http.MethodPatch, strings.Replace(endpoint, "/add/", "/patch/", 1), bytes.NewReader(payload))
-		req.Header.Set("Content-Type", "application/json")
-		resp, err = m.http.Do(req)
+		resp, body, err = m.configurePath(ctx, http.MethodPatch, strings.Replace(endpoint, "/add/", "/patch/", 1), payload)
 		if err != nil {
-			return err
+			return fmt.Errorf("update media path: %w", err)
 		}
-		defer resp.Body.Close()
 	}
 	if resp.StatusCode/100 != 2 {
-		return fmt.Errorf("MediaMTX returned %s", resp.Status)
+		return mediaMTXResponseError(resp.Status, body, rtspURI)
 	}
 	return nil
+}
+
+func (m *Manager) configurePath(ctx context.Context, method, endpoint string, payload []byte) (*http.Response, []byte, error) {
+	req, err := http.NewRequestWithContext(ctx, method, endpoint, bytes.NewReader(payload))
+	if err != nil {
+		return nil, nil, err
+	}
+	req.Header.Set("Content-Type", "application/json")
+	resp, err := m.http.Do(req)
+	if err != nil {
+		return nil, nil, err
+	}
+	defer resp.Body.Close()
+	body, err := io.ReadAll(io.LimitReader(resp.Body, 32<<10))
+	if err != nil {
+		return nil, nil, err
+	}
+	return resp, body, nil
+}
+
+func mediaMTXResponseError(status string, body []byte, rtspURI string) error {
+	message := ""
+	var response struct {
+		Error string `json:"error"`
+	}
+	if json.Unmarshal(body, &response) == nil {
+		message = strings.TrimSpace(response.Error)
+	}
+	if message == "" {
+		message = strings.TrimSpace(string(body))
+	}
+	// A MediaMTX validation error can echo the source URL. Never propagate
+	// camera credentials or RTSP addresses to persisted setup errors or logs.
+	if rtspURI != "" && strings.Contains(message, rtspURI) {
+		message = strings.ReplaceAll(message, rtspURI, "[RTSP source hidden]")
+	}
+	if strings.Contains(message, "rtsp://") || strings.Contains(message, "rtsps://") {
+		message = "invalid RTSP source configuration"
+	}
+	if message == "" {
+		return fmt.Errorf("MediaMTX returned %s", status)
+	}
+	return fmt.Errorf("MediaMTX returned %s: %s", status, message)
 }
 
 func (m *Manager) RemoveCamera(ctx context.Context, id string) error {

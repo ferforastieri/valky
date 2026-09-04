@@ -1,6 +1,6 @@
 {
   "name": "@valkyris/web",
-  "version": "1.0.2",
+  "version": "1.0.3",
   "private": true,
   "type": "module",
   "packageManager": "pnpm@10.15.0",
@@ -13,12 +13,12 @@
   },
   "dependencies": {
     "@astrojs/check": "^0.9.4",
+    "@astrojs/sitemap": "^3.7.4",
     "@fontsource-variable/bricolage-grotesque": "^5.2.8",
     "@fontsource-variable/manrope": "^5.2.8",
     "@fontsource/ibm-plex-mono": "^5.2.8",
-    "astro": "^5.13.5",
     "@lucide/astro": "^0.556.0",
+    "astro": "^5.13.5",
     "typescript": "^5.9.2"
-  },
-  "devDependencies": {}
+  }
 }

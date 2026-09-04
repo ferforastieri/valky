@@ -6,22 +6,105 @@ import '../styles/global.css';
 import type { Locale } from '../content/copy';
 interface Props { locale: Locale; title: string; description: string; }
 const { locale, title, description } = Astro.props;
+const canonical = new URL(Astro.url.pathname, Astro.site);
+const socialImage = new URL('/og-image.png', Astro.site);
+const isPortuguese = locale === 'pt-BR';
+const keywords = isPortuguese
+  ? 'monitoramento residencial self-hosted, homelab, câmera ONVIF, câmera RTSP, segurança residencial open source, NVR local, detecção local, Tapo TC40, servidor doméstico, Android'
+  : 'self-hosted home monitoring, homelab, ONVIF camera, RTSP camera, open source home security, local NVR, local detection, Tapo TC40, home server, Android';
+const socialImageAlt = isPortuguese
+  ? 'Valkyris, monitoramento residencial self-hosted para câmeras ONVIF'
+  : 'Valkyris, self-hosted home monitoring for ONVIF cameras';
+const structuredData = {
+  '@context': 'https://schema.org',
+  '@graph': [
+    {
+      '@type': 'WebSite',
+      '@id': 'https://valkyris.vercel.app/#website',
+      url: 'https://valkyris.vercel.app/',
+      name: 'Valkyris',
+      description,
+      inLanguage: ['pt-BR', 'en'],
+      publisher: { '@id': 'https://valkyris.vercel.app/#author' },
+    },
+    {
+      '@type': 'SoftwareApplication',
+      '@id': 'https://valkyris.vercel.app/#application',
+      name: 'Valkyris',
+      url: canonical.href,
+      description,
+      applicationCategory: 'HomeApplication',
+      applicationSubCategory: 'Home security and camera monitoring',
+      operatingSystem: 'Android 8.0 or later; Linux server with Docker',
+      softwareVersion: '1.0.3',
+      isAccessibleForFree: true,
+      license: 'https://opensource.org/license/mit',
+      codeRepository: 'https://github.com/ferforastieri/valkyris',
+      downloadUrl: 'https://github.com/ferforastieri/valkyris/releases/latest',
+      image: socialImage.href,
+      keywords,
+      inLanguage: locale,
+      author: { '@id': 'https://valkyris.vercel.app/#author' },
+      offers: {
+        '@type': 'Offer',
+        price: 0,
+        priceCurrency: isPortuguese ? 'BRL' : 'USD',
+        availability: 'https://schema.org/InStock',
+      },
+    },
+    {
+      '@type': 'Person',
+      '@id': 'https://valkyris.vercel.app/#author',
+      name: 'Fernando Forastieri',
+      url: 'https://github.com/ferforastieri',
+      sameAs: ['https://github.com/ferforastieri'],
+    },
+  ],
+};
 ---
 <!doctype html>
-<html lang={locale} data-theme="auto">
+<html lang={locale} data-theme="auto" prefix="og: https://ogp.me/ns#">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width" />
     <meta name="description" content={description} />
+    <meta name="keywords" content={keywords} />
+    <meta name="author" content="Fernando Forastieri" />
+    <meta name="application-name" content="Valkyris" />
+    <meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1" />
+    <meta name="googlebot" content="index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1" />
+    <meta name="referrer" content="strict-origin-when-cross-origin" />
+    <meta name="color-scheme" content="light dark" />
     <meta name="theme-color" content="#101310" media="(prefers-color-scheme: dark)" />
     <meta name="theme-color" content="#E8E9E5" media="(prefers-color-scheme: light)" />
-    <link rel="canonical" href={new URL(Astro.url.pathname, Astro.site)} />
+    <link rel="canonical" href={canonical} />
     <link rel="alternate" hreflang="pt-BR" href={new URL('/pt-BR', Astro.site)} />
     <link rel="alternate" hreflang="en" href={new URL('/en', Astro.site)} />
+    <link rel="alternate" hreflang="x-default" href={new URL('/', Astro.site)} />
+    <link rel="sitemap" href="/sitemap-index.xml" />
     <link rel="icon" href="/valkyris-mark.svg?v=6" type="image/svg+xml" />
     <link rel="icon" href="/favicon.png?v=6" type="image/png" sizes="64x64" />
     <link rel="apple-touch-icon" href="/apple-touch-icon.png?v=6" sizes="180x180" />
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="Valkyris" />
+    <meta property="og:title" content={title} />
+    <meta property="og:description" content={description} />
+    <meta property="og:url" content={canonical} />
+    <meta property="og:locale" content={isPortuguese ? 'pt_BR' : 'en_US'} />
+    <meta property="og:locale:alternate" content={isPortuguese ? 'en_US' : 'pt_BR'} />
+    <meta property="og:image" content={socialImage} />
+    <meta property="og:image:secure_url" content={socialImage} />
+    <meta property="og:image:type" content="image/png" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:image:alt" content={socialImageAlt} />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content={title} />
+    <meta name="twitter:description" content={description} />
+    <meta name="twitter:image" content={socialImage} />
+    <meta name="twitter:image:alt" content={socialImageAlt} />
     <title>{title}</title>
+    <script type="application/ld+json" set:html={JSON.stringify(structuredData)} is:inline />
     <script is:inline>
       const saved = localStorage.getItem('valkyris-theme');
       if (saved) document.documentElement.dataset.theme = saved;

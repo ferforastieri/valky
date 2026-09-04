@@ -49,3 +49,26 @@ func TestNormalizeIconFallsBackToCamera(t *testing.T) {
 		t.Fatalf("normalizeIcon = %q, want camera", got)
 	}
 }
+
+func TestDeleteRemovesCamera(t *testing.T) {
+	db, err := store.Open(t.TempDir() + "/valkyris.db")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db.Close()
+	vault, err := valkyriscrypto.LoadOrCreate(t.TempDir() + "/master.key")
+	if err != nil {
+		t.Fatal(err)
+	}
+	repository := NewRepository(db, vault)
+	created, err := repository.CreatePending(context.Background(), CreateInput{Name: "Entrada", Host: "192.168.1.20", Username: "camera", Password: "secret"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err = repository.Delete(context.Background(), created.ID); err != nil {
+		t.Fatal(err)
+	}
+	if _, _, err = repository.Get(context.Background(), created.ID); err == nil {
+		t.Fatal("deleted camera is still available")
+	}
+}

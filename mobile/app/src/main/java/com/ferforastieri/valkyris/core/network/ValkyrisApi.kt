@@ -87,14 +87,14 @@ class ValkyrisApi(private val session: () -> Session?) {
             }
         } catch (error: Throwable) {
             if (error is ApiException) {
-                publish(error.message.orEmpty(), false)
+                if (announce) publish(error.message.orEmpty(), false)
                 throw error
             }
             val complete = buildString {
                 append(error::class.simpleName ?: "Network error")
                 error.message?.takeIf { it.isNotBlank() }?.let { append(": ").append(it) }
             }
-            publish(complete, false)
+            if (announce) publish(complete, false)
             throw ApiException(complete, cause = error)
         }
     }
@@ -176,6 +176,13 @@ class ValkyrisApi(private val session: () -> Session?) {
         return requireNotNull(started.camera) { "The server did not return the saved camera" }
     }
 
+    suspend fun deleteCamera(id: String) {
+        val current = requireNotNull(session())
+        executeUnit(current.fingerprint) {
+            it.delete(base() + "/cameras/$id") { bearerAuth(current.token) }
+        }
+    }
+
     suspend fun updateInfo(): UpdateInfo = get("/system/update?clientVersion=${BuildConfig.VERSION_NAME.encodeURLParameter()}", announce = false)
 
     suspend fun startUpdate(): UpdateInfo = post("/system/update", UpdateRequest(BuildConfig.VERSION_NAME))
@@ -233,7 +240,6 @@ class ValkyrisApi(private val session: () -> Session?) {
         return pinnedClient(current.fingerprint).newWebSocket(request, object : WebSocketListener() {
             override fun onMessage(webSocket: WebSocket, text: String) = onMessage()
             override fun onFailure(webSocket: WebSocket, t: Throwable, response: Response?) {
-                publish("${t::class.simpleName}: ${t.message.orEmpty()}", false)
                 onDisconnect()
             }
             override fun onClosed(webSocket: WebSocket, code: Int, reason: String) = onDisconnect()

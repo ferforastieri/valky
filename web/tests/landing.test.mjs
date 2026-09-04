@@ -57,11 +57,30 @@ test('sincroniza os prints com o tema escolhido', () => {
   assert.match(landingSource, /systemTheme\.addEventListener\('change'/);
 });
 
+test('publica metadados sociais e SEO internacional', async () => {
+  assert.match(pt, /<meta name="robots" content="index, follow, max-image-preview:large/);
+  assert.match(pt, /<meta property="og:image" content="https:\/\/valkyris\.vercel\.app\/og-image\.png"/);
+  assert.match(pt, /<meta name="twitter:card" content="summary_large_image"/);
+  assert.match(pt, /<link rel="alternate" hreflang="x-default"/);
+  assert.match(pt, /application\/ld\+json/);
+  assert.match(pt, /SoftwareApplication/);
+  assert.match(pt, /monitoramento residencial self-hosted/);
+  assert.match(en, /self-hosted home monitoring/);
+  assert.match(root, /name="robots" content="noindex, follow"/);
+  const robots = await readFile(new URL('../dist/robots.txt', import.meta.url), 'utf8');
+  const sitemap = await readFile(new URL('../dist/sitemap-0.xml', import.meta.url), 'utf8');
+  assert.match(robots, /Sitemap: https:\/\/valkyris\.vercel\.app\/sitemap-index\.xml/);
+  assert.match(sitemap, /https:\/\/valkyris\.vercel\.app\/pt-BR/);
+  assert.match(sitemap, /https:\/\/valkyris\.vercel\.app\/en/);
+  assert.doesNotMatch(sitemap, /<loc>https:\/\/valkyris\.vercel\.app\/<\/loc>/);
+});
+
 test('carrossel avança automaticamente sem controle visual redundante', () => {
   assert.doesNotMatch(pt, /class="carousel-auto"/);
   assert.doesNotMatch(pt, /aria-label="Pausar carrossel"/);
   assert.match(landingSource, /setTimeout\(\(\)=>\{show\(slide\+1\);schedule\(\)\},4800\)/);
   assert.match(landingSource, /prefers-reduced-motion: reduce/);
+  assert.match(landingSource, /selected===slide\?slide\+1:selected/);
 });
 
 test('artefatos públicos acompanham a documentação', async () => {
@@ -70,8 +89,9 @@ test('artefatos públicos acompanham a documentação', async () => {
   const compose = await readFile(new URL('../../compose.yaml', import.meta.url), 'utf8');
   const favicon = await readFile(new URL('../dist/favicon.png', import.meta.url));
   assert.match(installer, /^#!\/bin\/sh/);
-  assert.match(installer, /directory-backup/);
-  assert.match(installer, /--force-recreate mediamtx/);
+  assert.doesNotMatch(installer, /directory-backup/);
+  assert.doesNotMatch(installer, /--force-recreate mediamtx/);
+  assert.match(installer, /corrija-o manualmente/);
   assert.match(compose, /create_host_path: false/);
   assert.match(openapi, /^openapi: 3\.1\.0/);
   assert.ok(favicon.length > 1_000);

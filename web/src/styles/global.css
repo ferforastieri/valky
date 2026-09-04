@@ -1688,6 +1688,21 @@ body {
   transform: translateX(-50%) scale(0.75);
   transition: transform 0.5s cubic-bezier(0.2, 0.8, 0.2, 1), opacity 0.35s ease, filter 0.35s ease;
 }
+
+@media (min-width: 981px) {
+  .app-carousel {
+    width: min(640px, 100%);
+    justify-self: end;
+    transform: translateX(clamp(18px, 3vw, 44px));
+  }
+}
+
+@media (max-width: 980px) {
+  .app-carousel {
+    justify-self: center;
+    transform: none;
+  }
+}
 .carousel-track .carousel-slide.is-active {
   z-index: 4;
   opacity: 1;
@@ -1939,9 +1954,9 @@ body {
 .carousel-track .carousel-slide {
   will-change: transform, opacity, filter;
   transition:
-    transform 0.72s cubic-bezier(0.22, 0.78, 0.18, 1),
-    opacity 0.48s ease,
-    filter 0.48s ease;
+    transform 0.92s cubic-bezier(0.22, 0.61, 0.36, 1),
+    opacity 0.72s ease,
+    filter 0.72s ease;
 }
 .carousel-track .carousel-slide.is-active {
   filter: saturate(1) brightness(1);
@@ -1959,18 +1974,4 @@ body {
   opacity: 0;
   filter: blur(3px) saturate(0.45);
   transform: translateX(-50%) translateY(72px) translateZ(-180px) scale(0.7);
-}
-.app-carousel[data-direction="next"] .carousel-slide.is-active {
-  animation: carousel-arrive-next 0.72s cubic-bezier(0.22, 0.78, 0.18, 1);
-}
-.app-carousel[data-direction="previous"] .carousel-slide.is-active {
-  animation: carousel-arrive-previous 0.72s cubic-bezier(0.22, 0.78, 0.18, 1);
-}
-@keyframes carousel-arrive-next {
-  from { transform: translateX(-40%) translateY(34px) rotate(7deg) scale(0.88); }
-  to { transform: translateX(-50%) translateY(0) rotate(-1deg) scale(1); }
-}
-@keyframes carousel-arrive-previous {
-  from { transform: translateX(-60%) translateY(34px) rotate(-7deg) scale(0.88); }
-  to { transform: translateX(-50%) translateY(0) rotate(-1deg) scale(1); }
 }

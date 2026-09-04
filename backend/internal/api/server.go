@@ -337,7 +337,15 @@ func (s *Server) deleteCamera(w http.ResponseWriter, r *http.Request) {
 	id := r.PathValue("id")
 	err := s.cameras.Delete(r.Context(), id)
 	if err == nil {
-		_ = s.media.RemoveCamera(r.Context(), id)
+		if mediaErr := s.media.RemoveCamera(r.Context(), id); mediaErr != nil {
+			s.logger.Warn("remove camera from media service", "camera", id, "error", mediaErr)
+		}
+		s.operationsMu.Lock()
+		delete(s.operations, id)
+		s.operationsMu.Unlock()
+		if s.hub != nil {
+			s.hub.Broadcast(map[string]any{"type": "camera.deleted", "cameraId": id})
+		}
 		writeSuccess(w, http.StatusOK, "Camera removed successfully", nil)
 		return
 	}

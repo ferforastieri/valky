@@ -2,12 +2,12 @@ export type Locale = 'pt-BR' | 'en';
 
 export const copy = {
   'pt-BR': {
-    metaTitle: 'Valkyris — sua casa avisa, seus dados ficam',
-    metaDescription: 'Monitoramento local-first para câmeras ONVIF, com detecção local, clipes e alertas Android.',
+    metaTitle: 'Valkyris | Monitoramento self-hosted para câmeras ONVIF',
+    metaDescription: 'Monitore câmeras ONVIF e RTSP no seu homelab com detecção local, clipes privados e alertas Android. Open source, self-hosted e sem nuvem central.',
     nav: ['Visão geral', 'Aplicativo', 'Instalação', 'Perguntas'],
     heroEyebrow: 'Monitoramento residencial privado',
     heroTitle: 'Sua casa avisa. Seus dados ficam.',
-    heroBody: 'Conecte câmeras ONVIF, reconheça sons e movimentos dentro de casa e receba o momento certo no Android — sem enviar sua rotina para uma nuvem central.',
+    heroBody: 'Transforme seu homelab em um monitor residencial self-hosted: conecte câmeras ONVIF, reconheça sons e movimentos e receba alertas no Android sem enviar sua rotina para uma nuvem central.',
     install: 'Instalar com Docker',
     github: 'Ver no GitHub',
     live: 'AO VIVO',
@@ -40,12 +40,12 @@ export const copy = {
     disclaimer: 'Valkyris não é afiliado à TP-Link ou Tapo.'
   },
   en: {
-    metaTitle: 'Valkyris — your home speaks, your data stays',
-    metaDescription: 'Local-first ONVIF camera monitoring with on-premise detection, event clips and Android alerts.',
+    metaTitle: 'Valkyris | Self-hosted ONVIF home camera monitoring',
+    metaDescription: 'Monitor ONVIF and RTSP cameras from your homelab with local detection, private event clips and Android alerts. Open source and self-hosted.',
     nav: ['Overview', 'Application', 'Install', 'Questions'],
     heroEyebrow: 'Private home monitoring',
     heroTitle: 'Your home speaks. Your data stays.',
-    heroBody: 'Connect ONVIF cameras, recognize sounds and movement at home, and receive the right moment on Android — without sending your routine to a central cloud.',
+    heroBody: 'Turn your homelab into a self-hosted home monitor: connect ONVIF cameras, recognize sounds and movement, and receive Android alerts without sending your routine to a central cloud.',
     install: 'Install with Docker', github: 'View on GitHub', live: 'LIVE', camera: 'Front entrance', status: 'Protection active', alert: 'Baby cry detected', alertMeta: 'Now · 91% confidence',
     principlesTitle: 'Your privacy matters.', principlesBody: 'Video, audio, rules and clips remain on your installation. Your phone reaches home over LAN or VPN without sending your routine to a central server.',
     detectBody: 'Combine minimum confidence, confirmations, schedules and cooldowns to reduce false positives.',

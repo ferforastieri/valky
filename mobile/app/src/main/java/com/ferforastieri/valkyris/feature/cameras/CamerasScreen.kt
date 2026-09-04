@@ -48,10 +48,13 @@ import com.composables.icons.lucide.ChevronDown
 import com.composables.icons.lucide.ChevronLeft
 import com.composables.icons.lucide.ChevronRight
 import com.composables.icons.lucide.ChevronUp
+import com.composables.icons.lucide.Check
+import com.composables.icons.lucide.EllipsisVertical
 import com.composables.icons.lucide.Lucide
 import com.composables.icons.lucide.Mic
 import com.composables.icons.lucide.Move
 import com.composables.icons.lucide.Plus
+import com.composables.icons.lucide.Trash2
 import com.composables.icons.lucide.Video
 import com.composables.icons.lucide.VideoOff
 
@@ -59,17 +62,20 @@ import com.composables.icons.lucide.VideoOff
     val state by vm.state.collectAsStateWithLifecycle()
     var showAdd by remember{mutableStateOf(false)}
     var failedCameraId by remember{mutableStateOf<String?>(null)}
+    var managedCameraId by remember{mutableStateOf<String?>(null)}
     val failedCamera=state.cameras.firstOrNull{it.id==failedCameraId}
+    val managedCamera=state.cameras.firstOrNull{it.id==managedCameraId}
     CamerasContent(state, onCamera={id->
         val camera=state.cameras.firstOrNull{it.id==id}
         if(camera?.setupStatus=="failed")failedCameraId=id else onCamera(id)
-    }, onAdd = { if (!state.creating) showAdd = true })
+    }, onManage={managedCameraId=it}, onAdd = { if (!state.creating) showAdd = true })
     if(showAdd)AddCameraDialog(onDismiss={showAdd=false},onSave={vm.add(it);showAdd=false})
-    failedCamera?.let{CameraFailureSheet(it){failedCameraId=null}}
+    failedCamera?.let{camera->CameraFailureSheet(camera,onDismiss={failedCameraId=null},onDelete={vm.delete(camera.id);failedCameraId=null})}
+    managedCamera?.let{camera->CameraOptionsSheet(camera,camera.id in state.deleting,onDismiss={managedCameraId=null},onDelete={vm.delete(camera.id);managedCameraId=null})}
 }
 
 @Composable
-fun CamerasContent(state: CamerasState, onCamera: (String) -> Unit = {}, onAdd: () -> Unit = {}) {
+fun CamerasContent(state: CamerasState, onCamera: (String) -> Unit = {}, onManage: (String) -> Unit = {}, onAdd: () -> Unit = {}) {
     Box(Modifier.fillMaxSize()){
         Column(Modifier.fillMaxSize().padding(horizontal=18.dp)){
             Spacer(Modifier.height(10.dp))
@@ -79,7 +85,7 @@ fun CamerasContent(state: CamerasState, onCamera: (String) -> Unit = {}, onAdd: 
             when{
                 state.loading->Box(Modifier.fillMaxSize()){CircularProgressIndicator(Modifier.align(Alignment.Center))}
                 state.cameras.isEmpty()->EmptyCameras()
-                else->LazyColumn(verticalArrangement=Arrangement.spacedBy(12.dp),contentPadding=PaddingValues(bottom=96.dp)){items(state.cameras,key={it.id}){camera->CameraCard(camera,state.snapshots[camera.id]){onCamera(camera.id)}}}
+                else->LazyColumn(verticalArrangement=Arrangement.spacedBy(12.dp),contentPadding=PaddingValues(bottom=96.dp)){items(state.cameras,key={it.id}){camera->CameraCard(camera,state.snapshots[camera.id],onClick={onCamera(camera.id)},onManage={onManage(camera.id)})}}
             }
         }
         FloatingActionButton(
@@ -95,11 +101,14 @@ fun CamerasContent(state: CamerasState, onCamera: (String) -> Unit = {}, onAdd: 
 }
 
 @Composable
-fun CameraFailureSheet(camera:Camera,onDismiss:()->Unit){
+fun CameraFailureSheet(camera:Camera,onDismiss:()->Unit,onDelete:(()->Unit)?=null){
     com.ferforastieri.valkyris.core.design.ValkyrisBottomSheet(
         title=stringResource(R.string.camera_error_title),
         onDismiss=onDismiss,
-        actions={Button(onClick=onDismiss){Text(stringResource(R.string.close))}},
+        actions={
+            onDelete?.let{TextButton(onClick=it,colors=ButtonDefaults.textButtonColors(contentColor=MaterialTheme.colorScheme.error)){Icon(Lucide.Trash2,null);Spacer(Modifier.width(6.dp));Text(stringResource(R.string.remove_camera))}}
+            Button(onClick=onDismiss){Text(stringResource(R.string.close))}
+        },
     ){
         Column(Modifier.fillMaxWidth(),horizontalAlignment=Alignment.CenterHorizontally,verticalArrangement=Arrangement.spacedBy(12.dp)){
             Surface(shape=MaterialTheme.shapes.large,color=MaterialTheme.colorScheme.errorContainer){
@@ -111,6 +120,39 @@ fun CameraFailureSheet(camera:Camera,onDismiss:()->Unit){
                 Text(camera.setupError.ifBlank{stringResource(R.string.camera_setup_failed)},Modifier.padding(16.dp),color=MaterialTheme.colorScheme.onErrorContainer,style=MaterialTheme.typography.bodySmall)
             }
         }
+    }
+}
+
+@Composable
+private fun CameraOptionsSheet(camera:Camera,deleting:Boolean,onDismiss:()->Unit,onDelete:()->Unit){
+    com.ferforastieri.valkyris.core.design.ValkyrisBottomSheet(
+        title=stringResource(R.string.camera_options),
+        onDismiss=onDismiss,
+        dismissEnabled=!deleting,
+        actions={
+            Button(
+                onClick=onDelete,
+                enabled=!deleting,
+                colors=ButtonDefaults.buttonColors(containerColor=MaterialTheme.colorScheme.error,contentColor=MaterialTheme.colorScheme.onError),
+            ){
+                if(deleting)CircularProgressIndicator(Modifier.size(18.dp),strokeWidth=2.dp,color=MaterialTheme.colorScheme.onError)
+                else Icon(Lucide.Trash2,null)
+                Spacer(Modifier.width(7.dp))
+                Text(if(deleting)stringResource(R.string.removing_camera) else stringResource(R.string.remove_camera))
+            }
+        },
+    ){
+        Row(Modifier.fillMaxWidth(),verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(14.dp)){
+            Surface(shape=MaterialTheme.shapes.large,color=MaterialTheme.colorScheme.secondaryContainer){
+                Icon(cameraIcon(camera.icon),null,Modifier.padding(14.dp).size(30.dp),tint=MaterialTheme.colorScheme.onSecondaryContainer)
+            }
+            Column(Modifier.weight(1f)){
+                Text(camera.name,style=MaterialTheme.typography.titleMedium,fontWeight=FontWeight.SemiBold)
+                Text(camera.host,style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+        }
+        Spacer(Modifier.height(18.dp))
+        Text(stringResource(R.string.remove_camera_body),style=MaterialTheme.typography.bodyMedium,color=MaterialTheme.colorScheme.onSurfaceVariant)
     }
 }
 
@@ -128,10 +170,10 @@ fun CameraFailureSheet(camera:Camera,onDismiss:()->Unit){
             OutlinedTextField(name,{name=it},Modifier.fillMaxWidth(),label={Text(stringResource(R.string.camera_name))})
             Text(stringResource(R.string.camera_icon),style=MaterialTheme.typography.labelLarge)
             Column(verticalArrangement=Arrangement.spacedBy(8.dp)){
-                cameraIconOptions.chunked(3).forEach { row ->
+                cameraIconOptions.chunked(2).forEach { row ->
                     Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.spacedBy(8.dp)){
                         row.forEach { option -> CameraIconChoice(option,icon==option.value,{icon=option.value},Modifier.weight(1f)) }
-                        repeat(3-row.size){Spacer(Modifier.weight(1f))}
+                        repeat(2-row.size){Spacer(Modifier.weight(1f))}
                     }
                 }
             }
@@ -144,7 +186,7 @@ fun CameraFailureSheet(camera:Camera,onDismiss:()->Unit){
     }
 }
 @Composable
-private fun CameraCard(camera: Camera, snapshot: android.graphics.Bitmap?, onClick: () -> Unit) {
+private fun CameraCard(camera: Camera, snapshot: android.graphics.Bitmap?, onClick: () -> Unit, onManage: () -> Unit) {
     val ready = camera.setupStatus == "ready"
     val failed = camera.setupStatus == "failed"
     Card(onClick = onClick, modifier = Modifier.fillMaxWidth(), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface), border = androidx.compose.foundation.BorderStroke(1.dp, if (failed) MaterialTheme.colorScheme.error.copy(alpha = .45f) else MaterialTheme.colorScheme.outlineVariant), elevation = CardDefaults.cardElevation(defaultElevation = 6.dp)) {
@@ -172,6 +214,7 @@ private fun CameraCard(camera: Camera, snapshot: android.graphics.Bitmap?, onCli
                 }
                 if (camera.capabilities.audio) Icon(Lucide.Mic, null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
                 if (camera.capabilities.ptz) { Spacer(Modifier.width(8.dp)); Icon(Lucide.Move, null, tint = MaterialTheme.colorScheme.onSurfaceVariant) }
+                IconButton(onClick=onManage){Icon(Lucide.EllipsisVertical,stringResource(R.string.camera_options),tint=MaterialTheme.colorScheme.onSurfaceVariant)}
             }
         }
     }
@@ -183,14 +226,19 @@ private data class CameraIconOption(val value:String,val label:Int,val image:Ima
 private fun CameraIconChoice(option:CameraIconOption,selected:Boolean,onClick:()->Unit,modifier:Modifier=Modifier){
     Surface(
         onClick=onClick,
-        modifier=modifier.height(72.dp),
+        modifier=modifier.height(92.dp),
         shape=MaterialTheme.shapes.medium,
         color=if(selected)MaterialTheme.colorScheme.secondaryContainer else MaterialTheme.colorScheme.surfaceVariant,
         border=androidx.compose.foundation.BorderStroke(1.dp,if(selected)MaterialTheme.colorScheme.secondary else MaterialTheme.colorScheme.outlineVariant),
     ){
-        Column(Modifier.padding(horizontal=4.dp,vertical=9.dp),horizontalAlignment=Alignment.CenterHorizontally,verticalArrangement=Arrangement.spacedBy(5.dp)){
-            Icon(option.image,null,Modifier.size(23.dp),tint=if(selected)MaterialTheme.colorScheme.onSecondaryContainer else MaterialTheme.colorScheme.onSurfaceVariant)
-            Text(stringResource(option.label),style=MaterialTheme.typography.labelSmall,maxLines=1)
+        Box(Modifier.fillMaxSize().padding(horizontal=10.dp,vertical=9.dp)){
+            Column(Modifier.align(Alignment.Center),horizontalAlignment=Alignment.CenterHorizontally,verticalArrangement=Arrangement.spacedBy(6.dp)){
+                Surface(shape=CircleShape,color=if(selected)MaterialTheme.colorScheme.secondary else MaterialTheme.colorScheme.surface){
+                    Icon(option.image,null,Modifier.padding(9.dp).size(24.dp),tint=if(selected)MaterialTheme.colorScheme.onSecondary else MaterialTheme.colorScheme.onSurface)
+                }
+                Text(stringResource(option.label),style=MaterialTheme.typography.labelMedium,maxLines=1)
+            }
+            if(selected)Icon(Lucide.Check,null,Modifier.align(Alignment.TopEnd).size(16.dp),tint=MaterialTheme.colorScheme.secondary)
         }
     }
 }

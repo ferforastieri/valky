@@ -52,6 +52,7 @@
     <string name="portuguese_brazil">Portuguese (Brazil)</string>
     <string name="english">English</string>
     <string name="theme">Theme</string>
+    <string name="choose_theme">Choose theme</string>
     <string name="system_default">System default</string>
     <string name="add_rule">Create rule</string>
     <string name="confidence">Minimum confidence</string>
@@ -81,6 +82,10 @@
     <string name="camera_icon_garage">Garage</string>
     <string name="camera_icon_kitchen">Kitchen</string>
     <string name="camera_icon_bathroom">Bathroom</string>
+    <string name="camera_options">Camera options</string>
+    <string name="remove_camera">Remove camera</string>
+    <string name="removing_camera">Removing…</string>
+    <string name="remove_camera_body">The camera, its rules and event history will be removed from this home. This does not change the physical camera settings.</string>
     <string name="camera_ip">IP or hostname</string>
     <string name="onvif_port">ONVIF port</string>
     <string name="camera_user">Camera account</string>

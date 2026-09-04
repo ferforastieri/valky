@@ -23,6 +23,7 @@ import javax.inject.Inject
 data class CamerasState(
     val loading: Boolean = true,
     val creating: Boolean = false,
+    val deleting: Set<String> = emptySet(),
     val cameras: List<Camera> = emptyList(),
     val snapshots: Map<String, Bitmap> = emptyMap(),
     val error: String? = null,
@@ -113,6 +114,27 @@ class CamerasViewModel @Inject constructor(private val api: ValkyrisApi) : ViewM
                     )
                 }
                 .onFailure { _state.value = _state.value.copy(creating = false, error = it.message) }
+        }
+    }
+
+    fun delete(id: String) {
+        if (id in _state.value.deleting) return
+        viewModelScope.launch {
+            _state.value = _state.value.copy(deleting = _state.value.deleting + id, error = null)
+            runCatching { api.deleteCamera(id) }
+                .onSuccess {
+                    _state.value = _state.value.copy(
+                        deleting = _state.value.deleting - id,
+                        cameras = _state.value.cameras.filterNot { it.id == id },
+                        snapshots = _state.value.snapshots - id,
+                    )
+                }
+                .onFailure {
+                    _state.value = _state.value.copy(
+                        deleting = _state.value.deleting - id,
+                        error = it.message,
+                    )
+                }
         }
     }
 

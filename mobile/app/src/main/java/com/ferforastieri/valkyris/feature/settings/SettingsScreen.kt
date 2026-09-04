@@ -51,6 +51,8 @@ import com.composables.icons.lucide.Languages
 import com.composables.icons.lucide.Lucide
 import com.composables.icons.lucide.Moon
 import com.composables.icons.lucide.ShieldCheck
+import com.composables.icons.lucide.Smartphone
+import com.composables.icons.lucide.Sun
 import com.composables.icons.lucide.UserPlus
 
 @Composable
@@ -67,6 +69,7 @@ fun SettingsScreen(main: MainViewModel, viewModel: SettingsViewModel = hiltViewM
     var showInvitation by remember { mutableStateOf(false) }
     var showPermissions by remember { mutableStateOf(false) }
     var showLanguage by remember { mutableStateOf(false) }
+    var showTheme by remember { mutableStateOf(false) }
     var showRetention by remember { mutableStateOf(false) }
     val notificationRequest = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) {
         permissionRefresh++
@@ -98,7 +101,7 @@ fun SettingsScreen(main: MainViewModel, viewModel: SettingsViewModel = hiltViewM
         onInvite = { showInvitation = true },
         onPermissions = { showPermissions = true },
         onLanguage = { showLanguage = true },
-        onTheme = { main.setTheme(when (theme) { "system" -> "light"; "light" -> "dark"; else -> "system" }) },
+        onTheme = { showTheme = true },
         onRetention = { showRetention = true },
         onSignOut = main::signOut,
     )
@@ -157,6 +160,16 @@ fun SettingsScreen(main: MainViewModel, viewModel: SettingsViewModel = hiltViewM
             },
             onDnd = { context.startActivity(Intent(Settings.ACTION_NOTIFICATION_POLICY_ACCESS_SETTINGS)) },
             onDismiss = { showPermissions = false },
+        )
+    }
+    if (showTheme) {
+        ThemeSheet(
+            current = theme,
+            onSelect = { selected ->
+                main.setTheme(selected)
+                showTheme = false
+            },
+            onDismiss = { showTheme = false },
         )
     }
     if (showRetention) {
@@ -427,6 +440,40 @@ fun LanguageSheet(current: String, onSelect: (String) -> Unit, onDismiss: () -> 
             LanguageOption("system", stringResource(R.string.system_default), current, onSelect)
             LanguageOption("pt-BR", stringResource(R.string.portuguese_brazil), current, onSelect)
             LanguageOption("en", stringResource(R.string.english), current, onSelect)
+        }
+    }
+}
+
+@Composable
+fun ThemeSheet(current: String, onSelect: (String) -> Unit, onDismiss: () -> Unit) {
+    ValkyrisBottomSheet(
+        title = stringResource(R.string.choose_theme),
+        onDismiss = onDismiss,
+    ) {
+        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            ThemeOption("system", stringResource(R.string.system_default), Lucide.Smartphone, current, onSelect)
+            ThemeOption("light", stringResource(R.string.light_theme), Lucide.Sun, current, onSelect)
+            ThemeOption("dark", stringResource(R.string.dark_theme), Lucide.Moon, current, onSelect)
+        }
+    }
+}
+
+@Composable
+private fun ThemeOption(value: String, label: String, icon: androidx.compose.ui.graphics.vector.ImageVector, current: String, onSelect: (String) -> Unit) {
+    Surface(
+        onClick = { onSelect(value) },
+        modifier = Modifier.fillMaxWidth(),
+        shape = MaterialTheme.shapes.medium,
+        color = if (current == value) MaterialTheme.colorScheme.secondary.copy(alpha = .16f)
+        else MaterialTheme.colorScheme.surfaceContainerLow,
+    ) {
+        Row(Modifier.padding(horizontal = 14.dp, vertical = 10.dp), verticalAlignment = Alignment.CenterVertically) {
+            Surface(shape = MaterialTheme.shapes.small, color = ColorTokens.BrandTile) {
+                Icon(icon, null, Modifier.padding(8.dp).size(20.dp), tint = MaterialTheme.colorScheme.secondary)
+            }
+            Spacer(Modifier.width(10.dp))
+            Text(label, Modifier.weight(1f), fontWeight = if (current == value) FontWeight.SemiBold else FontWeight.Normal)
+            RadioButton(selected = current == value, onClick = { onSelect(value) })
         }
     }
 }

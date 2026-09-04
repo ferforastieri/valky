@@ -1,0 +1,42 @@
+<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="1200" height="630" viewBox="0 0 1200 630" role="img" aria-labelledby="title description">
+  <title id="title">Valkyris</title>
+  <desc id="description">Self-hosted home monitoring for ONVIF cameras</desc>
+  <defs>
+    <linearGradient id="canvas" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#101310"/>
+      <stop offset="1" stop-color="#1a1f1a"/>
+    </linearGradient>
+    <filter id="shadow" x="-30%" y="-30%" width="160%" height="180%">
+      <feDropShadow dx="0" dy="18" stdDeviation="18" flood-color="#000" flood-opacity=".42"/>
+    </filter>
+    <clipPath id="screen-a"><rect x="760" y="82" width="228" height="494" rx="30"/></clipPath>
+    <clipPath id="screen-b"><rect x="947" y="126" width="206" height="446" rx="28"/></clipPath>
+  </defs>
+  <rect width="1200" height="630" fill="url(#canvas)"/>
+  <circle cx="1000" cy="62" r="310" fill="#7bd66f" opacity=".08"/>
+  <path d="M0 505 C150 505 168 442 260 442 S380 532 478 532 S591 392 684 392 S790 462 905 462 S1052 362 1200 362" fill="none" stroke="#7bd66f" stroke-width="3" opacity=".45"/>
+  <g transform="translate(72 60)">
+    <rect width="64" height="64" rx="19" fill="#7bd66f"/>
+    <image x="10" y="10" width="44" height="44" xlink:href="valkyris-mark.svg"/>
+    <text x="82" y="43" fill="#f1f4ef" font-family="Manrope, Arial, sans-serif" font-size="31" font-weight="700">Valkyris</text>
+  </g>
+  <text x="72" y="230" fill="#f1f4ef" font-family="Arial, sans-serif" font-size="62" font-weight="700" letter-spacing="-2">
+    <tspan x="72" dy="0">Sua casa avisa.</tspan>
+    <tspan x="72" dy="72">Seus dados ficam.</tspan>
+  </text>
+  <text x="74" y="400" fill="#a6afa5" font-family="Arial, sans-serif" font-size="24">
+    <tspan x="74" dy="0">Monitoramento self-hosted para câmeras ONVIF.</tspan>
+    <tspan x="74" dy="36">Seu homelab, seus alertas, seus dados.</tspan>
+  </text>
+  <g filter="url(#shadow)" transform="rotate(-5 874 329)">
+    <rect x="748" y="70" width="252" height="518" rx="40" fill="#202620" stroke="#3c463d" stroke-width="2"/>
+    <image x="760" y="82" width="228" height="494" preserveAspectRatio="xMidYMid slice" clip-path="url(#screen-a)" xlink:href="screenshots/overview-dark.png"/>
+  </g>
+  <g filter="url(#shadow)" transform="rotate(7 1050 349)">
+    <rect x="936" y="115" width="228" height="468" rx="38" fill="#202620" stroke="#3c463d" stroke-width="2"/>
+    <image x="947" y="126" width="206" height="446" preserveAspectRatio="xMidYMid slice" clip-path="url(#screen-b)" xlink:href="screenshots/events-dark.png"/>
+  </g>
+  <rect x="72" y="532" width="372" height="42" rx="21" fill="#242b24" stroke="#384238"/>
+  <circle cx="98" cy="553" r="6" fill="#7bd66f"/>
+  <text x="116" y="560" fill="#d6ddd4" font-family="monospace" font-size="17">OPEN SOURCE · ANDROID · DOCKER</text>
+</svg>
