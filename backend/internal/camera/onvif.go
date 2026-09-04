@@ -90,6 +90,14 @@ func (c *ONVIFClient) PTZ(ctx context.Context, cam Camera, cred Credentials, com
 		_, err := c.call(ctx, endpoint, cred.Username, cred.Password, "http://www.onvif.org/ver20/ptz/wsdl/Stop", fmt.Sprintf(`<tptz:Stop><tptz:ProfileToken>%s</tptz:ProfileToken><tptz:PanTilt>true</tptz:PanTilt><tptz:Zoom>true</tptz:Zoom></tptz:Stop>`, escape(cam.ProfileToken)))
 		return err
 	}
+	if command.Action == "preset" {
+		if command.PresetToken == "" {
+			return fmt.Errorf("preset token is required")
+		}
+		payload := fmt.Sprintf(`<tptz:GotoPreset><tptz:ProfileToken>%s</tptz:ProfileToken><tptz:PresetToken>%s</tptz:PresetToken></tptz:GotoPreset>`, escape(cam.ProfileToken), escape(command.PresetToken))
+		_, err := c.call(ctx, endpoint, cred.Username, cred.Password, "http://www.onvif.org/ver20/ptz/wsdl/GotoPreset", payload)
+		return err
+	}
 	if command.Action != "move" && command.Action != "relative" {
 		return fmt.Errorf("unsupported PTZ action")
 	}
@@ -104,6 +112,53 @@ func (c *ONVIFClient) PTZ(ctx context.Context, cam Camera, cred Credentials, com
 	}
 	_, err := c.call(ctx, endpoint, cred.Username, cred.Password, action, payload)
 	return err
+}
+
+func (c *ONVIFClient) Presets(ctx context.Context, cam Camera, cred Credentials) ([]Preset, error) {
+	endpoint := cam.Services.PTZ
+	if endpoint == "" {
+		endpoint = fmt.Sprintf("http://%s:%d/onvif/PTZ", cam.Host, cam.Port)
+	}
+	payload := fmt.Sprintf(`<tptz:GetPresets><tptz:ProfileToken>%s</tptz:ProfileToken></tptz:GetPresets>`, escape(cam.ProfileToken))
+	body, err := c.call(ctx, endpoint, cred.Username, cred.Password, "http://www.onvif.org/ver20/ptz/wsdl/GetPresets", payload)
+	if err != nil {
+		return nil, err
+	}
+	decoder := xml.NewDecoder(bytes.NewReader(body))
+	presets := make([]Preset, 0)
+	for {
+		token, tokenErr := decoder.Token()
+		if tokenErr == io.EOF {
+			break
+		}
+		if tokenErr != nil {
+			return nil, tokenErr
+		}
+		start, ok := token.(xml.StartElement)
+		if !ok || start.Name.Local != "Preset" {
+			continue
+		}
+		preset := Preset{}
+		for _, attribute := range start.Attr {
+			if attribute.Name.Local == "token" {
+				preset.Token = attribute.Value
+			}
+		}
+		var value struct {
+			Name string `xml:"Name"`
+		}
+		if err = decoder.DecodeElement(&value, &start); err != nil {
+			return nil, err
+		}
+		preset.Name = strings.TrimSpace(value.Name)
+		if preset.Token != "" {
+			if preset.Name == "" {
+				preset.Name = "Preset " + preset.Token
+			}
+			presets = append(presets, preset)
+		}
+	}
+	return presets, nil
 }
 
 func (c *ONVIFClient) SnapshotURI(ctx context.Context, cam Camera, cred Credentials) (string, error) {

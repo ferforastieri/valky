@@ -7,6 +7,7 @@ import type { Locale } from '../content/copy';
 interface Props { locale: Locale; title: string; description: string; }
 const { locale, title, description } = Astro.props;
 const canonical = new URL(Astro.url.pathname, Astro.site);
+const localizedPath = Astro.url.pathname.endsWith('/docs') ? '/docs' : '';
 const socialImage = new URL('/og-image.png', Astro.site);
 const isPortuguese = locale === 'pt-BR';
 const keywords = isPortuguese
@@ -36,7 +37,7 @@ const structuredData = {
       applicationCategory: 'HomeApplication',
       applicationSubCategory: 'Home security and camera monitoring',
       operatingSystem: 'Android 8.0 or later; Linux server with Docker',
-      softwareVersion: '1.0.3',
+      softwareVersion: '1.0.4',
       isAccessibleForFree: true,
       license: 'https://opensource.org/license/mit',
       codeRepository: 'https://github.com/ferforastieri/valkyris',
@@ -78,9 +79,9 @@ const structuredData = {
     <meta name="theme-color" content="#101310" media="(prefers-color-scheme: dark)" />
     <meta name="theme-color" content="#E8E9E5" media="(prefers-color-scheme: light)" />
     <link rel="canonical" href={canonical} />
-    <link rel="alternate" hreflang="pt-BR" href={new URL('/pt-BR', Astro.site)} />
-    <link rel="alternate" hreflang="en" href={new URL('/en', Astro.site)} />
-    <link rel="alternate" hreflang="x-default" href={new URL('/', Astro.site)} />
+    <link rel="alternate" hreflang="pt-BR" href={new URL(`/pt-BR${localizedPath}`, Astro.site)} />
+    <link rel="alternate" hreflang="en" href={new URL(`/en${localizedPath}`, Astro.site)} />
+    <link rel="alternate" hreflang="x-default" href={new URL(localizedPath ? `/pt-BR${localizedPath}` : '/', Astro.site)} />
     <link rel="sitemap" href="/sitemap-index.xml" />
     <link rel="icon" href="/valkyris-mark.svg?v=6" type="image/svg+xml" />
     <link rel="icon" href="/favicon.png?v=6" type="image/png" sizes="64x64" />

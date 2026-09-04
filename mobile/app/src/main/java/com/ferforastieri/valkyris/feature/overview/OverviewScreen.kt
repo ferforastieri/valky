@@ -37,6 +37,7 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.compose.LifecycleResumeEffect
 import androidx.lifecycle.viewModelScope
 import com.composables.icons.lucide.Bell
 import com.composables.icons.lucide.Camera
@@ -72,11 +73,16 @@ class OverviewViewModel @Inject constructor(private val repository: ValkyrisRepo
 
     init {
         viewModelScope.launch {
-            _state.value = OverviewState(runCatching { repository.api.cameras() }.getOrDefault(emptyList()), false)
+            repository.cameras.collect { _state.value = OverviewState(it, false) }
+        }
+        viewModelScope.launch {
+            runCatching { repository.refreshCameras() }
             runCatching { repository.refreshEvents() }
             runCatching { repository.refreshRules() }
         }
     }
+
+    fun refresh() { viewModelScope.launch { runCatching { repository.refreshCameras() };runCatching { repository.refreshEvents() };runCatching { repository.refreshRules() } } }
 }
 
 @Composable
@@ -85,6 +91,7 @@ fun OverviewScreen(
     onEvent: (String) -> Unit,
     viewModel: OverviewViewModel = hiltViewModel(),
 ) {
+    LifecycleResumeEffect(Unit) { viewModel.refresh();onPauseOrDispose {} }
     val state = viewModel.state.collectAsStateWithLifecycle().value
     val events = viewModel.events.collectAsStateWithLifecycle().value
     val rules = viewModel.rules.collectAsStateWithLifecycle().value

@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: Valkyris API
-  version: 1.0.3
+  version: 1.0.4
   description: Local-first home camera monitoring API. JSON responses use a success/message/data envelope; every response also includes X-Valkyris-Success and X-Valkyris-Message headers.
 servers:
   - url: https://valkyris.local:8443/api/v1
@@ -79,6 +79,11 @@ paths:
       parameters: [{$ref: '#/components/parameters/id'}]
       requestBody: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/PTZCommand'}}}}
       responses: {'200': {description: Command accepted with message envelope, content: {application/json: {schema: {$ref: '#/components/schemas/APIResponse'}}}}}
+  /cameras/{id}/presets:
+    get:
+      summary: List the presets advertised by an ONVIF PTZ camera
+      parameters: [{$ref: '#/components/parameters/id'}]
+      responses: {'200': {description: Presets in APIResponse.data, content: {application/json: {schema: {$ref: '#/components/schemas/APIResponse'}}}}}
   /cameras/{id}/snapshot:
     get:
       summary: Get a current authenticated snapshot
@@ -279,10 +284,17 @@ components:
       type: object
       required: [action]
       properties:
-        action: {type: string, enum: [move, relative, stop]}
+        action: {type: string, enum: [move, relative, stop, preset]}
         pan: {type: number, minimum: -1, maximum: 1}
         tilt: {type: number, minimum: -1, maximum: 1}
         zoom: {type: number, minimum: -1, maximum: 1}
+        presetToken: {type: string}
+    CameraPreset:
+      type: object
+      required: [token, name]
+      properties:
+        token: {type: string}
+        name: {type: string}
     Rule:
       type: object
       required: [cameraId, name, detectorTypes, actions]

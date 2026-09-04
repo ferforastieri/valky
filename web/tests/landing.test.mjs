@@ -5,6 +5,8 @@ import test from 'node:test';
 const pt = await readFile(new URL('../dist/pt-BR/index.html', import.meta.url), 'utf8');
 const en = await readFile(new URL('../dist/en/index.html', import.meta.url), 'utf8');
 const root = await readFile(new URL('../dist/index.html', import.meta.url), 'utf8');
+const ptDocs = await readFile(new URL('../dist/pt-BR/docs/index.html', import.meta.url), 'utf8');
+const enDocs = await readFile(new URL('../dist/en/docs/index.html', import.meta.url), 'utf8');
 const landingSource = await readFile(new URL('../src/components/Landing.astro', import.meta.url), 'utf8');
 
 test('publica as duas localizações com idioma correto', () => {
@@ -28,6 +30,9 @@ test('controles e navegação possuem nomes acessíveis', async () => {
   assert.match(pt, /screenshots\/settings-dark\.png/);
   assert.match(pt, /screenshots\/events-light\.png/);
   assert.match(pt, /class="app-carousel"/);
+  assert.match(pt, /href="\/pt-BR\/docs"/);
+  assert.match(en, /href="\/en\/docs"/);
+  assert.doesNotMatch(pt, /class="docs-shell"/);
   assert.match(pt, /Sua privacidade importa\./);
   assert.doesNotMatch(pt, /class="flow section"/);
   assert.doesNotMatch(pt, /class="compatibility section"/);
@@ -81,6 +86,24 @@ test('carrossel avança automaticamente sem controle visual redundante', () => {
   assert.match(landingSource, /setTimeout\(\(\)=>\{show\(slide\+1\);schedule\(\)\},4800\)/);
   assert.match(landingSource, /prefers-reduced-motion: reduce/);
   assert.match(landingSource, /selected===slide\?slide\+1:selected/);
+  assert.match(landingSource, /<button class="app-capture carousel-slide/);
+  assert.match(landingSource, /carousel-hit-prev/);
+  assert.doesNotMatch(landingSource, /role="button" tabindex="0"/);
+});
+
+test('documentação é uma rota separada, localizada e completa', async () => {
+  assert.match(ptDocs, /<html lang="pt-BR"/);
+  assert.match(enDocs, /<html lang="en"/);
+  assert.match(ptDocs, /Documentação do Valkyris/);
+  assert.match(enDocs, /Valkyris documentation/);
+  assert.match(ptDocs, /\/api\/v1\/cameras/);
+  assert.match(ptDocs, /\/api\/v1\/realtime/);
+  assert.match(ptDocs, /href="\/openapi.yaml"/);
+  assert.match(ptDocs, /hreflang="en" href="https:\/\/valkyris\.vercel\.app\/en\/docs"/);
+  assert.match(enDocs, /hreflang="pt-BR" href="https:\/\/valkyris\.vercel\.app\/pt-BR\/docs"/);
+  const sitemap = await readFile(new URL('../dist/sitemap-0.xml', import.meta.url), 'utf8');
+  assert.match(sitemap, /https:\/\/valkyris\.vercel\.app\/pt-BR\/docs/);
+  assert.match(sitemap, /https:\/\/valkyris\.vercel\.app\/en\/docs/);
 });
 
 test('artefatos públicos acompanham a documentação', async () => {

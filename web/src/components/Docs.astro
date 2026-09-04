@@ -1,0 +1,226 @@
+---
+import { BookOpen, Boxes, CodeXml, Download, ExternalLink, House, Languages, Menu, Moon, Network, ServerCog, ShieldCheck, Smartphone, SquareTerminal, Sun } from '@lucide/astro';
+import type { Locale } from '../content/copy';
+import BaseLayout from '../layouts/BaseLayout.astro';
+
+interface Props { locale: Locale }
+const { locale } = Astro.props;
+const pt = locale === 'pt-BR';
+const other = pt ? '/en/docs' : '/pt-BR/docs';
+const installCommand = 'curl -fsSL https://valkyris.vercel.app/install.sh | sh';
+
+const text = pt ? {
+  title: 'Documentação do Valkyris',
+  description: 'Guia de instalação, configuração de câmeras ONVIF, segurança, operação e referência completa da API HTTP do Valkyris.',
+  eyebrow: 'GUIA OPERACIONAL · API V1',
+  intro: 'Tudo o que você precisa para instalar o servidor, preparar uma câmera, conectar o Android e integrar a API — sem expor RTSP ou a câmera à internet.',
+  nav: ['Início', 'Começar', 'Câmeras', 'API'],
+  onThisPage: 'Nesta página',
+  toc: [['start','Começar'],['architecture','Arquitetura'],['camera','Preparar a câmera'],['android','Android'],['configuration','Configuração'],['api','API HTTP'],['updates','Atualizações'],['security','Segurança'],['diagnostics','Diagnóstico']],
+  requirements: ['Linux em amd64 ou arm64', 'Docker Engine com Docker Compose v2', 'Android 8.0 (SDK 26) ou mais recente', 'Câmera ONVIF Profile S com RTSP', 'Servidor, celular e câmera acessíveis por LAN ou VPN'],
+  methods: 'Bearer obrigatório, exceto onde indicado como público.',
+} : {
+  title: 'Valkyris documentation',
+  description: 'Installation, ONVIF camera setup, security, operations and complete Valkyris HTTP API reference.',
+  eyebrow: 'OPERATIONS GUIDE · API V1',
+  intro: 'Everything needed to install the server, prepare a camera, connect Android and integrate the API — without exposing RTSP or the camera to the internet.',
+  nav: ['Home', 'Get started', 'Cameras', 'API'],
+  onThisPage: 'On this page',
+  toc: [['start','Get started'],['architecture','Architecture'],['camera','Prepare a camera'],['android','Android'],['configuration','Configuration'],['api','HTTP API'],['updates','Updates'],['security','Security'],['diagnostics','Diagnostics']],
+  requirements: ['Linux on amd64 or arm64', 'Docker Engine with Docker Compose v2', 'Android 8.0 (SDK 26) or later', 'ONVIF Profile S camera with RTSP', 'Server, phone and camera reachable over LAN or VPN'],
+  methods: 'Bearer token required except routes marked public.',
+};
+
+const endpoints = pt ? [
+  ['GET','/health','Público','Saúde do servidor e versão em execução.'],
+  ['GET','/openapi.yaml','Público','Contrato OpenAPI 3.1 servido pelo backend.'],
+  ['GET','/api/v1/auth/status','Público','Informa se o primeiro administrador já existe.'],
+  ['POST','/api/v1/admin/bootstrap','Público','Cria a senha da casa e o primeiro administrador, uma única vez.'],
+  ['POST','/api/v1/login','Público','Troca a senha da casa por um token de dispositivo.'],
+  ['POST','/api/v1/pair','Público','Consome um convite de uso único.'],
+  ['POST','/api/v1/pairing-sessions','Admin','Cria um convite temporário para outro celular.'],
+  ['GET · POST','/api/v1/cameras','Autenticado','Lista câmeras ou inicia o cadastro assíncrono.'],
+  ['GET','/api/v1/camera-operations/{id}','Autenticado','Acompanha a descoberta ONVIF e a configuração de mídia.'],
+  ['DELETE','/api/v1/cameras/{id}','Autenticado','Remove câmera, stream e dados associados.'],
+  ['POST','/api/v1/cameras/{id}/ptz','Autenticado','Move, para, aplica zoom ou chama um preset.'],
+  ['GET','/api/v1/cameras/{id}/presets','Autenticado','Lista presets anunciados pela câmera.'],
+  ['GET','/api/v1/cameras/{id}/snapshot','Autenticado','Retorna o snapshot JPEG atual.'],
+  ['GET','/api/v1/cameras/{id}/live/index.m3u8','Autenticado','Entrega a playlist LL-HLS autenticada.'],
+  ['GET','/api/v1/detectors','Autenticado','Lista os tipos normalizados de detecção.'],
+  ['GET · POST','/api/v1/rules','Autenticado','Lista ou cria regras de automação.'],
+  ['DELETE','/api/v1/rules/{id}','Autenticado','Remove uma regra.'],
+  ['GET','/api/v1/events','Autenticado','Lista eventos recentes.'],
+  ['GET','/api/v1/events/{id}','Autenticado','Retorna metadados de um evento.'],
+  ['POST','/api/v1/events/{id}/acknowledge','Autenticado','Reconhece o evento e interrompe o alarme.'],
+  ['GET','/api/v1/events/{id}/snapshot','Autenticado','Retorna o JPEG preservado no evento.'],
+  ['GET','/api/v1/events/{id}/clip','Autenticado','Transmite o clipe MP4 do evento.'],
+  ['POST','/api/v1/devices/push','Autenticado','Registra UnifiedPush e o segredo de payload.'],
+  ['GET · PUT','/api/v1/settings/retention','Admin ao alterar','Lê ou altera os limites de retenção.'],
+  ['POST','/api/v1/detections','Autenticado','Recebe uma detecção normalizada de integração local.'],
+  ['GET · POST','/api/v1/system/update','Admin ao atualizar','Consulta uma release ou inicia atualização do backend.'],
+  ['GET','/api/v1/realtime','Autenticado','WebSocket para mudanças de câmeras e eventos.'],
+] : [
+  ['GET','/health','Public','Server health and running version.'],
+  ['GET','/openapi.yaml','Public','OpenAPI 3.1 contract served by the backend.'],
+  ['GET','/api/v1/auth/status','Public','Reports whether the first administrator exists.'],
+  ['POST','/api/v1/admin/bootstrap','Public','Creates the home password and first administrator once.'],
+  ['POST','/api/v1/login','Public','Exchanges the home password for a device token.'],
+  ['POST','/api/v1/pair','Public','Consumes a single-use invitation.'],
+  ['POST','/api/v1/pairing-sessions','Admin','Creates a temporary invitation for another phone.'],
+  ['GET · POST','/api/v1/cameras','Authenticated','Lists cameras or starts asynchronous setup.'],
+  ['GET','/api/v1/camera-operations/{id}','Authenticated','Tracks ONVIF discovery and media setup.'],
+  ['DELETE','/api/v1/cameras/{id}','Authenticated','Removes a camera, stream and related data.'],
+  ['POST','/api/v1/cameras/{id}/ptz','Authenticated','Moves, stops, zooms or recalls a preset.'],
+  ['GET','/api/v1/cameras/{id}/presets','Authenticated','Lists presets advertised by the camera.'],
+  ['GET','/api/v1/cameras/{id}/snapshot','Authenticated','Returns the current JPEG snapshot.'],
+  ['GET','/api/v1/cameras/{id}/live/index.m3u8','Authenticated','Serves the authenticated LL-HLS playlist.'],
+  ['GET','/api/v1/detectors','Authenticated','Lists normalized detector types.'],
+  ['GET · POST','/api/v1/rules','Authenticated','Lists or creates automation rules.'],
+  ['DELETE','/api/v1/rules/{id}','Authenticated','Deletes a rule.'],
+  ['GET','/api/v1/events','Authenticated','Lists recent events.'],
+  ['GET','/api/v1/events/{id}','Authenticated','Returns event metadata.'],
+  ['POST','/api/v1/events/{id}/acknowledge','Authenticated','Acknowledges the event and stops its alarm.'],
+  ['GET','/api/v1/events/{id}/snapshot','Authenticated','Returns the event JPEG.'],
+  ['GET','/api/v1/events/{id}/clip','Authenticated','Streams the event MP4 clip.'],
+  ['POST','/api/v1/devices/push','Authenticated','Registers UnifiedPush and its payload secret.'],
+  ['GET · PUT','/api/v1/settings/retention','Admin to change','Reads or changes retention limits.'],
+  ['POST','/api/v1/detections','Authenticated','Accepts normalized detections from local integrations.'],
+  ['GET · POST','/api/v1/system/update','Admin to update','Checks releases or starts a backend update.'],
+  ['GET','/api/v1/realtime','Authenticated','WebSocket for camera and event changes.'],
+];
+---
+<BaseLayout locale={locale} title={`${text.title} | Valkyris`} description={text.description}>
+  <main class="docs-shell">
+    <header class="docs-hero">
+      <div>
+        <p class="eyebrow"><span></span>{text.eyebrow}</p>
+        <h1>{text.title}</h1>
+        <p>{text.intro}</p>
+      </div>
+      <div class="docs-status" aria-label={pt ? 'Estado da documentação' : 'Documentation status'}>
+        <span><i></i>{pt ? 'Documentação da versão 1.0.4' : 'Version 1.0.4 documentation'}</span>
+        <a href="/openapi.yaml" download>OpenAPI 3.1 <Download size={16}/></a>
+      </div>
+    </header>
+
+    <div class="docs-grid">
+      <aside class="docs-toc">
+        <p>{text.onThisPage}</p>
+        <nav>{text.toc.map(([id,label],index)=><a href={`#${id}`}><span>{String(index + 1).padStart(2,'0')}</span>{label}</a>)}</nav>
+      </aside>
+
+      <article class="docs-content">
+        <section id="start">
+          <div class="docs-heading"><SquareTerminal size={22}/><div><span>01</span><h2>{pt ? 'Começar' : 'Get started'}</h2></div></div>
+          <p>{pt ? 'O instalador baixa artefatos da release, gera os segredos locais e o certificado TLS, prepara o Compose e inicia Valkyris, MediaMTX e o atualizador.' : 'The installer downloads release artifacts, generates local secrets and a TLS certificate, prepares Compose, then starts Valkyris, MediaMTX and the updater.'}</p>
+          <div class="docs-code"><code>{installCommand}</code><button class="docs-copy" type="button" data-command={installCommand}>{pt ? 'Copiar' : 'Copy'}</button></div>
+          <h3>{pt ? 'Requisitos' : 'Requirements'}</h3>
+          <ul class="check-list">{text.requirements.map(item=><li><span>✓</span>{item}</li>)}</ul>
+          <div class="docs-note"><ShieldCheck size={19}/><p>{pt ? 'Mantenha as portas ONVIF e RTSP acessíveis apenas na rede privada. Para acesso externo, conecte o celular por VPN; não publique a câmera na internet.' : 'Keep ONVIF and RTSP ports reachable only on the private network. For remote access, connect the phone through a VPN; never publish the camera to the internet.'}</p></div>
+        </section>
+
+        <section id="architecture">
+          <div class="docs-heading"><Boxes size={22}/><div><span>02</span><h2>{pt ? 'Arquitetura' : 'Architecture'}</h2></div></div>
+          <div class="architecture-flow">
+            <article><strong>{pt ? 'Câmera' : 'Camera'}</strong><small>ONVIF · RTSP</small></article><i>→</i>
+            <article><strong>MediaMTX</strong><small>LL-HLS · buffer</small></article><i>→</i>
+            <article><strong>Go + SQLite</strong><small>{pt ? 'regras · eventos' : 'rules · events'}</small></article><i>→</i>
+            <article><strong>Android</strong><small>Compose · push</small></article>
+          </div>
+          <p>{pt ? 'O backend é o limite de segurança. O app nunca recebe a senha da câmera, e o MediaMTX não publica portas no host. Credenciais ficam cifradas com AES-256-GCM; tokens são persistidos somente como hash.' : 'The backend is the security boundary. The app never receives camera passwords, and MediaMTX publishes no host ports. Credentials use AES-256-GCM encryption; tokens are stored only as hashes.'}</p>
+        </section>
+
+        <section id="camera">
+          <div class="docs-heading"><Network size={22}/><div><span>03</span><h2>{pt ? 'Preparar a câmera' : 'Prepare a camera'}</h2></div></div>
+          <ol class="docs-steps">
+            <li><span>1</span><div><strong>{pt ? 'Conecte ao Wi-Fi' : 'Connect to Wi-Fi'}</strong><p>{pt ? 'Na TC40, use o Tapo uma vez para concluir a configuração inicial.' : 'For a TC40, use Tapo once to complete initial provisioning.'}</p></div></li>
+            <li><span>2</span><div><strong>{pt ? 'Crie a Camera Account' : 'Create the Camera Account'}</strong><p>{pt ? 'Use uma credencial exclusiva nas configurações avançadas. Não é a senha da sua conta TP-Link.' : 'Use dedicated credentials in advanced settings. This is not your TP-Link account password.'}</p></div></li>
+            <li><span>3</span><div><strong>{pt ? 'Fixe o endereço local' : 'Reserve the local address'}</strong><p>{pt ? 'Prefira uma reserva DHCP no roteador. Não é necessário ativar IP estático dentro da câmera.' : 'Prefer a DHCP reservation on the router. A static address inside the camera is not required.'}</p></div></li>
+            <li><span>4</span><div><strong>{pt ? 'Cadastre no app' : 'Add it in the app'}</strong><p>{pt ? 'Informe nome, ícone, IP, usuário e senha. O RTSP principal da Tapo é montado automaticamente; use o campo avançado apenas para sobrescrever.' : 'Enter name, icon, IP, username and password. The primary Tapo RTSP URL is built automatically; use the advanced field only to override it.'}</p></div></li>
+          </ol>
+          <p>{pt ? 'O cadastro é persistido imediatamente. A tela da câmera acompanha queued, probing, stream, ready ou failed em tempo real, e o último erro sanitizado permanece salvo para diagnóstico.' : 'The camera is persisted immediately. Its screen follows queued, probing, stream, ready or failed in real time, and the last sanitized error remains stored for diagnosis.'}</p>
+        </section>
+
+        <section id="android">
+          <div class="docs-heading"><Smartphone size={22}/><div><span>04</span><h2>Android</h2></div></div>
+          <p>{pt ? 'Instale o APK da release mais recente. No primeiro acesso, informe a URL HTTPS pela qual o celular alcança o servidor e crie a senha da casa. O primeiro dispositivo vira administrador.' : 'Install the APK from the latest release. On first access, enter the HTTPS URL through which the phone reaches the server and create the home password. The first device becomes administrator.'}</p>
+          <div class="docs-actions"><a class="button dark" href="https://github.com/ferforastieri/valkyris/releases/latest"><Download size={17}/>{pt ? 'Baixar APK' : 'Download APK'}</a><a class="button quiet" href="https://github.com/ferforastieri/valkyris/releases"><ExternalLink size={17}/>{pt ? 'Todas as releases' : 'All releases'}</a></div>
+          <h3>{pt ? 'Outros celulares' : 'Other phones'}</h3>
+          <p>{pt ? 'Em Ajustes, o administrador cria um convite temporário e de uso único. O QR é montado dentro do app com a URL já conhecida; o backend não possui página pública de pareamento.' : 'In Settings, the administrator creates a temporary, single-use invitation. The QR is assembled inside the app using the known server URL; the backend has no public pairing page.'}</p>
+        </section>
+
+        <section id="configuration">
+          <div class="docs-heading"><ServerCog size={22}/><div><span>05</span><h2>{pt ? 'Configuração' : 'Configuration'}</h2></div></div>
+          <div class="config-table" role="table">
+            {[
+              ['VALKYRIS_LISTEN',':8443',pt?'Endereço interno do serviço HTTPS.':'Internal HTTPS listen address.'],
+              ['VALKYRIS_DATA_DIR','/data',pt?'Volume persistente.':'Persistent data volume.'],
+              ['VALKYRIS_DATABASE','/data/valkyris.db','SQLite.'],
+              ['VALKYRIS_TLS_CERT','/data/tls/server.crt',pt?'Certificado TLS.':'TLS certificate.'],
+              ['VALKYRIS_TLS_KEY','/data/tls/server.key',pt?'Chave TLS.':'TLS key.'],
+              ['VALKYRIS_MASTER_KEY_FILE','/data/secrets/master.key',pt?'Chave mestra de criptografia.':'Encryption master key.'],
+              ['VALKYRIS_MEDIA_URL','http://mediamtx:8888',pt?'Origem HLS interna.':'Internal HLS origin.'],
+              ['VALKYRIS_MEDIA_API','http://mediamtx:9997',pt?'API interna do MediaMTX.':'Internal MediaMTX API.'],
+              ['VALKYRIS_UPDATER_URL','http://updater:8080',pt?'Atualizador interno.':'Internal updater.'],
+              ['VALKYRIS_RELEASE_API','api.github.com/…/releases/latest',pt?'Release estável consultada.':'Stable release lookup.'],
+            ].map(([name,value,meaning])=><div role="row"><code>{name}</code><code>{value}</code><span>{meaning}</span></div>)}
+          </div>
+          <p>{pt ? 'O instalador escreve o token privado do atualizador no .env. Não reutilize nem publique esse segredo. O arquivo mediamtx.yml deve existir como arquivo antes de subir o Compose.' : 'The installer writes the private updater token to .env. Do not reuse or publish it. mediamtx.yml must exist as a file before Compose starts.'}</p>
+        </section>
+
+        <section id="api">
+          <div class="docs-heading"><CodeXml size={22}/><div><span>06</span><h2>{pt ? 'API HTTP' : 'HTTP API'}</h2></div></div>
+          <p>{text.methods} {pt ? 'A base é /api/v1. Respostas JSON usam o envelope success, message e data; erros usam success, message e error.' : 'The base path is /api/v1. JSON responses use the success, message and data envelope; errors use success, message and error.'}</p>
+          <div class="docs-code multiline"><code>{`curl -k https://SEU_SERVIDOR:8443/api/v1/cameras \\\n  -H 'Authorization: Bearer SEU_TOKEN'`}</code></div>
+          <div class="endpoint-head"><h3>{pt ? 'Referência de endpoints' : 'Endpoint reference'}</h3><a href="/openapi.yaml">OpenAPI YAML <ExternalLink size={14}/></a></div>
+          <div class="endpoint-list">{endpoints.map(([method,path,access,description])=><article><span class:list={['method', method.includes('POST') ? 'write' : 'read']}>{method}</span><code>{path}</code><small>{access}</small><p>{description}</p></article>)}</div>
+        </section>
+
+        <section id="updates">
+          <div class="docs-heading"><Download size={22}/><div><span>07</span><h2>{pt ? 'Atualizações' : 'Updates'}</h2></div></div>
+          <p>{pt ? 'Quando uma release estável mais nova existir, o app cria um evento de atualização. Um administrador pode atualizar o container do backend pelo botão; depois, o APK assinado é baixado do GitHub e o Android solicita confirmação para instalar.' : 'When a newer stable release exists, the app creates an update event. An administrator can update the backend container from the action; the signed APK is then downloaded from GitHub and Android requests installation confirmation.'}</p>
+          <p>{pt ? 'SQLite, clipes e snapshots permanecem no volume valkyris-data. O atualizador aceita somente tags de release validadas e não é exposto em uma porta do host.' : 'SQLite, clips and snapshots remain in the valkyris-data volume. The updater accepts only validated release tags and exposes no host port.'}</p>
+        </section>
+
+        <section id="security">
+          <div class="docs-heading"><ShieldCheck size={22}/><div><span>08</span><h2>{pt ? 'Segurança e backup' : 'Security and backup'}</h2></div></div>
+          <ul>
+            <li>{pt ? 'Não encaminhe 554, 2020, 8888 ou 9997 no roteador.' : 'Do not forward ports 554, 2020, 8888 or 9997 on the router.'}</li>
+            <li>{pt ? 'Use TLS confiável por proxy reverso ou instale a CA privada no celular.' : 'Use trusted TLS through a reverse proxy or install the private CA on the phone.'}</li>
+            <li>{pt ? 'Use Tailscale, WireGuard ou outra VPN para acesso fora de casa.' : 'Use Tailscale, WireGuard or another VPN away from home.'}</li>
+            <li>{pt ? 'Faça backup do volume valkyris-data e do .env juntos, com acesso restrito.' : 'Back up the valkyris-data volume and .env together with restricted access.'}</li>
+          </ul>
+        </section>
+
+        <section id="diagnostics">
+          <div class="docs-heading"><Menu size={22}/><div><span>09</span><h2>{pt ? 'Diagnóstico' : 'Diagnostics'}</h2></div></div>
+          <div class="docs-code multiline"><code>{`docker compose ps\ndocker compose logs --tail=200 valkyris\ndocker compose logs --tail=200 mediamtx\ncurl -k https://localhost:8443/health`}</code></div>
+          <div class="diagnostic-grid">
+            <article><strong>setup failed</strong><p>{pt ? 'Abra a câmera no app: a etapa e o erro persistido indicam se a falha ocorreu no ONVIF ou no stream.' : 'Open the camera in the app: persisted setup state and error show whether ONVIF or stream setup failed.'}</p></article>
+            <article><strong>EOFException</strong><p>{pt ? 'Verifique primeiro se MediaMTX está saudável e se mediamtx.yml foi montado como arquivo.' : 'First verify MediaMTX health and that mediamtx.yml is mounted as a file.'}</p></article>
+            <article><strong>{pt ? 'Sem preview' : 'No preview'}</strong><p>{pt ? 'Confira snapshot, perfil ONVIF escolhido e conectividade RTSP entre o host e a câmera.' : 'Check snapshot, selected ONVIF profile and RTSP connectivity between host and camera.'}</p></article>
+          </div>
+        </section>
+      </article>
+    </div>
+  </main>
+
+  <nav class="floating-dock docs-dock" aria-label={pt ? 'Navegação da documentação' : 'Documentation navigation'}>
+    <a class="dock-brand" href={`/${locale}`} aria-label="Valkyris home"><span class="brand-mark"><img src="/valkyris-mark.svg?v=6" alt="" /></span><span class="dock-identity"><strong>Valkyris</strong><small>DOCS · © 2026 Fernando Forastieri</small></span></a>
+    <div class="dock-links">
+      <a class="dock-link" href={`/${locale}`}><House size={17}/><span>{text.nav[0]}</span></a>
+      <a class="dock-link" href="#start"><SquareTerminal size={17}/><span>{text.nav[1]}</span></a>
+      <a class="dock-link" href="#camera"><Network size={17}/><span>{text.nav[2]}</span></a>
+      <a class="dock-link" href="#api"><BookOpen size={17}/><span>{text.nav[3]}</span></a>
+    </div>
+    <div class="dock-actions"><a class="icon-button" href={other} aria-label={pt ? 'Mudar para inglês' : 'Mudar para português'}><Languages size={18}/></a><button class="icon-button theme-toggle" type="button" aria-label={pt ? 'Alternar tema' : 'Toggle theme'}><Sun class="sun" size={18}/><Moon class="moon" size={18}/></button><a class="icon-button" href="https://github.com/ferforastieri/valkyris" aria-label="GitHub"><CodeXml size={18}/></a></div>
+  </nav>
+
+  <script>
+    const root=document.documentElement;
+    const systemTheme=matchMedia('(prefers-color-scheme: dark)');
+    const isDark=()=>root.dataset.theme==='dark'||(root.dataset.theme==='auto'&&systemTheme.matches);
+    document.querySelector('.theme-toggle')?.addEventListener('click',()=>{root.dataset.theme=isDark()?'light':'dark';localStorage.setItem('valkyris-theme',root.dataset.theme)});
+    document.querySelector('.docs-copy')?.addEventListener('click',async event=>{const button=event.currentTarget as HTMLButtonElement;await navigator.clipboard.writeText(button.dataset.command||'');button.textContent=document.documentElement.lang==='pt-BR'?'Copiado':'Copied';setTimeout(()=>button.textContent=document.documentElement.lang==='pt-BR'?'Copiar':'Copy',1400)});
+  </script>
+</BaseLayout>

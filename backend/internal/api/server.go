@@ -111,6 +111,7 @@ func (s *Server) Handler() http.Handler {
 	protected.HandleFunc("GET /camera-operations/{id}", s.cameraOperation)
 	protected.HandleFunc("DELETE /cameras/{id}", s.deleteCamera)
 	protected.HandleFunc("POST /cameras/{id}/ptz", s.ptz)
+	protected.HandleFunc("GET /cameras/{id}/presets", s.cameraPresets)
 	protected.HandleFunc("GET /cameras/{id}/snapshot", s.snapshot)
 	protected.HandleFunc("GET /cameras/{id}/live/{asset...}", s.live)
 	protected.HandleFunc("GET /detectors", s.detectors)
@@ -365,11 +366,33 @@ func (s *Server) ptz(w http.ResponseWriter, r *http.Request) {
 	if !decode(w, r, &command) {
 		return
 	}
+	if command.Action == "preset" && !cam.Capabilities.Presets {
+		writeError(w, http.StatusConflict, fmt.Errorf("camera does not advertise PTZ presets"))
+		return
+	}
+	if command.Zoom != 0 && !cam.Capabilities.Zoom {
+		writeError(w, http.StatusConflict, fmt.Errorf("camera does not advertise PTZ zoom"))
+		return
+	}
 	if err = s.onvif.PTZ(r.Context(), cam, cred, command); err != nil {
 		writeError(w, 502, err)
 		return
 	}
 	writeSuccess(w, http.StatusOK, "PTZ command accepted", nil)
+}
+
+func (s *Server) cameraPresets(w http.ResponseWriter, r *http.Request) {
+	cam, cred, err := s.cameras.Get(r.Context(), r.PathValue("id"))
+	if err != nil {
+		respond(w, nil, err)
+		return
+	}
+	if !cam.Capabilities.PTZ || !cam.Capabilities.Presets {
+		writeError(w, http.StatusConflict, fmt.Errorf("camera does not advertise PTZ presets"))
+		return
+	}
+	presets, err := s.onvif.Presets(r.Context(), cam, cred)
+	respondWithMessage(w, presets, err, "Camera presets loaded successfully")
 }
 func (s *Server) snapshot(w http.ResponseWriter, r *http.Request) {
 	cam, cred, err := s.cameras.Get(r.Context(), r.PathValue("id"))
@@ -377,28 +400,45 @@ func (s *Server) snapshot(w http.ResponseWriter, r *http.Request) {
 		respond(w, nil, err)
 		return
 	}
-	uri, err := s.onvif.SnapshotURI(r.Context(), cam, cred)
-	if err != nil {
-		writeError(w, 502, err)
+	// Prefer the ONVIF still-image endpoint since it is inexpensive. Some Tapo
+	// firmware advertises it but requires an authentication mode other than
+	// HTTP Basic; in that case capture a frame from the already authenticated
+	// MediaMTX stream instead.
+	directContext, cancelDirect := context.WithTimeout(r.Context(), 6*time.Second)
+	defer cancelDirect()
+	uri, snapshotErr := s.onvif.SnapshotURI(directContext, cam, cred)
+	if snapshotErr == nil {
+		req, requestErr := http.NewRequestWithContext(directContext, http.MethodGet, uri, nil)
+		if requestErr == nil {
+			req.SetBasicAuth(cred.Username, cred.Password)
+			resp, requestErr := (&http.Client{Timeout: 6 * time.Second}).Do(req)
+			if requestErr == nil {
+				defer resp.Body.Close()
+				if resp.StatusCode/100 == 2 {
+					w.Header().Set("Content-Type", resp.Header.Get("Content-Type"))
+					w.Header().Set("Cache-Control", "no-store")
+					setOutcomeHeaders(w, http.StatusOK, "Camera snapshot loaded")
+					_, _ = io.Copy(w, io.LimitReader(resp.Body, 12<<20))
+					return
+				}
+				snapshotErr = fmt.Errorf("ONVIF snapshot returned %s", resp.Status)
+			} else {
+				snapshotErr = requestErr
+			}
+		} else {
+			snapshotErr = requestErr
+		}
+	}
+	cancelDirect()
+	frame, streamErr := s.media.MonitoringFrame(r.Context(), cam.ID)
+	if streamErr != nil {
+		writeError(w, http.StatusBadGateway, fmt.Errorf("snapshot unavailable (ONVIF: %v; stream: %w)", snapshotErr, streamErr))
 		return
 	}
-	req, _ := http.NewRequestWithContext(r.Context(), http.MethodGet, uri, nil)
-	req.SetBasicAuth(cred.Username, cred.Password)
-	resp, err := http.DefaultClient.Do(req)
-	if err != nil {
-		writeError(w, 502, err)
-		return
-	}
-	defer resp.Body.Close()
-	w.Header().Set("Content-Type", resp.Header.Get("Content-Type"))
+	w.Header().Set("Content-Type", "image/jpeg")
 	w.Header().Set("Cache-Control", "no-store")
-	message := "Camera snapshot loaded"
-	if resp.StatusCode >= http.StatusBadRequest {
-		message = "Camera snapshot request failed: " + resp.Status
-	}
-	setOutcomeHeaders(w, resp.StatusCode, message)
-	w.WriteHeader(resp.StatusCode)
-	_, _ = io.Copy(w, io.LimitReader(resp.Body, 12<<20))
+	setOutcomeHeaders(w, http.StatusOK, "Camera snapshot loaded from live stream")
+	_, _ = w.Write(frame)
 }
 func (s *Server) live(w http.ResponseWriter, r *http.Request) {
 	target, _ := url.Parse(s.media.HLSBase())

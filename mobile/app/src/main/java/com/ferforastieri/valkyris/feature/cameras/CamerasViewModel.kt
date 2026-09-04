@@ -7,17 +7,24 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.ferforastieri.valkyris.core.model.Camera
 import com.ferforastieri.valkyris.core.model.CreateCameraRequest
+import com.ferforastieri.valkyris.core.model.CameraPreset
 import com.ferforastieri.valkyris.core.model.PTZCommand
 import com.ferforastieri.valkyris.core.network.ValkyrisApi
+import com.ferforastieri.valkyris.core.network.ValkyrisRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.supervisorScope
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.flow.update
 import okhttp3.Request
+import java.util.concurrent.TimeUnit
 import javax.inject.Inject
 
 data class CamerasState(
@@ -30,7 +37,8 @@ data class CamerasState(
 )
 
 @HiltViewModel
-class CamerasViewModel @Inject constructor(private val api: ValkyrisApi) : ViewModel() {
+class CamerasViewModel @Inject constructor(private val repository: ValkyrisRepository) : ViewModel() {
+    private val api = repository.api
     private val _state = MutableStateFlow(CamerasState())
     val state = _state.asStateFlow()
     private val mediaClient by lazy { api.mediaHttpClient() }
@@ -38,15 +46,24 @@ class CamerasViewModel @Inject constructor(private val api: ValkyrisApi) : ViewM
     private var active = true
 
     init {
+        viewModelScope.launch {
+            repository.cameras.collect { cameras ->
+                _state.update { state ->
+                    state.copy(
+                        cameras = cameras,
+                        snapshots = state.snapshots.filterKeys { id -> cameras.any { it.id == id } },
+                        loading = false,
+                    )
+                }
+            }
+        }
         refresh()
         connectRealtime()
         viewModelScope.launch {
             var cycles = 0
             while (isActive) {
                 delay(STATUS_REFRESH_MS)
-                runCatching { api.cameras() }.onSuccess { cameras ->
-                    _state.value = _state.value.copy(cameras = cameras, loading = false)
-                }
+                runCatching { repository.refreshCameras() }
                 cycles++
                 if (cycles % SNAPSHOT_REFRESH_CYCLES == 0) refreshSnapshots()
             }
@@ -61,79 +78,63 @@ class CamerasViewModel @Inject constructor(private val api: ValkyrisApi) : ViewM
 
     private fun refreshStatuses() {
         viewModelScope.launch {
-            runCatching { api.cameras() }.onSuccess { cameras ->
-                _state.value = _state.value.copy(cameras = cameras, loading = false)
-            }
+            runCatching { repository.refreshCameras() }
+                .onSuccess { refreshSnapshots() }
         }
     }
 
     fun refresh() {
         viewModelScope.launch {
-            val current = _state.value
-            _state.value = current.copy(loading = true, error = null)
-            runCatching { api.cameras() }
-                .onSuccess {
-                    _state.value = current.copy(loading = false, cameras = it)
-                    refreshSnapshots()
-                }
-                .onFailure { _state.value = current.copy(loading = false, error = it.message) }
+            _state.update { it.copy(loading = it.cameras.isEmpty(), error = null) }
+            runCatching { repository.refreshCameras() }
+                .onSuccess { refreshSnapshots() }
+                .onFailure { error -> _state.update { it.copy(loading = false, error = error.message) } }
         }
     }
 
     private suspend fun refreshSnapshots() {
-        val cameras = _state.value.cameras
-        if (cameras.isEmpty()) return
-        val loaded = withContext(Dispatchers.IO) {
-            cameras.mapNotNull { camera ->
+        val cameras = _state.value.cameras.filter { it.setupStatus == "ready" }
+        if (cameras.isEmpty()) {
+            _state.update { it.copy(snapshots = emptyMap()) }
+            return
+        }
+        val loaded = supervisorScope {
+            cameras.map { camera -> async(Dispatchers.IO) {
                 runCatching {
-                    val request = Request.Builder()
-                        .url(api.snapshotUrl(camera.id))
-                        .header("Authorization", "Bearer ${api.token()}")
-                        .build()
-                    mediaClient.newCall(request).execute().use { response ->
+                    val request = Request.Builder().url(api.snapshotUrl(camera.id))
+                        .header("Authorization", "Bearer ${api.token()}").build()
+                    mediaClient.newCall(request).apply { timeout().timeout(15, TimeUnit.SECONDS) }.execute().use { response ->
                         if (!response.isSuccessful) return@runCatching null
                         val bytes = response.body.bytes()
                         BitmapFactory.decodeByteArray(bytes, 0, bytes.size)?.let { camera.id to it }
                     }
                 }.getOrNull()
-            }.toMap()
+            } }.awaitAll().filterNotNull().toMap()
         }
         if (loaded.isNotEmpty()) {
-            _state.value = _state.value.copy(snapshots = _state.value.snapshots + loaded)
+            _state.update { state -> state.copy(snapshots = state.snapshots + loaded) }
         }
     }
 
     fun add(input: CreateCameraRequest) {
         viewModelScope.launch {
-            _state.value = _state.value.copy(creating = true, error = null)
-            runCatching { api.createCamera(input) }
-                .onSuccess { camera ->
-                    _state.value = _state.value.copy(
-                        creating = false,
-                        cameras = (_state.value.cameras + camera).distinctBy { it.id },
-                    )
-                }
-                .onFailure { _state.value = _state.value.copy(creating = false, error = it.message) }
+            _state.update { it.copy(creating = true, error = null) }
+            runCatching { repository.createCamera(input) }
+                .onSuccess { _state.update { it.copy(creating = false) } }
+                .onFailure { error -> _state.update { it.copy(creating = false, error = error.message) } }
         }
     }
 
     fun delete(id: String) {
         if (id in _state.value.deleting) return
         viewModelScope.launch {
-            _state.value = _state.value.copy(deleting = _state.value.deleting + id, error = null)
-            runCatching { api.deleteCamera(id) }
+            _state.update { it.copy(deleting = it.deleting + id, error = null) }
+            runCatching { repository.deleteCamera(id) }
                 .onSuccess {
-                    _state.value = _state.value.copy(
-                        deleting = _state.value.deleting - id,
-                        cameras = _state.value.cameras.filterNot { it.id == id },
-                        snapshots = _state.value.snapshots - id,
-                    )
+                    _state.update { it.copy(deleting = it.deleting - id, snapshots = it.snapshots - id) }
                 }
-                .onFailure {
-                    _state.value = _state.value.copy(
-                        deleting = _state.value.deleting - id,
-                        error = it.message,
-                    )
+                .onFailure { error ->
+                    _state.update { it.copy(deleting = it.deleting - id, error = error.message) }
                 }
         }
     }
@@ -154,13 +155,22 @@ class CameraLiveViewModel @Inject constructor(private val api: ValkyrisApi, save
     val id: String = checkNotNull(saved["id"])
     private val _camera = MutableStateFlow<Camera?>(null)
     val camera = _camera.asStateFlow()
+    private val _snapshot = MutableStateFlow<Bitmap?>(null)
+    val snapshot = _snapshot.asStateFlow()
+    private val _snapshotLoading = MutableStateFlow(false)
+    val snapshotLoading = _snapshotLoading.asStateFlow()
+    private val _presets = MutableStateFlow<List<CameraPreset>>(emptyList())
+    val presets = _presets.asStateFlow()
     private var realtime: okhttp3.WebSocket? = null
     init {
         realtime = api.realtime({ refresh() })
         viewModelScope.launch {
             while (isActive) {
                 runCatching { api.cameras().firstOrNull { it.id == id } }.onSuccess { _camera.value = it }
-                if (_camera.value?.setupStatus in setOf("ready", "failed")) break
+                if (_camera.value?.setupStatus in setOf("ready", "failed")) {
+                    if (_camera.value?.capabilities?.presets == true) loadPresets()
+                    break
+                }
                 delay(1_000)
             }
         }
@@ -170,6 +180,24 @@ class CameraLiveViewModel @Inject constructor(private val api: ValkyrisApi, save
     }
     fun move(pan: Double, tilt: Double, zoom: Double = 0.0) { viewModelScope.launch { runCatching { api.ptz(id, PTZCommand("move", pan, tilt, zoom)) } } }
     fun stop() { viewModelScope.launch { runCatching { api.ptz(id, PTZCommand("stop")) } } }
+    fun goToPreset(token: String) { viewModelScope.launch { runCatching { api.ptz(id, PTZCommand("preset", presetToken = token)) } } }
+    fun loadPresets() { viewModelScope.launch { runCatching { api.cameraPresets(id) }.onSuccess { _presets.value = it } } }
+    fun captureSnapshot() {
+        viewModelScope.launch {
+            _snapshotLoading.value = true
+            _snapshot.value = withContext(Dispatchers.IO) {
+                runCatching {
+                    val request = Request.Builder().url(api.snapshotUrl(id)).header("Authorization", "Bearer ${api.token()}").build()
+                    api.mediaHttpClient().newCall(request).apply { timeout().timeout(15, TimeUnit.SECONDS) }.execute().use { response ->
+                        if (!response.isSuccessful) return@runCatching null
+                        val bytes = response.body.bytes()
+                        BitmapFactory.decodeByteArray(bytes, 0, bytes.size)
+                    }
+                }.getOrNull()
+            }
+            _snapshotLoading.value = false
+        }
+    }
     fun liveUrl() = api.liveUrl(id)
     fun token() = api.token()
     fun httpClient() = api.mediaHttpClient()

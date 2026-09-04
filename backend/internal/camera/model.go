@@ -65,8 +65,14 @@ func normalizeIcon(icon string) string {
 }
 
 type PTZCommand struct {
-	Action string  `json:"action"`
-	Pan    float64 `json:"pan"`
-	Tilt   float64 `json:"tilt"`
-	Zoom   float64 `json:"zoom"`
+	Action      string  `json:"action"`
+	Pan         float64 `json:"pan"`
+	Tilt        float64 `json:"tilt"`
+	Zoom        float64 `json:"zoom"`
+	PresetToken string  `json:"presetToken,omitempty"`
+}
+
+type Preset struct {
+	Token string `json:"token"`
+	Name  string `json:"name"`
 }

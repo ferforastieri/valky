@@ -6,7 +6,6 @@ import android.app.Activity
 import android.content.Context
 import android.content.ContextWrapper
 import android.content.pm.ActivityInfo
-import android.content.res.Configuration
 import android.view.ViewGroup
 import androidx.compose.foundation.background
 import androidx.compose.foundation.Image
@@ -16,6 +15,7 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -26,12 +26,12 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.compose.LifecycleResumeEffect
 import androidx.media3.common.MediaItem
 import androidx.media3.datasource.okhttp.OkHttpDataSource
 import androidx.media3.exoplayer.ExoPlayer
@@ -44,6 +44,7 @@ import com.ferforastieri.valkyris.core.design.cameraIcon
 import com.ferforastieri.valkyris.core.model.Camera
 import com.ferforastieri.valkyris.core.model.CreateCameraRequest
 import com.composables.icons.lucide.ArrowLeft
+import com.composables.icons.lucide.Aperture
 import com.composables.icons.lucide.ChevronDown
 import com.composables.icons.lucide.ChevronLeft
 import com.composables.icons.lucide.ChevronRight
@@ -52,13 +53,18 @@ import com.composables.icons.lucide.Check
 import com.composables.icons.lucide.EllipsisVertical
 import com.composables.icons.lucide.Lucide
 import com.composables.icons.lucide.Mic
+import com.composables.icons.lucide.MapPin
+import com.composables.icons.lucide.Minus
 import com.composables.icons.lucide.Move
 import com.composables.icons.lucide.Plus
 import com.composables.icons.lucide.Trash2
 import com.composables.icons.lucide.Video
 import com.composables.icons.lucide.VideoOff
+import com.composables.icons.lucide.Volume2
+import com.composables.icons.lucide.VolumeX
 
 @Composable fun CamerasScreen(onCamera:(String)->Unit,vm:CamerasViewModel=hiltViewModel()){
+    LifecycleResumeEffect(Unit) { vm.refresh();onPauseOrDispose {} }
     val state by vm.state.collectAsStateWithLifecycle()
     var showAdd by remember{mutableStateOf(false)}
     var failedCameraId by remember{mutableStateOf<String?>(null)}
@@ -275,12 +281,29 @@ private val cameraIconOptions = listOf(
 @Composable
 fun CameraLiveScreen(cameraId:String,onBack:()->Unit,vm:CameraLiveViewModel=hiltViewModel()) {
     val camera by vm.camera.collectAsStateWithLifecycle()
-    Column(Modifier.fillMaxSize()) {
-        Row(Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
-            IconButton(onBack) { Icon(Lucide.ArrowLeft, null) }
-            Column {
-                Text(camera?.name ?: stringResource(R.string.live), fontWeight = FontWeight.SemiBold)
+    val context = androidx.compose.ui.platform.LocalContext.current
+    val activity = remember(context) { context.findActivity() }
+    DisposableEffect(activity) {
+        val previousOrientation = activity?.requestedOrientation
+        activity?.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
+        onDispose { if (previousOrientation != null) activity.requestedOrientation = previousOrientation }
+    }
+    Column(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
+        Row(Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+            Surface(shape=CircleShape,color=MaterialTheme.colorScheme.surface,border=androidx.compose.foundation.BorderStroke(1.dp,MaterialTheme.colorScheme.outlineVariant)) {
+                IconButton(onBack) { Icon(Lucide.ArrowLeft, stringResource(R.string.back)) }
+            }
+            Spacer(Modifier.width(12.dp))
+            Column(Modifier.weight(1f)) {
+                Text(camera?.name ?: stringResource(R.string.live), style=MaterialTheme.typography.titleLarge,fontWeight = FontWeight.SemiBold)
                 Text(if (camera?.setupStatus == "ready") stringResource(R.string.stream_private) else stringResource(R.string.camera_setup_saved), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+            camera?.takeIf { it.setupStatus=="ready" }?.let {
+                Surface(shape=RoundedCornerShape(12.dp),color=MaterialTheme.colorScheme.secondaryContainer) {
+                    Row(Modifier.padding(horizontal=10.dp,vertical=7.dp),verticalAlignment=Alignment.CenterVertically) {
+                        Box(Modifier.size(7.dp).background(MaterialTheme.colorScheme.secondary,CircleShape));Spacer(Modifier.width(6.dp));Text(stringResource(R.string.live),style=MaterialTheme.typography.labelMedium,fontWeight=FontWeight.SemiBold)
+                    }
+                }
             }
         }
         when (camera?.setupStatus) {
@@ -314,8 +337,12 @@ private fun CameraSetupContent(camera: Camera, failed: Boolean) {
 @Composable
 private fun ReadyCameraContent(camera: Camera, vm: CameraLiveViewModel) {
     val context = androidx.compose.ui.platform.LocalContext.current
-    val activity = remember(context) { context.findActivity() }
-    val landscape = LocalConfiguration.current.orientation == Configuration.ORIENTATION_LANDSCAPE
+    val snapshot by vm.snapshot.collectAsStateWithLifecycle()
+    val snapshotLoading by vm.snapshotLoading.collectAsStateWithLifecycle()
+    val presets by vm.presets.collectAsStateWithLifecycle()
+    var muted by remember { mutableStateOf(false) }
+    var showSnapshot by remember { mutableStateOf(false) }
+    var showPresets by remember { mutableStateOf(false) }
     val player = remember {
         val factory = OkHttpDataSource.Factory(vm.httpClient()).setDefaultRequestProperties(mapOf("Authorization" to "Bearer ${vm.token()}"))
         ExoPlayer.Builder(context).setMediaSourceFactory(HlsMediaSource.Factory(factory)).build().apply {
@@ -324,25 +351,54 @@ private fun ReadyCameraContent(camera: Camera, vm: CameraLiveViewModel) {
             playWhenReady = true
         }
     }
-    DisposableEffect(activity) {
-        val previousOrientation = activity?.requestedOrientation
-        activity?.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE
+    LaunchedEffect(muted) { player.volume = if(muted) 0f else 1f }
+    DisposableEffect(player) {
         onDispose {
             player.release()
             vm.stop()
-            if (previousOrientation != null) activity.requestedOrientation = previousOrientation
         }
     }
-    Box(Modifier.fillMaxSize()) {
-        if (landscape) {
-            Row(Modifier.fillMaxSize()) {
-                LivePlayer(player, Modifier.weight(1f).fillMaxHeight())
-                if (camera.capabilities.ptz) Box(Modifier.width(190.dp).fillMaxHeight()) { PTZPad(vm) }
+    Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal=18.dp),verticalArrangement=Arrangement.spacedBy(14.dp)) {
+        Surface(Modifier.fillMaxWidth().aspectRatio(16/9f),RoundedCornerShape(22.dp),color=ColorTokens.BrandTile,border=androidx.compose.foundation.BorderStroke(1.dp,MaterialTheme.colorScheme.outlineVariant),shadowElevation=7.dp) {
+            LivePlayer(player,Modifier.fillMaxSize())
+        }
+        Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.spacedBy(10.dp)) {
+            if(camera.capabilities.audio) CameraAction(if(muted)Lucide.VolumeX else Lucide.Volume2,if(muted)stringResource(R.string.unmute) else stringResource(R.string.mute),{muted=!muted},Modifier.weight(1f))
+            if(camera.capabilities.snapshot) CameraAction(Lucide.Aperture,stringResource(R.string.snapshot),{showSnapshot=true;vm.captureSnapshot()},Modifier.weight(1f))
+            if(camera.capabilities.presets) CameraAction(Lucide.MapPin,stringResource(R.string.presets),{showPresets=true;vm.loadPresets()},Modifier.weight(1f))
+        }
+        if(camera.capabilities.ptz) {
+            Surface(Modifier.fillMaxWidth(),RoundedCornerShape(24.dp),MaterialTheme.colorScheme.surface,border=androidx.compose.foundation.BorderStroke(1.dp,MaterialTheme.colorScheme.outlineVariant),shadowElevation=5.dp) {
+                Column(Modifier.padding(18.dp),horizontalAlignment=Alignment.CenterHorizontally) {
+                    Row(Modifier.fillMaxWidth(),verticalAlignment=Alignment.CenterVertically) {
+                        Column(Modifier.weight(1f)) { Text(stringResource(R.string.camera_position),style=MaterialTheme.typography.titleMedium,fontWeight=FontWeight.SemiBold);Text(stringResource(R.string.press_and_hold),style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant) }
+                        Icon(Lucide.Move,null,tint=MaterialTheme.colorScheme.secondary)
+                    }
+                    Spacer(Modifier.height(10.dp))
+                    PTZPad(vm)
+                    if(camera.capabilities.zoom) {
+                        HorizontalDivider(Modifier.padding(vertical=14.dp),color=MaterialTheme.colorScheme.outlineVariant)
+                        Row(Modifier.fillMaxWidth(),verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(12.dp)) {
+                            Text(stringResource(R.string.zoom),Modifier.weight(1f),fontWeight=FontWeight.Medium)
+                            PTZButton(Lucide.Minus,stringResource(R.string.zoom_out),{vm.move(0.0,0.0,-.55)},{vm.stop()})
+                            PTZButton(Lucide.Plus,stringResource(R.string.zoom_in),{vm.move(0.0,0.0,.55)},{vm.stop()})
+                        }
+                    }
+                }
             }
         } else {
-            LivePlayer(player, Modifier.fillMaxWidth().aspectRatio(16 / 9f))
-            if (camera.capabilities.ptz) PTZPad(vm)
+            Surface(Modifier.fillMaxWidth(),RoundedCornerShape(18.dp),MaterialTheme.colorScheme.surfaceVariant) { Text(stringResource(R.string.fixed_camera),Modifier.padding(16.dp),style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant) }
         }
+        Spacer(Modifier.height(18.dp))
+    }
+    if(showSnapshot) com.ferforastieri.valkyris.core.design.ValkyrisBottomSheet(title=stringResource(R.string.snapshot),onDismiss={showSnapshot=false}) {
+        Box(Modifier.fillMaxWidth().aspectRatio(16/9f).background(ColorTokens.BrandTile,RoundedCornerShape(18.dp)),contentAlignment=Alignment.Center) {
+            when { snapshotLoading->CircularProgressIndicator();snapshot!=null->Image(requireNotNull(snapshot).asImageBitmap(),camera.name,Modifier.fillMaxSize(),contentScale=ContentScale.Crop);else->Text(stringResource(R.string.snapshot_unavailable),color=MaterialTheme.colorScheme.onSurfaceVariant) }
+        }
+    }
+    if(showPresets) com.ferforastieri.valkyris.core.design.ValkyrisBottomSheet(title=stringResource(R.string.presets),onDismiss={showPresets=false}) {
+        if(presets.isEmpty()) Text(stringResource(R.string.no_presets),Modifier.fillMaxWidth().padding(vertical=24.dp),color=MaterialTheme.colorScheme.onSurfaceVariant)
+        else Column(verticalArrangement=Arrangement.spacedBy(8.dp)) { presets.forEach { preset->Surface(onClick={vm.goToPreset(preset.token);showPresets=false},modifier=Modifier.fillMaxWidth(),shape=RoundedCornerShape(15.dp),color=MaterialTheme.colorScheme.surfaceVariant){Row(Modifier.padding(15.dp),verticalAlignment=Alignment.CenterVertically){Icon(Lucide.MapPin,null,tint=MaterialTheme.colorScheme.secondary);Spacer(Modifier.width(12.dp));Text(preset.name,fontWeight=FontWeight.Medium)}} } }
     }
 }
 
@@ -359,5 +415,6 @@ private tailrec fun Context.findActivity(): Activity? = when (this) {
     is ContextWrapper -> baseContext.findActivity()
     else -> null
 }
-@Composable private fun PTZPad(vm:CameraLiveViewModel){Column(Modifier.fillMaxWidth().padding(24.dp),horizontalAlignment=Alignment.CenterHorizontally){PTZButton(icon=Lucide.ChevronUp,onPress={vm.move(0.0,.65)},onRelease={vm.stop()});Row(verticalAlignment=Alignment.CenterVertically){PTZButton(icon=Lucide.ChevronLeft,onPress={vm.move(-.65,0.0)},onRelease={vm.stop()});Spacer(Modifier.width(56.dp));PTZButton(icon=Lucide.ChevronRight,onPress={vm.move(.65,0.0)},onRelease={vm.stop()})};PTZButton(icon=Lucide.ChevronDown,onPress={vm.move(0.0,-.65)},onRelease={vm.stop()})}}
-@Composable private fun PTZButton(icon:androidx.compose.ui.graphics.vector.ImageVector,onPress:()->Unit,onRelease:()->Unit){Surface(Modifier.size(52.dp).pointerInput(Unit){detectTapGestures(onPress={onPress();tryAwaitRelease();onRelease()})},shape=CircleShape,color=MaterialTheme.colorScheme.surface,tonalElevation=2.dp){Box{Icon(icon,null,Modifier.align(Alignment.Center))}}}
+@Composable private fun CameraAction(icon:ImageVector,label:String,onClick:()->Unit,modifier:Modifier=Modifier){Surface(onClick=onClick,modifier=modifier.height(66.dp),shape=RoundedCornerShape(17.dp),color=MaterialTheme.colorScheme.surface,border=androidx.compose.foundation.BorderStroke(1.dp,MaterialTheme.colorScheme.outlineVariant),shadowElevation=3.dp){Column(Modifier.fillMaxSize(),horizontalAlignment=Alignment.CenterHorizontally,verticalArrangement=Arrangement.Center){Icon(icon,label,Modifier.size(20.dp),tint=MaterialTheme.colorScheme.secondary);Spacer(Modifier.height(5.dp));Text(label,style=MaterialTheme.typography.labelSmall,fontWeight=FontWeight.Medium,maxLines=1)}}}
+@Composable private fun PTZPad(vm:CameraLiveViewModel){Surface(Modifier.size(190.dp),CircleShape,color=MaterialTheme.colorScheme.surfaceVariant,border=androidx.compose.foundation.BorderStroke(1.dp,MaterialTheme.colorScheme.outlineVariant),tonalElevation=1.dp){Box(Modifier.fillMaxSize().padding(10.dp)){Surface(Modifier.size(72.dp).align(Alignment.Center),CircleShape,color=MaterialTheme.colorScheme.surface,border=androidx.compose.foundation.BorderStroke(1.dp,MaterialTheme.colorScheme.outlineVariant)){Box(contentAlignment=Alignment.Center){Icon(Lucide.Video,null,tint=MaterialTheme.colorScheme.secondary)}};PTZButton(Lucide.ChevronUp,stringResource(R.string.move_up),{vm.move(0.0,.65)},{vm.stop()},Modifier.align(Alignment.TopCenter));PTZButton(Lucide.ChevronLeft,stringResource(R.string.move_left),{vm.move(-.65,0.0)},{vm.stop()},Modifier.align(Alignment.CenterStart));PTZButton(Lucide.ChevronRight,stringResource(R.string.move_right),{vm.move(.65,0.0)},{vm.stop()},Modifier.align(Alignment.CenterEnd));PTZButton(Lucide.ChevronDown,stringResource(R.string.move_down),{vm.move(0.0,-.65)},{vm.stop()},Modifier.align(Alignment.BottomCenter))}}}
+@Composable private fun PTZButton(icon:ImageVector,label:String,onPress:()->Unit,onRelease:()->Unit,modifier:Modifier=Modifier){Surface(modifier.size(48.dp).pointerInput(Unit){detectTapGestures(onPress={onPress();tryAwaitRelease();onRelease()})},shape=CircleShape,color=MaterialTheme.colorScheme.surface,shadowElevation=3.dp){Box(contentAlignment=Alignment.Center){Icon(icon,label,Modifier.size(22.dp))}}}

@@ -4,7 +4,7 @@ export const copy = {
   'pt-BR': {
     metaTitle: 'Valkyris | Monitoramento self-hosted para câmeras ONVIF',
     metaDescription: 'Monitore câmeras ONVIF e RTSP no seu homelab com detecção local, clipes privados e alertas Android. Open source, self-hosted e sem nuvem central.',
-    nav: ['Visão geral', 'Aplicativo', 'Instalação', 'Perguntas'],
+    nav: ['Visão geral', 'Aplicativo', 'Instalação', 'Documentação'],
     heroEyebrow: 'Monitoramento residencial privado',
     heroTitle: 'Sua casa avisa. Seus dados ficam.',
     heroBody: 'Transforme seu homelab em um monitor residencial self-hosted: conecte câmeras ONVIF, reconheça sons e movimentos e receba alertas no Android sem enviar sua rotina para uma nuvem central.',
@@ -42,7 +42,7 @@ export const copy = {
   en: {
     metaTitle: 'Valkyris | Self-hosted ONVIF home camera monitoring',
     metaDescription: 'Monitor ONVIF and RTSP cameras from your homelab with local detection, private event clips and Android alerts. Open source and self-hosted.',
-    nav: ['Overview', 'Application', 'Install', 'Questions'],
+    nav: ['Overview', 'Application', 'Install', 'Documentation'],
     heroEyebrow: 'Private home monitoring',
     heroTitle: 'Your home speaks. Your data stays.',
     heroBody: 'Turn your homelab into a self-hosted home monitor: connect ONVIF cameras, recognize sounds and movement, and receive Android alerts without sending your routine to a central cloud.',

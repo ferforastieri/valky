@@ -27,7 +27,9 @@ func TestProbeAndPTZAgainstFakeONVIFServer(t *testing.T) {
 			fmt.Fprintf(w, `<s:Envelope><s:Body><GetCapabilitiesResponse><Capabilities><Media><tt:XAddr>%s/onvif/media</tt:XAddr></Media><Events><tt:XAddr>%s/onvif/event_service</tt:XAddr></Events><PTZ/></Capabilities></GetCapabilitiesResponse></s:Body></s:Envelope>`, server.URL, server.URL)
 		case strings.Contains(string(body), "GetProfiles"):
 			fmt.Fprint(w, `<s:Envelope><s:Body><GetProfilesResponse><Profiles token="main"><AudioEncoderConfiguration/><PTZConfiguration><ZoomLimits/></PTZConfiguration></Profiles></GetProfilesResponse></s:Body></s:Envelope>`)
-		case strings.Contains(string(body), "ContinuousMove") || strings.Contains(string(body), "RelativeMove"):
+		case strings.Contains(string(body), "GetPresets"):
+			fmt.Fprint(w, `<s:Envelope><s:Body><GetPresetsResponse><Preset token="door"><Name>Front door</Name></Preset></GetPresetsResponse></s:Body></s:Envelope>`)
+		case strings.Contains(string(body), "ContinuousMove") || strings.Contains(string(body), "RelativeMove") || strings.Contains(string(body), "GotoPreset"):
 			ptzBody.Store(string(body))
 			fmt.Fprint(w, `<s:Envelope><s:Body><ContinuousMoveResponse/></s:Body></s:Envelope>`)
 		default:
@@ -42,7 +44,7 @@ func TestProbeAndPTZAgainstFakeONVIFServer(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if profile != "main" || !caps.Events || !caps.PTZ || !caps.Audio || !caps.Zoom {
+	if profile != "main" || !caps.Events || !caps.PTZ || !caps.Audio || !caps.Zoom || !caps.Presets {
 		t.Fatalf("unexpected probe result: profile=%q caps=%+v", profile, caps)
 	}
 	if services.Media == "" || services.Events == "" || services.PTZ == "" {
@@ -62,6 +64,17 @@ func TestProbeAndPTZAgainstFakeONVIFServer(t *testing.T) {
 	request, _ = ptzBody.Load().(string)
 	if !strings.Contains(request, "RelativeMove") || !strings.Contains(request, `x="0.300"`) {
 		t.Fatalf("relative PTZ move was not sent: %s", request)
+	}
+	presets, err := client.Presets(context.Background(), cam, Credentials{Username: "camera", Password: "secret"})
+	if err != nil || len(presets) != 1 || presets[0].Token != "door" || presets[0].Name != "Front door" {
+		t.Fatalf("unexpected presets: %+v err=%v", presets, err)
+	}
+	if err = client.PTZ(context.Background(), cam, Credentials{Username: "camera", Password: "secret"}, PTZCommand{Action: "preset", PresetToken: "door"}); err != nil {
+		t.Fatal(err)
+	}
+	request, _ = ptzBody.Load().(string)
+	if !strings.Contains(request, "GotoPreset") || !strings.Contains(request, "<tptz:PresetToken>door</tptz:PresetToken>") {
+		t.Fatalf("preset command was not sent: %s", request)
 	}
 }
 
