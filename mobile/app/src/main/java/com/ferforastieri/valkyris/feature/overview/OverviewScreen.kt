@@ -42,6 +42,7 @@ import com.composables.icons.lucide.SlidersHorizontal
 import com.composables.icons.lucide.Video
 import com.ferforastieri.valkyris.R
 import com.ferforastieri.valkyris.core.database.EventEntity
+import com.ferforastieri.valkyris.core.design.cameraIcon
 import com.ferforastieri.valkyris.core.model.Camera as CameraModel
 import com.ferforastieri.valkyris.core.network.ValkyrisRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -117,7 +118,7 @@ fun OverviewContent(
                 ) {
                     Row(Modifier.fillMaxWidth().padding(15.dp), verticalAlignment = Alignment.CenterVertically) {
                         Surface(Modifier.size(42.dp), RoundedCornerShape(13.dp), color = com.ferforastieri.valkyris.core.design.ColorTokens.BrandTile) {
-                            Icon(Lucide.Camera, null, Modifier.padding(10.dp), tint = MaterialTheme.colorScheme.secondary)
+                            Icon(cameraIcon(camera.icon), null, Modifier.padding(10.dp), tint = MaterialTheme.colorScheme.secondary)
                         }
                         Spacer(Modifier.width(12.dp))
                         Column(Modifier.weight(1f)) {

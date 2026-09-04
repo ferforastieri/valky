@@ -3,8 +3,8 @@ package com.ferforastieri.valkyris.core.model
 import kotlinx.serialization.Serializable
 
 @Serializable data class Capabilities(val snapshot:Boolean=false,val events:Boolean=false,val ptz:Boolean=false,val zoom:Boolean=false,val presets:Boolean=false,val audio:Boolean=false)
-@Serializable data class Camera(val id:String,val name:String,val host:String,val port:Int=2020,val profileToken:String="",val capabilities:Capabilities=Capabilities(),val setupStatus:String="ready",val setupStep:String="",val setupError:String="",val setupUpdatedAt:String="",val enabled:Boolean=true)
-@Serializable data class CreateCameraRequest(val name:String,val host:String,val port:Int=2020,val username:String,val password:String,val rtspUri:String)
+@Serializable data class Camera(val id:String,val name:String,val host:String,val icon:String="camera",val port:Int=2020,val profileToken:String="",val capabilities:Capabilities=Capabilities(),val setupStatus:String="ready",val setupStep:String="",val setupError:String="",val setupUpdatedAt:String="",val enabled:Boolean=true)
+@Serializable data class CreateCameraRequest(val name:String,val icon:String="camera",val host:String,val port:Int=2020,val username:String,val password:String)
 @Serializable data class ValkyrisEvent(val id:String,val cameraId:String,val ruleId:String?=null,val type:String,val confidence:Double,val occurredAt:String,val snapshotPath:String?=null,val clipPath:String?=null,val acknowledgedAt:String?=null)
 @Serializable data class RuleActions(val record:Boolean=true,val notify:Boolean=true,val alarm:Boolean=false)
 @Serializable data class RuleSchedule(val days:List<Int> = emptyList(),val start:String="",val end:String="",val timezone:String="")

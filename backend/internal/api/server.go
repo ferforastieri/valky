@@ -261,7 +261,12 @@ func (s *Server) completeCameraCreation(operationID string, in camera.CreateInpu
 		return
 	}
 	s.updateCameraOperation(ctx, operationID, "pending", "stream", "ONVIF connected; preparing the video stream", "")
-	if err = s.media.ConfigureCamera(ctx, operationID, in.RTSPURI); err != nil {
+	_, credentials, err := s.cameras.Get(ctx, operationID)
+	if err != nil {
+		s.failCameraOperation(operationID, in, err)
+		return
+	}
+	if err = s.media.ConfigureCamera(ctx, operationID, credentials.RTSPURI); err != nil {
 		s.failCameraOperation(operationID, in, err)
 		return
 	}

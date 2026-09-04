@@ -5,6 +5,7 @@ import test from 'node:test';
 const pt = await readFile(new URL('../dist/pt-BR/index.html', import.meta.url), 'utf8');
 const en = await readFile(new URL('../dist/en/index.html', import.meta.url), 'utf8');
 const root = await readFile(new URL('../dist/index.html', import.meta.url), 'utf8');
+const landingSource = await readFile(new URL('../src/components/Landing.astro', import.meta.url), 'utf8');
 
 test('publica as duas localizações com idioma correto', () => {
   assert.match(pt, /<html lang="pt-BR"/);
@@ -47,6 +48,13 @@ test('respeita a preferência por movimento reduzido', async () => {
   assert.match(styles, /\.floating-dock\{[^}]*top:18px;bottom:auto/);
   assert.match(styles, /@media\(max-width:760px\)[^{]*\{[^}]*body\{padding-top:0;padding-bottom:76px\}/);
   assert.match(styles, /\.dock-link span\{display:none\}/);
+});
+
+test('sincroniza os prints com o tema escolhido', () => {
+  assert.match(pt, /class="theme-screenshot"[^>]+data-light-src="\/screenshots\/overview-light\.png"[^>]+data-dark-src="\/screenshots\/overview-dark\.png"/);
+  assert.match(pt, /class="theme-screenshot"[^>]+data-light-src="\/screenshots\/cameras-light\.png"[^>]+data-dark-src="\/screenshots\/cameras-dark\.png"/);
+  assert.match(landingSource, /syncThemeScreenshots/);
+  assert.match(landingSource, /systemTheme\.addEventListener\('change'/);
 });
 
 test('artefatos públicos acompanham a documentação', async () => {

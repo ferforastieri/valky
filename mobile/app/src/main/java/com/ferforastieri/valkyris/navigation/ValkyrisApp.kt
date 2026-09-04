@@ -51,24 +51,26 @@ fun ValkyrisApp(main: MainViewModel) {
     val admin by main.admin.collectAsStateWithLifecycle()
     val update by main.updateInfo.collectAsStateWithLifecycle()
     val updating by main.updating.collectAsStateWithLifecycle()
-    Box(Modifier.fillMaxSize()) {
-        if (!paired) {
-            OnboardingScreen(main)
-        } else {
-            ConnectedValkyrisApp(main)
-        }
-        ToastMessageHost(
-            notices = main.notices,
-            modifier = Modifier.align(androidx.compose.ui.Alignment.TopCenter).statusBarsPadding().padding(14.dp),
-        )
-        update?.let {
-            UpdateEventDialog(
-                update = it,
-                admin = admin,
-                updating = updating,
-                onUpdate = main::startUpdate,
-                onDismiss = main::dismissUpdate,
+    Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
+        Box(Modifier.fillMaxSize().windowInsetsPadding(WindowInsets.safeDrawing)) {
+            if (!paired) {
+                OnboardingScreen(main)
+            } else {
+                ConnectedValkyrisApp(main)
+            }
+            ToastMessageHost(
+                notices = main.notices,
+                modifier = Modifier.align(androidx.compose.ui.Alignment.TopCenter).padding(14.dp),
             )
+            update?.let {
+                UpdateEventDialog(
+                    update = it,
+                    admin = admin,
+                    updating = updating,
+                    onUpdate = main::startUpdate,
+                    onDismiss = main::dismissUpdate,
+                )
+            }
         }
     }
 }
@@ -100,8 +102,9 @@ private fun ConnectedValkyrisApp(main: MainViewModel) {
         }
     }
     Scaffold(
-        modifier = Modifier.imePadding(),
+        modifier = Modifier.fillMaxSize().imePadding(),
         containerColor = MaterialTheme.colorScheme.background,
+        contentWindowInsets = WindowInsets(0, 0, 0, 0),
         topBar = {
             if (showTopBar) {
                 val title = when (currentRoute) {
@@ -123,7 +126,7 @@ private fun ConnectedValkyrisApp(main: MainViewModel) {
         },
         bottomBar = {
             if (showBottomBar) Box(
-                Modifier.fillMaxWidth().navigationBarsPadding().padding(bottom = 8.dp),
+                Modifier.fillMaxWidth().padding(bottom = 8.dp),
                 contentAlignment = androidx.compose.ui.Alignment.Center,
             ) {
                 val labels = destinations.map { it.icon to stringResource(it.label) }

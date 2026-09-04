@@ -11,6 +11,7 @@ import android.view.ViewGroup
 import androidx.compose.foundation.background
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -21,6 +22,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.pointer.pointerInput
@@ -39,6 +41,7 @@ import androidx.media3.ui.PlayerView
 import com.ferforastieri.valkyris.R
 import com.ferforastieri.valkyris.core.design.SignalLine
 import com.ferforastieri.valkyris.core.design.ColorTokens
+import com.ferforastieri.valkyris.core.design.cameraIcon
 import com.ferforastieri.valkyris.core.model.Camera
 import com.ferforastieri.valkyris.core.model.CreateCameraRequest
 import com.composables.icons.lucide.ArrowLeft
@@ -87,16 +90,29 @@ fun CamerasContent(state: CamerasState, onCamera: (String) -> Unit = {}, onAdd: 
 }
 
 @Composable private fun AddCameraDialog(onDismiss:()->Unit,onSave:(CreateCameraRequest)->Unit){
-    var name by remember{mutableStateOf("")};var host by remember{mutableStateOf("")};var port by remember{mutableStateOf("2020")};var username by remember{mutableStateOf("")};var password by remember{mutableStateOf("")};var rtsp by remember{mutableStateOf("")}
+    var name by remember{mutableStateOf("")};var icon by remember{mutableStateOf("camera")};var host by remember{mutableStateOf("")};var port by remember{mutableStateOf("2020")};var username by remember{mutableStateOf("")};var password by remember{mutableStateOf("")}
     com.ferforastieri.valkyris.core.design.ValkyrisBottomSheet(
         title = stringResource(R.string.add_camera),
         onDismiss = onDismiss,
         actions = {
             TextButton(onDismiss) { Text(stringResource(R.string.cancel)) }
-            Button(onClick={onSave(CreateCameraRequest(name,host,port.toIntOrNull()?:2020,username,password,rtsp))},enabled=name.isNotBlank()&&host.isNotBlank()&&username.isNotBlank()&&password.isNotBlank()&&rtsp.startsWith("rtsp://")){Text(stringResource(R.string.save))}
+            Button(onClick={onSave(CreateCameraRequest(name=name,icon=icon,host=host,port=port.toIntOrNull()?:2020,username=username,password=password))},enabled=name.isNotBlank()&&host.isNotBlank()&&username.isNotBlank()&&password.isNotBlank()){Text(stringResource(R.string.save))}
         },
     ) {
-        Column(Modifier.fillMaxWidth().heightIn(max=480.dp).imePadding().verticalScroll(rememberScrollState()),verticalArrangement=Arrangement.spacedBy(8.dp)){OutlinedTextField(name,{name=it},Modifier.fillMaxWidth(),label={Text(stringResource(R.string.camera_name))});OutlinedTextField(host,{host=it},Modifier.fillMaxWidth(),label={Text(stringResource(R.string.camera_ip))});OutlinedTextField(port,{port=it.filter(Char::isDigit)},Modifier.fillMaxWidth(),label={Text(stringResource(R.string.onvif_port))});OutlinedTextField(username,{username=it},Modifier.fillMaxWidth(),label={Text(stringResource(R.string.camera_user))});OutlinedTextField(password,{password=it},Modifier.fillMaxWidth(),label={Text(stringResource(R.string.camera_password))},visualTransformation=androidx.compose.ui.text.input.PasswordVisualTransformation());OutlinedTextField(rtsp,{rtsp=it},Modifier.fillMaxWidth(),label={Text(stringResource(R.string.rtsp_uri))})}
+        Column(Modifier.fillMaxWidth().heightIn(max=520.dp).imePadding().verticalScroll(rememberScrollState()),verticalArrangement=Arrangement.spacedBy(8.dp)){
+            OutlinedTextField(name,{name=it},Modifier.fillMaxWidth(),label={Text(stringResource(R.string.camera_name))})
+            Text(stringResource(R.string.camera_icon),style=MaterialTheme.typography.labelLarge)
+            Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),horizontalArrangement=Arrangement.spacedBy(8.dp)){
+                cameraIconOptions.forEach { option ->
+                    FilterChip(selected=icon==option.value,onClick={icon=option.value},label={Text(stringResource(option.label))},leadingIcon={Icon(option.image,null,Modifier.size(18.dp))})
+                }
+            }
+            OutlinedTextField(host,{host=it},Modifier.fillMaxWidth(),label={Text(stringResource(R.string.camera_ip))})
+            OutlinedTextField(port,{port=it.filter(Char::isDigit)},Modifier.fillMaxWidth(),label={Text(stringResource(R.string.onvif_port))})
+            OutlinedTextField(username,{username=it},Modifier.fillMaxWidth(),label={Text(stringResource(R.string.camera_user))})
+            OutlinedTextField(password,{password=it},Modifier.fillMaxWidth(),label={Text(stringResource(R.string.camera_password))},visualTransformation=androidx.compose.ui.text.input.PasswordVisualTransformation())
+            Text(stringResource(R.string.rtsp_automatic_hint),style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant)
+        }
     }
 }
 @Composable
@@ -118,6 +134,10 @@ private fun CameraCard(camera: Camera, snapshot: android.graphics.Bitmap?, onCli
                 }
             }
             Row(Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
+                Surface(shape=MaterialTheme.shapes.medium,color=MaterialTheme.colorScheme.secondaryContainer) {
+                    Icon(cameraIcon(camera.icon),null,Modifier.padding(10.dp).size(20.dp),tint=MaterialTheme.colorScheme.onSecondaryContainer)
+                }
+                Spacer(Modifier.width(12.dp))
                 Column(Modifier.weight(1f)) {
                     Text(camera.name, fontWeight = FontWeight.SemiBold)
                     Text(if (ready) camera.host else setupDescription(camera), color = if (failed) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodySmall, maxLines = 2)
@@ -128,6 +148,20 @@ private fun CameraCard(camera: Camera, snapshot: android.graphics.Bitmap?, onCli
         }
     }
 }
+
+private data class CameraIconOption(val value:String,val label:Int,val image:ImageVector)
+
+private val cameraIconOptions = listOf(
+    CameraIconOption("camera",R.string.camera_icon_camera,cameraIcon("camera")),
+    CameraIconOption("baby",R.string.camera_icon_baby,cameraIcon("baby")),
+    CameraIconOption("bedroom",R.string.camera_icon_bedroom,cameraIcon("bedroom")),
+    CameraIconOption("office",R.string.camera_icon_office,cameraIcon("office")),
+    CameraIconOption("entrance",R.string.camera_icon_entrance,cameraIcon("entrance")),
+    CameraIconOption("living_room",R.string.camera_icon_living_room,cameraIcon("living_room")),
+    CameraIconOption("yard",R.string.camera_icon_yard,cameraIcon("yard")),
+    CameraIconOption("garage",R.string.camera_icon_garage,cameraIcon("garage")),
+    CameraIconOption("kitchen",R.string.camera_icon_kitchen,cameraIcon("kitchen")),
+)
 
 @Composable private fun setupLabel(camera: Camera) = when (camera.setupStatus) {
     "failed" -> stringResource(R.string.camera_setup_failed)

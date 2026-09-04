@@ -29,7 +29,7 @@ func TestOpenMigratesONVIFServiceAddresses(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer db.Close()
-	for _, column := range []string{"media_xaddr", "events_xaddr", "ptz_xaddr"} {
+	for _, column := range []string{"media_xaddr", "events_xaddr", "ptz_xaddr", "icon"} {
 		exists, checkErr := columnExists(context.Background(), db.DB, "cameras", column)
 		if checkErr != nil || !exists {
 			t.Fatalf("column %s was not migrated: %v", column, checkErr)

@@ -5,6 +5,9 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
+	"net"
+	"net/url"
+	"strings"
 	"time"
 
 	"github.com/ferforastieri/valkyris/backend/internal/crypto"
@@ -34,11 +37,15 @@ func (r *Repository) Create(ctx context.Context, in CreateInput, caps Capabiliti
 }
 
 func (r *Repository) CreatePending(ctx context.Context, in CreateInput) (Camera, error) {
-	if in.Name == "" || in.Host == "" || in.Username == "" || in.Password == "" || in.RTSPURI == "" {
-		return Camera{}, fmt.Errorf("name, host, username, password and rtspUri are required")
+	if in.Name == "" || in.Host == "" || in.Username == "" || in.Password == "" {
+		return Camera{}, fmt.Errorf("name, host, username and password are required")
 	}
 	if in.Port == 0 {
 		in.Port = 2020
+	}
+	in.Icon = normalizeIcon(in.Icon)
+	if in.RTSPURI == "" {
+		in.RTSPURI = defaultRTSPURI(in.Host, in.Username, in.Password)
 	}
 	user, err := r.vault.EncryptString(in.Username)
 	if err != nil {
@@ -53,10 +60,23 @@ func (r *Repository) CreatePending(ctx context.Context, in CreateInput) (Camera,
 		return Camera{}, err
 	}
 	now := time.Now().UTC()
-	c := Camera{ID: uuid.NewString(), Name: in.Name, Host: in.Host, Port: in.Port, SetupStatus: "pending", SetupStep: "queued", SetupUpdatedAt: now, Enabled: true, CreatedAt: now, UpdatedAt: now}
-	_, err = r.store.DB.ExecContext(ctx, `INSERT INTO cameras(id,name,host,port,username_enc,password_enc,rtsp_uri_enc,profile_token,capabilities_json,media_xaddr,events_xaddr,ptz_xaddr,setup_status,setup_step,setup_error,setup_updated_at,enabled,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
-		c.ID, c.Name, c.Host, c.Port, user, pass, rtsp, "", "{}", "", "", "", c.SetupStatus, c.SetupStep, "", now.Format(time.RFC3339Nano), 1, now.Format(time.RFC3339Nano), now.Format(time.RFC3339Nano))
+	c := Camera{ID: uuid.NewString(), Name: in.Name, Icon: in.Icon, Host: in.Host, Port: in.Port, SetupStatus: "pending", SetupStep: "queued", SetupUpdatedAt: now, Enabled: true, CreatedAt: now, UpdatedAt: now}
+	_, err = r.store.DB.ExecContext(ctx, `INSERT INTO cameras(id,name,icon,host,port,username_enc,password_enc,rtsp_uri_enc,profile_token,capabilities_json,media_xaddr,events_xaddr,ptz_xaddr,setup_status,setup_step,setup_error,setup_updated_at,enabled,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+		c.ID, c.Name, c.Icon, c.Host, c.Port, user, pass, rtsp, "", "{}", "", "", "", c.SetupStatus, c.SetupStep, "", now.Format(time.RFC3339Nano), 1, now.Format(time.RFC3339Nano), now.Format(time.RFC3339Nano))
 	return c, err
+}
+
+func defaultRTSPURI(host, username, password string) string {
+	host = strings.TrimSpace(host)
+	if parsed, err := url.Parse(host); err == nil && parsed.Hostname() != "" {
+		host = parsed.Hostname()
+	}
+	if strings.Contains(host, ":") {
+		host = net.JoinHostPort(strings.Trim(host, "[]"), "554")
+	} else {
+		host += ":554"
+	}
+	return (&url.URL{Scheme: "rtsp", User: url.UserPassword(username, password), Host: host, Path: "/stream1"}).String()
 }
 
 func (r *Repository) UpdateSetup(ctx context.Context, id, status, step, setupError string) error {
@@ -87,7 +107,7 @@ func (r *Repository) CompleteSetup(ctx context.Context, id string, caps Capabili
 }
 
 func (r *Repository) List(ctx context.Context) ([]Camera, error) {
-	rows, err := r.store.DB.QueryContext(ctx, `SELECT id,name,host,port,profile_token,capabilities_json,media_xaddr,events_xaddr,ptz_xaddr,setup_status,setup_step,setup_error,setup_updated_at,enabled,created_at,updated_at FROM cameras ORDER BY name`)
+	rows, err := r.store.DB.QueryContext(ctx, `SELECT id,name,icon,host,port,profile_token,capabilities_json,media_xaddr,events_xaddr,ptz_xaddr,setup_status,setup_step,setup_error,setup_updated_at,enabled,created_at,updated_at FROM cameras ORDER BY name`)
 	if err != nil {
 		return nil, err
 	}
@@ -104,13 +124,13 @@ func (r *Repository) List(ctx context.Context) ([]Camera, error) {
 }
 
 func (r *Repository) Get(ctx context.Context, id string) (Camera, Credentials, error) {
-	row := r.store.DB.QueryRowContext(ctx, `SELECT id,name,host,port,profile_token,capabilities_json,media_xaddr,events_xaddr,ptz_xaddr,setup_status,setup_step,setup_error,setup_updated_at,enabled,created_at,updated_at,username_enc,password_enc,rtsp_uri_enc FROM cameras WHERE id=?`, id)
+	row := r.store.DB.QueryRowContext(ctx, `SELECT id,name,icon,host,port,profile_token,capabilities_json,media_xaddr,events_xaddr,ptz_xaddr,setup_status,setup_step,setup_error,setup_updated_at,enabled,created_at,updated_at,username_enc,password_enc,rtsp_uri_enc FROM cameras WHERE id=?`, id)
 	var c Camera
 	var caps string
 	var enabled int
 	var setupUpdated, created, updated string
 	var user, pass, rtsp []byte
-	err := row.Scan(&c.ID, &c.Name, &c.Host, &c.Port, &c.ProfileToken, &caps, &c.Services.Media, &c.Services.Events, &c.Services.PTZ, &c.SetupStatus, &c.SetupStep, &c.SetupError, &setupUpdated, &enabled, &created, &updated, &user, &pass, &rtsp)
+	err := row.Scan(&c.ID, &c.Name, &c.Icon, &c.Host, &c.Port, &c.ProfileToken, &caps, &c.Services.Media, &c.Services.Events, &c.Services.PTZ, &c.SetupStatus, &c.SetupStep, &c.SetupError, &setupUpdated, &enabled, &created, &updated, &user, &pass, &rtsp)
 	if err != nil {
 		return c, Credentials{}, err
 	}
@@ -150,7 +170,7 @@ func scanCamera(s scanner) (Camera, error) {
 	var c Camera
 	var caps, setupUpdated, created, updated string
 	var enabled int
-	err := s.Scan(&c.ID, &c.Name, &c.Host, &c.Port, &c.ProfileToken, &caps, &c.Services.Media, &c.Services.Events, &c.Services.PTZ, &c.SetupStatus, &c.SetupStep, &c.SetupError, &setupUpdated, &enabled, &created, &updated)
+	err := s.Scan(&c.ID, &c.Name, &c.Icon, &c.Host, &c.Port, &c.ProfileToken, &caps, &c.Services.Media, &c.Services.Events, &c.Services.PTZ, &c.SetupStatus, &c.SetupStep, &c.SetupError, &setupUpdated, &enabled, &created, &updated)
 	if err != nil {
 		return c, err
 	}

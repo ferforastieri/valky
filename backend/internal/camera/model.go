@@ -20,6 +20,7 @@ type ServiceAddresses struct {
 type Camera struct {
 	ID             string           `json:"id"`
 	Name           string           `json:"name"`
+	Icon           string           `json:"icon"`
 	Host           string           `json:"host"`
 	Port           int              `json:"port"`
 	ProfileToken   string           `json:"profileToken"`
@@ -42,11 +43,24 @@ type Credentials struct {
 
 type CreateInput struct {
 	Name     string `json:"name"`
+	Icon     string `json:"icon"`
 	Host     string `json:"host"`
 	Port     int    `json:"port"`
 	Username string `json:"username"`
 	Password string `json:"password"`
 	RTSPURI  string `json:"rtspUri"`
+}
+
+var validIcons = map[string]struct{}{
+	"camera": {}, "baby": {}, "bedroom": {}, "office": {}, "entrance": {},
+	"living_room": {}, "yard": {}, "garage": {}, "kitchen": {},
+}
+
+func normalizeIcon(icon string) string {
+	if _, ok := validIcons[icon]; ok {
+		return icon
+	}
+	return "camera"
 }
 
 type PTZCommand struct {

@@ -40,6 +40,7 @@ func Open(path string) (*Store, error) {
 		{"cameras", "setup_step", `ALTER TABLE cameras ADD COLUMN setup_step TEXT NOT NULL DEFAULT ''`, ""},
 		{"cameras", "setup_error", `ALTER TABLE cameras ADD COLUMN setup_error TEXT NOT NULL DEFAULT ''`, ""},
 		{"cameras", "setup_updated_at", `ALTER TABLE cameras ADD COLUMN setup_updated_at TEXT NOT NULL DEFAULT ''`, `UPDATE cameras SET setup_updated_at=updated_at WHERE setup_updated_at=''`},
+		{"cameras", "icon", `ALTER TABLE cameras ADD COLUMN icon TEXT NOT NULL DEFAULT 'camera'`, ""},
 		// Devices paired by releases without roles were trusted setup devices.
 		{"devices", "is_admin", `ALTER TABLE devices ADD COLUMN is_admin INTEGER NOT NULL DEFAULT 0`, `UPDATE devices SET is_admin=1`},
 	} {

@@ -212,10 +212,11 @@ components:
         audio: {type: boolean}
     Camera:
       type: object
-      required: [id, name, host, capabilities, enabled]
+      required: [id, name, icon, host, capabilities, enabled]
       properties:
         id: {type: string, format: uuid}
         name: {type: string}
+        icon: {type: string, enum: [camera, baby, bedroom, office, entrance, living_room, yard, garage, kitchen]}
         host: {type: string}
         port: {type: integer}
         profileToken: {type: string}
@@ -227,14 +228,15 @@ components:
         enabled: {type: boolean}
     CameraInput:
       type: object
-      required: [name, host, username, password, rtspUri]
+      required: [name, host, username, password]
       properties:
         name: {type: string}
+        icon: {type: string, enum: [camera, baby, bedroom, office, entrance, living_room, yard, garage, kitchen], default: camera}
         host: {type: string}
         port: {type: integer, default: 2020}
         username: {type: string}
         password: {type: string, format: password}
-        rtspUri: {type: string, format: uri}
+        rtspUri: {type: string, format: uri, description: Optional override; defaults to the primary Tapo stream on port 554}
     CameraOperation:
       type: object
       required: [id, status, message, createdAt, updatedAt]

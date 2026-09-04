@@ -228,8 +228,8 @@ private fun Showcase(
 
 private object Samples {
     val cameras = listOf(
-        CameraModel("entry", "Entrada", "192.0.2.23", capabilities = Capabilities(events = true, ptz = true, audio = true)),
-        CameraModel("yard", "Quintal", "192.0.2.24", capabilities = Capabilities(events = true, audio = true)),
+        CameraModel("entry", "Entrada", "192.0.2.23", icon = "entrance", capabilities = Capabilities(events = true, ptz = true, audio = true)),
+        CameraModel("yard", "Quintal", "192.0.2.24", icon = "yard", capabilities = Capabilities(events = true, audio = true)),
     )
     val events = listOf(
         EventEntity("1", "entry", "movimento na entrada", .94, "2026-09-04T20:41:08Z", null, null, null),
