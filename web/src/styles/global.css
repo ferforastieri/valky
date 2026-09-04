@@ -1922,10 +1922,10 @@ body {
 /* Keep the hero copy clear and let the phone stack sit decisively to its right. */
 @media (min-width: 981px) {
   .hero-phone {
-    left: 51%;
+    left: 61%;
   }
   .hero-phone:first-child {
-    left: 20%;
+    left: 30%;
   }
 }
 
@@ -1973,32 +1973,4 @@ body {
 @keyframes carousel-arrive-previous {
   from { transform: translateX(-60%) translateY(34px) rotate(-7deg) scale(0.88); }
   to { transform: translateX(-50%) translateY(0) rotate(-1deg) scale(1); }
-}
-.carousel-controls {
-  position: relative;
-}
-.carousel-auto {
-  position: absolute;
-  left: calc(50% + 82px);
-  width: 30px;
-  height: 30px;
-  display: grid;
-  place-items: center;
-  padding: 0;
-  border: 1px solid var(--line);
-  border-radius: 10px;
-  background: color-mix(in srgb, var(--surface) 90%, transparent);
-  color: var(--muted);
-  cursor: pointer;
-}
-.carousel-auto .play-icon,
-.carousel-auto.is-paused .pause-icon {
-  display: none;
-}
-.carousel-auto.is-paused .play-icon {
-  display: block;
-}
-.carousel-auto:focus-visible {
-  outline: 2px solid var(--signal);
-  outline-offset: 3px;
 }

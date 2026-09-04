@@ -57,9 +57,9 @@ test('sincroniza os prints com o tema escolhido', () => {
   assert.match(landingSource, /systemTheme\.addEventListener\('change'/);
 });
 
-test('carrossel permite avanço automático e pausa acessível', () => {
-  assert.match(pt, /class="carousel-auto"/);
-  assert.match(pt, /aria-label="Pausar carrossel"/);
+test('carrossel avança automaticamente sem controle visual redundante', () => {
+  assert.doesNotMatch(pt, /class="carousel-auto"/);
+  assert.doesNotMatch(pt, /aria-label="Pausar carrossel"/);
   assert.match(landingSource, /setTimeout\(\(\)=>\{show\(slide\+1\);schedule\(\)\},4800\)/);
   assert.match(landingSource, /prefers-reduced-motion: reduce/);
 });

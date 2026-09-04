@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: Valkyris API
-  version: 1.0.1
+  version: 1.0.2
   description: Local-first home camera monitoring API. JSON responses use a success/message/data envelope; every response also includes X-Valkyris-Success and X-Valkyris-Message headers.
 servers:
   - url: https://valkyris.local:8443/api/v1
