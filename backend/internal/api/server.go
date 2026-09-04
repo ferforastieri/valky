@@ -113,6 +113,7 @@ func (s *Server) Handler() http.Handler {
 	protected.HandleFunc("POST /cameras/{id}/ptz", s.ptz)
 	protected.HandleFunc("GET /cameras/{id}/presets", s.cameraPresets)
 	protected.HandleFunc("GET /cameras/{id}/snapshot", s.snapshot)
+	protected.HandleFunc("GET /cameras/{id}/recording", s.recentRecording)
 	protected.HandleFunc("GET /cameras/{id}/live/{asset...}", s.live)
 	protected.HandleFunc("GET /detectors", s.detectors)
 	protected.HandleFunc("GET /rules", s.listRules)
@@ -439,6 +440,55 @@ func (s *Server) snapshot(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Cache-Control", "no-store")
 	setOutcomeHeaders(w, http.StatusOK, "Camera snapshot loaded from live stream")
 	_, _ = w.Write(frame)
+}
+
+func (s *Server) recentRecording(w http.ResponseWriter, r *http.Request) {
+	cam, _, err := s.cameras.Get(r.Context(), r.PathValue("id"))
+	if err != nil {
+		respond(w, nil, err)
+		return
+	}
+	if cam.SetupStatus != "ready" {
+		writeError(w, http.StatusConflict, fmt.Errorf("camera stream is not ready"))
+		return
+	}
+
+	temporary, err := os.CreateTemp("", "valkyris-recent-*.mp4")
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, fmt.Errorf("create temporary recording: %w", err))
+		return
+	}
+	path := temporary.Name()
+	if err = temporary.Close(); err != nil {
+		_ = os.Remove(path)
+		writeError(w, http.StatusInternalServerError, fmt.Errorf("prepare temporary recording: %w", err))
+		return
+	}
+	defer os.Remove(path)
+
+	clipContext, cancel := context.WithTimeout(r.Context(), 20*time.Second)
+	defer cancel()
+	if err = s.media.MaterializeRecentClip(clipContext, cam.ID, 10*time.Second, path); err != nil {
+		writeError(w, http.StatusBadGateway, fmt.Errorf("recent recording unavailable: %w", err))
+		return
+	}
+	file, err := os.Open(path)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, fmt.Errorf("open recent recording: %w", err))
+		return
+	}
+	defer file.Close()
+	info, err := file.Stat()
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, fmt.Errorf("inspect recent recording: %w", err))
+		return
+	}
+
+	w.Header().Set("Content-Type", "video/mp4")
+	w.Header().Set("Content-Disposition", `attachment; filename="valkyris-recording.mp4"`)
+	w.Header().Set("Cache-Control", "no-store")
+	setOutcomeHeaders(w, http.StatusOK, "Recent camera recording loaded")
+	http.ServeContent(w, r, "valkyris-recording.mp4", info.ModTime(), file)
 }
 func (s *Server) live(w http.ResponseWriter, r *http.Request) {
 	target, _ := url.Parse(s.media.HLSBase())

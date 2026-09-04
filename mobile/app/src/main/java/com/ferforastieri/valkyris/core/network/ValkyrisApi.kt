@@ -18,6 +18,8 @@ import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonElement
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import java.security.MessageDigest
 import java.security.cert.X509Certificate
 import java.util.concurrent.TimeUnit
@@ -256,10 +258,34 @@ class ValkyrisApi(
     }
 
     fun snapshotUrl(cameraId: String) = base() + "/cameras/$cameraId/snapshot"
+    fun recordingUrl(cameraId: String) = base() + "/cameras/$cameraId/recording"
     fun liveUrl(cameraId: String) = base() + "/cameras/$cameraId/live/index.m3u8"
     fun clipUrl(eventId: String) = base() + "/events/$eventId/clip"
     fun eventSnapshotUrl(eventId: String) = base() + "/events/$eventId/snapshot"
     fun token() = requireNotNull(session()).token
+
+    suspend fun downloadCameraSnapshot(cameraId: String): ByteArray = downloadMedia(snapshotUrl(cameraId))
+
+    suspend fun downloadRecentRecording(cameraId: String): ByteArray = downloadMedia(recordingUrl(cameraId))
+
+    fun announce(@StringRes messageRes: Int, success: Boolean = true) = publish(messageRes, success)
+
+    private suspend fun downloadMedia(url: String): ByteArray = withContext(Dispatchers.IO) {
+        try {
+            val request = Request.Builder().url(url).header("Authorization", "Bearer ${token()}").build()
+            mediaHttpClient().newCall(request).execute().use { response ->
+                if (!response.isSuccessful) {
+                    val raw = response.body.string()
+                    throw localizedError(raw, response.code)
+                }
+                response.body.bytes()
+            }
+        } catch (error: Throwable) {
+            val localized = if (error is ApiException) error else localizedError(error.message.orEmpty(), cause = error)
+            publish(localized.messageRes, false)
+            throw localized
+        }
+    }
 
     fun realtime(onMessage: () -> Unit, onDisconnect: () -> Unit = {}): WebSocket {
         val current = requireNotNull(session())

@@ -9,8 +9,10 @@ import com.ferforastieri.valkyris.core.model.Camera
 import com.ferforastieri.valkyris.core.model.CreateCameraRequest
 import com.ferforastieri.valkyris.core.model.CameraPreset
 import com.ferforastieri.valkyris.core.model.PTZCommand
+import com.ferforastieri.valkyris.core.media.DeviceMediaStore
 import com.ferforastieri.valkyris.core.network.ValkyrisApi
 import com.ferforastieri.valkyris.core.network.ValkyrisRepository
+import com.ferforastieri.valkyris.R
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -25,6 +27,8 @@ import kotlinx.coroutines.withContext
 import kotlinx.coroutines.flow.update
 import okhttp3.Request
 import java.util.concurrent.TimeUnit
+import java.time.LocalDateTime
+import java.time.format.DateTimeFormatter
 import javax.inject.Inject
 
 data class CamerasState(
@@ -151,14 +155,18 @@ class CamerasViewModel @Inject constructor(private val repository: ValkyrisRepos
     }
 }
 @HiltViewModel
-class CameraLiveViewModel @Inject constructor(private val api: ValkyrisApi, saved: SavedStateHandle) : ViewModel() {
+class CameraLiveViewModel @Inject constructor(
+    private val api: ValkyrisApi,
+    private val deviceMedia: DeviceMediaStore,
+    saved: SavedStateHandle,
+) : ViewModel() {
     val id: String = checkNotNull(saved["id"])
     private val _camera = MutableStateFlow<Camera?>(null)
     val camera = _camera.asStateFlow()
-    private val _snapshot = MutableStateFlow<Bitmap?>(null)
-    val snapshot = _snapshot.asStateFlow()
     private val _snapshotLoading = MutableStateFlow(false)
     val snapshotLoading = _snapshotLoading.asStateFlow()
+    private val _recordingLoading = MutableStateFlow(false)
+    val recordingLoading = _recordingLoading.asStateFlow()
     private val _presets = MutableStateFlow<List<CameraPreset>>(emptyList())
     val presets = _presets.asStateFlow()
     private var realtime: okhttp3.WebSocket? = null
@@ -183,20 +191,38 @@ class CameraLiveViewModel @Inject constructor(private val api: ValkyrisApi, save
     fun goToPreset(token: String) { viewModelScope.launch { runCatching { api.ptz(id, PTZCommand("preset", presetToken = token)) } } }
     fun loadPresets() { viewModelScope.launch { runCatching { api.cameraPresets(id) }.onSuccess { _presets.value = it } } }
     fun captureSnapshot() {
+        if (_snapshotLoading.value) return
         viewModelScope.launch {
             _snapshotLoading.value = true
-            _snapshot.value = withContext(Dispatchers.IO) {
-                runCatching {
-                    val request = Request.Builder().url(api.snapshotUrl(id)).header("Authorization", "Bearer ${api.token()}").build()
-                    api.mediaHttpClient().newCall(request).apply { timeout().timeout(15, TimeUnit.SECONDS) }.execute().use { response ->
-                        if (!response.isSuccessful) return@runCatching null
-                        val bytes = response.body.bytes()
-                        BitmapFactory.decodeByteArray(bytes, 0, bytes.size)
-                    }
-                }.getOrNull()
+            val bytes = runCatching { api.downloadCameraSnapshot(id) }.getOrElse {
+                _snapshotLoading.value = false
+                return@launch
             }
+            runCatching { deviceMedia.savePhoto(bytes, mediaName("jpg")) }
+                .onSuccess { api.announce(R.string.snapshot_saved) }
+                .onFailure { api.announce(R.string.media_save_failed, false) }
             _snapshotLoading.value = false
         }
+    }
+    fun recordRecentClip() {
+        if (_recordingLoading.value) return
+        viewModelScope.launch {
+            _recordingLoading.value = true
+            val bytes = runCatching { api.downloadRecentRecording(id) }.getOrElse {
+                _recordingLoading.value = false
+                return@launch
+            }
+            runCatching { deviceMedia.saveVideo(bytes, mediaName("mp4")) }
+                .onSuccess { api.announce(R.string.recording_saved) }
+                .onFailure { api.announce(R.string.media_save_failed, false) }
+            _recordingLoading.value = false
+        }
+    }
+    fun storagePermissionDenied() = api.announce(R.string.storage_permission_required, false)
+    private fun mediaName(extension: String): String {
+        val cameraName = _camera.value?.name.orEmpty().replace(Regex("[^A-Za-z0-9_-]+"), "-").trim('-').ifBlank { "camera" }
+        val timestamp = LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyyMMdd-HHmmss"))
+        return "Valkyris-$cameraName-$timestamp.$extension"
     }
     fun liveUrl() = api.liveUrl(id)
     fun token() = api.token()

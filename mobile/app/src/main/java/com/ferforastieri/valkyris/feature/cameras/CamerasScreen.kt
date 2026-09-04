@@ -2,14 +2,21 @@
 
 package com.ferforastieri.valkyris.feature.cameras
 
+import android.Manifest
 import android.app.Activity
 import android.content.Context
 import android.content.ContextWrapper
 import android.content.pm.ActivityInfo
+import android.content.pm.PackageManager
+import android.os.Build
 import android.view.ViewGroup
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.core.content.ContextCompat
 import androidx.compose.foundation.background
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.gestures.detectTransformGestures
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -21,6 +28,9 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.Modifier
@@ -29,6 +39,8 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.compose.LifecycleResumeEffect
@@ -54,12 +66,14 @@ import com.composables.icons.lucide.EllipsisVertical
 import com.composables.icons.lucide.Lucide
 import com.composables.icons.lucide.Mic
 import com.composables.icons.lucide.MapPin
+import com.composables.icons.lucide.Maximize2
 import com.composables.icons.lucide.Minus
 import com.composables.icons.lucide.Move
 import com.composables.icons.lucide.Plus
 import com.composables.icons.lucide.Trash2
 import com.composables.icons.lucide.Video
 import com.composables.icons.lucide.VideoOff
+import com.composables.icons.lucide.X
 import com.composables.icons.lucide.Volume2
 import com.composables.icons.lucide.VolumeX
 
@@ -337,12 +351,26 @@ private fun CameraSetupContent(camera: Camera, failed: Boolean) {
 @Composable
 private fun ReadyCameraContent(camera: Camera, vm: CameraLiveViewModel) {
     val context = androidx.compose.ui.platform.LocalContext.current
-    val snapshot by vm.snapshot.collectAsStateWithLifecycle()
     val snapshotLoading by vm.snapshotLoading.collectAsStateWithLifecycle()
+    val recordingLoading by vm.recordingLoading.collectAsStateWithLifecycle()
     val presets by vm.presets.collectAsStateWithLifecycle()
     var muted by remember { mutableStateOf(false) }
-    var showSnapshot by remember { mutableStateOf(false) }
     var showPresets by remember { mutableStateOf(false) }
+    var showFullscreen by remember { mutableStateOf(false) }
+    var pendingMediaAction by remember { mutableStateOf<MediaAction?>(null) }
+    val storagePermission = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
+        val action = pendingMediaAction
+        pendingMediaAction = null
+        if (granted && action != null) {
+            if (action == MediaAction.Snapshot) vm.captureSnapshot() else vm.recordRecentClip()
+        } else if (!granted) vm.storagePermissionDenied()
+    }
+    fun runMediaAction(action: MediaAction) {
+        if (Build.VERSION.SDK_INT <= Build.VERSION_CODES.P && ContextCompat.checkSelfPermission(context, Manifest.permission.WRITE_EXTERNAL_STORAGE) != PackageManager.PERMISSION_GRANTED) {
+            pendingMediaAction = action
+            storagePermission.launch(Manifest.permission.WRITE_EXTERNAL_STORAGE)
+        } else if (action == MediaAction.Snapshot) vm.captureSnapshot() else vm.recordRecentClip()
+    }
     val player = remember {
         val factory = OkHttpDataSource.Factory(vm.httpClient()).setDefaultRequestProperties(mapOf("Authorization" to "Bearer ${vm.token()}"))
         ExoPlayer.Builder(context).setMediaSourceFactory(HlsMediaSource.Factory(factory)).build().apply {
@@ -360,12 +388,29 @@ private fun ReadyCameraContent(camera: Camera, vm: CameraLiveViewModel) {
     }
     Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal=18.dp),verticalArrangement=Arrangement.spacedBy(14.dp)) {
         Surface(Modifier.fillMaxWidth().aspectRatio(16/9f),RoundedCornerShape(22.dp),color=ColorTokens.BrandTile,border=androidx.compose.foundation.BorderStroke(1.dp,MaterialTheme.colorScheme.outlineVariant),shadowElevation=7.dp) {
-            LivePlayer(player,Modifier.fillMaxSize())
+            Box {
+                if (!showFullscreen) LivePlayer(player,Modifier.fillMaxSize())
+                else Box(Modifier.fillMaxSize().background(Color.Black))
+                Box(
+                    Modifier.fillMaxSize().pointerInput(Unit) { detectTapGestures { showFullscreen = true } },
+                    contentAlignment = Alignment.TopEnd,
+                ) {
+                    Surface(Modifier.padding(10.dp), CircleShape, color = Color.Black.copy(alpha = .48f)) {
+                        Icon(Lucide.Maximize2, stringResource(R.string.fullscreen_camera), Modifier.padding(8.dp).size(18.dp), tint = Color.White)
+                    }
+                }
+            }
         }
-        Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.spacedBy(10.dp)) {
-            if(camera.capabilities.audio) CameraAction(if(muted)Lucide.VolumeX else Lucide.Volume2,if(muted)stringResource(R.string.unmute) else stringResource(R.string.mute),{muted=!muted},Modifier.weight(1f))
-            if(camera.capabilities.snapshot) CameraAction(Lucide.Aperture,stringResource(R.string.snapshot),{showSnapshot=true;vm.captureSnapshot()},Modifier.weight(1f))
-            if(camera.capabilities.presets) CameraAction(Lucide.MapPin,stringResource(R.string.presets),{showPresets=true;vm.loadPresets()},Modifier.weight(1f))
+        val actions = mutableListOf<CameraActionItem>()
+        if(camera.capabilities.audio) actions += CameraActionItem(if(muted)Lucide.VolumeX else Lucide.Volume2,if(muted)stringResource(R.string.unmute) else stringResource(R.string.mute),{muted=!muted})
+        actions += CameraActionItem(Lucide.Aperture,stringResource(R.string.snapshot),{runMediaAction(MediaAction.Snapshot)},snapshotLoading)
+        actions += CameraActionItem(Lucide.Video,stringResource(R.string.record_recent),{runMediaAction(MediaAction.Recording)},recordingLoading)
+        if(camera.capabilities.presets) actions += CameraActionItem(Lucide.MapPin,stringResource(R.string.presets),{showPresets=true;vm.loadPresets()})
+        actions.chunked(2).forEach { rowActions ->
+            Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.spacedBy(10.dp)) {
+                rowActions.forEach { action -> CameraAction(action.icon,action.label,action.onClick,Modifier.weight(1f),action.loading) }
+                if(rowActions.size==1)Spacer(Modifier.weight(1f))
+            }
         }
         if(camera.capabilities.ptz) {
             Surface(Modifier.fillMaxWidth(),RoundedCornerShape(24.dp),MaterialTheme.colorScheme.surface,border=androidx.compose.foundation.BorderStroke(1.dp,MaterialTheme.colorScheme.outlineVariant),shadowElevation=5.dp) {
@@ -391,11 +436,7 @@ private fun ReadyCameraContent(camera: Camera, vm: CameraLiveViewModel) {
         }
         Spacer(Modifier.height(18.dp))
     }
-    if(showSnapshot) com.ferforastieri.valkyris.core.design.ValkyrisBottomSheet(title=stringResource(R.string.snapshot),onDismiss={showSnapshot=false}) {
-        Box(Modifier.fillMaxWidth().aspectRatio(16/9f).background(ColorTokens.BrandTile,RoundedCornerShape(18.dp)),contentAlignment=Alignment.Center) {
-            when { snapshotLoading->CircularProgressIndicator();snapshot!=null->Image(requireNotNull(snapshot).asImageBitmap(),camera.name,Modifier.fillMaxSize(),contentScale=ContentScale.Crop);else->Text(stringResource(R.string.snapshot_unavailable),color=MaterialTheme.colorScheme.onSurfaceVariant) }
-        }
-    }
+    if(showFullscreen) FullscreenLivePlayer(player, camera.name, onDismiss = { showFullscreen = false })
     if(showPresets) com.ferforastieri.valkyris.core.design.ValkyrisBottomSheet(title=stringResource(R.string.presets),onDismiss={showPresets=false}) {
         if(presets.isEmpty()) Text(stringResource(R.string.no_presets),Modifier.fillMaxWidth().padding(vertical=24.dp),color=MaterialTheme.colorScheme.onSurfaceVariant)
         else Column(verticalArrangement=Arrangement.spacedBy(8.dp)) { presets.forEach { preset->Surface(onClick={vm.goToPreset(preset.token);showPresets=false},modifier=Modifier.fillMaxWidth(),shape=RoundedCornerShape(15.dp),color=MaterialTheme.colorScheme.surfaceVariant){Row(Modifier.padding(15.dp),verticalAlignment=Alignment.CenterVertically){Icon(Lucide.MapPin,null,tint=MaterialTheme.colorScheme.secondary);Spacer(Modifier.width(12.dp));Text(preset.name,fontWeight=FontWeight.Medium)}} } }
@@ -405,9 +446,43 @@ private fun ReadyCameraContent(camera: Camera, vm: CameraLiveViewModel) {
 @Composable
 private fun LivePlayer(player: ExoPlayer, modifier: Modifier) {
     AndroidView(
-        factory = { PlayerView(it).apply { this.player = player; useController = true; layoutParams = ViewGroup.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT) } },
+        factory = { PlayerView(it).apply { this.player = player; useController = false; layoutParams = ViewGroup.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT) } },
         modifier = modifier,
     )
+}
+
+@Composable
+private fun FullscreenLivePlayer(player: ExoPlayer, cameraName: String, onDismiss: () -> Unit) {
+    var scale by remember { mutableFloatStateOf(1f) }
+    var offset by remember { mutableStateOf(Offset.Zero) }
+    Dialog(onDismissRequest = onDismiss, properties = DialogProperties(usePlatformDefaultWidth = false, decorFitsSystemWindows = false)) {
+        Box(Modifier.fillMaxSize().background(Color.Black)) {
+            Box(
+                Modifier.fillMaxSize().graphicsLayer {
+                    scaleX = scale
+                    scaleY = scale
+                    translationX = offset.x
+                    translationY = offset.y
+                }.pointerInput(Unit) {
+                    detectTransformGestures { _, pan, zoom, _ ->
+                        scale = (scale * zoom).coerceIn(1f, 4f)
+                        offset = if (scale == 1f) Offset.Zero else offset + pan
+                    }
+                },
+            ) { LivePlayer(player, Modifier.fillMaxSize()) }
+            Text(
+                stringResource(R.string.pinch_to_zoom),
+                Modifier.align(Alignment.TopCenter).statusBarsPadding().padding(top = 14.dp),
+                color = Color.White.copy(alpha = .78f),
+                style = MaterialTheme.typography.labelMedium,
+            )
+            IconButton(
+                onClick = onDismiss,
+                modifier = Modifier.align(Alignment.TopEnd).statusBarsPadding().padding(10.dp).background(Color.Black.copy(alpha = .55f), CircleShape),
+            ) { Icon(Lucide.X, stringResource(R.string.close_fullscreen), tint = Color.White) }
+            Text(cameraName, Modifier.align(Alignment.BottomStart).navigationBarsPadding().padding(20.dp), color = Color.White, fontWeight = FontWeight.SemiBold)
+        }
+    }
 }
 
 private tailrec fun Context.findActivity(): Activity? = when (this) {
@@ -415,6 +490,8 @@ private tailrec fun Context.findActivity(): Activity? = when (this) {
     is ContextWrapper -> baseContext.findActivity()
     else -> null
 }
-@Composable private fun CameraAction(icon:ImageVector,label:String,onClick:()->Unit,modifier:Modifier=Modifier){Surface(onClick=onClick,modifier=modifier.height(66.dp),shape=RoundedCornerShape(17.dp),color=MaterialTheme.colorScheme.surface,border=androidx.compose.foundation.BorderStroke(1.dp,MaterialTheme.colorScheme.outlineVariant),shadowElevation=3.dp){Column(Modifier.fillMaxSize(),horizontalAlignment=Alignment.CenterHorizontally,verticalArrangement=Arrangement.Center){Icon(icon,label,Modifier.size(20.dp),tint=MaterialTheme.colorScheme.secondary);Spacer(Modifier.height(5.dp));Text(label,style=MaterialTheme.typography.labelSmall,fontWeight=FontWeight.Medium,maxLines=1)}}}
+@Composable private fun CameraAction(icon:ImageVector,label:String,onClick:()->Unit,modifier:Modifier=Modifier,loading:Boolean=false){Surface(onClick=onClick,enabled=!loading,modifier=modifier.height(66.dp),shape=RoundedCornerShape(17.dp),color=MaterialTheme.colorScheme.surface,border=androidx.compose.foundation.BorderStroke(1.dp,MaterialTheme.colorScheme.outlineVariant),shadowElevation=3.dp){Column(Modifier.fillMaxSize(),horizontalAlignment=Alignment.CenterHorizontally,verticalArrangement=Arrangement.Center){if(loading)CircularProgressIndicator(Modifier.size(20.dp),strokeWidth=2.dp)else Icon(icon,label,Modifier.size(20.dp),tint=MaterialTheme.colorScheme.secondary);Spacer(Modifier.height(5.dp));Text(label,style=MaterialTheme.typography.labelSmall,fontWeight=FontWeight.Medium,maxLines=1)}}}
+private enum class MediaAction { Snapshot, Recording }
+private data class CameraActionItem(val icon:ImageVector,val label:String,val onClick:()->Unit,val loading:Boolean=false)
 @Composable private fun PTZPad(vm:CameraLiveViewModel){Surface(Modifier.size(190.dp),CircleShape,color=MaterialTheme.colorScheme.surfaceVariant,border=androidx.compose.foundation.BorderStroke(1.dp,MaterialTheme.colorScheme.outlineVariant),tonalElevation=1.dp){Box(Modifier.fillMaxSize().padding(10.dp)){Surface(Modifier.size(72.dp).align(Alignment.Center),CircleShape,color=MaterialTheme.colorScheme.surface,border=androidx.compose.foundation.BorderStroke(1.dp,MaterialTheme.colorScheme.outlineVariant)){Box(contentAlignment=Alignment.Center){Icon(Lucide.Video,null,tint=MaterialTheme.colorScheme.secondary)}};PTZButton(Lucide.ChevronUp,stringResource(R.string.move_up),{vm.move(0.0,.65)},{vm.stop()},Modifier.align(Alignment.TopCenter));PTZButton(Lucide.ChevronLeft,stringResource(R.string.move_left),{vm.move(-.65,0.0)},{vm.stop()},Modifier.align(Alignment.CenterStart));PTZButton(Lucide.ChevronRight,stringResource(R.string.move_right),{vm.move(.65,0.0)},{vm.stop()},Modifier.align(Alignment.CenterEnd));PTZButton(Lucide.ChevronDown,stringResource(R.string.move_down),{vm.move(0.0,-.65)},{vm.stop()},Modifier.align(Alignment.BottomCenter))}}}
 @Composable private fun PTZButton(icon:ImageVector,label:String,onPress:()->Unit,onRelease:()->Unit,modifier:Modifier=Modifier){Surface(modifier.size(48.dp).pointerInput(Unit){detectTapGestures(onPress={onPress();tryAwaitRelease();onRelease()})},shape=CircleShape,color=MaterialTheme.colorScheme.surface,shadowElevation=3.dp){Box(contentAlignment=Alignment.Center){Icon(icon,label,Modifier.size(22.dp))}}}

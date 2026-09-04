@@ -8,6 +8,9 @@ plugins {
     id("io.github.takahirom.roborazzi")
 }
 
+val valkyrisVersionName = providers.environmentVariable("VALKYRIS_VERSION_NAME").orElse("1.0.5")
+val valkyrisVersionCode = providers.environmentVariable("VALKYRIS_VERSION_CODE").map(String::toInt).orElse(13)
+
 android {
     namespace = "com.ferforastieri.valkyris"
     compileSdk = 36
@@ -16,8 +19,8 @@ android {
         applicationId = "com.ferforastieri.valkyris"
         minSdk = 26
         targetSdk = 36
-        versionCode = 13
-        versionName = "1.0.5"
+        versionCode = valkyrisVersionCode.get()
+        versionName = valkyrisVersionName.get()
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables.useSupportLibrary = true
     }

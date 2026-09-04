@@ -177,6 +177,14 @@
     <string name="no_unread_notifications_body">No alerts are waiting for your attention.</string>
     <string name="back">Back</string>
     <string name="snapshot">Snapshot</string>
+    <string name="record_recent">Last 10 sec</string>
+    <string name="snapshot_saved">Snapshot saved to Photos</string>
+    <string name="recording_saved">Recording saved to your device</string>
+    <string name="media_save_failed">Could not save the media</string>
+    <string name="storage_permission_required">Allow photo and video storage to continue</string>
+    <string name="fullscreen_camera">Open camera full screen</string>
+    <string name="close_fullscreen">Close full screen</string>
+    <string name="pinch_to_zoom">Pinch with two fingers to zoom</string>
     <string name="presets">Positions</string>
     <string name="mute">Mute</string>
     <string name="unmute">Listen</string>

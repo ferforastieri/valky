@@ -45,6 +45,7 @@ const endpoints = pt ? [
   ['POST','/api/v1/cameras/{id}/ptz','Autenticado','Move, para, aplica zoom ou chama um preset.'],
   ['GET','/api/v1/cameras/{id}/presets','Autenticado','Lista presets anunciados pela câmera.'],
   ['GET','/api/v1/cameras/{id}/snapshot','Autenticado','Retorna o snapshot JPEG atual.'],
+  ['GET','/api/v1/cameras/{id}/recording','Autenticado','Baixa os últimos 10 segundos do buffer em MP4.'],
   ['GET','/api/v1/cameras/{id}/live/index.m3u8','Autenticado','Entrega a playlist LL-HLS autenticada.'],
   ['GET','/api/v1/detectors','Autenticado','Lista os tipos normalizados de detecção.'],
   ['GET · POST','/api/v1/rules','Autenticado','Lista ou cria regras de automação.'],
@@ -73,6 +74,7 @@ const endpoints = pt ? [
   ['POST','/api/v1/cameras/{id}/ptz','Authenticated','Moves, stops, zooms or recalls a preset.'],
   ['GET','/api/v1/cameras/{id}/presets','Authenticated','Lists presets advertised by the camera.'],
   ['GET','/api/v1/cameras/{id}/snapshot','Authenticated','Returns the current JPEG snapshot.'],
+  ['GET','/api/v1/cameras/{id}/recording','Authenticated','Downloads the latest 10 seconds from the rolling buffer as MP4.'],
   ['GET','/api/v1/cameras/{id}/live/index.m3u8','Authenticated','Serves the authenticated LL-HLS playlist.'],
   ['GET','/api/v1/detectors','Authenticated','Lists normalized detector types.'],
   ['GET · POST','/api/v1/rules','Authenticated','Lists or creates automation rules.'],
@@ -98,7 +100,7 @@ const endpoints = pt ? [
         <p>{text.intro}</p>
       </div>
       <div class="docs-status" aria-label={pt ? 'Estado da documentação' : 'Documentation status'}>
-        <span><i></i>{pt ? 'Documentação da versão 1.0.5' : 'Version 1.0.5 documentation'}</span>
+        <span><i></i>{pt ? 'Documentação sempre atualizada' : 'Continuously updated documentation'}</span>
         <a href="/openapi.yaml" download>OpenAPI 3.1 <Download size={16}/></a>
       </div>
     </header>
@@ -123,7 +125,7 @@ const endpoints = pt ? [
           <div class="docs-heading"><Boxes size={22}/><div><span>02</span><h2>{pt ? 'Arquitetura' : 'Architecture'}</h2></div></div>
           <div class="architecture-flow">
             <article><strong>{pt ? 'Câmera' : 'Camera'}</strong><small>ONVIF · RTSP</small></article><i>→</i>
-            <article><strong>MediaMTX</strong><small>LL-HLS · buffer</small></article><i>→</i>
+            <article><strong>MediaMTX</strong><small>LL-HLS · buffer · AAC</small></article><i>→</i>
             <article><strong>Go + SQLite</strong><small>{pt ? 'regras · eventos' : 'rules · events'}</small></article><i>→</i>
             <article><strong>Android</strong><small>Compose · push</small></article>
           </div>

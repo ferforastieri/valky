@@ -23,7 +23,7 @@
 Valkyris transforma um servidor doméstico em uma central privada de monitoramento. Uma única instalação pode gerenciar várias câmeras e autorizar vários celulares, sem cadastro público e sem expor RTSP, ONVIF ou o MediaMTX na internet.
 
 - Descoberta de capacidades e snapshots por ONVIF Profile S.
-- Live view LL-HLS autenticado, com uma única conexão RTSP por câmera.
+- Live view LL-HLS autenticado, com uma única conexão RTSP por câmera e conversão apenas do áudio G.711 para AAC.
 - Movimento PTZ por pressionar e segurar, zoom e presets quando anunciados pela câmera.
 - Cadastro assíncrono: a câmera aparece imediatamente e o progresso ou erro fica persistido.
 - Regras para movimento e sons residenciais, com confiança, confirmações, agenda e cooldown.
@@ -41,7 +41,7 @@ Câmera ONVIF / RTSP
   MediaMTX interno ─── LL-HLS autenticado ─── Android
          │
          ├── ONVIF: capabilities, eventos e PTZ
-         ├── FFmpeg: snapshots, áudio e buffer
+         ├── FFmpeg: snapshots, G.711 → AAC, detecção e buffer
          ▼
  Detectores locais → Regras → Evento + mídia → UnifiedPush / ntfy
 ```
@@ -195,12 +195,14 @@ Respostas JSON seguem um envelope consistente:
 
 ## Testes e integração contínua
 
-Em pushes e pull requests, o GitHub Actions executa formatação, análise estática e testes Go, build/smoke test Docker, lint/testes/APK Android e typecheck/build/testes do Astro. Tags `v*` publicam:
+Em pushes e pull requests, o GitHub Actions executa formatação, análise estática e testes Go, build/smoke test Docker, lint/testes/APK Android e typecheck/build/testes do Astro. Todo commit enviado para `main` que concluir a CI com sucesso gera automaticamente a próxima versão, cria sua tag e publica:
 
 - imagens multiarch do backend e atualizador no GHCR;
 - APK universal assinado;
 - Compose, configuração do MediaMTX, instalador e contrato OpenAPI;
 - checksums SHA-256, SBOM, proveniência e GitHub Release.
+
+Não é necessário criar tags nem executar comandos de release manualmente: basta fazer commit e push para `main`.
 
 ## Compatibilidade e limites
 

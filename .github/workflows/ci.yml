@@ -48,7 +48,7 @@ jobs:
           container=false
           while IFS= read -r file; do
             case "$file" in
-              .github/workflows/ci.yml)
+              .github/workflows/*.yml)
                 backend=true; web=true; android=true; container=true ;;
               backend/*)
                 backend=true

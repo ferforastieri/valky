@@ -177,6 +177,14 @@
     <string name="no_unread_notifications_body">Não há alertas aguardando sua atenção.</string>
     <string name="back">Voltar</string>
     <string name="snapshot">Captura</string>
+    <string name="record_recent">Últimos 10 s</string>
+    <string name="snapshot_saved">Captura salva em Fotos</string>
+    <string name="recording_saved">Gravação salva no celular</string>
+    <string name="media_save_failed">Não foi possível salvar a mídia</string>
+    <string name="storage_permission_required">Permita salvar fotos e vídeos para continuar</string>
+    <string name="fullscreen_camera">Abrir câmera em tela cheia</string>
+    <string name="close_fullscreen">Fechar tela cheia</string>
+    <string name="pinch_to_zoom">Use dois dedos para ampliar</string>
     <string name="presets">Posições</string>
     <string name="mute">Silenciar</string>
     <string name="unmute">Ouvir</string>

@@ -1,12 +1,10 @@
 name: Release
 
 on:
-  push:
-    tags: ['v*']
-
-concurrency:
-  group: release-${{ github.ref }}
-  cancel-in-progress: true
+  workflow_run:
+    workflows: [CI]
+    types: [completed]
+    branches: [main]
 
 permissions:
   contents: write
@@ -17,10 +15,38 @@ permissions:
 env:
   IMAGE: ghcr.io/ferforastieri/valkyris
   UPDATER_IMAGE: ghcr.io/ferforastieri/valkyris-updater
+  RELEASE_SERIES: '1.0'
+  # Run 13 published v1.0.5. This keeps the next automatic release at v1.0.6.
+  RELEASE_PATCH_OFFSET: 8
 
 jobs:
+  prepare:
+    name: Preparar versão automática
+    if: github.event.workflow_run.conclusion == 'success'
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+      apk_version: ${{ steps.version.outputs.apk_version }}
+      version_code: ${{ steps.version.outputs.version_code }}
+      commit: ${{ steps.version.outputs.commit }}
+    steps:
+      - name: Gerar versão a partir da execução
+        id: version
+        env:
+          HEAD_SHA: ${{ github.event.workflow_run.head_sha }}
+        run: |
+          patch=$((GITHUB_RUN_NUMBER - RELEASE_PATCH_OFFSET))
+          test "$patch" -gt 0
+          {
+            echo "version=v${RELEASE_SERIES}.${patch}"
+            echo "apk_version=${RELEASE_SERIES}.${patch}"
+            echo "version_code=${GITHUB_RUN_NUMBER}"
+            echo "commit=${HEAD_SHA}"
+          } >> "$GITHUB_OUTPUT"
+
   image:
     name: Imagem · ${{ matrix.arch }}
+    needs: prepare
     runs-on: ${{ matrix.runner }}
     strategy:
       fail-fast: false
@@ -34,6 +60,8 @@ jobs:
             runner: ubuntu-24.04-arm
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.prepare.outputs.commit }}
       - uses: docker/setup-buildx-action@v3
       - uses: docker/login-action@v3
         with:
@@ -47,8 +75,8 @@ jobs:
           file: backend/Dockerfile
           platforms: ${{ matrix.platform }}
           push: true
-          tags: ${{ env.IMAGE }}:${{ github.ref_name }}-${{ matrix.arch }}
-          build-args: BUILD_VERSION=${{ github.ref_name }}
+          tags: ${{ env.IMAGE }}:${{ needs.prepare.outputs.version }}-${{ matrix.arch }}
+          build-args: BUILD_VERSION=${{ needs.prepare.outputs.version }}
           provenance: mode=min
           sbom: true
           cache-from: type=gha,scope=release-${{ matrix.arch }}
@@ -60,7 +88,7 @@ jobs:
           file: updater/Dockerfile
           platforms: ${{ matrix.platform }}
           push: true
-          tags: ${{ env.UPDATER_IMAGE }}:${{ github.ref_name }}-${{ matrix.arch }}
+          tags: ${{ env.UPDATER_IMAGE }}:${{ needs.prepare.outputs.version }}-${{ matrix.arch }}
           provenance: mode=min
           sbom: true
           cache-from: type=gha,scope=release-updater-${{ matrix.arch }}
@@ -69,7 +97,7 @@ jobs:
   manifest:
     name: Manifesto multiarch
     runs-on: ubuntu-latest
-    needs: image
+    needs: [prepare, image]
     steps:
       - uses: docker/setup-buildx-action@v3
       - uses: docker/login-action@v3
@@ -78,25 +106,28 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
       - name: Publicar tags multiarch
+        env:
+          VERSION: ${{ needs.prepare.outputs.version }}
         run: |
           docker buildx imagetools create \
-            --tag "$IMAGE:${GITHUB_REF_NAME}" \
-            --tag "$IMAGE:latest" \
-            "$IMAGE:${GITHUB_REF_NAME}-amd64" \
-            "$IMAGE:${GITHUB_REF_NAME}-arm64"
+            --tag "$IMAGE:$VERSION" \
+            "$IMAGE:$VERSION-amd64" \
+            "$IMAGE:$VERSION-arm64"
           docker buildx imagetools create \
-            --tag "$UPDATER_IMAGE:${GITHUB_REF_NAME}" \
-            --tag "$UPDATER_IMAGE:latest" \
-            "$UPDATER_IMAGE:${GITHUB_REF_NAME}-amd64" \
-            "$UPDATER_IMAGE:${GITHUB_REF_NAME}-arm64"
-          docker buildx imagetools inspect "$IMAGE:${GITHUB_REF_NAME}"
-          docker buildx imagetools inspect "$UPDATER_IMAGE:${GITHUB_REF_NAME}"
+            --tag "$UPDATER_IMAGE:$VERSION" \
+            "$UPDATER_IMAGE:$VERSION-amd64" \
+            "$UPDATER_IMAGE:$VERSION-arm64"
+          docker buildx imagetools inspect "$IMAGE:$VERSION"
+          docker buildx imagetools inspect "$UPDATER_IMAGE:$VERSION"
 
   android:
     name: APK assinado
+    needs: prepare
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.prepare.outputs.commit }}
       - uses: actions/setup-java@v4
         with:
           distribution: temurin
@@ -118,6 +149,8 @@ jobs:
           ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
           ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
           ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+          VALKYRIS_VERSION_NAME: ${{ needs.prepare.outputs.apk_version }}
+          VALKYRIS_VERSION_CODE: ${{ needs.prepare.outputs.version_code }}
         run: ./gradlew --stacktrace lintRelease testDebugUnitTest assembleRelease
       - uses: actions/upload-artifact@v4
         with:
@@ -128,7 +161,7 @@ jobs:
   smoke:
     name: Smoke · ${{ matrix.arch }}
     runs-on: ${{ matrix.runner }}
-    needs: manifest
+    needs: [prepare, manifest]
     strategy:
       fail-fast: false
       matrix:
@@ -146,9 +179,10 @@ jobs:
       - name: Iniciar e verificar imagem nativa
         env:
           CONTAINER: valkyris-smoke-${{ matrix.arch }}
+          VERSION: ${{ needs.prepare.outputs.version }}
         run: |
-          docker pull "$IMAGE:${GITHUB_REF_NAME}"
-          docker run -d --rm --name "$CONTAINER" -p 127.0.0.1:18443:8443 "$IMAGE:${GITHUB_REF_NAME}"
+          docker pull "$IMAGE:$VERSION"
+          docker run -d --rm --name "$CONTAINER" -p 127.0.0.1:18443:8443 "$IMAGE:$VERSION"
           for attempt in $(seq 1 30); do
             if curl -kfsS https://127.0.0.1:18443/health | grep -q '"status":"ok"'; then
               docker stop "$CONTAINER"
@@ -163,16 +197,18 @@ jobs:
   release:
     name: Publicar artefatos
     runs-on: ubuntu-latest
-    needs: [android, smoke]
+    needs: [prepare, android, smoke]
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.prepare.outputs.commit }}
       - uses: actions/download-artifact@v4
         with:
           name: valkyris-release-apk
           path: artifacts
       - name: Montar release verificável
         env:
-          RELEASE_VERSION: ${{ github.ref_name }}
+          RELEASE_VERSION: ${{ needs.prepare.outputs.version }}
         run: |
           mkdir -p release
           cp artifacts/app-release.apk "release/valkyris-${RELEASE_VERSION}.apk"
@@ -184,4 +220,23 @@ jobs:
       - name: Publicar GitHub Release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: gh release create "${GITHUB_REF_NAME}" release/* --generate-notes --verify-tag
+          RELEASE_VERSION: ${{ needs.prepare.outputs.version }}
+          RELEASE_COMMIT: ${{ needs.prepare.outputs.commit }}
+        run: gh release create "$RELEASE_VERSION" release/* --generate-notes --target "$RELEASE_COMMIT" --latest=false
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Promover somente a versão mais nova
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RELEASE_VERSION: ${{ needs.prepare.outputs.version }}
+        run: |
+          newest="$(gh api "repos/$GITHUB_REPOSITORY/releases" --paginate --jq '.[] | select(.draft == false and .prerelease == false) | .tag_name' | sort -V | tail -1)"
+          if [ "$newest" = "$RELEASE_VERSION" ]; then
+            gh release edit "$RELEASE_VERSION" --latest
+            docker buildx imagetools create --tag "$IMAGE:latest" "$IMAGE:$RELEASE_VERSION"
+            docker buildx imagetools create --tag "$UPDATER_IMAGE:latest" "$UPDATER_IMAGE:$RELEASE_VERSION"
+          fi

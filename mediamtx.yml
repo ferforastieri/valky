@@ -5,12 +5,14 @@ apiEncryption: false
 hls: true
 hlsAddress: :8888
 hlsEncryption: false
-hlsAlwaysRemux: true
+hlsAlwaysRemux: false
 hlsVariant: lowLatency
 hlsSegmentCount: 7
 hlsSegmentDuration: 1s
 hlsPartDuration: 200ms
-rtsp: false
+rtsp: true
+rtspAddress: :8554
+rtspTransports: [tcp]
 rtmp: false
 srt: false
 webrtc: false
@@ -34,4 +36,3 @@ paths:
     recordPartDuration: 1s
     recordSegmentDuration: 2s
     recordDeleteAfter: 10m
-
