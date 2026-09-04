@@ -18,16 +18,20 @@ type ServiceAddresses struct {
 }
 
 type Camera struct {
-	ID           string           `json:"id"`
-	Name         string           `json:"name"`
-	Host         string           `json:"host"`
-	Port         int              `json:"port"`
-	ProfileToken string           `json:"profileToken"`
-	Capabilities Capabilities     `json:"capabilities"`
-	Services     ServiceAddresses `json:"-"`
-	Enabled      bool             `json:"enabled"`
-	CreatedAt    time.Time        `json:"createdAt"`
-	UpdatedAt    time.Time        `json:"updatedAt"`
+	ID             string           `json:"id"`
+	Name           string           `json:"name"`
+	Host           string           `json:"host"`
+	Port           int              `json:"port"`
+	ProfileToken   string           `json:"profileToken"`
+	Capabilities   Capabilities     `json:"capabilities"`
+	Services       ServiceAddresses `json:"-"`
+	SetupStatus    string           `json:"setupStatus"`
+	SetupStep      string           `json:"setupStep"`
+	SetupError     string           `json:"setupError,omitempty"`
+	SetupUpdatedAt time.Time        `json:"setupUpdatedAt"`
+	Enabled        bool             `json:"enabled"`
+	CreatedAt      time.Time        `json:"createdAt"`
+	UpdatedAt      time.Time        `json:"updatedAt"`
 }
 
 type Credentials struct {

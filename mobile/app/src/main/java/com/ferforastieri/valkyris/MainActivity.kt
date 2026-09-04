@@ -23,7 +23,7 @@ class MainActivity : ComponentActivity() {
         installSplashScreen()
         super.onCreate(savedInstanceState)
         apkInstaller = ApkInstaller(this)
-        viewModel.acceptLaunch(intent?.data, intent?.getStringExtra("eventId"))
+        viewModel.acceptLaunch(intent?.data, intent?.getStringExtra("eventId"), intent?.getStringExtra("cameraId"))
         enableEdgeToEdge()
         setContent {
             val theme by viewModel.theme.collectAsStateWithLifecycle()
@@ -50,6 +50,6 @@ class MainActivity : ComponentActivity() {
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         setIntent(intent)
-        viewModel.acceptLaunch(intent.data, intent.getStringExtra("eventId"))
+        viewModel.acceptLaunch(intent.data, intent.getStringExtra("eventId"), intent.getStringExtra("cameraId"))
     }
 }

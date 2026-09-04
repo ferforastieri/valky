@@ -14,6 +14,7 @@ import (
 	"github.com/ferforastieri/valkyris/backend/internal/event"
 	"github.com/ferforastieri/valkyris/backend/internal/media"
 	"github.com/ferforastieri/valkyris/backend/internal/notify"
+	"github.com/ferforastieri/valkyris/backend/internal/preferences"
 	"github.com/ferforastieri/valkyris/backend/internal/rules"
 )
 
@@ -26,6 +27,7 @@ type Service struct {
 	Hub           *api.Hub
 	DataDir       string
 	Logger        *slog.Logger
+	Preferences   *preferences.Service
 	captureMu     sync.Mutex
 	captureGroups map[string]*captureGroup
 }
@@ -149,15 +151,29 @@ func (s *Service) captureClip(group *captureGroup) {
 func (s *Service) RunRetention(ctx context.Context, maxAge time.Duration, maxBytes int64) {
 	ticker := time.NewTicker(time.Hour)
 	defer ticker.Stop()
-	s.retain(maxAge, maxBytes)
+	s.retainConfigured(ctx, maxAge, maxBytes)
 	for {
 		select {
 		case <-ctx.Done():
 			return
 		case <-ticker.C:
-			s.retain(maxAge, maxBytes)
+			s.retainConfigured(ctx, maxAge, maxBytes)
 		}
 	}
+}
+
+func (s *Service) retainConfigured(ctx context.Context, defaultAge time.Duration, defaultBytes int64) {
+	maxAge, maxBytes := defaultAge, defaultBytes
+	if s.Preferences != nil {
+		value, err := s.Preferences.Retention(ctx)
+		if err != nil {
+			s.Logger.Warn("load media retention settings", "error", err)
+		} else {
+			maxAge = time.Duration(value.MaxAgeDays) * 24 * time.Hour
+			maxBytes = value.MaxStorageGB * 1024 * 1024 * 1024
+		}
+	}
+	s.retain(maxAge, maxBytes)
 }
 func (s *Service) retain(maxAge time.Duration, maxBytes int64) {
 	root := filepath.Join(s.DataDir, "events")

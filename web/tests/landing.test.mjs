@@ -13,17 +13,27 @@ test('publica as duas localizações com idioma correto', () => {
   assert.match(root, /valkyris-locale/);
 });
 
-test('controles e navegação possuem nomes acessíveis', () => {
+test('controles e navegação possuem nomes acessíveis', async () => {
   assert.match(pt, /aria-label="[^"]+"/);
   assert.match(pt, /href="\/en"/);
   assert.match(en, /href="\/pt-BR"/);
   assert.match(pt, /class="floating-dock"/);
   assert.doesNotMatch(pt, /<header[\s>]/);
   assert.doesNotMatch(pt, /<footer[\s>]/);
-  assert.match(pt, /© 2026 · MIT/);
-  assert.match(pt, /valkyris-mark\.png/);
-  assert.match(pt, /href="\/favicon\.png\?v=2"/);
-  assert.match(pt, /href="\/apple-touch-icon\.png\?v=2"/);
+  assert.match(pt, /© 2026 Fernando Forastieri · MIT/);
+  assert.match(pt, /valkyris-mark\.svg/);
+  assert.match(pt, /screenshots\/cameras-light\.png/);
+  assert.match(pt, /screenshots\/rules-light\.png/);
+  assert.match(pt, /screenshots\/settings-dark\.png/);
+  assert.match(pt, /screenshots\/events-light\.png/);
+  assert.match(pt, /class="app-carousel"/);
+  assert.match(pt, /Sua privacidade importa\./);
+  assert.doesNotMatch(pt, /class="flow section"/);
+  assert.doesNotMatch(pt, /class="compatibility section"/);
+  assert.doesNotMatch(pt, /class="detect section/);
+  assert.doesNotMatch(pt, /Sinais que importam/);
+  assert.match(pt, /href="\/favicon\.png\?v=6"/);
+  assert.match(pt, /href="\/apple-touch-icon\.png\?v=6"/);
 });
 
 test('respeita a preferência por movimento reduzido', async () => {
@@ -31,7 +41,8 @@ test('respeita a preferência por movimento reduzido', async () => {
   const files = (await readdir(assets)).filter((file) => file.endsWith('.css'));
   const styles = (await Promise.all(files.map((file) => readFile(new URL(file, assets), 'utf8')))).join('\n');
   assert.match(styles, /prefers-reduced-motion:reduce/);
-  assert.match(styles, /\.phone-stage\{height:auto;display:grid/);
+  assert.match(styles, /\.carousel-track\{position:relative;display:block/);
+  assert.match(styles, /\.floating-dock\{width:max-content/);
   assert.match(styles, /\.floating-dock\{position:fixed/);
   assert.match(styles, /\.floating-dock\{[^}]*top:18px;bottom:auto/);
   assert.match(styles, /@media\(max-width:760px\)[^{]*\{[^}]*body\{padding-top:0;padding-bottom:76px\}/);

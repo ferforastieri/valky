@@ -24,6 +24,8 @@
     <string name="generate_again">Generate another</string>
     <string name="close">Close</string>
     <string name="cameras">Cameras</string>
+    <string name="overview">Overview</string>
+    <string name="pending_alerts">Alerts</string>
     <string name="events">Events</string>
     <string name="rules">Rules</string>
     <string name="settings">Settings</string>
@@ -43,7 +45,12 @@
     <string name="not_now">Not now</string>
     <string name="notification_setup">Set up notifications</string>
     <string name="notification_permission">Notification permission</string>
+    <string name="permissions">Permissions</string>
+    <string name="permissions_summary">%1$d of 3 permissions active</string>
     <string name="language">Language</string>
+    <string name="choose_language">Choose language</string>
+    <string name="portuguese_brazil">Portuguese (Brazil)</string>
+    <string name="english">English</string>
     <string name="theme">Theme</string>
     <string name="system_default">System default</string>
     <string name="add_rule">Create rule</string>
@@ -52,6 +59,13 @@
     <string name="cancel">Cancel</string>
     <string name="add_camera">Add camera</string>
     <string name="validating_camera">Validating ONVIF and preparing the stream. You can keep using the app.</string>
+    <string name="camera_setup_saved">Camera saved</string>
+    <string name="camera_setup_queued">Waiting for secure validation</string>
+    <string name="camera_setup_probing">Connecting to the ONVIF service</string>
+    <string name="camera_setup_stream">ONVIF connected. Preparing the stream</string>
+    <string name="camera_setup_failed">Setup could not be completed</string>
+    <string name="camera_setup_error_label">Error persisted by the server</string>
+    <string name="camera_setup_live_hint">This screen will update automatically.</string>
     <string name="camera_name">Camera name</string>
     <string name="camera_ip">IP or hostname</string>
     <string name="onvif_port">ONVIF port</string>
@@ -62,6 +76,26 @@
     <string name="light_theme">Light</string>
     <string name="dark_theme">Dark</string>
     <string name="rule_subtitle">When this happens → alert me</string>
+    <string name="rule_enabled">Active</string>
+    <string name="rule_disabled">Paused</string>
+    <string name="rule_detects">Detects: %1$s</string>
+    <string name="rule_motion_description">Watches for movement or presence and runs the selected actions.</string>
+    <string name="rule_audio_description">Recognizes the selected sound and runs the selected actions.</string>
+    <string name="rule_critical_description">Prioritizes a critical signal and triggers the safety actions.</string>
+    <string name="detector_motion">Motion</string>
+    <string name="detector_person">Person</string>
+    <string name="detector_tamper">Camera tampering</string>
+    <string name="detector_baby_cry">Baby cry</string>
+    <string name="detector_crying">Crying or sobbing</string>
+    <string name="detector_scream">Scream</string>
+    <string name="detector_glass_break">Glass breaking</string>
+    <string name="detector_smoke_alarm">Smoke alarm</string>
+    <string name="detector_fire_alarm">Fire alarm</string>
+    <string name="detector_siren">Siren</string>
+    <string name="detector_doorbell">Doorbell</string>
+    <string name="detector_knock">Knock</string>
+    <string name="detector_dog_bark">Dog bark</string>
+    <string name="detector_other">Configured detector</string>
     <string name="no_rules">No rules yet</string>
     <string name="rule_name">Rule name</string>
     <string name="detector">Detector</string>
@@ -70,6 +104,7 @@
     <string name="rtsp_uri">RTSP address</string>
     <string name="add_camera_hint">Use the + button to connect an ONVIF camera.</string>
     <string name="stream_private">LL-HLS · private</string>
+    <string name="snapshot_preview">SNAPSHOT</string>
     <string name="stream_local">The stream stays inside your LAN or VPN.</string>
     <string name="push_not_configured">Not configured</string>
     <string name="push_waiting">Waiting for ntfy endpoint</string>
@@ -80,7 +115,8 @@
     <string name="permission_optional">Optional to bypass silent mode</string>
     <string name="do_not_disturb_access">Alarms during Do Not Disturb</string>
     <string name="disconnect_phone">Disconnect this phone</string>
-    <string name="local_only">Valkyris · LAN / VPN only</string>
+    <string name="app_version">Valkyris · v%1$s</string>
+    <string name="copyright_owner">© 2026 Fernando Forastieri</string>
     <string name="record_media">Save snapshot and clip</string>
     <string name="send_notification">Send persistent notification</string>
     <string name="confirmations">Confirmations</string>
@@ -88,7 +124,14 @@
     <string name="schedule_start">Schedule: start HH:mm (optional)</string>
     <string name="schedule_end">Schedule: end HH:mm (optional)</string>
     <string name="media_retention">Media retention</string>
-    <string name="media_retention_value">7 days or 5 GB, whichever comes first</string>
+    <string name="retention_summary">%1$d days or %2$d GB</string>
+    <string name="retention_description">Choose how long snapshots and clips are kept and how much space they may use. The first limit reached is applied.</string>
+    <string name="retention_days">Keep media for</string>
+    <string name="retention_storage">Maximum storage</string>
+    <plurals name="days_value">
+        <item quantity="one">%1$d day</item>
+        <item quantity="other">%1$d days</item>
+    </plurals>
     <string name="monitoring_local">Local monitoring</string>
     <string name="connected_status">connected</string>
     <string name="recent_activity">Recent activity</string>
@@ -104,4 +147,10 @@
     <string name="download_apk">Download APK</string>
     <string name="later">Later</string>
     <string name="downloading_update">Downloading the signed application update</string>
+    <string name="open_camera">Open camera</string>
+    <string name="view_event">View event</string>
+    <string name="all_notifications">All</string>
+    <string name="unread_notifications">Unacknowledged</string>
+    <string name="no_unread_notifications">All acknowledged</string>
+    <string name="no_unread_notifications_body">No alerts are waiting for your attention.</string>
 </resources>

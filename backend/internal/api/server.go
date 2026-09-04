@@ -15,6 +15,7 @@ import (
 	"os"
 	"path/filepath"
 	"strconv"
+	"strings"
 	"sync"
 	"time"
 
@@ -24,9 +25,9 @@ import (
 	"github.com/ferforastieri/valkyris/backend/internal/event"
 	"github.com/ferforastieri/valkyris/backend/internal/media"
 	"github.com/ferforastieri/valkyris/backend/internal/notify"
+	"github.com/ferforastieri/valkyris/backend/internal/preferences"
 	"github.com/ferforastieri/valkyris/backend/internal/rules"
 	"github.com/ferforastieri/valkyris/backend/internal/updates"
-	"github.com/google/uuid"
 )
 
 //go:embed openapi.yaml
@@ -49,6 +50,7 @@ type Server struct {
 	operationsMu sync.RWMutex
 	operations   map[string]CameraOperation
 	updates      *updates.Service
+	preferences  *preferences.Service
 }
 
 type CameraOperation struct {
@@ -63,8 +65,36 @@ type CameraOperation struct {
 func NewServer(a *auth.Manager, c *camera.Repository, o *camera.ONVIFClient, m *media.Manager, r *rules.Service, e *event.Service, n *notify.Service, h *Hub, logger *slog.Logger) *Server {
 	return &Server{auth: a, cameras: c, onvif: o, media: m, rules: r, events: e, notify: n, hub: h, logger: logger, operations: make(map[string]CameraOperation)}
 }
-func (s *Server) SetSubmitter(sub DetectionSubmitter) { s.submitter = sub }
-func (s *Server) SetUpdates(service *updates.Service) { s.updates = service }
+func (s *Server) SetSubmitter(sub DetectionSubmitter)         { s.submitter = sub }
+func (s *Server) SetUpdates(service *updates.Service)         { s.updates = service }
+func (s *Server) SetPreferences(service *preferences.Service) { s.preferences = service }
+
+// ResumeCameraSetups continues cameras that were persisted before an interrupted
+// background probe. Failed cameras remain untouched so their diagnosis is kept.
+func (s *Server) ResumeCameraSetups(ctx context.Context) {
+	cameras, err := s.cameras.List(ctx)
+	if err != nil {
+		s.logger.Warn("list camera setups to resume", "error", err)
+		return
+	}
+	for _, cam := range cameras {
+		if cam.SetupStatus != "pending" {
+			continue
+		}
+		_, credentials, getErr := s.cameras.Get(ctx, cam.ID)
+		if getErr != nil {
+			s.failCameraOperation(cam.ID, camera.CreateInput{}, getErr)
+			continue
+		}
+		operation := operationFromCamera(cam)
+		s.operationsMu.Lock()
+		s.operations[cam.ID] = operation
+		s.operationsMu.Unlock()
+		input := camera.CreateInput{Name: cam.Name, Host: cam.Host, Port: cam.Port, Username: credentials.Username, Password: credentials.Password, RTSPURI: credentials.RTSPURI}
+		go s.completeCameraCreation(cam.ID, input)
+	}
+}
+
 func (s *Server) Handler() http.Handler {
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /{$}", s.health)
@@ -93,6 +123,8 @@ func (s *Server) Handler() http.Handler {
 	protected.HandleFunc("GET /events/{id}/snapshot", s.eventSnapshot)
 	protected.HandleFunc("GET /events/{id}/clip", s.eventClip)
 	protected.HandleFunc("POST /devices/push", s.push)
+	protected.HandleFunc("GET /settings/retention", s.getRetention)
+	protected.Handle("PUT /settings/retention", s.auth.RequireAdmin(http.HandlerFunc(s.setRetention)))
 	protected.HandleFunc("POST /detections", s.submitDetection)
 	protected.HandleFunc("GET /system/update", s.systemUpdate)
 	protected.Handle("POST /system/update", s.auth.RequireAdmin(http.HandlerFunc(s.startSystemUpdate)))
@@ -178,11 +210,17 @@ func (s *Server) createCamera(w http.ResponseWriter, r *http.Request) {
 	if !decode(w, r, &in) {
 		return
 	}
+	cam, err := s.cameras.CreatePending(r.Context(), in)
+	if err != nil {
+		writeError(w, http.StatusBadRequest, err)
+		return
+	}
 	now := time.Now().UTC()
 	operation := CameraOperation{
-		ID:        uuid.NewString(),
+		ID:        cam.ID,
 		Status:    "pending",
-		Message:   "Camera validation started; ONVIF capabilities are being discovered",
+		Message:   "Camera saved; ONVIF validation will continue in the background",
+		Camera:    &cam,
 		CreatedAt: now,
 		UpdatedAt: now,
 	}
@@ -203,8 +241,12 @@ func (s *Server) cameraOperation(w http.ResponseWriter, r *http.Request) {
 	operation, ok := s.operations[r.PathValue("id")]
 	s.operationsMu.RUnlock()
 	if !ok {
-		writeError(w, http.StatusNotFound, fmt.Errorf("camera operation not found or expired"))
-		return
+		cam, _, err := s.cameras.Get(r.Context(), r.PathValue("id"))
+		if err != nil {
+			writeError(w, http.StatusNotFound, fmt.Errorf("camera operation not found"))
+			return
+		}
+		operation = operationFromCamera(cam)
 	}
 	writeSuccess(w, http.StatusOK, operation.Message, operation)
 }
@@ -212,22 +254,62 @@ func (s *Server) cameraOperation(w http.ResponseWriter, r *http.Request) {
 func (s *Server) completeCameraCreation(operationID string, in camera.CreateInput) {
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
 	defer cancel()
+	s.updateCameraOperation(ctx, operationID, "pending", "probing", "Connecting to the ONVIF service", "")
 	caps, profile, services, err := s.onvif.Probe(ctx, in.Host, defaultPort(in.Port), in.Username, in.Password)
 	if err != nil {
-		s.finishCameraOperation(operationID, CameraOperation{Status: "failed", Message: "Camera was not added: " + err.Error()})
+		s.failCameraOperation(operationID, in, err)
 		return
 	}
-	cam, err := s.cameras.Create(ctx, in, caps, profile, services)
+	s.updateCameraOperation(ctx, operationID, "pending", "stream", "ONVIF connected; preparing the video stream", "")
+	if err = s.media.ConfigureCamera(ctx, operationID, in.RTSPURI); err != nil {
+		s.failCameraOperation(operationID, in, err)
+		return
+	}
+	if err = s.cameras.CompleteSetup(ctx, operationID, caps, profile, services); err != nil {
+		s.failCameraOperation(operationID, in, err)
+		return
+	}
+	cam, _, err := s.cameras.Get(ctx, operationID)
 	if err != nil {
-		s.finishCameraOperation(operationID, CameraOperation{Status: "failed", Message: "Camera was not added: " + err.Error()})
+		s.failCameraOperation(operationID, in, err)
 		return
 	}
-	if err = s.media.ConfigureCamera(ctx, cam.ID, in.RTSPURI); err != nil {
-		_ = s.cameras.Delete(context.Background(), cam.ID)
-		s.finishCameraOperation(operationID, CameraOperation{Status: "failed", Message: "Camera was not added: " + err.Error()})
-		return
+	s.finishCameraOperation(operationID, CameraOperation{Status: "completed", Message: "Camera is ready and its ONVIF capabilities were discovered", Camera: &cam})
+}
+
+func (s *Server) updateCameraOperation(ctx context.Context, id, status, step, message, setupError string) {
+	if err := s.cameras.UpdateSetup(ctx, id, status, step, setupError); err != nil {
+		s.logger.Warn("persist camera setup state", "camera", id, "error", err)
 	}
-	s.finishCameraOperation(operationID, CameraOperation{Status: "completed", Message: "Camera added and ONVIF capabilities discovered successfully", Camera: &cam})
+	cam, _, _ := s.cameras.Get(ctx, id)
+	s.finishCameraOperation(id, CameraOperation{Status: status, Message: message, Camera: &cam})
+}
+
+func (s *Server) failCameraOperation(id string, in camera.CreateInput, cause error) {
+	message := "Camera setup failed: " + safeCameraError(cause, in)
+	s.updateCameraOperation(context.Background(), id, "failed", "failed", message, message)
+}
+
+func safeCameraError(err error, in camera.CreateInput) string {
+	message := err.Error()
+	for _, secret := range []string{in.Password, in.Username, in.RTSPURI} {
+		if secret != "" {
+			message = strings.ReplaceAll(message, secret, "[redacted]")
+		}
+	}
+	return message
+}
+
+func operationFromCamera(cam camera.Camera) CameraOperation {
+	status := cam.SetupStatus
+	message := "Camera setup is in progress"
+	if status == "ready" {
+		status, message = "completed", "Camera is ready"
+	}
+	if status == "failed" {
+		message = cam.SetupError
+	}
+	return CameraOperation{ID: cam.ID, Status: status, Message: message, Camera: &cam, CreatedAt: cam.CreatedAt, UpdatedAt: cam.SetupUpdatedAt}
 }
 
 func (s *Server) finishCameraOperation(id string, result CameraOperation) {
@@ -242,6 +324,9 @@ func (s *Server) finishCameraOperation(id string, result CameraOperation) {
 	operation.Camera = result.Camera
 	operation.UpdatedAt = time.Now().UTC()
 	s.operations[id] = operation
+	if s.hub != nil {
+		s.hub.Broadcast(map[string]any{"type": "camera.setup", "cameraId": id, "status": operation.Status, "message": operation.Message})
+	}
 }
 func (s *Server) deleteCamera(w http.ResponseWriter, r *http.Request) {
 	id := r.PathValue("id")
@@ -419,6 +504,30 @@ func (s *Server) push(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeSuccess(w, http.StatusOK, "Push device registered successfully", nil)
+}
+func (s *Server) getRetention(w http.ResponseWriter, r *http.Request) {
+	if s.preferences == nil {
+		writeError(w, http.StatusServiceUnavailable, fmt.Errorf("settings service is not configured"))
+		return
+	}
+	value, err := s.preferences.Retention(r.Context())
+	respondWithMessage(w, value, err, "Media retention settings loaded successfully")
+}
+func (s *Server) setRetention(w http.ResponseWriter, r *http.Request) {
+	if s.preferences == nil {
+		writeError(w, http.StatusServiceUnavailable, fmt.Errorf("settings service is not configured"))
+		return
+	}
+	var value preferences.Retention
+	if !decode(w, r, &value) {
+		return
+	}
+	result, err := s.preferences.SetRetention(r.Context(), value)
+	if err != nil {
+		writeError(w, http.StatusBadRequest, err)
+		return
+	}
+	writeSuccess(w, http.StatusOK, "Media retention settings saved successfully", result)
 }
 func (s *Server) submitDetection(w http.ResponseWriter, r *http.Request) {
 	if s.submitter == nil {

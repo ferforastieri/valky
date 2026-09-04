@@ -12,7 +12,6 @@ import io.ktor.client.statement.HttpResponse
 import io.ktor.client.statement.bodyAsText
 import io.ktor.http.*
 import io.ktor.serialization.kotlinx.json.json
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.serialization.json.Json
@@ -107,7 +106,7 @@ class ValkyrisApi(private val session: () -> Session?) {
         execute<JsonElement>(fingerprint, request = request)
     }
 
-    private suspend inline fun <reified T> get(path: String, announce: Boolean = true): T {
+    private suspend inline fun <reified T> get(path: String, announce: Boolean = false): T {
         val current = requireNotNull(session())
         return execute(current.fingerprint, announce) {
             it.get(base() + path) { bearerAuth(current.token) }
@@ -125,7 +124,18 @@ class ValkyrisApi(private val session: () -> Session?) {
         }
     }
 
-    suspend fun authStatus(baseUrl: String): AuthStatus = execute("") {
+    private suspend inline fun <reified T, reified B> put(path: String, body: B): T {
+        val current = requireNotNull(session())
+        return execute(current.fingerprint) {
+            it.put(base() + path) {
+                bearerAuth(current.token)
+                contentType(ContentType.Application.Json)
+                setBody(body)
+            }
+        }
+    }
+
+    suspend fun authStatus(baseUrl: String): AuthStatus = execute("", announce = false) {
         it.get(baseUrl.trimEnd('/') + "/api/v1/auth/status")
     }
 
@@ -163,28 +173,16 @@ class ValkyrisApi(private val session: () -> Session?) {
 
     suspend fun createCamera(camera: CreateCameraRequest): Camera {
         val started: CameraOperation = post("/cameras", camera)
-        repeat(120) {
-            delay(1_000)
-            val operation: CameraOperation = get("/camera-operations/${started.id}", announce = false)
-            when (operation.status) {
-                "completed" -> {
-                    publish(operation.message, true)
-                    return requireNotNull(operation.camera)
-                }
-                "failed" -> {
-                    publish(operation.message, false)
-                    throw ApiException(operation.message, 422)
-                }
-            }
-        }
-        val message = "Camera validation did not finish within two minutes"
-        publish(message, false)
-        throw ApiException(message)
+        return requireNotNull(started.camera) { "The server did not return the saved camera" }
     }
 
     suspend fun updateInfo(): UpdateInfo = get("/system/update?clientVersion=${BuildConfig.VERSION_NAME.encodeURLParameter()}", announce = false)
 
     suspend fun startUpdate(): UpdateInfo = post("/system/update", UpdateRequest(BuildConfig.VERSION_NAME))
+
+    suspend fun retention(): RetentionSettings = get("/settings/retention")
+
+    suspend fun updateRetention(settings: RetentionSettings): RetentionSettings = put("/settings/retention", settings)
 
     suspend fun events(): List<ValkyrisEvent> = get("/events?limit=100")
     suspend fun event(id: String): ValkyrisEvent = get("/events/$id")

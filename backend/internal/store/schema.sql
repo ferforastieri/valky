@@ -20,6 +20,10 @@ CREATE TABLE IF NOT EXISTS cameras (
   media_xaddr TEXT NOT NULL DEFAULT '',
   events_xaddr TEXT NOT NULL DEFAULT '',
   ptz_xaddr TEXT NOT NULL DEFAULT '',
+  setup_status TEXT NOT NULL DEFAULT 'ready',
+  setup_step TEXT NOT NULL DEFAULT '',
+  setup_error TEXT NOT NULL DEFAULT '',
+  setup_updated_at TEXT NOT NULL DEFAULT '',
   enabled INTEGER NOT NULL DEFAULT 1,
   created_at TEXT NOT NULL,
   updated_at TEXT NOT NULL

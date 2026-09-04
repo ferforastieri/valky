@@ -135,6 +135,22 @@ paths:
       summary: Register a UnifiedPush endpoint and encryption secret
       requestBody: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/PushDevice'}}}}
       responses: {'200': {description: Registered with message envelope, content: {application/json: {schema: {$ref: '#/components/schemas/APIResponse'}}}}}
+  /settings/retention:
+    get:
+      summary: Read the active media retention limits
+      responses:
+        '200': {description: Retention settings, content: {application/json: {schema: {$ref: '#/components/schemas/RetentionSettingsResponse'}}}}
+    put:
+      summary: Change media retention limits as the administrator
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/RetentionSettings'}
+      responses:
+        '200': {description: Retention settings saved, content: {application/json: {schema: {$ref: '#/components/schemas/RetentionSettingsResponse'}}}}
+        '400': {description: Invalid limits, content: {application/json: {schema: {$ref: '#/components/schemas/APIError'}}}}
+        '403': {description: Administrator access required, content: {application/json: {schema: {$ref: '#/components/schemas/APIError'}}}}
   /detections:
     post:
       summary: Submit a normalized detection from a trusted local integration
@@ -204,6 +220,10 @@ components:
         port: {type: integer}
         profileToken: {type: string}
         capabilities: {$ref: '#/components/schemas/CapabilitySet'}
+        setupStatus: {type: string, enum: [pending, ready, failed]}
+        setupStep: {type: string, enum: [queued, probing, stream, ready, failed]}
+        setupError: {type: string, description: Persisted diagnostic from the latest setup attempt}
+        setupUpdatedAt: {type: string, format: date-time}
         enabled: {type: boolean}
     CameraInput:
       type: object
@@ -305,6 +325,19 @@ components:
       properties:
         endpoint: {type: string, format: uri}
         secret: {type: string}
+    RetentionSettings:
+      type: object
+      required: [maxAgeDays, maxStorageGB]
+      properties:
+        maxAgeDays: {type: integer, minimum: 1, maximum: 365, default: 7}
+        maxStorageGB: {type: integer, minimum: 1, maximum: 1000, default: 5}
+    RetentionSettingsResponse:
+      type: object
+      required: [success, message, data]
+      properties:
+        success: {type: boolean, const: true}
+        message: {type: string}
+        data: {$ref: '#/components/schemas/RetentionSettings'}
     PairingSession:
       type: object
       properties:

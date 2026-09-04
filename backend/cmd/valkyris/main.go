@@ -28,6 +28,7 @@ import (
 	"github.com/ferforastieri/valkyris/backend/internal/event"
 	"github.com/ferforastieri/valkyris/backend/internal/media"
 	"github.com/ferforastieri/valkyris/backend/internal/notify"
+	"github.com/ferforastieri/valkyris/backend/internal/preferences"
 	"github.com/ferforastieri/valkyris/backend/internal/rules"
 	"github.com/ferforastieri/valkyris/backend/internal/store"
 	"github.com/ferforastieri/valkyris/backend/internal/updates"
@@ -64,16 +65,22 @@ func main() {
 	rulesService := rules.NewService(db)
 	eventService := event.NewService(db)
 	notifyService := notify.NewService(db, vault)
+	preferencesService := preferences.New(db, preferences.Retention{
+		MaxAgeDays:   int(cfg.RetentionAge / (24 * time.Hour)),
+		MaxStorageGB: cfg.RetentionBytes / (1024 * 1024 * 1024),
+	})
 	hub := api.NewHub()
-	application := &app.Service{Rules: rulesService, Events: eventService, Cameras: cameraRepo, Media: mediaManager, Notify: notifyService, Hub: hub, DataDir: cfg.DataDir, Logger: logger}
+	application := &app.Service{Rules: rulesService, Events: eventService, Cameras: cameraRepo, Media: mediaManager, Notify: notifyService, Hub: hub, DataDir: cfg.DataDir, Logger: logger, Preferences: preferencesService}
 	apiServer := api.NewServer(authManager, cameraRepo, onvif, mediaManager, rulesService, eventService, notifyService, hub, logger)
 	apiServer.SetSubmitter(application)
 	apiServer.SetUpdates(updates.New(version, cfg.ReleaseAPI, cfg.UpdaterURL, cfg.UpdaterToken))
+	apiServer.SetPreferences(preferencesService)
 	ctx, cancel := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer cancel()
 	go notifyService.Run(ctx)
 	go application.RunRetention(ctx, cfg.RetentionAge, cfg.RetentionBytes)
 	restoreMedia(ctx, cameraRepo, mediaManager, logger)
+	apiServer.ResumeCameraSetups(ctx)
 	var classifier *detector.NativeClassifier
 	model := filepath.Join(cfg.ModelsDir, "model.int8.onnx")
 	labels := filepath.Join(cfg.ModelsDir, "class_labels_indices.csv")
@@ -111,6 +118,9 @@ func restoreMedia(ctx context.Context, repo *camera.Repository, m *media.Manager
 		return
 	}
 	for _, cam := range cams {
+		if cam.SetupStatus != "ready" {
+			continue
+		}
 		_, cred, e := repo.Get(ctx, cam.ID)
 		if e == nil {
 			if e = m.ConfigureCamera(ctx, cam.ID, cred.RTSPURI); e != nil {

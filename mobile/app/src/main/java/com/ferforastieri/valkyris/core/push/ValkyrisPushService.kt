@@ -26,9 +26,8 @@ import javax.inject.Inject
     @Inject lateinit var notifier:AlarmNotifier
     private val scope=CoroutineScope(SupervisorJob()+Dispatchers.IO)
     override fun onNewEndpoint(endpoint:PushEndpoint,instance:String){scope.launch{runCatching{api.registerPush(PushRegistration(endpoint.url,secrets.getOrCreate()))}}}
-    override fun onMessage(message:PushMessage,instance:String){runCatching{val wrapper=JSONObject(String(message.content));val payload=JSONObject(String(open(wrapper.getString("ciphertext"),secrets.getOrCreate())));val eventId=payload.getString("eventId");val type=payload.optString("type","event");val confidence=payload.optDouble("confidence",0.0);notifier.show(eventId,type,confidence,payload.optBoolean("alarm",true))}}
+    override fun onMessage(message:PushMessage,instance:String){runCatching{val wrapper=JSONObject(String(message.content));val payload=JSONObject(String(open(wrapper.getString("ciphertext"),secrets.getOrCreate())));val eventId=payload.getString("eventId");val cameraId=payload.optString("cameraId");val type=payload.optString("type","event");val confidence=payload.optDouble("confidence",0.0);notifier.show(eventId,cameraId,type,confidence,payload.optBoolean("alarm",true),payload.optString("target","event")=="camera")}}
     override fun onRegistrationFailed(reason:FailedReason,instance:String)=Unit
     override fun onUnregistered(instance:String)=Unit
     private fun open(encoded:String,secret:String):ByteArray{val sealed=Base64.decode(encoded,Base64.NO_WRAP or Base64.URL_SAFE);val key=MessageDigest.getInstance("SHA-256").digest(secret.toByteArray());val cipher=Cipher.getInstance("AES/GCM/NoPadding");cipher.init(Cipher.DECRYPT_MODE,SecretKeySpec(key,"AES"),GCMParameterSpec(128,sealed.copyOfRange(0,12)));return cipher.doFinal(sealed.copyOfRange(12,sealed.size))}
 }
-

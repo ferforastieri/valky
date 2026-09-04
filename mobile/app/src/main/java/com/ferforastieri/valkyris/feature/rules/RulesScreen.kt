@@ -9,13 +9,14 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.ferforastieri.valkyris.R
-import com.ferforastieri.valkyris.core.design.OperationalHeader
 import com.ferforastieri.valkyris.core.model.Camera
 import com.ferforastieri.valkyris.core.model.DetectorKind
 import com.ferforastieri.valkyris.core.model.Rule
@@ -24,8 +25,11 @@ import com.ferforastieri.valkyris.core.model.RuleSchedule
 import java.time.ZoneId
 import kotlin.math.roundToInt
 import com.composables.icons.lucide.Lucide
+import com.composables.icons.lucide.Mic
 import com.composables.icons.lucide.Plus
 import com.composables.icons.lucide.SlidersHorizontal
+import com.composables.icons.lucide.TriangleAlert
+import com.composables.icons.lucide.Video
 
 @Composable
 fun RulesScreen(vm: RulesViewModel = hiltViewModel()) {
@@ -33,29 +37,22 @@ fun RulesScreen(vm: RulesViewModel = hiltViewModel()) {
     val cameras = vm.cameras.collectAsStateWithLifecycle().value
     val detectors = vm.detectors.collectAsStateWithLifecycle().value
     var show by remember { mutableStateOf(false) }
+    RulesContent(rules, cameras.isNotEmpty() && detectors.isNotEmpty(), onAdd = { show = true })
+    if (show) QuickRuleDialog(cameras, detectors, onDismiss = { show = false }) {
+        vm.create(it)
+        show = false
+    }
+}
 
-    Column(Modifier.fillMaxSize().padding(horizontal = 18.dp)) {
-        Spacer(Modifier.height(18.dp))
-        OperationalHeader(
-            icon = Lucide.SlidersHorizontal,
-            eyebrow = stringResource(R.string.automation_status),
-            title = stringResource(R.string.rules),
-            metric = rules.size.toString(),
-            status = stringResource(R.string.active_status),
-            action = {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Column(horizontalAlignment = Alignment.End) {
-                        Text(rules.size.toString(), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
-                        Text(stringResource(R.string.active_status), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    }
-                    Spacer(Modifier.width(8.dp))
-                    FilledIconButton(onClick = { show = true }, enabled = cameras.isNotEmpty() && detectors.isNotEmpty()) {
-                        Icon(Lucide.Plus, contentDescription = stringResource(R.string.add_rule))
-                    }
-                }
-            }
-        )
-        Spacer(Modifier.height(18.dp))
+@Composable
+fun RulesContent(
+    rules: List<com.ferforastieri.valkyris.core.database.RuleEntity>,
+    canAdd: Boolean = true,
+    onAdd: () -> Unit = {},
+) {
+    Box(Modifier.fillMaxSize()) {
+      Column(Modifier.fillMaxSize().padding(horizontal = 18.dp)) {
+        Spacer(Modifier.height(10.dp))
         if (rules.isEmpty()) {
             Box(Modifier.fillMaxSize()) {
                 Column(Modifier.align(Alignment.Center), horizontalAlignment = Alignment.CenterHorizontally) {
@@ -64,23 +61,105 @@ fun RulesScreen(vm: RulesViewModel = hiltViewModel()) {
                 }
             }
         } else {
-            LazyColumn(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            LazyColumn(verticalArrangement = Arrangement.spacedBy(10.dp), contentPadding = PaddingValues(bottom = 90.dp)) {
                 items(rules, key = { it.id }) { rule ->
-                    Card(Modifier.fillMaxWidth(), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface), border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant), elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)) {
-                        Column(Modifier.padding(16.dp)) {
-                            Text(rule.name, fontWeight = FontWeight.SemiBold)
-                            Text(rule.detectorTypes.replace(",", " · "), color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodySmall)
-                        }
-                    }
+                    RuleCard(rule)
                 }
             }
         }
-    }
-    if (show) QuickRuleDialog(cameras, detectors, onDismiss = { show = false }) {
-        vm.create(it)
-        show = false
+      }
+      if (canAdd) {
+          FloatingActionButton(
+              onClick = onAdd,
+              modifier = Modifier.align(Alignment.BottomEnd).padding(end = 20.dp, bottom = 80.dp),
+              containerColor = MaterialTheme.colorScheme.secondary,
+              contentColor = MaterialTheme.colorScheme.onSecondary,
+          ) { Icon(Lucide.Plus, contentDescription = stringResource(R.string.add_rule)) }
+      }
     }
 }
+
+@Composable
+private fun RuleCard(rule: com.ferforastieri.valkyris.core.database.RuleEntity) {
+    val identifiers = rule.detectorTypes.split(',').map(String::trim).filter(String::isNotBlank)
+    val detectorNames = mutableListOf<String>()
+    for (identifier in identifiers) detectorNames += detectorLabel(identifier)
+    val critical = identifiers.any { it in setOf("scream", "glass_break", "smoke_alarm", "fire_alarm", "siren", "tamper") }
+    val motion = identifiers.any { it == "motion" || it == "person" || it == "tamper" }
+    val icon: ImageVector = when {
+        critical -> Lucide.TriangleAlert
+        motion -> Lucide.Video
+        else -> Lucide.Mic
+    }
+    val accent: Color = if (critical) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.secondary
+    val description = stringResource(
+        when {
+            critical -> R.string.rule_critical_description
+            motion -> R.string.rule_motion_description
+            else -> R.string.rule_audio_description
+        },
+    )
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+        border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+        elevation = CardDefaults.cardElevation(defaultElevation = 4.dp),
+    ) {
+        Row(Modifier.padding(16.dp), verticalAlignment = Alignment.Top) {
+            Surface(
+                shape = MaterialTheme.shapes.medium,
+                color = accent.copy(alpha = .14f),
+            ) {
+                Icon(icon, null, Modifier.padding(11.dp).size(23.dp), tint = accent)
+            }
+            Spacer(Modifier.width(13.dp))
+            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(5.dp)) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(rule.name, Modifier.weight(1f), fontWeight = FontWeight.SemiBold)
+                    Surface(
+                        shape = MaterialTheme.shapes.small,
+                        color = if (rule.enabled) MaterialTheme.colorScheme.secondary.copy(alpha = .18f)
+                        else MaterialTheme.colorScheme.surfaceVariant,
+                    ) {
+                        Text(
+                            stringResource(if (rule.enabled) R.string.rule_enabled else R.string.rule_disabled),
+                            Modifier.padding(horizontal = 8.dp, vertical = 3.dp),
+                            style = MaterialTheme.typography.labelSmall,
+                            fontWeight = FontWeight.SemiBold,
+                        )
+                    }
+                }
+                Text(description, color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodySmall)
+                Text(
+                    stringResource(R.string.rule_detects, detectorNames.joinToString(" · ")),
+                    color = accent,
+                    style = MaterialTheme.typography.labelMedium,
+                    fontWeight = FontWeight.Medium,
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun detectorLabel(identifier: String): String = stringResource(
+    when (identifier) {
+        "motion" -> R.string.detector_motion
+        "person" -> R.string.detector_person
+        "tamper" -> R.string.detector_tamper
+        "baby_cry" -> R.string.detector_baby_cry
+        "crying" -> R.string.detector_crying
+        "scream" -> R.string.detector_scream
+        "glass_break" -> R.string.detector_glass_break
+        "smoke_alarm" -> R.string.detector_smoke_alarm
+        "fire_alarm" -> R.string.detector_fire_alarm
+        "siren" -> R.string.detector_siren
+        "doorbell" -> R.string.detector_doorbell
+        "knock" -> R.string.detector_knock
+        "dog_bark" -> R.string.detector_dog_bark
+        else -> R.string.detector_other
+    },
+)
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -101,10 +180,20 @@ private fun QuickRuleDialog(cameras: List<Camera>, detectors: List<DetectorKind>
     val timePattern = remember { Regex("^([01]\\d|2[0-3]):[0-5]\\d$") }
     val scheduleValid = (scheduleStart.isBlank() && scheduleEnd.isBlank()) || (timePattern.matches(scheduleStart) && timePattern.matches(scheduleEnd))
 
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text(stringResource(R.string.add_rule)) },
-        text = {
+    com.ferforastieri.valkyris.core.design.ValkyrisBottomSheet(
+        title = stringResource(R.string.add_rule),
+        onDismiss = onDismiss,
+        actions = {
+            TextButton(onDismiss) { Text(stringResource(R.string.cancel)) }
+            Button(
+                onClick = {
+                    val schedule = if (scheduleStart.isBlank()) RuleSchedule() else RuleSchedule((0..6).toList(), scheduleStart, scheduleEnd, ZoneId.systemDefault().id)
+                    onSave(Rule(cameraId = checkNotNull(camera).id, name = name, detectorTypes = listOf(checkNotNull(detector).id), minConfidence = confidence.toDouble(), confirmations = confirmations.toIntOrNull() ?: 2, cooldownSeconds = cooldown.toIntOrNull() ?: 60, schedule = schedule, actions = RuleActions(record, notify, alarm)))
+                },
+                enabled = camera != null && detector != null && name.isNotBlank() && scheduleValid,
+            ) { Text(stringResource(R.string.save)) }
+        },
+    ) {
             Column(Modifier.fillMaxWidth().heightIn(max = 520.dp).imePadding().verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 ExposedDropdownMenuBox(cameraExpanded, { cameraExpanded = it }) {
                     OutlinedTextField(camera?.name.orEmpty(), {}, readOnly = true, label = { Text(stringResource(R.string.cameras)) }, trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(cameraExpanded) }, modifier = Modifier.menuAnchor(MenuAnchorType.PrimaryNotEditable).fillMaxWidth())
@@ -127,18 +216,7 @@ private fun QuickRuleDialog(cameras: List<Camera>, detectors: List<DetectorKind>
                 RuleActionRow(notify, { notify = it }, stringResource(R.string.send_notification))
                 RuleActionRow(alarm, { alarm = it }, stringResource(R.string.sound_alarm))
             }
-        },
-        confirmButton = {
-            Button(
-                onClick = {
-                    val schedule = if (scheduleStart.isBlank()) RuleSchedule() else RuleSchedule((0..6).toList(), scheduleStart, scheduleEnd, ZoneId.systemDefault().id)
-                    onSave(Rule(cameraId = checkNotNull(camera).id, name = name, detectorTypes = listOf(checkNotNull(detector).id), minConfidence = confidence.toDouble(), confirmations = confirmations.toIntOrNull() ?: 2, cooldownSeconds = cooldown.toIntOrNull() ?: 60, schedule = schedule, actions = RuleActions(record, notify, alarm)))
-                },
-                enabled = camera != null && detector != null && name.isNotBlank() && scheduleValid,
-            ) { Text(stringResource(R.string.save)) }
-        },
-        dismissButton = { TextButton(onDismiss) { Text(stringResource(R.string.cancel)) } },
-    )
+    }
 }
 
 @Composable

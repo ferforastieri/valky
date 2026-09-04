@@ -117,8 +117,15 @@ func (s *Service) deliverBatch(ctx context.Context) {
 	for _, i := range items {
 		var metadata map[string]any
 		_ = json.Unmarshal([]byte(i.metadata), &metadata)
-		s.deliver(ctx, i.id, i.attempts, i.endpoint, i.secret, map[string]any{"eventId": i.eventID, "cameraId": i.cameraID, "type": i.eventType, "confidence": i.confidence, "occurredAt": i.occurred, "alarm": metadata["alarm"]})
+		s.deliver(ctx, i.id, i.attempts, i.endpoint, i.secret, map[string]any{"eventId": i.eventID, "cameraId": i.cameraID, "type": i.eventType, "confidence": i.confidence, "occurredAt": i.occurred, "alarm": metadata["alarm"], "target": notificationTarget(i.eventType)})
 	}
+}
+
+func notificationTarget(eventType string) string {
+	if eventType == "motion" || eventType == "person" || eventType == "tamper" {
+		return "camera"
+	}
+	return "event"
 }
 func (s *Service) deliver(ctx context.Context, id string, attempts int, endpointEnc, secretEnc []byte, payload any) {
 	endpoint, err := s.vault.DecryptString(endpointEnc)

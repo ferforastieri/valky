@@ -29,6 +29,7 @@ data class ApkDownload(val url:String,val version:String)
     private val _authInitialized=MutableStateFlow<Boolean?>(null);val authInitialized=_authInitialized.asStateFlow()
     private val _error=MutableStateFlow<String?>(null);val error=_error.asStateFlow()
     private val _pendingEvent=MutableStateFlow<String?>(null);val pendingEvent=_pendingEvent.asStateFlow()
+    private val _pendingCamera=MutableStateFlow<String?>(null);val pendingCamera=_pendingCamera.asStateFlow()
     private val _updateInfo=MutableStateFlow<UpdateInfo?>(null);val updateInfo=_updateInfo.asStateFlow()
     private val _updating=MutableStateFlow(false);val updating=_updating.asStateFlow()
     private val _apkDownloads=MutableSharedFlow<ApkDownload>(extraBufferCapacity=1);val apkDownloads=_apkDownloads.asSharedFlow()
@@ -36,8 +37,9 @@ data class ApkDownload(val url:String,val version:String)
     val theme=preferences.theme.stateIn(viewModelScope,SharingStarted.Eagerly,"system")
     val language=preferences.language.stateIn(viewModelScope,SharingStarted.Eagerly,"system")
     fun acceptPairingLink(uri:Uri?){if(uri?.scheme!="valkyris"||uri.host!="pair")return;val url=uri.getQueryParameter("url").orEmpty();val code=uri.getQueryParameter("code").orEmpty();val fingerprint=uri.getQueryParameter("fingerprint").orEmpty();if(url.startsWith("https://")&&code.isNotBlank())pair(url,code,fingerprint)}
-    fun acceptLaunch(uri:Uri?,eventId:String?){acceptPairingLink(uri);val deepLinkId=if(uri?.scheme=="valkyris"&&uri.host=="event")uri.lastPathSegment else null;_pendingEvent.value=eventId?.takeIf(String::isNotBlank)?:deepLinkId?.takeIf(String::isNotBlank)}
+    fun acceptLaunch(uri:Uri?,eventId:String?,cameraId:String?=null){acceptPairingLink(uri);val deepLinkId=if(uri?.scheme=="valkyris"&&uri.host=="event")uri.lastPathSegment else null;val deepCameraId=if(uri?.scheme=="valkyris"&&uri.host=="camera")uri.lastPathSegment else null;_pendingCamera.value=cameraId?.takeIf(String::isNotBlank)?:deepCameraId?.takeIf(String::isNotBlank);_pendingEvent.value=if(_pendingCamera.value==null)eventId?.takeIf(String::isNotBlank)?:deepLinkId?.takeIf(String::isNotBlank) else null}
     fun eventOpened(){_pendingEvent.value=null}
+    fun cameraOpened(){_pendingCamera.value=null}
     fun resetAuthStatus(){_authInitialized.value=null;_error.value=null}
     fun inspectServer(url:String){val base=url.trim().trimEnd('/');if(!base.startsWith("https://")){_error.value="Use um endereço HTTPS válido.";return};viewModelScope.launch{_connecting.value=true;_error.value=null;runCatching{api.authStatus(base)}.onSuccess{_authInitialized.value=it.initialized}.onFailure{_error.value=it.message};_connecting.value=false}}
     fun login(url:String,password:String,bootstrap:Boolean){val base=url.trim().trimEnd('/');if(!base.startsWith("https://")||password.isBlank()){_error.value="Use um endereço HTTPS e informe a senha da casa.";return};viewModelScope.launch{_connecting.value=true;_error.value=null;runCatching{api.login(base,com.ferforastieri.valkyris.core.model.LoginRequest(password,android.os.Build.MODEL,Locale.getDefault().toLanguageTag()),bootstrap)}.onSuccess{sessions.save(Session(base,it.token,admin=it.admin));_admin.value=it.admin;_paired.value=true;checkForUpdates(force=true)}.onFailure{_error.value=it.message};_connecting.value=false}}

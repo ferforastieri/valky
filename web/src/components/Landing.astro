@@ -1,96 +1,77 @@
 ---
-import { ArrowRight, BadgeCheck, BellRing, Check, ChevronDown, CodeXml, Download, House, Languages, LockKeyhole, Moon, Server, Settings, ShieldCheck, SlidersHorizontal, Sun, Video, Waypoints, Wifi } from '@lucide/astro';
+import { ArrowLeft, ArrowRight, BellRing, Check, ChevronDown, CircleQuestionMark, CodeXml, Download, House, Languages, Moon, ShieldCheck, Smartphone, Sun } from '@lucide/astro';
 import { copy, type Locale } from '../content/copy';
 import BaseLayout from '../layouts/BaseLayout.astro';
-import Signal from './Signal.astro';
 interface Props { locale: Locale }
 const { locale } = Astro.props;
 const t = copy[locale];
 const other = locale === 'pt-BR' ? '/en' : '/pt-BR';
 const command = 'curl -fsSL https://valkyris.vercel.app/install.sh | sh';
+const heroLines = locale === 'pt-BR' ? ['Sua casa avisa.', 'Seus dados ficam.'] : ['Your home speaks.', 'Your data stays.'];
 ---
 <BaseLayout locale={locale} title={t.metaTitle} description={t.metaDescription}>
   <main class="landing-shell">
     <section class="hero" id="overview">
-      <div class="overview-strip" aria-label={locale === 'pt-BR' ? 'Resumo do sistema' : 'System summary'}>
-        <article><span class="overview-icon"><Server size={20}/></span><div><small>{locale === 'pt-BR' ? 'Processamento' : 'Processing'}</small><strong>{locale === 'pt-BR' ? 'Dentro de casa' : 'At home'}</strong></div><em>{locale === 'pt-BR' ? 'local' : 'local'}</em></article>
-        <article><span class="overview-icon"><Wifi size={20}/></span><div><small>{locale === 'pt-BR' ? 'Acesso seguro' : 'Secure access'}</small><strong>LAN / VPN</strong></div><em>{locale === 'pt-BR' ? 'privado' : 'private'}</em></article>
-        <article><span class="overview-icon"><BellRing size={20}/></span><div><small>{locale === 'pt-BR' ? 'Alertas' : 'Alerts'}</small><strong>{locale === 'pt-BR' ? 'No seu Android' : 'On Android'}</strong></div><em>{locale === 'pt-BR' ? 'ativos' : 'active'}</em></article>
-      </div>
       <div class="hero-copy reveal">
         <p class="eyebrow"><span></span>{t.heroEyebrow}</p>
-        <h1>{t.heroTitle.split('\n').map((line) => <span>{line}</span>)}</h1>
+        <h1>{heroLines.map(line => <span>{line}</span>)}</h1>
         <p class="lede">{t.heroBody}</p>
         <div class="hero-actions">
           <a class="button dark" href="#install"><Download size={17}/>{t.install}</a>
           <a class="button quiet" href="https://github.com/ferforastieri/valkyris">{t.github}<ArrowRight size={17}/></a>
         </div>
         <div class="trust-row"><ShieldCheck size={17}/><span>MIT · ONVIF Profile S · LAN / VPN</span></div>
+        <p class="hero-interaction-hint"><span class="status-dot"></span>{locale === 'pt-BR' ? 'Clique em uma tela para trazê-la à frente' : 'Click a screen to bring it forward'}</p>
       </div>
-      <div class="camera-window reveal delayed">
-        <div class="camera-toolbar"><div class="camera-name"><span class="status-dot"></span>{t.camera}</div><div class="live-pill">{t.live}</div></div>
-        <div class="camera-scene" aria-hidden="true">
-          <div class="scene-grid"></div><div class="door"></div><div class="plant"><i></i><i></i><i></i></div><div class="timestamp">20:41:08<br/>CAM 01</div>
-          <Signal class="hero-signal" />
+      <div class="hero-screens reveal delayed" aria-label={locale === 'pt-BR' ? 'Telas interativas do aplicativo Valkyris' : 'Interactive Valkyris application screens'}>
+        <button class="hero-phone is-front" type="button" aria-pressed="true" aria-label={locale === 'pt-BR' ? 'Trazer visão geral para frente' : 'Bring overview to front'}>
+          <picture><source srcset="/screenshots/overview-dark.png" media="(prefers-color-scheme: dark)"/><img src="/screenshots/overview-light.png" alt={locale === 'pt-BR' ? 'Visão geral real do Valkyris' : 'Actual Valkyris overview'} width="1170" height="2532"/></picture>
+        </button>
+        <button class="hero-phone" type="button" aria-pressed="false" aria-label={locale === 'pt-BR' ? 'Trazer notificações para frente' : 'Bring notifications to front'}>
+          <picture><source srcset="/screenshots/events-dark.png" media="(prefers-color-scheme: dark)"/><img src="/screenshots/events-light.png" alt={locale === 'pt-BR' ? 'Central real de notificações do Valkyris' : 'Actual Valkyris notification center'} width="1170" height="2532"/></picture>
+        </button>
+      </div>
+    </section>
+
+    <section class="app-section section" id="app">
+      <div class="app-copy"><p class="eyebrow"><span></span>ANDROID NATIVE</p><h2>{t.appTitle}</h2><p>{t.appBody}</p><div class="app-assurances"><article><ShieldCheck size={20}/><div><strong>{t.principlesTitle}</strong><p>{t.principlesBody}</p></div></article><article><BellRing size={20}/><div><strong>{locale === 'pt-BR' ? 'Alertas do seu jeito' : 'Alerts on your terms'}</strong><p>{t.detectBody}</p></div></article></div><ul><li><Check size={16}/>Kotlin + Jetpack Compose</li><li><Check size={16}/>UnifiedPush / ntfy</li><li><Check size={16}/>LL-HLS authenticated</li></ul></div>
+      <div class="app-carousel" aria-roledescription="carousel" aria-label={locale === 'pt-BR' ? 'Telas reais do aplicativo' : 'Actual application screens'}>
+        <div class="carousel-viewport"><div class="carousel-track">
+          <figure class="app-capture carousel-slide is-active" data-slide-index="0" role="button" tabindex="0" aria-label="1 de 4"><picture><source srcset="/screenshots/cameras-dark.png" media="(prefers-color-scheme: dark)"/><img src="/screenshots/cameras-light.png" alt={locale === 'pt-BR' ? 'Tela real de câmeras do Valkyris' : 'Actual Valkyris cameras screen'} width="1170" height="2532"/></picture><figcaption>{locale === 'pt-BR' ? 'Câmeras e snapshots' : 'Cameras and snapshots'}</figcaption></figure>
+          <figure class="app-capture carousel-slide is-next" data-slide-index="1" role="button" tabindex="0" aria-label="2 de 4"><picture><source srcset="/screenshots/events-dark.png" media="(prefers-color-scheme: dark)"/><img src="/screenshots/events-light.png" alt={locale === 'pt-BR' ? 'Central de eventos do Valkyris' : 'Valkyris event center'} width="1170" height="2532"/></picture><figcaption>{locale === 'pt-BR' ? 'Alertas e acesso à câmera' : 'Alerts and camera access'}</figcaption></figure>
+          <figure class="app-capture carousel-slide is-hidden" data-slide-index="2" role="button" tabindex="0" aria-label="3 de 4"><picture><source srcset="/screenshots/rules-dark.png" media="(prefers-color-scheme: dark)"/><img src="/screenshots/rules-light.png" alt={locale === 'pt-BR' ? 'Tela real de regras do Valkyris' : 'Actual Valkyris rules screen'} width="1170" height="2532"/></picture><figcaption>{locale === 'pt-BR' ? 'Regras locais' : 'Local rules'}</figcaption></figure>
+          <figure class="app-capture carousel-slide is-prev" data-slide-index="3" role="button" tabindex="0" aria-label="4 de 4"><picture><source srcset="/screenshots/settings-dark.png" media="(prefers-color-scheme: dark)"/><img src="/screenshots/settings-light.png" alt={locale === 'pt-BR' ? 'Tela real de ajustes' : 'Actual settings screen'} width="1170" height="2532"/></picture><figcaption>{locale === 'pt-BR' ? 'Casa e preferências' : 'Home and preferences'}</figcaption></figure>
+        </div></div>
+        <div class="carousel-controls">
+          <button class="carousel-arrow carousel-prev" type="button" aria-label={locale === 'pt-BR' ? 'Tela anterior' : 'Previous screen'}><ArrowLeft size={18}/></button>
+          <div class="carousel-dots" aria-label={locale === 'pt-BR' ? 'Escolher tela' : 'Choose screen'}>{[0,1,2,3].map((index)=><button type="button" class={index === 0 ? 'is-active' : ''} data-slide={index} aria-label={`${locale === 'pt-BR' ? 'Ir para tela' : 'Go to screen'} ${index+1}`} aria-current={index === 0 ? 'true' : undefined}></button>)}</div>
+          <button class="carousel-arrow carousel-next" type="button" aria-label={locale === 'pt-BR' ? 'Próxima tela' : 'Next screen'}><ArrowRight size={18}/></button>
         </div>
-        <div class="camera-footer"><div><Check size={16}/><span>{t.status}</span></div><span>1080p · 15 fps</span></div>
-        <div class="alert-card"><span class="alert-icon"><BellRing size={18}/></span><div><strong>{t.alert}</strong><small>{t.alertMeta}</small></div><ChevronDown size={17}/></div>
       </div>
-    </section>
-
-    <section class="principles section" aria-labelledby="principles-title">
-      <div class="section-intro"><p class="eyebrow"><span></span>LOCAL-FIRST</p><h2 id="principles-title">{t.principlesTitle}</h2><p>{t.principlesBody}</p></div>
-      <div class="principle-grid">{t.principles.map(([title,body],i)=><article><span class="principle-icon">{i===0?<Server size={21}/>:i===1?<LockKeyhole size={21}/>:<Wifi size={21}/>}</span><h3>{title}</h3><p>{body}</p></article>)}</div>
-    </section>
-
-    <section class="detect section dark-section">
-      <div class="detect-copy"><p class="eyebrow light"><span></span>DETECTION LAYERS</p><h2>{t.detectTitle.split('\n').map((line)=><span>{line}</span>)}</h2><p>{t.detectBody}</p></div>
-      <div class="detector-orbit" aria-label="Detector catalog">
-        <Signal class="detector-signal" />
-        <div class="detector-list">{t.detectors.map((item,i) => {
-          const positions = [[0,0],[48,15],[8,31],[52,47],[2,63],[48,79],[13,92]];
-          const [left, top] = positions[i] ?? [0, 0];
-          return <span style={`left:${left}%;top:${top}%`}><i></i>{item}</span>;
-        })}</div>
-      </div>
-    </section>
-
-    <section class="flow section" id="flow">
-      <div class="section-heading"><p class="eyebrow"><span></span>PIPELINE</p><h2>{t.flowTitle}</h2></div>
-      <div class="flow-line">{t.flow.map(([title,body],i)=><article><div class="flow-number">0{i+1}</div><span class="flow-icon">{i===0?<Video size={22}/>:i===1?<Server size={22}/>:<BellRing size={22}/>}</span><h3>{title}</h3><p>{body}</p></article>)}</div>
-    </section>
-
-    <section class="app-section section">
-      <div class="phone-stage">
-        <div class="phone phone-back"><div class="phone-screen"><div class="phone-title">Timeline</div>{['Baby cry','Motion','Doorbell'].map((v,i)=><div class="mini-event"><span class={i===0?'danger':''}></span><div><strong>{v}</strong><small>{i===0?'Now · 91%':'Today · 18:2'+i}</small></div></div>)}</div></div>
-        <div class="phone phone-front"><div class="phone-screen live-screen"><div class="phone-top"><b>{t.camera}</b><span></span></div><div class="phone-video"><div class="door"></div><Signal /></div><div class="ptz"><button>↑</button><div><button>←</button><button>●</button><button>→</button></div><button>↓</button></div><div class="phone-nav"><Video class="active" size={17}/><BellRing size={17}/><SlidersHorizontal size={17}/><Settings size={17}/></div></div></div>
-      </div>
-      <div class="app-copy"><p class="eyebrow"><span></span>ANDROID NATIVE</p><h2>{t.appTitle.split('\n').map((line)=><span>{line}</span>)}</h2><p>{t.appBody}</p><ul><li><Check size={16}/>Kotlin + Jetpack Compose</li><li><Check size={16}/>UnifiedPush / ntfy</li><li><Check size={16}/>LL-HLS authenticated</li></ul></div>
     </section>
 
     <section class="install section" id="install">
-      <div class="install-header"><p class="eyebrow"><span></span>QUICK START</p><h2>{t.setupTitle}</h2></div>
+      <div class="install-header">
+        <div><p class="eyebrow"><span></span>QUICK START</p><h2>{t.setupTitle}</h2></div>
+        <p class="install-intro">{locale === 'pt-BR' ? 'Um comando prepara o servidor, a mídia e as atualizações. Depois, basta concluir a conexão pelo Android.' : 'One command prepares the server, media, and updates. Then finish the connection from Android.'}</p>
+      </div>
       <div class="steps">{t.steps.map(([title,body],i)=><article><span>0{i+1}</span><h3>{title}</h3><p>{body}</p></article>)}</div>
       <div class="terminal"><div class="terminal-bar"><span></span><span></span><span></span><b>install.sh</b></div><div class="terminal-command"><code>{command}</code><button class="copy-command" data-command={command} aria-label="Copy install command">COPY</button></div><div class="terminal-output"><span>✓ Docker Compose detected</span><span>✓ TLS identity generated</span><span>✓ Valkyris is listening on :8443</span></div></div>
     </section>
 
-    <section class="compatibility section" id="compatibility">
-      <div class="compat-card"><div><p class="eyebrow"><span></span>ONVIF PROFILE S</p><h2>{t.compatibilityTitle}</h2><p>{t.compatibilityBody}</p></div><div class="capability-list">{['RTSP / H.264','ONVIF events','PTZ','Audio tagging','Snapshots','Capability fallback'].map(item=><span><Check size={16}/>{item}</span>)}</div></div>
-    </section>
-
-    <section class="faq section"><div><p class="eyebrow"><span></span>FAQ</p><h2>{t.faqTitle}</h2></div><div class="faq-list">{t.faq.map(([q,a])=><details><summary>{q}<ChevronDown size={18}/></summary><p>{a}</p></details>)}</div></section>
+    <section class="faq section" id="faq"><div><p class="eyebrow"><span></span>FAQ · ONVIF PROFILE S</p><h2>{t.faqTitle}</h2></div><div class="faq-list">{t.faq.map(([q,a])=><details><summary>{q}<ChevronDown size={18}/></summary><p>{a}</p></details>)}</div></section>
   </main>
 
   <nav class="floating-dock" aria-label="Main navigation">
     <a class="dock-brand" href={`/${locale}`} aria-label="Valkyris home">
-      <span class="brand-mark"><img src="/valkyris-mark.png" alt="" /></span>
-      <span class="dock-identity"><strong>Valkyris</strong><small title={t.disclaimer}>© 2026 · MIT</small></span>
+      <span class="brand-mark"><img src="/valkyris-mark.svg?v=6" alt="" /></span>
+      <span class="dock-identity"><strong>Valkyris</strong><small title={t.disclaimer}>© 2026 Fernando Forastieri · MIT</small></span>
     </a>
     <div class="dock-links">
       <a class="dock-link" href="#overview"><House size={17}/><span>{t.nav[0]}</span></a>
-      <a class="dock-link" href="#flow"><Waypoints size={17}/><span>{t.nav[1]}</span></a>
+      <a class="dock-link" href="#app"><Smartphone size={17}/><span>{t.nav[1]}</span></a>
       <a class="dock-link" href="#install"><Download size={17}/><span>{t.nav[2]}</span></a>
-      <a class="dock-link" href="#compatibility"><BadgeCheck size={17}/><span>{t.nav[3]}</span></a>
+      <a class="dock-link" href="#faq"><CircleQuestionMark size={17}/><span>{t.nav[3]}</span></a>
     </div>
     <div class="dock-actions">
       <a class="icon-button" href={other} aria-label="Change language"><Languages size={18}/></a>
@@ -103,5 +84,9 @@ const command = 'curl -fsSL https://valkyris.vercel.app/install.sh | sh';
     const root=document.documentElement;
     document.querySelector('.theme-toggle')?.addEventListener('click',()=>{const current=root.dataset.theme;const dark=current==='dark'||(current==='auto'&&matchMedia('(prefers-color-scheme: dark)').matches);root.dataset.theme=dark?'light':'dark';localStorage.setItem('valkyris-theme',root.dataset.theme)});
     document.querySelector('.copy-command')?.addEventListener('click',async(event)=>{const button=event.currentTarget as HTMLButtonElement;await navigator.clipboard.writeText(button.dataset.command||'');const previous=button.textContent;button.textContent='COPIED';setTimeout(()=>button.textContent=previous,1400)});
+    const heroPhones=[...document.querySelectorAll<HTMLButtonElement>('.hero-phone')];
+    heroPhones.forEach(phone=>phone.addEventListener('click',()=>heroPhones.forEach(item=>{const active=item===phone;item.classList.toggle('is-front',active);item.setAttribute('aria-pressed',String(active))})));
+    const carousel=document.querySelector<HTMLElement>('.app-carousel');
+    if(carousel){const slides=[...carousel.querySelectorAll<HTMLElement>('.carousel-slide')];const dots=[...carousel.querySelectorAll<HTMLButtonElement>('.carousel-dots button')];let slide=0;const show=(next:number)=>{slide=(next+dots.length)%dots.length;slides.forEach((item,index)=>{const delta=(index-slide+dots.length)%dots.length;item.classList.remove('is-active','is-prev','is-next','is-hidden');item.classList.add(delta===0?'is-active':delta===1?'is-next':delta===dots.length-1?'is-prev':'is-hidden');item.setAttribute('aria-current',delta===0?'true':'false')});dots.forEach((dot,index)=>{dot.classList.toggle('is-active',index===slide);if(index===slide)dot.setAttribute('aria-current','true');else dot.removeAttribute('aria-current')})};carousel.querySelector('.carousel-prev')?.addEventListener('click',()=>show(slide-1));carousel.querySelector('.carousel-next')?.addEventListener('click',()=>show(slide+1));dots.forEach(dot=>dot.addEventListener('click',()=>show(Number(dot.dataset.slide))));slides.forEach(item=>{const select=()=>show(Number(item.dataset.slideIndex));item.addEventListener('click',select);item.addEventListener('keydown',event=>{if(event.key==='Enter'||event.key===' '){event.preventDefault();select()}})})}
   </script>
 </BaseLayout>

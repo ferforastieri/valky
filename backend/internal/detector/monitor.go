@@ -63,7 +63,7 @@ func (m *Monitor) refresh(ctx context.Context) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	for _, cam := range cameras {
-		if !cam.Enabled {
+		if !cam.Enabled || cam.SetupStatus != "ready" {
 			continue
 		}
 		active[cam.ID] = true

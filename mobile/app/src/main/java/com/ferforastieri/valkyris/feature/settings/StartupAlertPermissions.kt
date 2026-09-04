@@ -18,7 +18,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -46,6 +45,7 @@ import com.composables.icons.lucide.Check
 import com.composables.icons.lucide.Lucide
 import com.composables.icons.lucide.TriangleAlert
 import com.ferforastieri.valkyris.R
+import com.ferforastieri.valkyris.core.design.ValkyrisBottomSheet
 
 @Composable
 fun StartupAlertPermissions() {
@@ -87,28 +87,11 @@ fun StartupAlertPermissions() {
         !fullScreenAllowed -> stringResource(R.string.full_screen_alarms)
         else -> stringResource(R.string.do_not_disturb_access)
     }
-    AlertDialog(
-        onDismissRequest = { dialogVisible = false },
-        icon = {
-            Surface(shape = CircleShape, color = MaterialTheme.colorScheme.primary) {
-                Icon(
-                    Lucide.BellRing,
-                    contentDescription = null,
-                    tint = MaterialTheme.colorScheme.secondary,
-                    modifier = Modifier.padding(12.dp).size(24.dp),
-                )
-            }
-        },
-        title = { Text(stringResource(R.string.alert_readiness_title)) },
-        text = {
-            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                Text(stringResource(R.string.alert_readiness_body), color = MaterialTheme.colorScheme.onSurfaceVariant)
-                PermissionRow(stringResource(R.string.notification_permission), notificationsAllowed)
-                PermissionRow(stringResource(R.string.full_screen_alarms), fullScreenAllowed)
-                PermissionRow(stringResource(R.string.do_not_disturb_access), dndAllowed)
-            }
-        },
-        confirmButton = {
+    ValkyrisBottomSheet(
+        title = stringResource(R.string.alert_readiness_title),
+        onDismiss = { dialogVisible = false },
+        actions = {
+            TextButton({ dialogVisible = false }) { Text(stringResource(R.string.not_now)) }
             Button(
                 onClick = {
                     when {
@@ -124,8 +107,26 @@ fun StartupAlertPermissions() {
                 },
             ) { Text(stringResource(R.string.configure_permission, nextTitle)) }
         },
-        dismissButton = { TextButton({ dialogVisible = false }) { Text(stringResource(R.string.not_now)) } },
-    )
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Surface(shape = CircleShape, color = MaterialTheme.colorScheme.primary) {
+                Icon(
+                    Lucide.BellRing,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.secondary,
+                    modifier = Modifier.padding(12.dp).size(24.dp),
+                )
+            }
+            Spacer(Modifier.width(12.dp))
+            Text(stringResource(R.string.alert_readiness_body), color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+        Spacer(Modifier.size(16.dp))
+        Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            PermissionRow(stringResource(R.string.notification_permission), notificationsAllowed)
+            PermissionRow(stringResource(R.string.full_screen_alarms), fullScreenAllowed)
+            PermissionRow(stringResource(R.string.do_not_disturb_access), dndAllowed)
+        }
+    }
 }
 
 @Composable

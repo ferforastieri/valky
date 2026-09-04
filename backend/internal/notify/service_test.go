@@ -87,8 +87,21 @@ func TestEncryptedPushRetriesAndThenDelivers(t *testing.T) {
 		t.Fatal(err)
 	}
 	plain, err := openTestPayload(secret, sealed)
-	if err != nil || !strings.Contains(string(plain), "baby_cry") || strings.Contains(string(plain), endpoint.URL) {
+	if err != nil || !strings.Contains(string(plain), "baby_cry") || !strings.Contains(string(plain), `"target":"event"`) || strings.Contains(string(plain), endpoint.URL) {
 		t.Fatalf("unexpected decrypted payload %q: %v", plain, err)
+	}
+}
+
+func TestNotificationTarget(t *testing.T) {
+	for _, eventType := range []string{"motion", "person", "tamper"} {
+		if got := notificationTarget(eventType); got != "camera" {
+			t.Fatalf("%s should open camera, got %s", eventType, got)
+		}
+	}
+	for _, eventType := range []string{"baby_cry", "smoke_alarm", "dog_bark"} {
+		if got := notificationTarget(eventType); got != "event" {
+			t.Fatalf("%s should open event, got %s", eventType, got)
+		}
 	}
 }
 

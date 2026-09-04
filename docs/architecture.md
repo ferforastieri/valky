@@ -3,8 +3,12 @@
 Valkyris is a single-home system. The Go process is the security boundary: apps
 never receive camera passwords and MediaMTX is not published on a host port.
 
-1. The camera is added by address and camera-account credentials.
-2. ONVIF probing stores the capabilities, service addresses and media profile token.
+1. The camera and its encrypted credentials are persisted immediately with a
+   `pending` setup state, so the Android app can open it without waiting for ONVIF.
+2. The backend publishes the `queued`, `probing` and `stream` steps over the
+   realtime channel while also storing them in SQLite. ONVIF probing then stores
+   capabilities, service addresses and the media profile token. A terminal error
+   is sanitized and persisted on the camera instead of removing it.
 3. MediaMTX pulls the selected RTSP profile once and maintains LL-HLS plus a
    short rolling fMP4 buffer.
 4. ONVIF events and local audio/video detectors submit normalized detections to

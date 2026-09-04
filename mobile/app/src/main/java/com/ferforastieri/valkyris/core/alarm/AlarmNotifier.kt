@@ -40,9 +40,9 @@ class AlarmNotifier @Inject constructor(@param:ApplicationContext private val co
         )
     }
 
-    fun show(eventId: String, type: String, confidence: Double, alarm: Boolean) {
+    fun show(eventId: String, cameraId: String, type: String, confidence: Double, alarm: Boolean, opensCamera: Boolean) {
         if (Build.VERSION.SDK_INT >= 33 && ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) return
-        val open = PendingIntent.getActivity(
+        val eventIntent = PendingIntent.getActivity(
             context,
             eventId.hashCode(),
             Intent(context, MainActivity::class.java).putExtra("eventId", eventId),
@@ -54,6 +54,13 @@ class AlarmNotifier @Inject constructor(@param:ApplicationContext private val co
             Intent(context, AlarmActivity::class.java).putExtra("eventId", eventId).putExtra("eventType", type),
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
         )
+        val cameraIntent = PendingIntent.getActivity(
+            context,
+            eventId.hashCode() + 2,
+            Intent(context, MainActivity::class.java).putExtra("cameraId", cameraId),
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
+        )
+        val open = if (opensCamera && cameraId.isNotBlank()) cameraIntent else eventIntent
         val manager = context.getSystemService(NotificationManager::class.java)
         val canUseFullScreen = !alarm || Build.VERSION.SDK_INT < 34 || manager.canUseFullScreenIntent()
         val notification = NotificationCompat.Builder(context, if (alarm) ALARMS else EVENTS)
@@ -65,6 +72,12 @@ class AlarmNotifier @Inject constructor(@param:ApplicationContext private val co
             .setAutoCancel(false)
             .setPriority(NotificationCompat.PRIORITY_MAX)
             .setCategory(if (alarm) NotificationCompat.CATEGORY_ALARM else NotificationCompat.CATEGORY_EVENT)
+            .setNumber(1)
+            .setGroup("valkyris-home-events")
+            .apply {
+                if (cameraId.isNotBlank() && !opensCamera) addAction(0, context.getString(R.string.open_camera), cameraIntent)
+                if (opensCamera) addAction(0, context.getString(R.string.view_event), eventIntent)
+            }
             .addAction(0, context.getString(R.string.acknowledge), alarmIntent)
             .apply { if (alarm && canUseFullScreen) setFullScreenIntent(alarmIntent, true) }
             .build()
