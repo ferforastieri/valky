@@ -66,7 +66,12 @@ services:
     restart: unless-stopped
     command: ["/etc/mediamtx.yml"]
     volumes:
-      - ./mediamtx.yml:/etc/mediamtx.yml:ro
+      - type: bind
+        source: ./mediamtx.yml
+        target: /etc/mediamtx.yml
+        read_only: true
+        bind:
+          create_host_path: false
       - valkyris-data:/data
     expose:
       - "8888"

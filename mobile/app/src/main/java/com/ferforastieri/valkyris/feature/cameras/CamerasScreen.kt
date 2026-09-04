@@ -11,7 +11,6 @@ import android.view.ViewGroup
 import androidx.compose.foundation.background
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.gestures.detectTapGestures
-import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -59,8 +58,14 @@ import com.composables.icons.lucide.VideoOff
 @Composable fun CamerasScreen(onCamera:(String)->Unit,vm:CamerasViewModel=hiltViewModel()){
     val state by vm.state.collectAsStateWithLifecycle()
     var showAdd by remember{mutableStateOf(false)}
-    CamerasContent(state, onCamera, onAdd = { if (!state.creating) showAdd = true })
+    var failedCameraId by remember{mutableStateOf<String?>(null)}
+    val failedCamera=state.cameras.firstOrNull{it.id==failedCameraId}
+    CamerasContent(state, onCamera={id->
+        val camera=state.cameras.firstOrNull{it.id==id}
+        if(camera?.setupStatus=="failed")failedCameraId=id else onCamera(id)
+    }, onAdd = { if (!state.creating) showAdd = true })
     if(showAdd)AddCameraDialog(onDismiss={showAdd=false},onSave={vm.add(it);showAdd=false})
+    failedCamera?.let{CameraFailureSheet(it){failedCameraId=null}}
 }
 
 @Composable
@@ -79,12 +84,32 @@ fun CamerasContent(state: CamerasState, onCamera: (String) -> Unit = {}, onAdd: 
         }
         FloatingActionButton(
             onClick = onAdd,
-            modifier = Modifier.align(Alignment.BottomEnd).padding(end = 20.dp, bottom = 80.dp),
+            modifier = Modifier.align(Alignment.BottomEnd).padding(end = 20.dp, bottom = 18.dp),
             containerColor = if (state.creating) MaterialTheme.colorScheme.surfaceVariant else MaterialTheme.colorScheme.secondary,
             contentColor = if (state.creating) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.onSecondary,
         ) {
             if (state.creating) CircularProgressIndicator(Modifier.size(22.dp), strokeWidth = 2.dp)
             else Icon(Lucide.Plus, stringResource(R.string.add_camera))
+        }
+    }
+}
+
+@Composable
+fun CameraFailureSheet(camera:Camera,onDismiss:()->Unit){
+    com.ferforastieri.valkyris.core.design.ValkyrisBottomSheet(
+        title=stringResource(R.string.camera_error_title),
+        onDismiss=onDismiss,
+        actions={Button(onClick=onDismiss){Text(stringResource(R.string.close))}},
+    ){
+        Column(Modifier.fillMaxWidth(),horizontalAlignment=Alignment.CenterHorizontally,verticalArrangement=Arrangement.spacedBy(12.dp)){
+            Surface(shape=MaterialTheme.shapes.large,color=MaterialTheme.colorScheme.errorContainer){
+                Icon(Lucide.VideoOff,null,Modifier.padding(14.dp).size(30.dp),tint=MaterialTheme.colorScheme.error)
+            }
+            Text(camera.name,style=MaterialTheme.typography.titleMedium,fontWeight=FontWeight.SemiBold)
+            Text(stringResource(R.string.camera_error_body),style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant)
+            Surface(Modifier.fillMaxWidth(),shape=MaterialTheme.shapes.medium,color=MaterialTheme.colorScheme.errorContainer){
+                Text(camera.setupError.ifBlank{stringResource(R.string.camera_setup_failed)},Modifier.padding(16.dp),color=MaterialTheme.colorScheme.onErrorContainer,style=MaterialTheme.typography.bodySmall)
+            }
         }
     }
 }
@@ -102,9 +127,12 @@ fun CamerasContent(state: CamerasState, onCamera: (String) -> Unit = {}, onAdd: 
         Column(Modifier.fillMaxWidth().heightIn(max=520.dp).imePadding().verticalScroll(rememberScrollState()),verticalArrangement=Arrangement.spacedBy(8.dp)){
             OutlinedTextField(name,{name=it},Modifier.fillMaxWidth(),label={Text(stringResource(R.string.camera_name))})
             Text(stringResource(R.string.camera_icon),style=MaterialTheme.typography.labelLarge)
-            Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),horizontalArrangement=Arrangement.spacedBy(8.dp)){
-                cameraIconOptions.forEach { option ->
-                    FilterChip(selected=icon==option.value,onClick={icon=option.value},label={Text(stringResource(option.label))},leadingIcon={Icon(option.image,null,Modifier.size(18.dp))})
+            Column(verticalArrangement=Arrangement.spacedBy(8.dp)){
+                cameraIconOptions.chunked(3).forEach { row ->
+                    Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.spacedBy(8.dp)){
+                        row.forEach { option -> CameraIconChoice(option,icon==option.value,{icon=option.value},Modifier.weight(1f)) }
+                        repeat(3-row.size){Spacer(Modifier.weight(1f))}
+                    }
                 }
             }
             OutlinedTextField(host,{host=it},Modifier.fillMaxWidth(),label={Text(stringResource(R.string.camera_ip))})
@@ -151,9 +179,28 @@ private fun CameraCard(camera: Camera, snapshot: android.graphics.Bitmap?, onCli
 
 private data class CameraIconOption(val value:String,val label:Int,val image:ImageVector)
 
+@Composable
+private fun CameraIconChoice(option:CameraIconOption,selected:Boolean,onClick:()->Unit,modifier:Modifier=Modifier){
+    Surface(
+        onClick=onClick,
+        modifier=modifier.height(72.dp),
+        shape=MaterialTheme.shapes.medium,
+        color=if(selected)MaterialTheme.colorScheme.secondaryContainer else MaterialTheme.colorScheme.surfaceVariant,
+        border=androidx.compose.foundation.BorderStroke(1.dp,if(selected)MaterialTheme.colorScheme.secondary else MaterialTheme.colorScheme.outlineVariant),
+    ){
+        Column(Modifier.padding(horizontal=4.dp,vertical=9.dp),horizontalAlignment=Alignment.CenterHorizontally,verticalArrangement=Arrangement.spacedBy(5.dp)){
+            Icon(option.image,null,Modifier.size(23.dp),tint=if(selected)MaterialTheme.colorScheme.onSecondaryContainer else MaterialTheme.colorScheme.onSurfaceVariant)
+            Text(stringResource(option.label),style=MaterialTheme.typography.labelSmall,maxLines=1)
+        }
+    }
+}
+
 private val cameraIconOptions = listOf(
     CameraIconOption("camera",R.string.camera_icon_camera,cameraIcon("camera")),
+    CameraIconOption("nursery",R.string.camera_icon_nursery,cameraIcon("nursery")),
     CameraIconOption("baby",R.string.camera_icon_baby,cameraIcon("baby")),
+    CameraIconOption("bottle",R.string.camera_icon_bottle,cameraIcon("bottle")),
+    CameraIconOption("dog",R.string.camera_icon_dog,cameraIcon("dog")),
     CameraIconOption("bedroom",R.string.camera_icon_bedroom,cameraIcon("bedroom")),
     CameraIconOption("office",R.string.camera_icon_office,cameraIcon("office")),
     CameraIconOption("entrance",R.string.camera_icon_entrance,cameraIcon("entrance")),
@@ -161,6 +208,7 @@ private val cameraIconOptions = listOf(
     CameraIconOption("yard",R.string.camera_icon_yard,cameraIcon("yard")),
     CameraIconOption("garage",R.string.camera_icon_garage,cameraIcon("garage")),
     CameraIconOption("kitchen",R.string.camera_icon_kitchen,cameraIcon("kitchen")),
+    CameraIconOption("bathroom",R.string.camera_icon_bathroom,cameraIcon("bathroom")),
 )
 
 @Composable private fun setupLabel(camera: Camera) = when (camera.setupStatus) {

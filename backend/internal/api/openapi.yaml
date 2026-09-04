@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: Valkyris API
-  version: 1.0.0
+  version: 1.0.1
   description: Local-first home camera monitoring API. JSON responses use a success/message/data envelope; every response also includes X-Valkyris-Success and X-Valkyris-Message headers.
 servers:
   - url: https://valkyris.local:8443/api/v1
@@ -216,7 +216,7 @@ components:
       properties:
         id: {type: string, format: uuid}
         name: {type: string}
-        icon: {type: string, enum: [camera, baby, bedroom, office, entrance, living_room, yard, garage, kitchen]}
+        icon: {type: string, enum: [camera, nursery, baby, bottle, dog, bedroom, office, entrance, living_room, yard, garage, kitchen, bathroom]}
         host: {type: string}
         port: {type: integer}
         profileToken: {type: string}
@@ -231,7 +231,7 @@ components:
       required: [name, host, username, password]
       properties:
         name: {type: string}
-        icon: {type: string, enum: [camera, baby, bedroom, office, entrance, living_room, yard, garage, kitchen], default: camera}
+        icon: {type: string, enum: [camera, nursery, baby, bottle, dog, bedroom, office, entrance, living_room, yard, garage, kitchen, bathroom], default: camera}
         host: {type: string}
         port: {type: integer, default: 2020}
         username: {type: string}

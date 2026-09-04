@@ -25,6 +25,10 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
@@ -45,6 +49,7 @@ import com.ferforastieri.valkyris.core.database.EventEntity
 import com.ferforastieri.valkyris.core.design.cameraIcon
 import com.ferforastieri.valkyris.core.model.Camera as CameraModel
 import com.ferforastieri.valkyris.core.network.ValkyrisRepository
+import com.ferforastieri.valkyris.feature.cameras.CameraFailureSheet
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -83,7 +88,13 @@ fun OverviewScreen(
     val state = viewModel.state.collectAsStateWithLifecycle().value
     val events = viewModel.events.collectAsStateWithLifecycle().value
     val rules = viewModel.rules.collectAsStateWithLifecycle().value
-    OverviewContent(state.cameras, rules.count { it.enabled }, events, onCamera, onEvent)
+    var failedCameraId by remember { mutableStateOf<String?>(null) }
+    val failedCamera = state.cameras.firstOrNull { it.id == failedCameraId }
+    OverviewContent(state.cameras, rules.count { it.enabled }, events, onCamera = { id ->
+        val camera = state.cameras.firstOrNull { it.id == id }
+        if (camera?.setupStatus == "failed") failedCameraId = id else onCamera(id)
+    }, onEvent = onEvent)
+    failedCamera?.let { CameraFailureSheet(it) { failedCameraId = null } }
 }
 
 @Composable

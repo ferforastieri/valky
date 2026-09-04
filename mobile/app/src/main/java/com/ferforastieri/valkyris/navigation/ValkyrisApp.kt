@@ -11,6 +11,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavGraph.Companion.findStartDestination
+import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
@@ -126,16 +127,12 @@ private fun ConnectedValkyrisApp(main: MainViewModel) {
         },
         bottomBar = {
             if (showBottomBar) Box(
-                Modifier.fillMaxWidth().padding(bottom = 8.dp),
+                Modifier.fillMaxWidth().padding(bottom = 18.dp),
                 contentAlignment = androidx.compose.ui.Alignment.Center,
             ) {
                 val labels = destinations.map { it.icon to stringResource(it.label) }
                 FloatingDock(labels, selectedIndex, onSelect = { index ->
-                    nav.navigate(destinations[index].route) {
-                        popUpTo(nav.graph.findStartDestination().id) { saveState = true }
-                        launchSingleTop = true
-                        restoreState = true
-                    }
+                    nav.openTopLevel(destinations[index].route)
                 })
             }
         },
@@ -155,5 +152,19 @@ private fun ConnectedValkyrisApp(main: MainViewModel) {
             composable("rules") { RulesScreen() }
             composable("settings") { SettingsScreen(main) }
         }
+    }
+}
+
+private fun NavHostController.openTopLevel(route: String) {
+    if (route == "overview") {
+        if (!popBackStack("overview", inclusive = false) && currentDestination?.route != "overview") {
+            navigate("overview") { launchSingleTop = true }
+        }
+        return
+    }
+    navigate(route) {
+        popUpTo(graph.findStartDestination().id) { saveState = true }
+        launchSingleTop = true
+        restoreState = true
     }
 }

@@ -52,8 +52,9 @@ type CreateInput struct {
 }
 
 var validIcons = map[string]struct{}{
-	"camera": {}, "baby": {}, "bedroom": {}, "office": {}, "entrance": {},
-	"living_room": {}, "yard": {}, "garage": {}, "kitchen": {},
+	"camera": {}, "nursery": {}, "baby": {}, "bottle": {}, "dog": {},
+	"bedroom": {}, "office": {}, "entrance": {}, "living_room": {},
+	"yard": {}, "garage": {}, "kitchen": {}, "bathroom": {},
 }
 
 func normalizeIcon(icon string) string {

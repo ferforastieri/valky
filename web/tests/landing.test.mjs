@@ -57,11 +57,22 @@ test('sincroniza os prints com o tema escolhido', () => {
   assert.match(landingSource, /systemTheme\.addEventListener\('change'/);
 });
 
+test('carrossel permite avanço automático e pausa acessível', () => {
+  assert.match(pt, /class="carousel-auto"/);
+  assert.match(pt, /aria-label="Pausar carrossel"/);
+  assert.match(landingSource, /setTimeout\(\(\)=>\{show\(slide\+1\);schedule\(\)\},4800\)/);
+  assert.match(landingSource, /prefers-reduced-motion: reduce/);
+});
+
 test('artefatos públicos acompanham a documentação', async () => {
   const installer = await readFile(new URL('../dist/install.sh', import.meta.url), 'utf8');
   const openapi = await readFile(new URL('../dist/openapi.yaml', import.meta.url), 'utf8');
+  const compose = await readFile(new URL('../../compose.yaml', import.meta.url), 'utf8');
   const favicon = await readFile(new URL('../dist/favicon.png', import.meta.url));
   assert.match(installer, /^#!\/bin\/sh/);
+  assert.match(installer, /directory-backup/);
+  assert.match(installer, /--force-recreate mediamtx/);
+  assert.match(compose, /create_host_path: false/);
   assert.match(openapi, /^openapi: 3\.1\.0/);
   assert.ok(favicon.length > 1_000);
 });

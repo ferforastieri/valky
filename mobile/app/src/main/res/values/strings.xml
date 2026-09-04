@@ -69,7 +69,10 @@
     <string name="camera_name">Nome da câmera</string>
     <string name="camera_icon">Identifique o ambiente</string>
     <string name="camera_icon_camera">Câmera</string>
+    <string name="camera_icon_nursery">Quarto infantil</string>
     <string name="camera_icon_baby">Bebê</string>
+    <string name="camera_icon_bottle">Mamadeira</string>
+    <string name="camera_icon_dog">Cachorro</string>
     <string name="camera_icon_bedroom">Quarto</string>
     <string name="camera_icon_office">Escritório</string>
     <string name="camera_icon_entrance">Entrada</string>
@@ -77,11 +80,14 @@
     <string name="camera_icon_yard">Quintal</string>
     <string name="camera_icon_garage">Garagem</string>
     <string name="camera_icon_kitchen">Cozinha</string>
+    <string name="camera_icon_bathroom">Banheiro</string>
     <string name="camera_ip">IP ou hostname</string>
     <string name="onvif_port">Porta ONVIF</string>
     <string name="camera_user">Conta da câmera</string>
     <string name="camera_password">Senha da câmera</string>
     <string name="rtsp_automatic_hint">O endereço RTSP principal será configurado automaticamente.</string>
+    <string name="camera_error_title">Câmera indisponível</string>
+    <string name="camera_error_body">A configuração não foi concluída. O diagnóstico persistido pelo servidor está abaixo.</string>
     <string name="event_detail">Detalhe do evento</string>
     <string name="media_processing">O clipe ainda está sendo processado.</string>
     <string name="light_theme">Claro</string>

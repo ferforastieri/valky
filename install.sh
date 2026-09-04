@@ -60,11 +60,21 @@ case "$RELEASE_VERSION" in
 esac
 
 mkdir -p "$INSTALL_ROOT"
+MEDIAMTX_REPAIR_REQUIRED=0
 for asset in compose.yaml mediamtx.yml; do
-  if [ -f "${INSTALL_ROOT}/${asset}" ]; then
-    cp -p "${INSTALL_ROOT}/${asset}" "${INSTALL_ROOT}/${asset}.previous"
+  target="${INSTALL_ROOT}/${asset}"
+  if [ -d "$target" ]; then
+    directory_backup="${target}.directory-backup"
+    while [ -e "$directory_backup" ]; do
+      directory_backup="${directory_backup}.previous"
+    done
+    mv "$target" "$directory_backup"
+    printf 'Valkyris: corrigido %s que havia sido criado como diretório (backup: %s).\n' "$asset" "$directory_backup"
+    [ "$asset" != "mediamtx.yml" ] || MEDIAMTX_REPAIR_REQUIRED=1
+  elif [ -f "$target" ]; then
+    cp -p "$target" "${target}.previous"
   fi
-  mv "${TEMP_ROOT}/${asset}" "${INSTALL_ROOT}/${asset}"
+  mv "${TEMP_ROOT}/${asset}" "$target"
 done
 
 LAN_ADDRESS="$(hostname -I 2>/dev/null | awk '{ print $1 }')"
@@ -95,6 +105,9 @@ chmod 600 "$ENV_FILE"
 
 printf 'Valkyris: iniciando os serviços em %s...\n' "$INSTALL_ROOT"
 docker compose --project-directory "$INSTALL_ROOT" --env-file "$ENV_FILE" pull
+if [ "$MEDIAMTX_REPAIR_REQUIRED" = "1" ]; then
+  docker compose --project-directory "$INSTALL_ROOT" --env-file "$ENV_FILE" up -d --force-recreate mediamtx
+fi
 docker compose --project-directory "$INSTALL_ROOT" --env-file "$ENV_FILE" up -d --remove-orphans
 
 PORT="$(awk -F= '$1 == "VALKYRIS_PORT" { print substr($0, index($0, "=") + 1); exit }' "$ENV_FILE")"

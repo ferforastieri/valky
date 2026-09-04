@@ -1918,3 +1918,87 @@ body {
     margin-top: 14px;
   }
 }
+
+/* Keep the hero copy clear and let the phone stack sit decisively to its right. */
+@media (min-width: 981px) {
+  .hero-phone {
+    left: 51%;
+  }
+  .hero-phone:first-child {
+    left: 20%;
+  }
+}
+
+/* A quiet depth transition for the real app screens. */
+.carousel-viewport {
+  perspective: 1500px;
+}
+.carousel-track {
+  transform-style: preserve-3d;
+}
+.carousel-track .carousel-slide {
+  will-change: transform, opacity, filter;
+  transition:
+    transform 0.72s cubic-bezier(0.22, 0.78, 0.18, 1),
+    opacity 0.48s ease,
+    filter 0.48s ease;
+}
+.carousel-track .carousel-slide.is-active {
+  filter: saturate(1) brightness(1);
+  transform: translateX(-50%) translateZ(0) rotate(-1deg) scale(1);
+}
+.carousel-track .carousel-slide.is-prev {
+  filter: saturate(0.62) brightness(0.9);
+  transform: translateX(-50%) translate3d(-24px, 46px, -110px) rotateY(9deg) rotate(-9deg) scale(0.84);
+}
+.carousel-track .carousel-slide.is-next {
+  filter: saturate(0.62) brightness(0.9);
+  transform: translateX(-50%) translate3d(24px, 46px, -110px) rotateY(-9deg) rotate(9deg) scale(0.84);
+}
+.carousel-track .carousel-slide.is-hidden {
+  opacity: 0;
+  filter: blur(3px) saturate(0.45);
+  transform: translateX(-50%) translateY(72px) translateZ(-180px) scale(0.7);
+}
+.app-carousel[data-direction="next"] .carousel-slide.is-active {
+  animation: carousel-arrive-next 0.72s cubic-bezier(0.22, 0.78, 0.18, 1);
+}
+.app-carousel[data-direction="previous"] .carousel-slide.is-active {
+  animation: carousel-arrive-previous 0.72s cubic-bezier(0.22, 0.78, 0.18, 1);
+}
+@keyframes carousel-arrive-next {
+  from { transform: translateX(-40%) translateY(34px) rotate(7deg) scale(0.88); }
+  to { transform: translateX(-50%) translateY(0) rotate(-1deg) scale(1); }
+}
+@keyframes carousel-arrive-previous {
+  from { transform: translateX(-60%) translateY(34px) rotate(-7deg) scale(0.88); }
+  to { transform: translateX(-50%) translateY(0) rotate(-1deg) scale(1); }
+}
+.carousel-controls {
+  position: relative;
+}
+.carousel-auto {
+  position: absolute;
+  left: calc(50% + 82px);
+  width: 30px;
+  height: 30px;
+  display: grid;
+  place-items: center;
+  padding: 0;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--surface) 90%, transparent);
+  color: var(--muted);
+  cursor: pointer;
+}
+.carousel-auto .play-icon,
+.carousel-auto.is-paused .pause-icon {
+  display: none;
+}
+.carousel-auto.is-paused .play-icon {
+  display: block;
+}
+.carousel-auto:focus-visible {
+  outline: 2px solid var(--signal);
+  outline-offset: 3px;
+}

@@ -1,5 +1,5 @@
 ---
-import { ArrowLeft, ArrowRight, BellRing, Check, ChevronDown, CircleQuestionMark, CodeXml, Download, House, Languages, Moon, ShieldCheck, Smartphone, Sun } from '@lucide/astro';
+import { ArrowLeft, ArrowRight, BellRing, Check, ChevronDown, CircleQuestionMark, CodeXml, Download, House, Languages, Moon, Pause, Play, ShieldCheck, Smartphone, Sun } from '@lucide/astro';
 import { copy, type Locale } from '../content/copy';
 import BaseLayout from '../layouts/BaseLayout.astro';
 interface Props { locale: Locale }
@@ -46,6 +46,7 @@ const heroLines = locale === 'pt-BR' ? ['Sua casa avisa.', 'Seus dados ficam.'] 
           <button class="carousel-arrow carousel-prev" type="button" aria-label={locale === 'pt-BR' ? 'Tela anterior' : 'Previous screen'}><ArrowLeft size={18}/></button>
           <div class="carousel-dots" aria-label={locale === 'pt-BR' ? 'Escolher tela' : 'Choose screen'}>{[0,1,2,3].map((index)=><button type="button" class={index === 0 ? 'is-active' : ''} data-slide={index} aria-label={`${locale === 'pt-BR' ? 'Ir para tela' : 'Go to screen'} ${index+1}`} aria-current={index === 0 ? 'true' : undefined}></button>)}</div>
           <button class="carousel-arrow carousel-next" type="button" aria-label={locale === 'pt-BR' ? 'Próxima tela' : 'Next screen'}><ArrowRight size={18}/></button>
+          <button class="carousel-auto" type="button" aria-label={locale === 'pt-BR' ? 'Pausar carrossel' : 'Pause carousel'} data-pause-label={locale === 'pt-BR' ? 'Pausar carrossel' : 'Pause carousel'} data-play-label={locale === 'pt-BR' ? 'Retomar carrossel' : 'Resume carousel'}><Pause class="pause-icon" size={15}/><Play class="play-icon" size={15}/></button>
         </div>
       </div>
     </section>
@@ -92,6 +93,39 @@ const heroLines = locale === 'pt-BR' ? ['Sua casa avisa.', 'Seus dados ficam.'] 
     const heroPhones=[...document.querySelectorAll<HTMLButtonElement>('.hero-phone')];
     heroPhones.forEach(phone=>phone.addEventListener('click',()=>heroPhones.forEach(item=>{const active=item===phone;item.classList.toggle('is-front',active);item.setAttribute('aria-pressed',String(active))})));
     const carousel=document.querySelector<HTMLElement>('.app-carousel');
-    if(carousel){const slides=[...carousel.querySelectorAll<HTMLElement>('.carousel-slide')];const dots=[...carousel.querySelectorAll<HTMLButtonElement>('.carousel-dots button')];let slide=0;const show=(next:number)=>{slide=(next+dots.length)%dots.length;slides.forEach((item,index)=>{const delta=(index-slide+dots.length)%dots.length;item.classList.remove('is-active','is-prev','is-next','is-hidden');item.classList.add(delta===0?'is-active':delta===1?'is-next':delta===dots.length-1?'is-prev':'is-hidden');item.setAttribute('aria-current',delta===0?'true':'false')});dots.forEach((dot,index)=>{dot.classList.toggle('is-active',index===slide);if(index===slide)dot.setAttribute('aria-current','true');else dot.removeAttribute('aria-current')})};carousel.querySelector('.carousel-prev')?.addEventListener('click',()=>show(slide-1));carousel.querySelector('.carousel-next')?.addEventListener('click',()=>show(slide+1));dots.forEach(dot=>dot.addEventListener('click',()=>show(Number(dot.dataset.slide))));slides.forEach(item=>{const select=()=>show(Number(item.dataset.slideIndex));item.addEventListener('click',select);item.addEventListener('keydown',event=>{if(event.key==='Enter'||event.key===' '){event.preventDefault();select()}})})}
+    if(carousel){
+      const slides=[...carousel.querySelectorAll<HTMLElement>('.carousel-slide')];
+      const dots=[...carousel.querySelectorAll<HTMLButtonElement>('.carousel-dots button')];
+      const autoButton=carousel.querySelector<HTMLButtonElement>('.carousel-auto');
+      const reducedMotion=matchMedia('(prefers-reduced-motion: reduce)');
+      const hoverCapable=matchMedia('(hover: hover)');
+      let slide=0;
+      let autoPaused=reducedMotion.matches;
+      let autoTimer:number|undefined;
+      const show=(next:number)=>{
+        const previous=slide;
+        slide=(next+dots.length)%dots.length;
+        carousel.dataset.direction=(next>previous||(previous===dots.length-1&&slide===0))?'next':'previous';
+        slides.forEach((item,index)=>{const delta=(index-slide+dots.length)%dots.length;item.classList.remove('is-active','is-prev','is-next','is-hidden');item.classList.add(delta===0?'is-active':delta===1?'is-next':delta===dots.length-1?'is-prev':'is-hidden');item.setAttribute('aria-current',delta===0?'true':'false')});
+        dots.forEach((dot,index)=>{dot.classList.toggle('is-active',index===slide);if(index===slide)dot.setAttribute('aria-current','true');else dot.removeAttribute('aria-current')});
+      };
+      const stopTimer=()=>{if(autoTimer!==undefined){window.clearTimeout(autoTimer);autoTimer=undefined}};
+      const schedule=()=>{stopTimer();if(!autoPaused&&!document.hidden&&!carousel.matches(':focus-within')&&(!hoverCapable.matches||!carousel.matches(':hover')))autoTimer=window.setTimeout(()=>{show(slide+1);schedule()},4800)};
+      const renderAutoState=()=>{autoButton?.classList.toggle('is-paused',autoPaused);autoButton?.setAttribute('aria-label',autoPaused?(autoButton.dataset.playLabel||'Resume carousel'):(autoButton.dataset.pauseLabel||'Pause carousel'))};
+      const interact=(next:number)=>{show(next);schedule()};
+      carousel.querySelector('.carousel-prev')?.addEventListener('click',()=>interact(slide-1));
+      carousel.querySelector('.carousel-next')?.addEventListener('click',()=>interact(slide+1));
+      dots.forEach(dot=>dot.addEventListener('click',()=>interact(Number(dot.dataset.slide))));
+      slides.forEach(item=>{const select=()=>interact(Number(item.dataset.slideIndex));item.addEventListener('click',select);item.addEventListener('keydown',event=>{if(event.key==='Enter'||event.key===' '){event.preventDefault();select()}})});
+      autoButton?.addEventListener('click',()=>{autoPaused=!autoPaused;renderAutoState();schedule()});
+      carousel.addEventListener('pointerenter',stopTimer);
+      carousel.addEventListener('pointerleave',schedule);
+      carousel.addEventListener('focusin',stopTimer);
+      carousel.addEventListener('focusout',event=>{if(!carousel.contains((event as FocusEvent).relatedTarget as Node|null))schedule()});
+      document.addEventListener('visibilitychange',()=>document.hidden?stopTimer():schedule());
+      reducedMotion.addEventListener('change',event=>{autoPaused=event.matches;renderAutoState();schedule()});
+      renderAutoState();
+      schedule();
+    }
   </script>
 </BaseLayout>

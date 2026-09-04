@@ -71,7 +71,7 @@ fun RulesContent(
       if (canAdd) {
           FloatingActionButton(
               onClick = onAdd,
-              modifier = Modifier.align(Alignment.BottomEnd).padding(end = 20.dp, bottom = 80.dp),
+              modifier = Modifier.align(Alignment.BottomEnd).padding(end = 20.dp, bottom = 18.dp),
               containerColor = MaterialTheme.colorScheme.secondary,
               contentColor = MaterialTheme.colorScheme.onSecondary,
           ) { Icon(Lucide.Plus, contentDescription = stringResource(R.string.add_rule)) }
