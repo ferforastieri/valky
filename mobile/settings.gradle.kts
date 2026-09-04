@@ -10,9 +10,7 @@ dependencyResolutionManagement {
     repositories {
         google()
         mavenCentral()
-        maven("https://maven.unifiedpush.org")
     }
 }
 rootProject.name = "Valkyris"
 include(":app")
-

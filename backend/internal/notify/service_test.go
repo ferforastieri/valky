@@ -18,6 +18,7 @@ import (
 	appcrypto "github.com/ferforastieri/valkyris/backend/internal/crypto"
 	"github.com/ferforastieri/valkyris/backend/internal/event"
 	"github.com/ferforastieri/valkyris/backend/internal/store"
+	"golang.org/x/oauth2"
 )
 
 func TestEncryptedPushRetriesAndThenDelivers(t *testing.T) {
@@ -43,7 +44,10 @@ func TestEncryptedPushRetriesAndThenDelivers(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	service := NewService(db, vault)
+	service := NewService(db, vault, "")
+	service.fcmEndpoint = endpoint.URL
+	service.projectID = "valkyris-test"
+	service.tokenSource = oauth2.StaticTokenSource(&oauth2.Token{AccessToken: "test-access-token"})
 	now := time.Now().UTC().Format(time.RFC3339Nano)
 	if _, err = db.DB.Exec(`INSERT INTO cameras(id,name,host,username_enc,password_enc,rtsp_uri_enc,created_at,updated_at) VALUES('camera','Door','10.0.0.2',x'01',x'01',x'01',?,?)`, now, now); err != nil {
 		t.Fatal(err)
@@ -52,7 +56,7 @@ func TestEncryptedPushRetriesAndThenDelivers(t *testing.T) {
 		t.Fatal(err)
 	}
 	secret := "device-side-secret"
-	if err = service.Register(context.Background(), "phone", Registration{Endpoint: endpoint.URL, Secret: secret}); err != nil {
+	if err = service.Register(context.Background(), "phone", Registration{Token: "fcm-device-token", Secret: secret}); err != nil {
 		t.Fatal(err)
 	}
 	events := event.NewService(db)
@@ -75,20 +79,45 @@ func TestEncryptedPushRetriesAndThenDelivers(t *testing.T) {
 	if err = db.DB.QueryRow(`SELECT attempts,delivered_at FROM push_deliveries`).Scan(&count, &delivered); err != nil || count != 2 || delivered == "" {
 		t.Fatalf("delivery was not persisted: attempts=%d delivered=%q err=%v", count, delivered, err)
 	}
-	if len(bodies) != 2 || strings.Contains(string(bodies[1]), "baby_cry") {
+	if len(bodies) != 2 || strings.Contains(string(bodies[1]), "baby_cry") || !strings.Contains(string(bodies[1]), `"priority":"high"`) {
 		t.Fatalf("push body leaked plaintext: %s", bodies[1])
 	}
-	var wrapper map[string]string
+	var wrapper struct {
+		Message struct {
+			Token string            `json:"token"`
+			Data  map[string]string `json:"data"`
+		} `json:"message"`
+	}
 	if err = json.Unmarshal(bodies[1], &wrapper); err != nil {
 		t.Fatal(err)
 	}
-	sealed, err := base64.RawURLEncoding.DecodeString(wrapper["ciphertext"])
+	if wrapper.Message.Token != "fcm-device-token" {
+		t.Fatalf("unexpected FCM token: %q", wrapper.Message.Token)
+	}
+	sealed, err := base64.RawURLEncoding.DecodeString(wrapper.Message.Data["ciphertext"])
 	if err != nil {
 		t.Fatal(err)
 	}
 	plain, err := openTestPayload(secret, sealed)
-	if err != nil || !strings.Contains(string(plain), "baby_cry") || !strings.Contains(string(plain), `"target":"event"`) || strings.Contains(string(plain), endpoint.URL) {
+	if err != nil || !strings.Contains(string(plain), "baby_cry") || !strings.Contains(string(plain), `"target":"event"`) || strings.Contains(string(plain), "fcm-device-token") {
 		t.Fatalf("unexpected decrypted payload %q: %v", plain, err)
+	}
+}
+
+func TestRegisterRequiresFirebaseCredentials(t *testing.T) {
+	db, err := store.Open(t.TempDir() + "/notify.db")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db.Close()
+	vault, err := appcrypto.LoadOrCreate(t.TempDir() + "/master.key")
+	if err != nil {
+		t.Fatal(err)
+	}
+	service := NewService(db, vault, "")
+	err = service.Register(context.Background(), "phone", Registration{Token: "token", Secret: "secret"})
+	if err == nil || !strings.Contains(err.Error(), "FCM is not configured") {
+		t.Fatalf("expected missing Firebase configuration error, got %v", err)
 	}
 }
 

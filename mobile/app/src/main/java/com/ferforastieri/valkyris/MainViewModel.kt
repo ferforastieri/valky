@@ -6,6 +6,7 @@ import androidx.lifecycle.viewModelScope
 import com.ferforastieri.valkyris.core.network.ValkyrisApi
 import com.ferforastieri.valkyris.core.model.UpdateInfo
 import com.ferforastieri.valkyris.core.preferences.AppPreferences
+import com.ferforastieri.valkyris.core.push.FcmRegistration
 import com.ferforastieri.valkyris.core.security.Session
 import com.ferforastieri.valkyris.core.security.SessionStore
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -21,7 +22,7 @@ import javax.inject.Inject
 
 data class ApkDownload(val url:String,val version:String)
 
-@HiltViewModel class MainViewModel @Inject constructor(private val api:ValkyrisApi,private val sessions:SessionStore,private val preferences:AppPreferences):ViewModel(){
+@HiltViewModel class MainViewModel @Inject constructor(private val api:ValkyrisApi,private val sessions:SessionStore,private val preferences:AppPreferences,private val push:FcmRegistration):ViewModel(){
     val notices=api.notices
     private val _paired=MutableStateFlow(sessions.get()!=null);val paired=_paired.asStateFlow()
     private val _admin=MutableStateFlow(sessions.get()?.admin==true);val admin=_admin.asStateFlow()
@@ -42,8 +43,8 @@ data class ApkDownload(val url:String,val version:String)
     fun cameraOpened(){_pendingCamera.value=null}
     fun resetAuthStatus(){_authInitialized.value=null;_error.value=null}
     fun inspectServer(url:String){val base=url.trim().trimEnd('/');if(!base.startsWith("https://")){_error.value="Use um endereço HTTPS válido.";return};viewModelScope.launch{_connecting.value=true;_error.value=null;runCatching{api.authStatus(base)}.onSuccess{_authInitialized.value=it.initialized}.onFailure{_error.value=it.message};_connecting.value=false}}
-    fun login(url:String,password:String,bootstrap:Boolean){val base=url.trim().trimEnd('/');if(!base.startsWith("https://")||password.isBlank()){_error.value="Use um endereço HTTPS e informe a senha da casa.";return};viewModelScope.launch{_connecting.value=true;_error.value=null;runCatching{api.login(base,com.ferforastieri.valkyris.core.model.LoginRequest(password,android.os.Build.MODEL,Locale.getDefault().toLanguageTag()),bootstrap)}.onSuccess{sessions.save(Session(base,it.token,admin=it.admin));_admin.value=it.admin;_paired.value=true;checkForUpdates(force=true)}.onFailure{_error.value=it.message};_connecting.value=false}}
-    private fun pair(url:String,code:String,fingerprint:String){viewModelScope.launch{_connecting.value=true;_error.value=null;runCatching{api.pair(url,fingerprint,com.ferforastieri.valkyris.core.model.PairRequest(code,android.os.Build.MODEL,Locale.getDefault().toLanguageTag()))}.onSuccess{sessions.save(Session(url,it.token,fingerprint,it.admin));_admin.value=it.admin;_paired.value=true}.onFailure{_error.value=it.message};_connecting.value=false}}
+    fun login(url:String,password:String,bootstrap:Boolean){val base=url.trim().trimEnd('/');if(!base.startsWith("https://")||password.isBlank()){_error.value="Use um endereço HTTPS e informe a senha da casa.";return};viewModelScope.launch{_connecting.value=true;_error.value=null;runCatching{api.login(base,com.ferforastieri.valkyris.core.model.LoginRequest(password,android.os.Build.MODEL,Locale.getDefault().toLanguageTag()),bootstrap)}.onSuccess{sessions.save(Session(base,it.token,admin=it.admin));_admin.value=it.admin;_paired.value=true;push.registerCurrent();checkForUpdates(force=true)}.onFailure{_error.value=it.message};_connecting.value=false}}
+    private fun pair(url:String,code:String,fingerprint:String){viewModelScope.launch{_connecting.value=true;_error.value=null;runCatching{api.pair(url,fingerprint,com.ferforastieri.valkyris.core.model.PairRequest(code,android.os.Build.MODEL,Locale.getDefault().toLanguageTag()))}.onSuccess{sessions.save(Session(url,it.token,fingerprint,it.admin));_admin.value=it.admin;_paired.value=true;push.registerCurrent()}.onFailure{_error.value=it.message};_connecting.value=false}}
     fun signOut(){sessions.clear();_admin.value=false;_paired.value=false;_updateInfo.value=null}
     fun checkForUpdates(force:Boolean=false){if(!_paired.value)return;val now=android.os.SystemClock.elapsedRealtime();if(!force&&lastUpdateCheck!=0L&&now-lastUpdateCheck<15*60_000)return;lastUpdateCheck=now;viewModelScope.launch{runCatching{api.updateInfo()}.onSuccess{_updateInfo.value=it.takeIf(UpdateInfo::available)}}}
     fun dismissUpdate(){_updateInfo.value=null}

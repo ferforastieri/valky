@@ -16,13 +16,11 @@
   <a href="LICENSE">Licença MIT</a>
 </p>
 
-> Valkyris é um software independente e não possui afiliação com TP-Link ou Tapo.
-
 ## O projeto
 
 Valkyris transforma um servidor doméstico em uma central privada de monitoramento. Uma única instalação pode gerenciar várias câmeras e autorizar vários celulares, sem cadastro público e sem expor RTSP, ONVIF ou o MediaMTX na internet.
 
-- Descoberta de capacidades e snapshots por ONVIF Profile S.
+- Descoberta de capacidades e do perfil principal por ONVIF Profile S; previews são extraídos do stream local já conectado.
 - Live view LL-HLS autenticado, com uma única conexão RTSP por câmera e conversão apenas do áudio G.711 para AAC.
 - Movimento PTZ por pressionar e segurar e zoom quando anunciado pela câmera.
 - Cadastro assíncrono: a câmera aparece imediatamente e o progresso ou erro fica persistido.
@@ -43,7 +41,7 @@ Câmera ONVIF / RTSP
          ├── ONVIF: capabilities, eventos e PTZ
          ├── FFmpeg: snapshots, G.711 → AAC, detecção e buffer
          ▼
- Detectores locais → Regras → Evento + mídia → UnifiedPush / ntfy
+ Detectores locais → Regras → Evento + mídia → FCM → alerta nativo Android
 ```
 
 O backend Go é o limite de segurança: o app nunca recebe a senha da câmera e o MediaMTX não publica portas no host. SQLite, certificados, segredos, snapshots e clipes vivem no volume persistente `valkyris-data`.
@@ -54,7 +52,7 @@ O backend Go é o limite de segurança: o app nunca recebe a senha da câmera e 
 | --- | --- |
 | Backend | Go 1.26, SQLite, ONVIF, FFmpeg, sherpa-onnx, WebSocket |
 | Mídia | MediaMTX, RTSP, LL-HLS, MP4 |
-| Android | Kotlin, Jetpack Compose, Material 3, Hilt, Room, DataStore, Ktor/OkHttp, Media3, Coil, UnifiedPush |
+| Android | Kotlin, Jetpack Compose, Material 3, Hilt, Room, DataStore, Ktor/OkHttp, Media3, Coil, Firebase Cloud Messaging |
 | Web | Astro, TypeScript, CSS, Lucide, geração estática para Vercel |
 | Distribuição | Docker Compose, GHCR multiarch (`amd64`/`arm64`), GitHub Actions, APK assinado |
 
@@ -161,8 +159,26 @@ O arquivo [.env.example](.env.example) lista as variáveis suportadas. As princi
 | `VALKYRIS_MEDIA_URL` / `VALKYRIS_MEDIA_API` / `VALKYRIS_MEDIA_PLAYBACK` | Endereços internos de HLS, configuração e reprodução do MediaMTX. |
 | `VALKYRIS_UPDATER_URL` / `VALKYRIS_UPDATER_TOKEN` | Canal privado do atualizador. |
 | `VALKYRIS_RELEASE_API` | Release estável consultada pelo backend. |
+| `VALKYRIS_FIREBASE_CREDENTIALS_FILE` | Conta de serviço usada pelo backend para enviar alertas pelo FCM. |
 
 Não existe `PUBLIC_URL`: cada celular informa a URL que realmente usa para alcançar sua instalação. Convites para outros dispositivos são criados dentro do app e combinados com essa URL localmente.
+
+### Notificações nativas com FCM
+
+O Valkyris não exige aplicativo auxiliar no celular. O APK recebe mensagens de dados pelo Firebase Cloud Messaging e cria localmente a notificação ou o alarme nativo. O conteúdo do evento continua cifrado de ponta a ponta entre o backend e o dispositivo.
+
+1. No Firebase Console, crie um projeto, adicione o aplicativo Android `com.ferforastieri.valkyris` e baixe `google-services.json`.
+2. Codifique esse arquivo em base64 e cadastre o conteúdo no secret do GitHub `FIREBASE_ANDROID_CONFIG_BASE64`; ele será incluído no APK durante a release.
+3. Em **Configurações do projeto → Contas de serviço**, gere uma chave privada JSON e copie-a para o servidor sem adicioná-la ao Git:
+
+```bash
+cd ~/.local/share/valkyris
+docker compose cp /CAMINHO/firebase-service-account.json valkyris:/data/secrets/firebase-service-account.json
+docker compose exec -u root valkyris sh -c 'chown valkyris:valkyris /data/secrets/firebase-service-account.json && chmod 600 /data/secrets/firebase-service-account.json'
+docker compose restart valkyris
+```
+
+O APK registra o token FCM automaticamente depois do login. No app, basta conceder a permissão de notificações; não existe configuração ou tentativa manual de registro. A chave de conta de serviço é privada e deve permanecer somente no servidor.
 
 ## Documentação
 

@@ -41,7 +41,7 @@ const endpoints = pt ? [
   ['GET','/api/v1/camera-operations/{id}','Autenticado','Acompanha a descoberta ONVIF e a configuração de mídia.'],
   ['DELETE','/api/v1/cameras/{id}','Autenticado','Remove câmera, stream e dados associados.'],
   ['POST','/api/v1/cameras/{id}/ptz','Autenticado','Move, para ou aplica zoom quando suportado.'],
-  ['GET','/api/v1/cameras/{id}/snapshot','Autenticado','Retorna o snapshot JPEG atual.'],
+  ['GET','/api/v1/cameras/{id}/snapshot','Autenticado','Retorna um frame JPEG do stream local atual.'],
   ['GET','/api/v1/cameras/{id}/recording','Autenticado','Baixa os últimos 10 segundos do buffer em MP4.'],
   ['GET','/api/v1/cameras/{id}/live/index.m3u8','Autenticado','Entrega a playlist LL-HLS autenticada.'],
   ['GET','/api/v1/detectors','Autenticado','Lista os tipos normalizados de detecção.'],
@@ -52,7 +52,7 @@ const endpoints = pt ? [
   ['POST','/api/v1/events/{id}/acknowledge','Autenticado','Reconhece o evento e interrompe o alarme.'],
   ['GET','/api/v1/events/{id}/snapshot','Autenticado','Retorna o JPEG preservado no evento.'],
   ['GET','/api/v1/events/{id}/clip','Autenticado','Transmite o clipe MP4 do evento.'],
-  ['POST','/api/v1/devices/push','Autenticado','Registra UnifiedPush e o segredo de payload.'],
+  ['POST','/api/v1/devices/push','Autenticado','Registra o token FCM e o segredo do payload cifrado.'],
   ['GET · PUT','/api/v1/settings/retention','Admin ao alterar','Lê ou altera os limites de retenção.'],
   ['POST','/api/v1/detections','Autenticado','Recebe uma detecção normalizada de integração local.'],
   ['GET · POST','/api/v1/system/update','Admin ao atualizar','Consulta uma release ou inicia atualização do backend.'],
@@ -69,7 +69,7 @@ const endpoints = pt ? [
   ['GET','/api/v1/camera-operations/{id}','Authenticated','Tracks ONVIF discovery and media setup.'],
   ['DELETE','/api/v1/cameras/{id}','Authenticated','Removes a camera, stream and related data.'],
   ['POST','/api/v1/cameras/{id}/ptz','Authenticated','Moves, stops or zooms when supported.'],
-  ['GET','/api/v1/cameras/{id}/snapshot','Authenticated','Returns the current JPEG snapshot.'],
+  ['GET','/api/v1/cameras/{id}/snapshot','Authenticated','Returns a JPEG frame from the current local stream.'],
   ['GET','/api/v1/cameras/{id}/recording','Authenticated','Downloads the latest 10 seconds from the rolling buffer as MP4.'],
   ['GET','/api/v1/cameras/{id}/live/index.m3u8','Authenticated','Serves the authenticated LL-HLS playlist.'],
   ['GET','/api/v1/detectors','Authenticated','Lists normalized detector types.'],
@@ -80,7 +80,7 @@ const endpoints = pt ? [
   ['POST','/api/v1/events/{id}/acknowledge','Authenticated','Acknowledges the event and stops its alarm.'],
   ['GET','/api/v1/events/{id}/snapshot','Authenticated','Returns the event JPEG.'],
   ['GET','/api/v1/events/{id}/clip','Authenticated','Streams the event MP4 clip.'],
-  ['POST','/api/v1/devices/push','Authenticated','Registers UnifiedPush and its payload secret.'],
+  ['POST','/api/v1/devices/push','Authenticated','Registers the FCM token and encrypted payload secret.'],
   ['GET · PUT','/api/v1/settings/retention','Admin to change','Reads or changes retention limits.'],
   ['POST','/api/v1/detections','Authenticated','Accepts normalized detections from local integrations.'],
   ['GET · POST','/api/v1/system/update','Admin to update','Checks releases or starts a backend update.'],
@@ -145,6 +145,14 @@ const endpoints = pt ? [
           <div class="docs-actions"><a class="button dark" href="https://github.com/ferforastieri/valkyris/releases/latest"><Download size={17}/>{pt ? 'Baixar APK' : 'Download APK'}</a><a class="button quiet" href="https://github.com/ferforastieri/valkyris/releases"><ExternalLink size={17}/>{pt ? 'Todas as releases' : 'All releases'}</a></div>
           <h3>{pt ? 'Outros celulares' : 'Other phones'}</h3>
           <p>{pt ? 'Em Ajustes, o administrador cria um convite temporário e de uso único. O QR é montado dentro do app com a URL já conhecida; o backend não possui página pública de pareamento.' : 'In Settings, the administrator creates a temporary, single-use invitation. The QR is assembled inside the app using the known server URL; the backend has no public pairing page.'}</p>
+          <h3>{pt ? 'Notificações nativas' : 'Native notifications'}</h3>
+          <p>{pt ? 'O APK usa Firebase Cloud Messaging diretamente e não exige aplicativo auxiliar. Após o login, o token deste celular é registrado automaticamente; o Android recebe um payload mínimo cifrado e o Valkyris cria a notificação ou o alarme nativo.' : 'The APK uses Firebase Cloud Messaging directly and requires no companion app. After login, this phone token is registered automatically; Android receives a minimal encrypted payload and Valkyris creates the native notification or alarm.'}</p>
+          <ol class="docs-steps">
+            <li><span>1</span><div><strong>{pt ? 'Configure o APK' : 'Configure the APK'}</strong><p>{pt ? 'Adicione com.ferforastieri.valkyris ao projeto Firebase, baixe google-services.json e grave seu base64 no secret FIREBASE_ANDROID_CONFIG_BASE64 do GitHub.' : 'Add com.ferforastieri.valkyris to the Firebase project, download google-services.json and store its base64 in the FIREBASE_ANDROID_CONFIG_BASE64 GitHub secret.'}</p></div></li>
+            <li><span>2</span><div><strong>{pt ? 'Configure o servidor' : 'Configure the server'}</strong><p>{pt ? 'Gere uma chave JSON em Configurações do projeto → Contas de serviço e copie-a, sem versionar, para o volume persistente.' : 'Generate a JSON key under Project settings → Service accounts and copy it, without committing it, into the persistent volume.'}</p></div></li>
+            <li><span>3</span><div><strong>{pt ? 'Conceda a permissão' : 'Grant permission'}</strong><p>{pt ? 'Abra o APK da nova release, faça login e permita notificações. O registro no FCM acontece automaticamente.' : 'Open the APK from the new release, sign in and allow notifications. FCM registration happens automatically.'}</p></div></li>
+          </ol>
+          <div class="docs-code multiline"><code>{`cd ~/.local/share/valkyris\ndocker compose cp /CAMINHO/firebase-service-account.json valkyris:/data/secrets/firebase-service-account.json\ndocker compose exec -u root valkyris sh -c 'chown valkyris:valkyris /data/secrets/firebase-service-account.json && chmod 600 /data/secrets/firebase-service-account.json'\ndocker compose restart valkyris`}</code></div>
         </section>
 
         <section id="configuration">
@@ -162,6 +170,7 @@ const endpoints = pt ? [
               ['VALKYRIS_MEDIA_PLAYBACK','http://mediamtx:9996',pt?'API interna para gerar clipes recentes.':'Internal API used to generate recent clips.'],
               ['VALKYRIS_UPDATER_URL','http://updater:8080',pt?'Atualizador interno.':'Internal updater.'],
               ['VALKYRIS_RELEASE_API','api.github.com/…/releases/latest',pt?'Release estável consultada.':'Stable release lookup.'],
+              ['VALKYRIS_FIREBASE_CREDENTIALS_FILE','/data/secrets/firebase-service-account.json',pt?'Conta de serviço privada usada para enviar pelo FCM.':'Private service account used to send through FCM.'],
             ].map(([name,value,meaning])=><div role="row"><code>{name}</code><code>{value}</code><span>{meaning}</span></div>)}
           </div>
           <p>{pt ? 'O instalador escreve o token privado do atualizador no .env. Não reutilize nem publique esse segredo. O arquivo mediamtx.yml deve existir como arquivo antes de subir o Compose.' : 'The installer writes the private updater token to .env. Do not reuse or publish it. mediamtx.yml must exist as a file before Compose starts.'}</p>

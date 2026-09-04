@@ -7,7 +7,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"io"
 	"log/slog"
 	"net/http"
 	"net/http/httputil"
@@ -378,48 +377,23 @@ func (s *Server) ptz(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) snapshot(w http.ResponseWriter, r *http.Request) {
-	cam, cred, err := s.cameras.Get(r.Context(), r.PathValue("id"))
+	cam, _, err := s.cameras.Get(r.Context(), r.PathValue("id"))
 	if err != nil {
 		respond(w, nil, err)
 		return
 	}
-	// Prefer the ONVIF still-image endpoint since it is inexpensive. Some Tapo
-	// firmware advertises it but requires an authentication mode other than
-	// HTTP Basic; in that case capture a frame from the already authenticated
-	// MediaMTX stream instead.
-	directContext, cancelDirect := context.WithTimeout(r.Context(), 6*time.Second)
-	defer cancelDirect()
-	uri, snapshotErr := s.onvif.SnapshotURI(directContext, cam, cred)
-	if snapshotErr == nil {
-		req, requestErr := http.NewRequestWithContext(directContext, http.MethodGet, uri, nil)
-		if requestErr == nil {
-			req.SetBasicAuth(cred.Username, cred.Password)
-			resp, requestErr := (&http.Client{Timeout: 6 * time.Second}).Do(req)
-			if requestErr == nil {
-				defer resp.Body.Close()
-				if resp.StatusCode/100 == 2 {
-					w.Header().Set("Content-Type", resp.Header.Get("Content-Type"))
-					w.Header().Set("Cache-Control", "no-store")
-					setOutcomeHeaders(w, http.StatusOK, "Camera snapshot loaded")
-					_, _ = io.Copy(w, io.LimitReader(resp.Body, 12<<20))
-					return
-				}
-				snapshotErr = fmt.Errorf("ONVIF snapshot returned %s", resp.Status)
-			} else {
-				snapshotErr = requestErr
-			}
-		} else {
-			snapshotErr = requestErr
-		}
-	}
-	cancelDirect()
-	frame, streamErr := s.media.MonitoringFrame(r.Context(), cam.ID)
+	// Prefer the already-open local stream. It avoids a fresh HTTP authentication
+	// round trip to the camera on every list refresh and retains the main stream
+	// resolution selected during the ONVIF probe.
+	streamContext, cancelStream := context.WithTimeout(r.Context(), 3*time.Second)
+	frame, streamErr := s.media.PreviewFrame(streamContext, cam.ID)
+	cancelStream()
 	if streamErr != nil {
-		writeError(w, http.StatusBadGateway, fmt.Errorf("snapshot unavailable (ONVIF: %v; stream: %w)", snapshotErr, streamErr))
+		writeError(w, http.StatusBadGateway, fmt.Errorf("camera preview unavailable: %w", streamErr))
 		return
 	}
 	w.Header().Set("Content-Type", "image/jpeg")
-	w.Header().Set("Cache-Control", "no-store")
+	w.Header().Set("Cache-Control", "private, max-age=2")
 	setOutcomeHeaders(w, http.StatusOK, "Camera snapshot loaded from live stream")
 	_, _ = w.Write(frame)
 }
@@ -585,7 +559,7 @@ func (s *Server) push(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if err := s.notify.Register(r.Context(), auth.DeviceID(r.Context()), in); err != nil {
-		writeError(w, 400, err)
+		writeError(w, http.StatusServiceUnavailable, err)
 		return
 	}
 	writeSuccess(w, http.StatusOK, "Push device registered successfully", nil)

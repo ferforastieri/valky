@@ -1,5 +1,5 @@
 ---
-import { BookOpen, CodeXml, Download, House, Languages, Moon, Smartphone, Sun } from '@lucide/astro';
+import { BookOpen, Check, ChevronDown, CodeXml, Download, House, Languages, Moon, Smartphone, Sun } from '@lucide/astro';
 import { copy, type Locale } from '../content/copy';
 
 interface Props {
@@ -9,10 +9,9 @@ interface Props {
 
 const { locale, current } = Astro.props;
 const t = copy[locale];
-const otherLocale = locale === 'pt-BR' ? 'en' : 'pt-BR';
 const homePath = `/${locale}`;
 const sectionPath = (section: string) => current === 'home' ? `#${section}` : `${homePath}#${section}`;
-const languagePath = current === 'docs' ? `/${otherLocale}/docs` : `/${otherLocale}`;
+const languagePath = (target: Locale) => current === 'docs' ? `/${target}/docs` : `/${target}`;
 ---
 <nav class="floating-dock" aria-label={locale === 'pt-BR' ? 'Navegação principal' : 'Main navigation'}>
   <a class="dock-brand" href={homePath} aria-label="Valkyris home">
@@ -20,14 +19,31 @@ const languagePath = current === 'docs' ? `/${otherLocale}/docs` : `/${otherLoca
     <span class="dock-identity"><strong>Valkyris</strong><small>© 2026 Fernando Forastieri · MIT</small></span>
   </a>
   <div class="dock-links">
-    <a class="dock-link" href={sectionPath('overview')} aria-current={current === 'home' ? 'page' : undefined}><House size={17}/><span>{t.nav[0]}</span></a>
+    <a class="dock-link" href={`${homePath}#top`} aria-current={current === 'home' ? 'page' : undefined}><House size={17}/><span>{t.nav[0]}</span></a>
     <a class="dock-link" href={sectionPath('app')}><Smartphone size={17}/><span>{t.nav[1]}</span></a>
     <a class="dock-link" href={sectionPath('install')}><Download size={17}/><span>{t.nav[2]}</span></a>
     <a class="dock-link" href={`/${locale}/docs`} aria-current={current === 'docs' ? 'page' : undefined}><BookOpen size={17}/><span>{t.nav[3]}</span></a>
   </div>
   <div class="dock-actions">
-    <a class="icon-button" href={languagePath} aria-label={locale === 'pt-BR' ? 'Mudar para inglês' : 'Switch to Portuguese'}><Languages size={18}/></a>
+    <details class="language-menu">
+      <summary class="icon-button" aria-label={locale === 'pt-BR' ? 'Escolher idioma' : 'Choose language'}><Languages size={18}/><ChevronDown class="language-chevron" size={12}/></summary>
+      <div class="language-popover" role="menu" aria-label={locale === 'pt-BR' ? 'Idiomas disponíveis' : 'Available languages'}>
+        <p>{locale === 'pt-BR' ? 'Idioma' : 'Language'}</p>
+        <a href={languagePath('pt-BR')} role="menuitem" aria-current={locale === 'pt-BR' ? 'true' : undefined}><span><strong>Português</strong><small>Brasil</small></span>{locale === 'pt-BR' && <Check size={16}/>}</a>
+        <a href={languagePath('en')} role="menuitem" aria-current={locale === 'en' ? 'true' : undefined}><span><strong>English</strong><small>International</small></span>{locale === 'en' && <Check size={16}/>}</a>
+      </div>
+    </details>
     <button class="icon-button theme-toggle" type="button" aria-label={locale === 'pt-BR' ? 'Alternar tema' : 'Toggle theme'}><Sun class="sun" size={18}/><Moon class="moon" size={18}/></button>
     <a class="icon-button" href="https://github.com/ferforastieri/valkyris" aria-label="GitHub"><CodeXml size={18}/></a>
   </div>
 </nav>
+
+<script>
+  const languageMenus = [...document.querySelectorAll<HTMLDetailsElement>('.language-menu')];
+  document.addEventListener('click', event => languageMenus.forEach(menu => {
+    if (!menu.contains(event.target as Node)) menu.removeAttribute('open');
+  }));
+  document.addEventListener('keydown', event => {
+    if (event.key === 'Escape') languageMenus.forEach(menu => menu.removeAttribute('open'));
+  });
+</script>

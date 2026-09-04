@@ -10,7 +10,7 @@ const command = 'curl -fsSL https://valkyris.vercel.app/install.sh | sh';
 const heroLines = locale === 'pt-BR' ? ['Sua casa avisa.', 'Seus dados ficam.'] : ['Your home speaks.', 'Your data stays.'];
 ---
 <BaseLayout locale={locale} title={t.metaTitle} description={t.metaDescription}>
-  <main class="landing-shell">
+  <main class="landing-shell" id="top">
     <section class="hero" id="overview">
       <div class="hero-copy reveal">
         <p class="eyebrow"><span></span>{t.heroEyebrow}</p>
@@ -34,7 +34,7 @@ const heroLines = locale === 'pt-BR' ? ['Sua casa avisa.', 'Seus dados ficam.'] 
     </section>
 
     <section class="app-section section" id="app">
-      <div class="app-copy"><p class="eyebrow"><span></span>ANDROID NATIVE</p><h2>{t.appTitle}</h2><p>{t.appBody}</p><div class="app-assurances"><article><ShieldCheck size={20}/><div><strong>{t.principlesTitle}</strong><p>{t.principlesBody}</p></div></article><article><BellRing size={20}/><div><strong>{locale === 'pt-BR' ? 'Alertas do seu jeito' : 'Alerts on your terms'}</strong><p>{t.detectBody}</p></div></article></div><ul><li><Check size={16}/>Kotlin + Jetpack Compose</li><li><Check size={16}/>UnifiedPush / ntfy</li><li><Check size={16}/>LL-HLS authenticated</li></ul></div>
+      <div class="app-copy"><p class="eyebrow"><span></span>ANDROID NATIVE</p><h2>{t.appTitle}</h2><p>{t.appBody}</p><div class="app-assurances"><article><ShieldCheck size={20}/><div><strong>{t.principlesTitle}</strong><p>{t.principlesBody}</p></div></article><article><BellRing size={20}/><div><strong>{locale === 'pt-BR' ? 'Alertas do seu jeito' : 'Alerts on your terms'}</strong><p>{t.detectBody}</p></div></article></div><ul><li><Check size={16}/>Kotlin + Jetpack Compose</li><li><Check size={16}/>Firebase Cloud Messaging</li><li><Check size={16}/>LL-HLS authenticated</li></ul></div>
       <div class="app-carousel" aria-roledescription="carousel" aria-label={locale === 'pt-BR' ? 'Telas reais do aplicativo' : 'Actual application screens'}>
         <div class="carousel-viewport"><div class="carousel-track">
           <button class="app-capture carousel-slide is-active" type="button" data-slide-index="0" aria-label={locale === 'pt-BR' ? 'Tela 1 de 4. Clique para avançar.' : 'Screen 1 of 4. Click to advance.'}><picture><img class="theme-screenshot" src="/screenshots/cameras-light.png" data-light-src="/screenshots/cameras-light.png" data-dark-src="/screenshots/cameras-dark.png" alt={locale === 'pt-BR' ? 'Tela real de câmeras do Valkyris' : 'Actual Valkyris cameras screen'} width="1170" height="2532"/></picture><span class="capture-caption">{locale === 'pt-BR' ? 'Câmeras e snapshots' : 'Cameras and snapshots'}</span></button>

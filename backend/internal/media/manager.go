@@ -14,8 +14,14 @@ import (
 	"regexp"
 	"sort"
 	"strings"
+	"sync"
 	"time"
 )
+
+type cachedFrame struct {
+	data     []byte
+	captured time.Time
+}
 
 type Manager struct {
 	api        string
@@ -23,6 +29,8 @@ type Manager struct {
 	playback   string
 	recordings string
 	http       *http.Client
+	previewMu  sync.Mutex
+	previews   map[string]cachedFrame
 }
 
 func New(api, hls, playback, recordings string) *Manager {
@@ -32,6 +40,7 @@ func New(api, hls, playback, recordings string) *Manager {
 		playback:   strings.TrimRight(playback, "/"),
 		recordings: recordings,
 		http:       &http.Client{Timeout: 30 * time.Second},
+		previews:   make(map[string]cachedFrame),
 	}
 }
 
@@ -172,6 +181,9 @@ func (m *Manager) RemoveCamera(ctx context.Context, id string) error {
 	if err := m.removePath(ctx, "camera-"+id+"-source"); err != nil {
 		return err
 	}
+	m.previewMu.Lock()
+	delete(m.previews, id)
+	m.previewMu.Unlock()
 	return m.removePath(ctx, "camera-"+id)
 }
 
@@ -208,6 +220,29 @@ func (m *Manager) MonitoringFrame(ctx context.Context, cameraID string) ([]byte,
 	if err != nil {
 		return nil, fmt.Errorf("capture monitoring frame: %w", err)
 	}
+	return frame, nil
+}
+
+// PreviewFrame keeps a very short in-memory cache for UI navigation. Detection
+// continues to call MonitoringFrame directly and therefore never sees stale
+// frames.
+func (m *Manager) PreviewFrame(ctx context.Context, cameraID string) ([]byte, error) {
+	m.previewMu.Lock()
+	cached, ok := m.previews[cameraID]
+	if ok && time.Since(cached.captured) < 5*time.Second {
+		frame := append([]byte(nil), cached.data...)
+		m.previewMu.Unlock()
+		return frame, nil
+	}
+	m.previewMu.Unlock()
+
+	frame, err := m.MonitoringFrame(ctx, cameraID)
+	if err != nil {
+		return nil, err
+	}
+	m.previewMu.Lock()
+	m.previews[cameraID] = cachedFrame{data: append([]byte(nil), frame...), captured: time.Now()}
+	m.previewMu.Unlock()
 	return frame, nil
 }
 

@@ -51,7 +51,7 @@
         </activity>
         <service android:name=".core.push.ValkyrisPushService" android:exported="false">
             <intent-filter>
-                <action android:name="org.unifiedpush.android.connector.PUSH_EVENT" />
+                <action android:name="com.google.firebase.MESSAGING_EVENT" />
             </intent-filter>
         </service>
         <service

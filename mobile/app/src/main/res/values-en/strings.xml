@@ -43,7 +43,6 @@
     <string name="alert_readiness_body">Valkyris needs these permissions to alert you while the screen is locked or the phone is in silent mode.</string>
     <string name="configure_permission">Configure %1$s</string>
     <string name="not_now">Not now</string>
-    <string name="notification_setup">Set up notifications</string>
     <string name="notification_permission">Notification permission</string>
     <string name="permissions">Permissions</string>
     <string name="permissions_summary">%1$d of 3 permissions active</string>
@@ -128,9 +127,6 @@
     <string name="stream_private">LL-HLS · private</string>
     <string name="snapshot_preview">SNAPSHOT</string>
     <string name="stream_local">The stream stays inside your LAN or VPN.</string>
-    <string name="push_not_configured">Not configured</string>
-    <string name="push_waiting">Waiting for ntfy endpoint</string>
-    <string name="push_install_ntfy">Install or select ntfy</string>
     <string name="full_screen_alarms">Full-screen alarms</string>
     <string name="permission_allowed">Allowed</string>
     <string name="permission_required">Permission required</string>

@@ -413,11 +413,8 @@ private fun ReadyCameraContent(camera: Camera, vm: CameraLiveViewModel) {
         if(camera.capabilities.audio) actions += CameraActionItem(if(muted)Lucide.VolumeX else Lucide.Volume2,if(muted)stringResource(R.string.unmute) else stringResource(R.string.mute),{muted=!muted})
         actions += CameraActionItem(Lucide.Aperture,stringResource(R.string.snapshot),{runMediaAction(MediaAction.Snapshot)},snapshotLoading)
         actions += CameraActionItem(Lucide.Video,stringResource(R.string.record_recent),{runMediaAction(MediaAction.Recording)},recordingLoading)
-        actions.chunked(2).forEach { rowActions ->
-            Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.spacedBy(10.dp)) {
-                rowActions.forEach { action -> CameraAction(action.icon,action.label,action.onClick,Modifier.weight(1f),action.loading) }
-                if(rowActions.size==1)Spacer(Modifier.weight(1f))
-            }
+        Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.spacedBy(8.dp)) {
+            actions.forEach { action -> CameraAction(action.icon,action.label,action.onClick,Modifier.weight(1f),action.loading) }
         }
         if(camera.capabilities.ptz) {
             Surface(Modifier.fillMaxWidth(),RoundedCornerShape(24.dp),MaterialTheme.colorScheme.surface,border=androidx.compose.foundation.BorderStroke(1.dp,MaterialTheme.colorScheme.outlineVariant),shadowElevation=5.dp) {
@@ -474,7 +471,7 @@ private fun ZoomableLivePlayer(player:ExoPlayer,preview:android.graphics.Bitmap?
             LivePlayer(player,Modifier.fillMaxSize())
             if(!rendered)preview?.let{Image(it.asImageBitmap(),null,Modifier.fillMaxSize(),contentScale=ContentScale.Crop)}
         }
-        if(!rendered)CircularProgressIndicator(Modifier.align(Alignment.Center).size(28.dp),strokeWidth=2.dp,color=Color.White)
+        if(!rendered&&preview==null)CircularProgressIndicator(Modifier.align(Alignment.Center).size(28.dp),strokeWidth=2.dp,color=Color.White)
     }
 }
 
@@ -508,7 +505,7 @@ private fun FullscreenLivePlayer(player: ExoPlayer,preview:android.graphics.Bitm
             ) {
                 LivePlayer(player, Modifier.fillMaxSize())
                 if(!rendered)preview?.let{Image(it.asImageBitmap(),null,Modifier.fillMaxSize(),contentScale=ContentScale.Crop)}
-                if(!rendered)CircularProgressIndicator(Modifier.align(Alignment.Center).size(30.dp),strokeWidth=2.dp,color=Color.White)
+                if(!rendered&&preview==null)CircularProgressIndicator(Modifier.align(Alignment.Center).size(30.dp),strokeWidth=2.dp,color=Color.White)
             }
             Text(
                 stringResource(R.string.pinch_to_zoom),

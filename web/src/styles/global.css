@@ -795,6 +795,111 @@ p {
   }
 }
 
+/* Language selection stays inside the navigation's compact control language. */
+.language-menu {
+  position: relative;
+}
+.language-menu > summary {
+  list-style: none;
+}
+.language-menu > summary::-webkit-details-marker {
+  display: none;
+}
+.language-menu > summary.icon-button {
+  display: flex;
+  gap: 2px;
+}
+.language-chevron {
+  transition: transform 180ms ease;
+}
+.language-menu[open] .language-chevron {
+  transform: rotate(180deg);
+}
+.language-popover {
+  position: absolute;
+  top: calc(100% + 12px);
+  right: 0;
+  width: 210px;
+  padding: 8px;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  background: var(--surface);
+  box-shadow: 0 18px 42px rgba(20, 25, 20, 0.18), 0 2px 5px rgba(20, 25, 20, 0.08);
+}
+.language-popover::before {
+  content: '';
+  position: absolute;
+  top: -5px;
+  right: 16px;
+  width: 9px;
+  height: 9px;
+  border-top: 1px solid var(--line);
+  border-left: 1px solid var(--line);
+  background: var(--surface);
+  transform: rotate(45deg);
+}
+.language-popover p {
+  margin: 3px 8px 7px;
+  color: var(--muted);
+  font: 500 0.58rem var(--mono);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+.language-popover a {
+  display: flex;
+  min-height: 50px;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 10px;
+  border-radius: 11px;
+  color: var(--ink);
+  transition: background 160ms ease;
+}
+.language-popover a:hover,
+.language-popover a:focus-visible,
+.language-popover a[aria-current='true'] {
+  background: color-mix(in srgb, var(--signal) 18%, var(--surface));
+}
+.language-popover a span {
+  display: grid;
+  gap: 2px;
+}
+.language-popover strong {
+  font-size: 0.78rem;
+  font-weight: 650;
+}
+.language-popover small {
+  color: var(--muted);
+  font: 400 0.58rem var(--mono);
+}
+.language-popover svg {
+  color: var(--signal);
+}
+@media (max-width: 760px) {
+  .language-chevron {
+    display: none;
+  }
+  .language-popover {
+    top: auto;
+    right: -80px;
+    bottom: calc(100% + 12px);
+  }
+  .language-popover::before {
+    top: auto;
+    right: 95px;
+    bottom: -5px;
+    border-top: 0;
+    border-left: 0;
+    border-right: 1px solid var(--line);
+    border-bottom: 1px solid var(--line);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .language-chevron {
+    transition: none;
+  }
+}
+
 /* Balance Quick Start with useful context beside the heading. */
 .install-header {
   display: grid;

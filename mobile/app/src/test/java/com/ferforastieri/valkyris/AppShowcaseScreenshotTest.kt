@@ -126,7 +126,6 @@ class AppShowcaseScreenshotTest {
             notificationsAllowed = true,
             fullScreenAllowed = false,
             dndAllowed = false,
-            pushStatusRes = R.string.push_not_configured,
         )
     }
     @Test fun permissionsSheetDark() = capture("permissions-sheet-dark.png", true, "Ajustes", 3) {
@@ -142,7 +141,6 @@ class AppShowcaseScreenshotTest {
             notificationsAllowed = true,
             fullScreenAllowed = false,
             dndAllowed = false,
-            pushStatusRes = R.string.push_not_configured,
         )
     }
     @Test fun retentionSheetLight() = capture("retention-sheet-light.png", false, "Ajustes", 3) {

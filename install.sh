@@ -114,3 +114,4 @@ done
 printf '\nValkyris %s está pronto. Abra o app para criar o primeiro administrador:\n\n' "$RELEASE_VERSION"
 printf 'Endereço local: https://%s:%s\n' "$LAN_ADDRESS" "$PORT"
 printf '\nSe você usa Caddy ou outro proxy, informe o domínio HTTPS no app no lugar do endereço local.\n'
+printf 'Para receber alertas nativos, configure a conta de serviço FCM conforme https://valkyris.vercel.app/pt-BR/docs\n'

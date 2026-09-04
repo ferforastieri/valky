@@ -8,6 +8,10 @@ plugins {
     id("io.github.takahirom.roborazzi")
 }
 
+if (providers.environmentVariable("VALKYRIS_FIREBASE_ENABLED").orNull == "true") {
+    apply(plugin = "com.google.gms.google-services")
+}
+
 val valkyrisVersionName = providers.environmentVariable("VALKYRIS_VERSION_NAME").orElse("1.0.5")
 val valkyrisVersionCode = providers.environmentVariable("VALKYRIS_VERSION_CODE").map(String::toInt).orElse(13)
 
@@ -92,7 +96,8 @@ dependencies {
     implementation("androidx.media3:media3-ui:1.11.0")
     implementation("io.coil-kt.coil3:coil-compose:3.3.0")
     implementation("io.coil-kt.coil3:coil-network-okhttp:3.3.0")
-    implementation("org.unifiedpush.android:connector:3.0.10")
+    implementation(platform("com.google.firebase:firebase-bom:34.18.0"))
+    implementation("com.google.firebase:firebase-messaging")
     implementation("com.journeyapps:zxing-android-embedded:4.3.0")
 
     testImplementation("junit:junit:4.13.2")

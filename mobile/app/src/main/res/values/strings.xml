@@ -43,7 +43,6 @@
     <string name="alert_readiness_body">O Valkyris precisa destes acessos para avisar mesmo com a tela bloqueada ou o celular em modo silencioso.</string>
     <string name="configure_permission">Configurar %1$s</string>
     <string name="not_now">Agora não</string>
-    <string name="notification_setup">Configurar notificações</string>
     <string name="notification_permission">Permissão de notificações</string>
     <string name="permissions">Permissões</string>
     <string name="permissions_summary">%1$d de 3 acessos ativos</string>
@@ -128,9 +127,6 @@
     <string name="stream_private">LL-HLS · privado</string>
     <string name="snapshot_preview">CAPTURA</string>
     <string name="stream_local">A transmissão permanece dentro da sua LAN ou VPN.</string>
-    <string name="push_not_configured">Não configurado</string>
-    <string name="push_waiting">Aguardando endpoint do ntfy</string>
-    <string name="push_install_ntfy">Instale ou selecione o ntfy</string>
     <string name="full_screen_alarms">Alarmes em tela cheia</string>
     <string name="permission_allowed">Permitido</string>
     <string name="permission_required">Permissão necessária</string>

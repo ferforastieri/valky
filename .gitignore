@@ -17,6 +17,8 @@ mobile/.gradle/
 mobile/local.properties
 mobile/**/build/
 mobile/keystore.jks
+mobile/app/google-services.json
+firebase-service-account.json
 web/node_modules/
 web/.astro/
 web/.vercel/

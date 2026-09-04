@@ -64,7 +64,7 @@ func main() {
 	authManager := auth.NewManager(db, cfg.PairingLifetime)
 	rulesService := rules.NewService(db)
 	eventService := event.NewService(db)
-	notifyService := notify.NewService(db, vault)
+	notifyService := notify.NewService(db, vault, cfg.FirebaseCredentials)
 	preferencesService := preferences.New(db, preferences.Retention{
 		MaxAgeDays:   int(cfg.RetentionAge / (24 * time.Hour)),
 		MaxStorageGB: cfg.RetentionBytes / (1024 * 1024 * 1024),

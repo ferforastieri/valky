@@ -13,33 +13,46 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"os"
+	"strings"
+	"sync"
 	"time"
 
 	appcrypto "github.com/ferforastieri/valkyris/backend/internal/crypto"
 	"github.com/ferforastieri/valkyris/backend/internal/event"
 	"github.com/ferforastieri/valkyris/backend/internal/store"
 	"github.com/google/uuid"
+	"golang.org/x/oauth2"
+	"golang.org/x/oauth2/google"
 )
 
 type Service struct {
-	store *store.Store
-	vault *appcrypto.Vault
-	http  *http.Client
+	store           *store.Store
+	vault           *appcrypto.Vault
+	http            *http.Client
+	tokenSource     oauth2.TokenSource
+	projectID       string
+	fcmEndpoint     string
+	credentialsFile string
+	tokenMu         sync.Mutex
 }
 type Registration struct {
-	Endpoint string `json:"endpoint"`
-	Secret   string `json:"secret"`
+	Token  string `json:"token"`
+	Secret string `json:"secret"`
 }
 
-func NewService(s *store.Store, v *appcrypto.Vault) *Service {
-	return &Service{store: s, vault: v, http: &http.Client{Timeout: 10 * time.Second}}
+func NewService(s *store.Store, v *appcrypto.Vault, credentialsFile string) *Service {
+	return &Service{store: s, vault: v, http: &http.Client{Timeout: 10 * time.Second}, credentialsFile: credentialsFile, fcmEndpoint: "https://fcm.googleapis.com"}
 }
 
 func (s *Service) Register(ctx context.Context, deviceID string, r Registration) error {
-	if r.Endpoint == "" || r.Secret == "" {
-		return fmt.Errorf("endpoint and secret are required")
+	if r.Token == "" || r.Secret == "" {
+		return fmt.Errorf("FCM token and secret are required")
 	}
-	endpoint, err := s.vault.EncryptString(r.Endpoint)
+	if _, err := s.accessToken(ctx); err != nil {
+		return err
+	}
+	endpoint, err := s.vault.EncryptString(r.Token)
 	if err != nil {
 		return err
 	}
@@ -128,7 +141,7 @@ func notificationTarget(eventType string) string {
 	return "event"
 }
 func (s *Service) deliver(ctx context.Context, id string, attempts int, endpointEnc, secretEnc []byte, payload any) {
-	endpoint, err := s.vault.DecryptString(endpointEnc)
+	deviceToken, err := s.vault.DecryptString(endpointEnc)
 	if err != nil {
 		s.fail(ctx, id, attempts, err)
 		return
@@ -144,13 +157,24 @@ func (s *Service) deliver(ctx context.Context, id string, attempts int, endpoint
 		s.fail(ctx, id, attempts, err)
 		return
 	}
-	body, _ := json.Marshal(map[string]string{"ciphertext": base64.RawURLEncoding.EncodeToString(sealed)})
+	accessToken, err := s.accessToken(ctx)
+	if err != nil {
+		s.fail(ctx, id, attempts, err)
+		return
+	}
+	body, _ := json.Marshal(map[string]any{"message": map[string]any{
+		"token":   deviceToken,
+		"data":    map[string]string{"ciphertext": base64.RawURLEncoding.EncodeToString(sealed)},
+		"android": map[string]any{"priority": "high", "ttl": "60s"},
+	}})
+	endpoint := strings.TrimRight(s.fcmEndpoint, "/") + "/v1/projects/" + s.projectID + "/messages:send"
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, endpoint, bytes.NewReader(body))
 	if err != nil {
 		s.fail(ctx, id, attempts, err)
 		return
 	}
 	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", "Bearer "+accessToken)
 	resp, err := s.http.Do(req)
 	if err != nil {
 		s.fail(ctx, id, attempts, err)
@@ -163,6 +187,34 @@ func (s *Service) deliver(ctx context.Context, id string, attempts int, endpoint
 		return
 	}
 	_, _ = s.store.DB.ExecContext(ctx, `UPDATE push_deliveries SET delivered_at=?,attempts=attempts+1,last_error=NULL WHERE id=?`, time.Now().UTC().Format(time.RFC3339Nano), id)
+}
+
+func (s *Service) accessToken(ctx context.Context) (string, error) {
+	s.tokenMu.Lock()
+	defer s.tokenMu.Unlock()
+	if s.tokenSource == nil {
+		if s.credentialsFile == "" {
+			return "", fmt.Errorf("FCM is not configured: VALKYRIS_FIREBASE_CREDENTIALS_FILE is empty")
+		}
+		data, err := os.ReadFile(s.credentialsFile)
+		if err != nil {
+			return "", fmt.Errorf("read Firebase credentials: %w", err)
+		}
+		credentials, err := google.CredentialsFromJSON(context.Background(), data, "https://www.googleapis.com/auth/firebase.messaging")
+		if err != nil {
+			return "", fmt.Errorf("parse Firebase credentials: %w", err)
+		}
+		if credentials.ProjectID == "" {
+			return "", fmt.Errorf("Firebase credentials do not contain project_id")
+		}
+		s.projectID = credentials.ProjectID
+		s.tokenSource = credentials.TokenSource
+	}
+	token, err := s.tokenSource.Token()
+	if err != nil {
+		return "", fmt.Errorf("authorize Firebase messaging: %w", err)
+	}
+	return token.AccessToken, nil
 }
 func (s *Service) fail(ctx context.Context, id string, attempts int, err error) {
 	delay := time.Duration(1<<min(attempts, 8)) * time.Minute

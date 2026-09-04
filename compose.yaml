@@ -23,6 +23,7 @@ services:
       VALKYRIS_MEDIA_RECORDINGS: /data/recordings
       VALKYRIS_UPDATER_URL: http://updater:8080
       VALKYRIS_UPDATER_TOKEN: ${VALKYRIS_UPDATER_TOKEN:-}
+      VALKYRIS_FIREBASE_CREDENTIALS_FILE: ${VALKYRIS_FIREBASE_CREDENTIALS_FILE:-/data/secrets/firebase-service-account.json}
     ports:
       - "${VALKYRIS_PORT:-8443}:8443"
     volumes:

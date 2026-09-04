@@ -16,7 +16,7 @@ import kotlinx.serialization.Serializable
 @Serializable data class PairResponse(val deviceId:String,val token:String,val admin:Boolean=false)
 @Serializable data class PairingSession(val id:String,val code:String,val expiresAt:String)
 @Serializable data class PTZCommand(val action:String,val pan:Double=0.0,val tilt:Double=0.0,val zoom:Double=0.0)
-@Serializable data class PushRegistration(val endpoint:String,val secret:String)
+@Serializable data class PushRegistration(val token:String,val secret:String)
 @Serializable data class ApiEnvelope<T>(val success:Boolean,val message:String="",val data:T?=null,val error:String?=null)
 @Serializable data class CameraOperation(val id:String,val status:String,val message:String,val camera:Camera?=null,val createdAt:String="",val updatedAt:String="")
 @Serializable data class UpdateInfo(val currentVersion:String="",val clientVersion:String="",val latestVersion:String,val available:Boolean=false,val serverUpdateAvailable:Boolean=false,val apkUpdateAvailable:Boolean=false,val releaseUrl:String="",val apkUrl:String="",val publishedAt:String="",val message:String="")

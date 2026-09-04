@@ -7,10 +7,12 @@ require (
 	github.com/google/uuid v1.6.0
 	github.com/k2-fsa/sherpa-onnx-go v1.13.7
 	golang.org/x/crypto v0.42.0
+	golang.org/x/oauth2 v0.36.0
 	modernc.org/sqlite v1.39.1
 )
 
 require (
+	cloud.google.com/go/compute/metadata v0.3.0 // indirect
 	github.com/dustin/go-humanize v1.0.1 // indirect
 	github.com/k2-fsa/sherpa-onnx-go-linux v1.13.7 // indirect
 	github.com/k2-fsa/sherpa-onnx-go-macos v1.13.7 // indirect

@@ -23,6 +23,7 @@ import kotlinx.coroutines.withContext
 import java.security.MessageDigest
 import java.security.cert.X509Certificate
 import java.util.concurrent.TimeUnit
+import java.util.concurrent.ConcurrentHashMap
 import javax.net.ssl.SSLContext
 import javax.net.ssl.X509TrustManager
 import okhttp3.Request
@@ -39,8 +40,13 @@ class ValkyrisApi(
     private val json = Json { ignoreUnknownKeys = true; explicitNulls = false }
     private val _notices = MutableSharedFlow<ApiNotice>(extraBufferCapacity = 32)
     val notices = _notices.asSharedFlow()
+    private val apiClients = ConcurrentHashMap<String, HttpClient>()
+    private val mediaClients = ConcurrentHashMap<String, okhttp3.OkHttpClient>()
 
-    fun mediaHttpClient() = pinnedClient(requireNotNull(session()).fingerprint)
+    fun mediaHttpClient(): okhttp3.OkHttpClient {
+        val fingerprint = requireNotNull(session()).fingerprint
+        return mediaClients.computeIfAbsent(fingerprint) { pinnedClient(it) }
+    }
 
     private fun pinnedClient(fingerprint: String) = okhttp3.OkHttpClient.Builder()
         .connectTimeout(20, TimeUnit.SECONDS)
@@ -58,10 +64,12 @@ class ValkyrisApi(
         }
         .build()
 
-    private fun client(fingerprint: String) = HttpClient(OkHttp) {
-        expectSuccess = false
-        engine { preconfigured = pinnedClient(fingerprint) }
-        install(ContentNegotiation) { json(json) }
+    private fun client(fingerprint: String) = apiClients.computeIfAbsent(fingerprint) {
+        HttpClient(OkHttp) {
+            expectSuccess = false
+            engine { preconfigured = pinnedClient(fingerprint) }
+            install(ContentNegotiation) { json(json) }
+        }
     }
 
     private fun base() = requireNotNull(session()) { "Valkyris is not paired" }.baseUrl + "/api/v1"
@@ -73,7 +81,7 @@ class ValkyrisApi(
         crossinline request: suspend (HttpClient) -> HttpResponse,
     ): T {
         try {
-            return client(fingerprint).use { http ->
+            return client(fingerprint).let { http ->
                 val response = request(http)
                 val raw = response.bodyAsText()
                 val envelope = runCatching { json.decodeFromString<ApiEnvelope<T>>(raw) }.getOrElse { decodeError ->

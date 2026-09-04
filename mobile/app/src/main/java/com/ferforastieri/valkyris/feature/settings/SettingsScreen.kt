@@ -38,14 +38,12 @@ import com.ferforastieri.valkyris.core.alarm.AlarmNotifier
 import com.ferforastieri.valkyris.core.design.ColorTokens
 import com.ferforastieri.valkyris.core.design.ValkyrisBottomSheet
 import com.ferforastieri.valkyris.core.model.RetentionSettings
-import org.unifiedpush.android.connector.UnifiedPush
 import com.google.zxing.BarcodeFormat
 import com.journeyapps.barcodescanner.BarcodeEncoder
 import com.composables.icons.lucide.AlarmClock
 import com.composables.icons.lucide.Bell
 import com.composables.icons.lucide.BellOff
 import com.composables.icons.lucide.ChevronRight
-import com.composables.icons.lucide.CloudSync
 import com.composables.icons.lucide.Database
 import com.composables.icons.lucide.Languages
 import com.composables.icons.lucide.Lucide
@@ -60,7 +58,6 @@ fun SettingsScreen(main: MainViewModel, viewModel: SettingsViewModel = hiltViewM
     val context = LocalContext.current
     val manager = context.getSystemService(NotificationManager::class.java)
     var permissionRefresh by remember { mutableIntStateOf(0) }
-    var pushStatusRes by remember { mutableIntStateOf(R.string.push_not_configured) }
     val theme by main.theme.collectAsStateWithLifecycle()
     val language by main.language.collectAsStateWithLifecycle()
     val admin by main.admin.collectAsStateWithLifecycle()
@@ -133,7 +130,6 @@ fun SettingsScreen(main: MainViewModel, viewModel: SettingsViewModel = hiltViewM
             notificationsAllowed = notificationsAllowed,
             fullScreenAllowed = fullScreenAllowed,
             dndAllowed = dndAllowed,
-            pushStatusRes = pushStatusRes,
             onNotifications = {
                 if (Build.VERSION.SDK_INT >= 33 && !notificationsAllowed) {
                     notificationRequest.launch(Manifest.permission.POST_NOTIFICATIONS)
@@ -142,14 +138,6 @@ fun SettingsScreen(main: MainViewModel, viewModel: SettingsViewModel = hiltViewM
                         Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS)
                             .putExtra(Settings.EXTRA_APP_PACKAGE, context.packageName),
                     )
-                }
-            },
-            onPush = {
-                UnifiedPush.tryUseCurrentOrDefaultDistributor(context) { success ->
-                    if (success) {
-                        UnifiedPush.register(context, "Valkyris home alerts", null)
-                        pushStatusRes = R.string.push_waiting
-                    } else pushStatusRes = R.string.push_install_ntfy
                 }
             },
             onFullScreen = {
@@ -320,9 +308,7 @@ fun PermissionsSheet(
     notificationsAllowed: Boolean,
     fullScreenAllowed: Boolean,
     dndAllowed: Boolean,
-    pushStatusRes: Int,
     onNotifications: () -> Unit = {},
-    onPush: () -> Unit = {},
     onFullScreen: () -> Unit = {},
     onDnd: () -> Unit = {},
     onDismiss: () -> Unit = {},
@@ -344,13 +330,6 @@ fun PermissionsSheet(
                 status = stringResource(if (notificationsAllowed) R.string.permission_allowed else R.string.permission_required),
                 allowed = notificationsAllowed,
                 onClick = onNotifications,
-            )
-            PermissionOption(
-                icon = Lucide.CloudSync,
-                title = stringResource(R.string.notification_setup),
-                status = stringResource(pushStatusRes),
-                allowed = pushStatusRes == R.string.push_waiting,
-                onClick = onPush,
             )
             PermissionOption(
                 icon = Lucide.AlarmClock,

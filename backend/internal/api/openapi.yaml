@@ -81,7 +81,7 @@ paths:
       responses: {'200': {description: Command accepted with message envelope, content: {application/json: {schema: {$ref: '#/components/schemas/APIResponse'}}}}}
   /cameras/{id}/snapshot:
     get:
-      summary: Get a current authenticated snapshot
+      summary: Get a current JPEG frame from the authenticated local stream
       parameters: [{$ref: '#/components/parameters/id'}]
       responses: {'200': {description: JPEG image, content: {image/jpeg: {schema: {type: string, contentEncoding: binary}}}}}
   /cameras/{id}/recording:
@@ -139,7 +139,7 @@ paths:
       responses: {'200': {description: JPEG snapshot}}
   /devices/push:
     post:
-      summary: Register a UnifiedPush endpoint and encryption secret
+      summary: Register an FCM device token and payload encryption secret
       requestBody: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/PushDevice'}}}}
       responses: {'200': {description: Registered with message envelope, content: {application/json: {schema: {$ref: '#/components/schemas/APIResponse'}}}}}
   /settings/retention:
@@ -330,8 +330,9 @@ components:
         acknowledgedAt: {type: string, format: date-time}
     PushDevice:
       type: object
+      required: [token, secret]
       properties:
-        endpoint: {type: string, format: uri}
+        token: {type: string, description: Firebase Cloud Messaging registration token}
         secret: {type: string}
     RetentionSettings:
       type: object

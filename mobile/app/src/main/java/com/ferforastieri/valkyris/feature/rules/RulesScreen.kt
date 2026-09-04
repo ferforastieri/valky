@@ -36,11 +36,11 @@ fun RulesScreen(vm: RulesViewModel = hiltViewModel()) {
     val rules = vm.rules.collectAsStateWithLifecycle().value
     val cameras = vm.cameras.collectAsStateWithLifecycle().value
     val detectors = vm.detectors.collectAsStateWithLifecycle().value
+    val creating = vm.creating.collectAsStateWithLifecycle().value
     var show by remember { mutableStateOf(false) }
-    RulesContent(rules, cameras.isNotEmpty() && detectors.isNotEmpty(), onAdd = { show = true })
-    if (show) QuickRuleDialog(cameras, detectors, onDismiss = { show = false }) {
-        vm.create(it)
-        show = false
+    RulesContent(rules, cameras.isNotEmpty() && detectors.isNotEmpty(), creating, onAdd = { show = true })
+    if (show) QuickRuleDialog(cameras, detectors, creating, onDismiss = { if (!creating) show = false }) {
+        vm.create(it) { success -> if (success) show = false }
     }
 }
 
@@ -48,6 +48,7 @@ fun RulesScreen(vm: RulesViewModel = hiltViewModel()) {
 fun RulesContent(
     rules: List<com.ferforastieri.valkyris.core.database.RuleEntity>,
     canAdd: Boolean = true,
+    creating: Boolean = false,
     onAdd: () -> Unit = {},
 ) {
     Box(Modifier.fillMaxSize()) {
@@ -74,7 +75,10 @@ fun RulesContent(
               modifier = Modifier.align(Alignment.BottomEnd).padding(end = 20.dp, bottom = 18.dp),
               containerColor = MaterialTheme.colorScheme.secondary,
               contentColor = MaterialTheme.colorScheme.onSecondary,
-          ) { Icon(Lucide.Plus, contentDescription = stringResource(R.string.add_rule)) }
+          ) {
+              if (creating) CircularProgressIndicator(Modifier.size(22.dp), strokeWidth = 2.dp, color = MaterialTheme.colorScheme.onSecondary)
+              else Icon(Lucide.Plus, contentDescription = stringResource(R.string.add_rule))
+          }
       }
     }
 }
@@ -163,7 +167,7 @@ private fun detectorLabel(identifier: String): String = stringResource(
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun QuickRuleDialog(cameras: List<Camera>, detectors: List<DetectorKind>, onDismiss: () -> Unit, onSave: (Rule) -> Unit) {
+private fun QuickRuleDialog(cameras: List<Camera>, detectors: List<DetectorKind>, saving: Boolean, onDismiss: () -> Unit, onSave: (Rule) -> Unit) {
     var camera by remember { mutableStateOf(cameras.firstOrNull()) }
     var detector by remember { mutableStateOf(detectors.firstOrNull()) }
     var name by remember { mutableStateOf("") }
@@ -183,15 +187,19 @@ private fun QuickRuleDialog(cameras: List<Camera>, detectors: List<DetectorKind>
     com.ferforastieri.valkyris.core.design.ValkyrisBottomSheet(
         title = stringResource(R.string.add_rule),
         onDismiss = onDismiss,
+        dismissEnabled = !saving,
         actions = {
-            TextButton(onDismiss) { Text(stringResource(R.string.cancel)) }
+            TextButton(onDismiss, enabled = !saving) { Text(stringResource(R.string.cancel)) }
             Button(
                 onClick = {
                     val schedule = if (scheduleStart.isBlank()) RuleSchedule() else RuleSchedule((0..6).toList(), scheduleStart, scheduleEnd, ZoneId.systemDefault().id)
                     onSave(Rule(cameraId = checkNotNull(camera).id, name = name, detectorTypes = listOf(checkNotNull(detector).id), minConfidence = confidence.toDouble(), confirmations = confirmations.toIntOrNull() ?: 2, cooldownSeconds = cooldown.toIntOrNull() ?: 60, schedule = schedule, actions = RuleActions(record, notify, alarm)))
                 },
-                enabled = camera != null && detector != null && name.isNotBlank() && scheduleValid,
-            ) { Text(stringResource(R.string.save)) }
+                enabled = !saving && camera != null && detector != null && name.isNotBlank() && scheduleValid,
+            ) {
+                if (saving) CircularProgressIndicator(Modifier.size(18.dp), strokeWidth = 2.dp, color = MaterialTheme.colorScheme.onPrimary)
+                else Text(stringResource(R.string.save))
+            }
         },
     ) {
             Column(Modifier.fillMaxWidth().heightIn(max = 520.dp).imePadding().verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(10.dp)) {
