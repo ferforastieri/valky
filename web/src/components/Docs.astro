@@ -1,12 +1,12 @@
 ---
-import { BookOpen, Boxes, CodeXml, Download, ExternalLink, House, Languages, Menu, Moon, Network, ServerCog, ShieldCheck, Smartphone, SquareTerminal, Sun } from '@lucide/astro';
+import { Boxes, CodeXml, Download, ExternalLink, Menu, Network, ServerCog, ShieldCheck, Smartphone, SquareTerminal } from '@lucide/astro';
 import type { Locale } from '../content/copy';
 import BaseLayout from '../layouts/BaseLayout.astro';
+import Navigation from './Navigation.astro';
 
 interface Props { locale: Locale }
 const { locale } = Astro.props;
 const pt = locale === 'pt-BR';
-const other = pt ? '/en/docs' : '/pt-BR/docs';
 const installCommand = 'curl -fsSL https://valkyris.vercel.app/install.sh | sh';
 
 const text = pt ? {
@@ -14,7 +14,6 @@ const text = pt ? {
   description: 'Guia de instalação, configuração de câmeras ONVIF, segurança, operação e referência completa da API HTTP do Valkyris.',
   eyebrow: 'GUIA OPERACIONAL · API V1',
   intro: 'Tudo o que você precisa para instalar o servidor, preparar uma câmera, conectar o Android e integrar a API — sem expor RTSP ou a câmera à internet.',
-  nav: ['Início', 'Começar', 'Câmeras', 'API'],
   onThisPage: 'Nesta página',
   toc: [['start','Começar'],['architecture','Arquitetura'],['camera','Preparar a câmera'],['android','Android'],['configuration','Configuração'],['api','API HTTP'],['updates','Atualizações'],['security','Segurança'],['diagnostics','Diagnóstico']],
   requirements: ['Linux em amd64 ou arm64', 'Docker Engine com Docker Compose v2', 'Android 8.0 (SDK 26) ou mais recente', 'Câmera ONVIF Profile S com RTSP', 'Servidor, celular e câmera acessíveis por LAN ou VPN'],
@@ -24,7 +23,6 @@ const text = pt ? {
   description: 'Installation, ONVIF camera setup, security, operations and complete Valkyris HTTP API reference.',
   eyebrow: 'OPERATIONS GUIDE · API V1',
   intro: 'Everything needed to install the server, prepare a camera, connect Android and integrate the API — without exposing RTSP or the camera to the internet.',
-  nav: ['Home', 'Get started', 'Cameras', 'API'],
   onThisPage: 'On this page',
   toc: [['start','Get started'],['architecture','Architecture'],['camera','Prepare a camera'],['android','Android'],['configuration','Configuration'],['api','HTTP API'],['updates','Updates'],['security','Security'],['diagnostics','Diagnostics']],
   requirements: ['Linux on amd64 or arm64', 'Docker Engine with Docker Compose v2', 'Android 8.0 (SDK 26) or later', 'ONVIF Profile S camera with RTSP', 'Server, phone and camera reachable over LAN or VPN'],
@@ -207,16 +205,7 @@ const endpoints = pt ? [
     </div>
   </main>
 
-  <nav class="floating-dock docs-dock" aria-label={pt ? 'Navegação da documentação' : 'Documentation navigation'}>
-    <a class="dock-brand" href={`/${locale}`} aria-label="Valkyris home"><span class="brand-mark"><img src="/valkyris-mark.svg?v=6" alt="" /></span><span class="dock-identity"><strong>Valkyris</strong><small>DOCS · © 2026 Fernando Forastieri</small></span></a>
-    <div class="dock-links">
-      <a class="dock-link" href={`/${locale}`}><House size={17}/><span>{text.nav[0]}</span></a>
-      <a class="dock-link" href="#start"><SquareTerminal size={17}/><span>{text.nav[1]}</span></a>
-      <a class="dock-link" href="#camera"><Network size={17}/><span>{text.nav[2]}</span></a>
-      <a class="dock-link" href="#api"><BookOpen size={17}/><span>{text.nav[3]}</span></a>
-    </div>
-    <div class="dock-actions"><a class="icon-button" href={other} aria-label={pt ? 'Mudar para inglês' : 'Mudar para português'}><Languages size={18}/></a><button class="icon-button theme-toggle" type="button" aria-label={pt ? 'Alternar tema' : 'Toggle theme'}><Sun class="sun" size={18}/><Moon class="moon" size={18}/></button><a class="icon-button" href="https://github.com/ferforastieri/valkyris" aria-label="GitHub"><CodeXml size={18}/></a></div>
-  </nav>
+  <Navigation locale={locale} current="docs" />
 
   <script>
     const root=document.documentElement;

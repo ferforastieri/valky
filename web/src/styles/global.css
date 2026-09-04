@@ -2471,3 +2471,121 @@ body {
     flex-direction: column;
   }
 }
+
+/* Keep the documentation within the same product shell as the landing page. */
+.floating-dock .dock-link:first-child:not([aria-current="page"]) {
+  background: transparent;
+  color: var(--muted);
+}
+.floating-dock .dock-link[aria-current="page"] {
+  background: color-mix(in srgb, var(--signal) 27%, var(--surface));
+  color: var(--ink);
+}
+
+@media (max-width: 760px) {
+  .docs-shell,
+  .docs-content,
+  .docs-content > section {
+    min-width: 0;
+  }
+  .docs-content img,
+  .docs-content video,
+  .docs-content svg {
+    max-width: 100%;
+  }
+}
+
+@media (max-width: 620px) {
+  .docs-shell {
+    width: calc(100% - 24px);
+    padding-top: 8px;
+  }
+  .docs-hero {
+    gap: 22px;
+    padding: 24px 2px 34px;
+  }
+  .docs-hero h1 {
+    margin-bottom: 16px;
+    font-size: clamp(2.45rem, 13vw, 3.5rem);
+    overflow-wrap: anywhere;
+  }
+  .docs-hero > div:first-child > p:last-child {
+    font-size: 0.94rem;
+    line-height: 1.65;
+  }
+  .docs-status {
+    width: 100%;
+    min-width: 0;
+  }
+  .docs-grid {
+    gap: 42px;
+    padding-top: 32px;
+  }
+  .docs-toc nav {
+    grid-template-columns: 1fr 1fr;
+    column-gap: 14px;
+  }
+  .docs-toc a {
+    min-width: 0;
+  }
+  .docs-heading {
+    align-items: flex-start;
+    gap: 11px;
+  }
+  .docs-heading > svg {
+    flex: 0 0 auto;
+    padding: 9px;
+    border-radius: 12px;
+  }
+  .docs-heading div {
+    min-width: 0;
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 3px;
+  }
+  .docs-heading h2 {
+    font-size: clamp(1.9rem, 10vw, 2.6rem);
+    overflow-wrap: anywhere;
+  }
+  .docs-code {
+    align-items: stretch;
+    flex-direction: column;
+    padding: 14px;
+  }
+  .docs-code code {
+    width: max-content;
+    min-width: 100%;
+    font-size: 0.66rem;
+  }
+  .docs-copy {
+    align-self: flex-end;
+  }
+  .docs-note {
+    grid-template-columns: 20px minmax(0, 1fr);
+  }
+  .endpoint-list article {
+    grid-template-columns: minmax(0, auto) minmax(0, 1fr);
+    gap: 9px 10px;
+    padding: 13px;
+  }
+  .endpoint-list code,
+  .endpoint-list p {
+    min-width: 0;
+    overflow-wrap: anywhere;
+  }
+  .endpoint-list small {
+    grid-column: 1 / -1;
+  }
+  .endpoint-list p {
+    grid-column: 1 / -1;
+  }
+}
+
+@media (max-width: 380px) {
+  .docs-toc nav {
+    grid-template-columns: 1fr;
+  }
+  .docs-shell {
+    width: calc(100% - 20px);
+  }
+}

@@ -1,0 +1,33 @@
+---
+import { BookOpen, CodeXml, Download, House, Languages, Moon, Smartphone, Sun } from '@lucide/astro';
+import { copy, type Locale } from '../content/copy';
+
+interface Props {
+  locale: Locale;
+  current: 'home' | 'docs';
+}
+
+const { locale, current } = Astro.props;
+const t = copy[locale];
+const otherLocale = locale === 'pt-BR' ? 'en' : 'pt-BR';
+const homePath = `/${locale}`;
+const sectionPath = (section: string) => current === 'home' ? `#${section}` : `${homePath}#${section}`;
+const languagePath = current === 'docs' ? `/${otherLocale}/docs` : `/${otherLocale}`;
+---
+<nav class="floating-dock" aria-label={locale === 'pt-BR' ? 'Navegação principal' : 'Main navigation'}>
+  <a class="dock-brand" href={homePath} aria-label="Valkyris home">
+    <span class="brand-mark"><img src="/valkyris-mark.svg?v=6" alt="" /></span>
+    <span class="dock-identity"><strong>Valkyris</strong><small>© 2026 Fernando Forastieri · MIT</small></span>
+  </a>
+  <div class="dock-links">
+    <a class="dock-link" href={sectionPath('overview')} aria-current={current === 'home' ? 'page' : undefined}><House size={17}/><span>{t.nav[0]}</span></a>
+    <a class="dock-link" href={sectionPath('app')}><Smartphone size={17}/><span>{t.nav[1]}</span></a>
+    <a class="dock-link" href={sectionPath('install')}><Download size={17}/><span>{t.nav[2]}</span></a>
+    <a class="dock-link" href={`/${locale}/docs`} aria-current={current === 'docs' ? 'page' : undefined}><BookOpen size={17}/><span>{t.nav[3]}</span></a>
+  </div>
+  <div class="dock-actions">
+    <a class="icon-button" href={languagePath} aria-label={locale === 'pt-BR' ? 'Mudar para inglês' : 'Switch to Portuguese'}><Languages size={18}/></a>
+    <button class="icon-button theme-toggle" type="button" aria-label={locale === 'pt-BR' ? 'Alternar tema' : 'Toggle theme'}><Sun class="sun" size={18}/><Moon class="moon" size={18}/></button>
+    <a class="icon-button" href="https://github.com/ferforastieri/valkyris" aria-label="GitHub"><CodeXml size={18}/></a>
+  </div>
+</nav>

@@ -1,11 +1,11 @@
 ---
-import { ArrowLeft, ArrowRight, BellRing, BookOpen, Check, ChevronDown, CodeXml, Download, House, Languages, Moon, ShieldCheck, Smartphone, Sun } from '@lucide/astro';
+import { ArrowLeft, ArrowRight, BellRing, Check, ChevronDown, Download, ShieldCheck } from '@lucide/astro';
 import { copy, type Locale } from '../content/copy';
 import BaseLayout from '../layouts/BaseLayout.astro';
+import Navigation from './Navigation.astro';
 interface Props { locale: Locale }
 const { locale } = Astro.props;
 const t = copy[locale];
-const other = locale === 'pt-BR' ? '/en' : '/pt-BR';
 const command = 'curl -fsSL https://valkyris.vercel.app/install.sh | sh';
 const heroLines = locale === 'pt-BR' ? ['Sua casa avisa.', 'Seus dados ficam.'] : ['Your home speaks.', 'Your data stays.'];
 ---
@@ -62,23 +62,7 @@ const heroLines = locale === 'pt-BR' ? ['Sua casa avisa.', 'Seus dados ficam.'] 
     <section class="faq section" id="faq"><div><p class="eyebrow"><span></span>FAQ · ONVIF PROFILE S</p><h2>{t.faqTitle}</h2></div><div class="faq-list">{t.faq.map(([q,a])=><details><summary>{q}<ChevronDown size={18}/></summary><p>{a}</p></details>)}</div></section>
   </main>
 
-  <nav class="floating-dock" aria-label="Main navigation">
-    <a class="dock-brand" href={`/${locale}`} aria-label="Valkyris home">
-      <span class="brand-mark"><img src="/valkyris-mark.svg?v=6" alt="" /></span>
-      <span class="dock-identity"><strong>Valkyris</strong><small title={t.disclaimer}>© 2026 Fernando Forastieri · MIT</small></span>
-    </a>
-    <div class="dock-links">
-      <a class="dock-link" href="#overview"><House size={17}/><span>{t.nav[0]}</span></a>
-      <a class="dock-link" href="#app"><Smartphone size={17}/><span>{t.nav[1]}</span></a>
-      <a class="dock-link" href="#install"><Download size={17}/><span>{t.nav[2]}</span></a>
-      <a class="dock-link" href={`/${locale}/docs`}><BookOpen size={17}/><span>{t.nav[3]}</span></a>
-    </div>
-    <div class="dock-actions">
-      <a class="icon-button" href={other} aria-label="Change language"><Languages size={18}/></a>
-      <button class="icon-button theme-toggle" type="button" aria-label="Toggle theme"><Sun class="sun" size={18}/><Moon class="moon" size={18}/></button>
-      <a class="icon-button" href="https://github.com/ferforastieri/valkyris" aria-label="GitHub"><CodeXml size={18}/></a>
-    </div>
-  </nav>
+  <Navigation locale={locale} current="home" />
 
   <script>
     const root=document.documentElement;

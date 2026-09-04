@@ -102,11 +102,17 @@ test('documentação é uma rota separada, localizada e completa', async () => {
   assert.match(ptDocs, /\/api\/v1\/cameras/);
   assert.match(ptDocs, /\/api\/v1\/realtime/);
   assert.match(ptDocs, /href="\/openapi.yaml"/);
+  assert.match(ptDocs, /href="\/pt-BR#overview"/);
+  assert.match(ptDocs, /href="\/pt-BR#app"/);
+  assert.match(ptDocs, /href="\/pt-BR#install"/);
+  assert.match(ptDocs, /href="\/pt-BR\/docs" aria-current="page"/);
+  assert.match(ptDocs, /© 2026 Fernando Forastieri · MIT/);
   assert.match(ptDocs, /hreflang="en" href="https:\/\/valkyris\.vercel\.app\/en\/docs"/);
   assert.match(enDocs, /hreflang="pt-BR" href="https:\/\/valkyris\.vercel\.app\/pt-BR\/docs"/);
   const sitemap = await readFile(new URL('../dist/sitemap-0.xml', import.meta.url), 'utf8');
   assert.match(sitemap, /https:\/\/valkyris\.vercel\.app\/pt-BR\/docs/);
   assert.match(sitemap, /https:\/\/valkyris\.vercel\.app\/en\/docs/);
+  assert.match(stylesSource, /@media \(max-width: 620px\)[\s\S]*\.endpoint-list article\s*\{[\s\S]*grid-template-columns: minmax\(0, auto\) minmax\(0, 1fr\)/);
 });
 
 test('artefatos públicos acompanham a documentação', async () => {
