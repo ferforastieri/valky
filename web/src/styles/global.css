@@ -1999,12 +1999,6 @@ body {
 .carousel-hit-next {
   right: 0;
 }
-.carousel-hit:hover {
-  background: linear-gradient(90deg, color-mix(in srgb, var(--signal) 5%, transparent), transparent);
-}
-.carousel-hit-next:hover {
-  background: linear-gradient(-90deg, color-mix(in srgb, var(--signal) 5%, transparent), transparent);
-}
 
 /* Documentation is an operational reference, not another marketing section. */
 .docs-shell {

@@ -8,6 +8,7 @@ const root = await readFile(new URL('../dist/index.html', import.meta.url), 'utf
 const ptDocs = await readFile(new URL('../dist/pt-BR/docs/index.html', import.meta.url), 'utf8');
 const enDocs = await readFile(new URL('../dist/en/docs/index.html', import.meta.url), 'utf8');
 const landingSource = await readFile(new URL('../src/components/Landing.astro', import.meta.url), 'utf8');
+const stylesSource = await readFile(new URL('../src/styles/global.css', import.meta.url), 'utf8');
 
 test('publica as duas localizações com idioma correto', () => {
   assert.match(pt, /<html lang="pt-BR"/);
@@ -89,6 +90,8 @@ test('carrossel avança automaticamente sem controle visual redundante', () => {
   assert.match(landingSource, /<button class="app-capture carousel-slide/);
   assert.match(landingSource, /carousel-hit-prev/);
   assert.doesNotMatch(landingSource, /role="button" tabindex="0"/);
+  assert.match(stylesSource, /\.carousel-hit\s*\{[^}]*cursor:\s*pointer/s);
+  assert.doesNotMatch(stylesSource, /\.carousel-hit(?:-next)?:hover/);
 });
 
 test('documentação é uma rota separada, localizada e completa', async () => {

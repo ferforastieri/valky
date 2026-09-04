@@ -3,7 +3,12 @@
 .env
 data
 mobile
-web/node_modules
-web/dist
+updater
+web
+docs
 **/*_test.go
-
+*.md
+LICENSE
+compose.yaml
+mediamtx.yml
+install.sh
