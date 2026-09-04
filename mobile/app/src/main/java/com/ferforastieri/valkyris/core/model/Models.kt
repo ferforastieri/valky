@@ -2,7 +2,7 @@ package com.ferforastieri.valkyris.core.model
 
 import kotlinx.serialization.Serializable
 
-@Serializable data class Capabilities(val snapshot:Boolean=false,val events:Boolean=false,val ptz:Boolean=false,val zoom:Boolean=false,val presets:Boolean=false,val audio:Boolean=false)
+@Serializable data class Capabilities(val snapshot:Boolean=false,val events:Boolean=false,val ptz:Boolean=false,val zoom:Boolean=false,val audio:Boolean=false)
 @Serializable data class Camera(val id:String,val name:String,val host:String,val icon:String="camera",val port:Int=2020,val profileToken:String="",val capabilities:Capabilities=Capabilities(),val setupStatus:String="ready",val setupStep:String="",val setupError:String="",val setupUpdatedAt:String="",val enabled:Boolean=true)
 @Serializable data class CreateCameraRequest(val name:String,val icon:String="camera",val host:String,val port:Int=2020,val username:String,val password:String)
 @Serializable data class ValkyrisEvent(val id:String,val cameraId:String,val ruleId:String?=null,val type:String,val confidence:Double,val occurredAt:String,val snapshotPath:String?=null,val clipPath:String?=null,val acknowledgedAt:String?=null)
@@ -15,8 +15,7 @@ import kotlinx.serialization.Serializable
 @Serializable data class PairRequest(val code:String,val deviceName:String,val locale:String)
 @Serializable data class PairResponse(val deviceId:String,val token:String,val admin:Boolean=false)
 @Serializable data class PairingSession(val id:String,val code:String,val expiresAt:String)
-@Serializable data class PTZCommand(val action:String,val pan:Double=0.0,val tilt:Double=0.0,val zoom:Double=0.0,val presetToken:String="")
-@Serializable data class CameraPreset(val token:String,val name:String)
+@Serializable data class PTZCommand(val action:String,val pan:Double=0.0,val tilt:Double=0.0,val zoom:Double=0.0)
 @Serializable data class PushRegistration(val endpoint:String,val secret:String)
 @Serializable data class ApiEnvelope<T>(val success:Boolean,val message:String="",val data:T?=null,val error:String?=null)
 @Serializable data class CameraOperation(val id:String,val status:String,val message:String,val camera:Camera?=null,val createdAt:String="",val updatedAt:String="")

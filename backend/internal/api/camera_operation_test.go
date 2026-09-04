@@ -65,7 +65,7 @@ func TestCameraCreationContinuesAsynchronously(t *testing.T) {
 		authManager,
 		repository,
 		camera.NewONVIFClient(),
-		media.New(mediaServer.URL, mediaServer.URL, filepath.Join(directory, "recordings")),
+		media.New(mediaServer.URL, mediaServer.URL, mediaServer.URL, filepath.Join(directory, "recordings")),
 		nil,
 		nil,
 		nil,
@@ -141,7 +141,7 @@ func TestCameraCreationPersistsProbeFailure(t *testing.T) {
 		t.Fatal(err)
 	}
 	repository := camera.NewRepository(database, vault)
-	server := NewServer(authManager, repository, camera.NewONVIFClient(), media.New("http://127.0.0.1:1", "http://127.0.0.1:1", directory), nil, nil, nil, NewHub(), slog.New(slog.NewTextHandler(io.Discard, nil)))
+	server := NewServer(authManager, repository, camera.NewONVIFClient(), media.New("http://127.0.0.1:1", "http://127.0.0.1:1", "http://127.0.0.1:1", directory), nil, nil, nil, NewHub(), slog.New(slog.NewTextHandler(io.Discard, nil)))
 	created := performJSON(t, server.Handler(), http.MethodPost, "/api/v1/cameras", session.Token, camera.CreateInput{Name: "Offline", Host: "127.0.0.1", Port: 1, Username: "camera", Password: "secret", RTSPURI: "rtsp://127.0.0.1/offline"})
 	var started struct {
 		Data CameraOperation `json:"data"`

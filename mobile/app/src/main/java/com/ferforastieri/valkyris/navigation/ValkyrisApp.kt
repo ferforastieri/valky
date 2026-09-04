@@ -86,8 +86,8 @@ private fun ConnectedValkyrisApp(main: MainViewModel) {
     val entry by nav.currentBackStackEntryAsState()
     val currentRoute = entry?.destination?.route
     val selectedIndex = destinations.indexOfFirst { it.route == currentRoute }
-    val showBottomBar = selectedIndex >= 0 || currentRoute == "events"
-    val showTopBar = showBottomBar
+    val showBottomBar = selectedIndex >= 0 || currentRoute == "events" || currentRoute == "camera/{id}"
+    val showTopBar = selectedIndex >= 0 || currentRoute == "events"
     val pendingEvent by main.pendingEvent.collectAsStateWithLifecycle()
     val pendingCamera by main.pendingCamera.collectAsStateWithLifecycle()
     LaunchedEffect(pendingEvent) {
@@ -140,7 +140,7 @@ private fun ConnectedValkyrisApp(main: MainViewModel) {
         NavHost(nav, "overview", Modifier.padding(padding)) {
             composable("overview") { OverviewScreen(onCamera = { nav.navigate("camera/$it") }, onEvent = { nav.navigate("event/$it") }) }
             composable("cameras") { CamerasScreen(onCamera = { nav.navigate("camera/$it") }) }
-            composable("camera/{id}") { CameraLiveScreen(cameraId = it.arguments?.getString("id").orEmpty(), onBack = { nav.popBackStack() }) }
+            composable("camera/{id}") { CameraLiveScreen(cameraId = it.arguments?.getString("id").orEmpty()) }
             composable("events") {
                 EventsScreen(
                     onEvent = { nav.navigate("event/$it") },

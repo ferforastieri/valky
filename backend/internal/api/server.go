@@ -111,7 +111,6 @@ func (s *Server) Handler() http.Handler {
 	protected.HandleFunc("GET /camera-operations/{id}", s.cameraOperation)
 	protected.HandleFunc("DELETE /cameras/{id}", s.deleteCamera)
 	protected.HandleFunc("POST /cameras/{id}/ptz", s.ptz)
-	protected.HandleFunc("GET /cameras/{id}/presets", s.cameraPresets)
 	protected.HandleFunc("GET /cameras/{id}/snapshot", s.snapshot)
 	protected.HandleFunc("GET /cameras/{id}/recording", s.recentRecording)
 	protected.HandleFunc("GET /cameras/{id}/live/{asset...}", s.live)
@@ -367,10 +366,6 @@ func (s *Server) ptz(w http.ResponseWriter, r *http.Request) {
 	if !decode(w, r, &command) {
 		return
 	}
-	if command.Action == "preset" && !cam.Capabilities.Presets {
-		writeError(w, http.StatusConflict, fmt.Errorf("camera does not advertise PTZ presets"))
-		return
-	}
 	if command.Zoom != 0 && !cam.Capabilities.Zoom {
 		writeError(w, http.StatusConflict, fmt.Errorf("camera does not advertise PTZ zoom"))
 		return
@@ -382,19 +377,6 @@ func (s *Server) ptz(w http.ResponseWriter, r *http.Request) {
 	writeSuccess(w, http.StatusOK, "PTZ command accepted", nil)
 }
 
-func (s *Server) cameraPresets(w http.ResponseWriter, r *http.Request) {
-	cam, cred, err := s.cameras.Get(r.Context(), r.PathValue("id"))
-	if err != nil {
-		respond(w, nil, err)
-		return
-	}
-	if !cam.Capabilities.PTZ || !cam.Capabilities.Presets {
-		writeError(w, http.StatusConflict, fmt.Errorf("camera does not advertise PTZ presets"))
-		return
-	}
-	presets, err := s.onvif.Presets(r.Context(), cam, cred)
-	respondWithMessage(w, presets, err, "Camera presets loaded successfully")
-}
 func (s *Server) snapshot(w http.ResponseWriter, r *http.Request) {
 	cam, cred, err := s.cameras.Get(r.Context(), r.PathValue("id"))
 	if err != nil {

@@ -15,6 +15,8 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.core.content.ContextCompat
 import androidx.compose.foundation.background
 import androidx.compose.foundation.Image
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.gestures.detectTransformGestures
 import androidx.compose.foundation.rememberScrollState
@@ -26,10 +28,12 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
@@ -45,6 +49,9 @@ import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.compose.LifecycleResumeEffect
 import androidx.media3.common.MediaItem
+import androidx.media3.common.AudioAttributes
+import androidx.media3.common.C
+import androidx.media3.common.Player
 import androidx.media3.datasource.okhttp.OkHttpDataSource
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.exoplayer.hls.HlsMediaSource
@@ -55,7 +62,6 @@ import com.ferforastieri.valkyris.core.design.ColorTokens
 import com.ferforastieri.valkyris.core.design.cameraIcon
 import com.ferforastieri.valkyris.core.model.Camera
 import com.ferforastieri.valkyris.core.model.CreateCameraRequest
-import com.composables.icons.lucide.ArrowLeft
 import com.composables.icons.lucide.Aperture
 import com.composables.icons.lucide.ChevronDown
 import com.composables.icons.lucide.ChevronLeft
@@ -65,7 +71,6 @@ import com.composables.icons.lucide.Check
 import com.composables.icons.lucide.EllipsisVertical
 import com.composables.icons.lucide.Lucide
 import com.composables.icons.lucide.Mic
-import com.composables.icons.lucide.MapPin
 import com.composables.icons.lucide.Maximize2
 import com.composables.icons.lucide.Minus
 import com.composables.icons.lucide.Move
@@ -293,7 +298,7 @@ private val cameraIconOptions = listOf(
 @Composable private fun EmptyCameras(){Box(Modifier.fillMaxSize()){Column(Modifier.align(Alignment.Center),horizontalAlignment=Alignment.CenterHorizontally){Icon(Lucide.VideoOff,null,Modifier.size(42.dp),tint=MaterialTheme.colorScheme.onSurfaceVariant);Spacer(Modifier.height(12.dp));Text(stringResource(R.string.no_cameras),fontWeight=FontWeight.SemiBold);Text(stringResource(R.string.add_camera_hint),color=MaterialTheme.colorScheme.onSurfaceVariant)}}}
 
 @Composable
-fun CameraLiveScreen(cameraId:String,onBack:()->Unit,vm:CameraLiveViewModel=hiltViewModel()) {
+fun CameraLiveScreen(cameraId:String,vm:CameraLiveViewModel=hiltViewModel()) {
     val camera by vm.camera.collectAsStateWithLifecycle()
     val context = androidx.compose.ui.platform.LocalContext.current
     val activity = remember(context) { context.findActivity() }
@@ -303,11 +308,7 @@ fun CameraLiveScreen(cameraId:String,onBack:()->Unit,vm:CameraLiveViewModel=hilt
         onDispose { if (previousOrientation != null) activity.requestedOrientation = previousOrientation }
     }
     Column(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
-        Row(Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
-            Surface(shape=CircleShape,color=MaterialTheme.colorScheme.surface,border=androidx.compose.foundation.BorderStroke(1.dp,MaterialTheme.colorScheme.outlineVariant)) {
-                IconButton(onBack) { Icon(Lucide.ArrowLeft, stringResource(R.string.back)) }
-            }
-            Spacer(Modifier.width(12.dp))
+        Row(Modifier.fillMaxWidth().padding(horizontal = 18.dp, vertical = 10.dp), verticalAlignment = Alignment.CenterVertically) {
             Column(Modifier.weight(1f)) {
                 Text(camera?.name ?: stringResource(R.string.live), style=MaterialTheme.typography.titleLarge,fontWeight = FontWeight.SemiBold)
                 Text(if (camera?.setupStatus == "ready") stringResource(R.string.stream_private) else stringResource(R.string.camera_setup_saved), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -353,10 +354,10 @@ private fun ReadyCameraContent(camera: Camera, vm: CameraLiveViewModel) {
     val context = androidx.compose.ui.platform.LocalContext.current
     val snapshotLoading by vm.snapshotLoading.collectAsStateWithLifecycle()
     val recordingLoading by vm.recordingLoading.collectAsStateWithLifecycle()
-    val presets by vm.presets.collectAsStateWithLifecycle()
+    val preview by vm.preview.collectAsStateWithLifecycle()
     var muted by remember { mutableStateOf(false) }
-    var showPresets by remember { mutableStateOf(false) }
-    var showFullscreen by remember { mutableStateOf(false) }
+    var showFullscreen by rememberSaveable { mutableStateOf(false) }
+    var renderedFirstFrame by remember { mutableStateOf(false) }
     var pendingMediaAction by remember { mutableStateOf<MediaAction?>(null) }
     val storagePermission = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
         val action = pendingMediaAction
@@ -374,6 +375,11 @@ private fun ReadyCameraContent(camera: Camera, vm: CameraLiveViewModel) {
     val player = remember {
         val factory = OkHttpDataSource.Factory(vm.httpClient()).setDefaultRequestProperties(mapOf("Authorization" to "Bearer ${vm.token()}"))
         ExoPlayer.Builder(context).setMediaSourceFactory(HlsMediaSource.Factory(factory)).build().apply {
+            setAudioAttributes(
+                AudioAttributes.Builder().setUsage(C.USAGE_MEDIA).setContentType(C.AUDIO_CONTENT_TYPE_MOVIE).build(),
+                true,
+            )
+            setHandleAudioBecomingNoisy(true)
             setMediaItem(MediaItem.fromUri(vm.liveUrl()))
             prepare()
             playWhenReady = true
@@ -381,7 +387,12 @@ private fun ReadyCameraContent(camera: Camera, vm: CameraLiveViewModel) {
     }
     LaunchedEffect(muted) { player.volume = if(muted) 0f else 1f }
     DisposableEffect(player) {
+        val listener = object : Player.Listener {
+            override fun onRenderedFirstFrame() { renderedFirstFrame = true }
+        }
+        player.addListener(listener)
         onDispose {
+            player.removeListener(listener)
             player.release()
             vm.stop()
         }
@@ -389,13 +400,10 @@ private fun ReadyCameraContent(camera: Camera, vm: CameraLiveViewModel) {
     Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal=18.dp),verticalArrangement=Arrangement.spacedBy(14.dp)) {
         Surface(Modifier.fillMaxWidth().aspectRatio(16/9f),RoundedCornerShape(22.dp),color=ColorTokens.BrandTile,border=androidx.compose.foundation.BorderStroke(1.dp,MaterialTheme.colorScheme.outlineVariant),shadowElevation=7.dp) {
             Box {
-                if (!showFullscreen) LivePlayer(player,Modifier.fillMaxSize())
+                if (!showFullscreen) ZoomableLivePlayer(player,preview,renderedFirstFrame,{showFullscreen=true},Modifier.fillMaxSize())
                 else Box(Modifier.fillMaxSize().background(Color.Black))
-                Box(
-                    Modifier.fillMaxSize().pointerInput(Unit) { detectTapGestures { showFullscreen = true } },
-                    contentAlignment = Alignment.TopEnd,
-                ) {
-                    Surface(Modifier.padding(10.dp), CircleShape, color = Color.Black.copy(alpha = .48f)) {
+                Box(Modifier.fillMaxSize(),contentAlignment = Alignment.TopEnd) {
+                    Surface(onClick={showFullscreen=true},modifier=Modifier.padding(10.dp), shape=CircleShape, color = Color.Black.copy(alpha = .48f)) {
                         Icon(Lucide.Maximize2, stringResource(R.string.fullscreen_camera), Modifier.padding(8.dp).size(18.dp), tint = Color.White)
                     }
                 }
@@ -405,7 +413,6 @@ private fun ReadyCameraContent(camera: Camera, vm: CameraLiveViewModel) {
         if(camera.capabilities.audio) actions += CameraActionItem(if(muted)Lucide.VolumeX else Lucide.Volume2,if(muted)stringResource(R.string.unmute) else stringResource(R.string.mute),{muted=!muted})
         actions += CameraActionItem(Lucide.Aperture,stringResource(R.string.snapshot),{runMediaAction(MediaAction.Snapshot)},snapshotLoading)
         actions += CameraActionItem(Lucide.Video,stringResource(R.string.record_recent),{runMediaAction(MediaAction.Recording)},recordingLoading)
-        if(camera.capabilities.presets) actions += CameraActionItem(Lucide.MapPin,stringResource(R.string.presets),{showPresets=true;vm.loadPresets()})
         actions.chunked(2).forEach { rowActions ->
             Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.spacedBy(10.dp)) {
                 rowActions.forEach { action -> CameraAction(action.icon,action.label,action.onClick,Modifier.weight(1f),action.loading) }
@@ -436,23 +443,50 @@ private fun ReadyCameraContent(camera: Camera, vm: CameraLiveViewModel) {
         }
         Spacer(Modifier.height(18.dp))
     }
-    if(showFullscreen) FullscreenLivePlayer(player, camera.name, onDismiss = { showFullscreen = false })
-    if(showPresets) com.ferforastieri.valkyris.core.design.ValkyrisBottomSheet(title=stringResource(R.string.presets),onDismiss={showPresets=false}) {
-        if(presets.isEmpty()) Text(stringResource(R.string.no_presets),Modifier.fillMaxWidth().padding(vertical=24.dp),color=MaterialTheme.colorScheme.onSurfaceVariant)
-        else Column(verticalArrangement=Arrangement.spacedBy(8.dp)) { presets.forEach { preset->Surface(onClick={vm.goToPreset(preset.token);showPresets=false},modifier=Modifier.fillMaxWidth(),shape=RoundedCornerShape(15.dp),color=MaterialTheme.colorScheme.surfaceVariant){Row(Modifier.padding(15.dp),verticalAlignment=Alignment.CenterVertically){Icon(Lucide.MapPin,null,tint=MaterialTheme.colorScheme.secondary);Spacer(Modifier.width(12.dp));Text(preset.name,fontWeight=FontWeight.Medium)}} } }
-    }
+    if(showFullscreen) FullscreenLivePlayer(player,preview,renderedFirstFrame,camera.name,onDismiss={showFullscreen=false})
 }
 
 @Composable
 private fun LivePlayer(player: ExoPlayer, modifier: Modifier) {
     AndroidView(
-        factory = { PlayerView(it).apply { this.player = player; useController = false; layoutParams = ViewGroup.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT) } },
+        factory = { PlayerView(it).apply {
+            this.player = player
+            useController = false
+            setKeepContentOnPlayerReset(true)
+            setShutterBackgroundColor(Color.Transparent.toArgb())
+            layoutParams = ViewGroup.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT)
+        } },
         modifier = modifier,
     )
 }
 
 @Composable
-private fun FullscreenLivePlayer(player: ExoPlayer, cameraName: String, onDismiss: () -> Unit) {
+private fun ZoomableLivePlayer(player:ExoPlayer,preview:android.graphics.Bitmap?,rendered:Boolean,onOpen:()->Unit,modifier:Modifier=Modifier){
+    var scale by remember { mutableFloatStateOf(1f) }
+    var offset by remember { mutableStateOf(Offset.Zero) }
+    Box(modifier.pointerInput(Unit){
+        detectTransformGestures { _,pan,zoom,_->
+            scale=(scale*zoom).coerceIn(1f,4f)
+            offset=if(scale==1f)Offset.Zero else offset+pan
+        }
+    }.pointerInput(Unit){detectTapGestures(onTap={onOpen()},onDoubleTap={scale=1f;offset=Offset.Zero})}){
+        Box(Modifier.fillMaxSize().graphicsLayer{scaleX=scale;scaleY=scale;translationX=offset.x;translationY=offset.y}){
+            LivePlayer(player,Modifier.fillMaxSize())
+            if(!rendered)preview?.let{Image(it.asImageBitmap(),null,Modifier.fillMaxSize(),contentScale=ContentScale.Crop)}
+        }
+        if(!rendered)CircularProgressIndicator(Modifier.align(Alignment.Center).size(28.dp),strokeWidth=2.dp,color=Color.White)
+    }
+}
+
+@Composable
+private fun FullscreenLivePlayer(player: ExoPlayer,preview:android.graphics.Bitmap?,rendered:Boolean,cameraName: String,onDismiss: () -> Unit) {
+    val context=androidx.compose.ui.platform.LocalContext.current
+    val activity=remember(context){context.findActivity()}
+    DisposableEffect(activity){
+        val previous=activity?.requestedOrientation
+        activity?.requestedOrientation=ActivityInfo.SCREEN_ORIENTATION_FULL_SENSOR
+        onDispose{if(previous!=null)activity.requestedOrientation=previous}
+    }
     var scale by remember { mutableFloatStateOf(1f) }
     var offset by remember { mutableStateOf(Offset.Zero) }
     Dialog(onDismissRequest = onDismiss, properties = DialogProperties(usePlatformDefaultWidth = false, decorFitsSystemWindows = false)) {
@@ -468,8 +502,14 @@ private fun FullscreenLivePlayer(player: ExoPlayer, cameraName: String, onDismis
                         scale = (scale * zoom).coerceIn(1f, 4f)
                         offset = if (scale == 1f) Offset.Zero else offset + pan
                     }
+                }.pointerInput(Unit) {
+                    detectTapGestures(onDoubleTap={scale=1f;offset=Offset.Zero})
                 },
-            ) { LivePlayer(player, Modifier.fillMaxSize()) }
+            ) {
+                LivePlayer(player, Modifier.fillMaxSize())
+                if(!rendered)preview?.let{Image(it.asImageBitmap(),null,Modifier.fillMaxSize(),contentScale=ContentScale.Crop)}
+                if(!rendered)CircularProgressIndicator(Modifier.align(Alignment.Center).size(30.dp),strokeWidth=2.dp,color=Color.White)
+            }
             Text(
                 stringResource(R.string.pinch_to_zoom),
                 Modifier.align(Alignment.TopCenter).statusBarsPadding().padding(top = 14.dp),
@@ -494,4 +534,12 @@ private tailrec fun Context.findActivity(): Activity? = when (this) {
 private enum class MediaAction { Snapshot, Recording }
 private data class CameraActionItem(val icon:ImageVector,val label:String,val onClick:()->Unit,val loading:Boolean=false)
 @Composable private fun PTZPad(vm:CameraLiveViewModel){Surface(Modifier.size(190.dp),CircleShape,color=MaterialTheme.colorScheme.surfaceVariant,border=androidx.compose.foundation.BorderStroke(1.dp,MaterialTheme.colorScheme.outlineVariant),tonalElevation=1.dp){Box(Modifier.fillMaxSize().padding(10.dp)){Surface(Modifier.size(72.dp).align(Alignment.Center),CircleShape,color=MaterialTheme.colorScheme.surface,border=androidx.compose.foundation.BorderStroke(1.dp,MaterialTheme.colorScheme.outlineVariant)){Box(contentAlignment=Alignment.Center){Icon(Lucide.Video,null,tint=MaterialTheme.colorScheme.secondary)}};PTZButton(Lucide.ChevronUp,stringResource(R.string.move_up),{vm.move(0.0,.65)},{vm.stop()},Modifier.align(Alignment.TopCenter));PTZButton(Lucide.ChevronLeft,stringResource(R.string.move_left),{vm.move(-.65,0.0)},{vm.stop()},Modifier.align(Alignment.CenterStart));PTZButton(Lucide.ChevronRight,stringResource(R.string.move_right),{vm.move(.65,0.0)},{vm.stop()},Modifier.align(Alignment.CenterEnd));PTZButton(Lucide.ChevronDown,stringResource(R.string.move_down),{vm.move(0.0,-.65)},{vm.stop()},Modifier.align(Alignment.BottomCenter))}}}
-@Composable private fun PTZButton(icon:ImageVector,label:String,onPress:()->Unit,onRelease:()->Unit,modifier:Modifier=Modifier){Surface(modifier.size(48.dp).pointerInput(Unit){detectTapGestures(onPress={onPress();tryAwaitRelease();onRelease()})},shape=CircleShape,color=MaterialTheme.colorScheme.surface,shadowElevation=3.dp){Box(contentAlignment=Alignment.Center){Icon(icon,label,Modifier.size(22.dp))}}}
+@Composable private fun PTZButton(icon:ImageVector,label:String,onPress:()->Unit,onRelease:()->Unit,modifier:Modifier=Modifier){
+    var pressed by remember{mutableStateOf(false)}
+    val scale by animateFloatAsState(if(pressed).88f else 1f,label="ptz-scale")
+    val color by animateColorAsState(if(pressed)MaterialTheme.colorScheme.secondaryContainer else MaterialTheme.colorScheme.surface,label="ptz-color")
+    Surface(
+        modifier.size(48.dp).graphicsLayer{scaleX=scale;scaleY=scale}.pointerInput(Unit){detectTapGestures(onPress={pressed=true;onPress();try{tryAwaitRelease()}finally{onRelease();pressed=false}})},
+        shape=CircleShape,color=color,shadowElevation=if(pressed)0.dp else 3.dp,
+    ){Box(contentAlignment=Alignment.Center){Icon(icon,label,Modifier.size(22.dp),tint=if(pressed)MaterialTheme.colorScheme.secondary else LocalContentColor.current)}}
+}

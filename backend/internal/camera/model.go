@@ -7,7 +7,6 @@ type Capabilities struct {
 	Events   bool `json:"events"`
 	PTZ      bool `json:"ptz"`
 	Zoom     bool `json:"zoom"`
-	Presets  bool `json:"presets"`
 	Audio    bool `json:"audio"`
 }
 
@@ -65,14 +64,8 @@ func normalizeIcon(icon string) string {
 }
 
 type PTZCommand struct {
-	Action      string  `json:"action"`
-	Pan         float64 `json:"pan"`
-	Tilt        float64 `json:"tilt"`
-	Zoom        float64 `json:"zoom"`
-	PresetToken string  `json:"presetToken,omitempty"`
-}
-
-type Preset struct {
-	Token string `json:"token"`
-	Name  string `json:"name"`
+	Action string  `json:"action"`
+	Pan    float64 `json:"pan"`
+	Tilt   float64 `json:"tilt"`
+	Zoom   float64 `json:"zoom"`
 }

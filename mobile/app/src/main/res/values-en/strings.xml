@@ -185,7 +185,6 @@
     <string name="fullscreen_camera">Open camera full screen</string>
     <string name="close_fullscreen">Close full screen</string>
     <string name="pinch_to_zoom">Pinch with two fingers to zoom</string>
-    <string name="presets">Positions</string>
     <string name="mute">Mute</string>
     <string name="unmute">Listen</string>
     <string name="camera_position">Camera position</string>
@@ -195,7 +194,6 @@
     <string name="zoom_out">Zoom out</string>
     <string name="fixed_camera">This camera did not advertise movement controls through ONVIF.</string>
     <string name="snapshot_unavailable">The snapshot could not be loaded.</string>
-    <string name="no_presets">The camera returned no saved positions.</string>
     <string name="move_up">Move up</string>
     <string name="move_down">Move down</string>
     <string name="move_left">Move left</string>

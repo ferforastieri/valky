@@ -79,11 +79,6 @@ paths:
       parameters: [{$ref: '#/components/parameters/id'}]
       requestBody: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/PTZCommand'}}}}
       responses: {'200': {description: Command accepted with message envelope, content: {application/json: {schema: {$ref: '#/components/schemas/APIResponse'}}}}}
-  /cameras/{id}/presets:
-    get:
-      summary: List the presets advertised by an ONVIF PTZ camera
-      parameters: [{$ref: '#/components/parameters/id'}]
-      responses: {'200': {description: Presets in APIResponse.data, content: {application/json: {schema: {$ref: '#/components/schemas/APIResponse'}}}}}
   /cameras/{id}/snapshot:
     get:
       summary: Get a current authenticated snapshot
@@ -214,13 +209,12 @@ components:
         error: {type: string}
     CapabilitySet:
       type: object
-      required: [snapshot, events, ptz, zoom, presets, audio]
+      required: [snapshot, events, ptz, zoom, audio]
       properties:
         snapshot: {type: boolean}
         events: {type: boolean}
         ptz: {type: boolean}
         zoom: {type: boolean}
-        presets: {type: boolean}
         audio: {type: boolean}
     Camera:
       type: object
@@ -291,17 +285,10 @@ components:
       type: object
       required: [action]
       properties:
-        action: {type: string, enum: [move, relative, stop, preset]}
+        action: {type: string, enum: [move, relative, stop]}
         pan: {type: number, minimum: -1, maximum: 1}
         tilt: {type: number, minimum: -1, maximum: 1}
         zoom: {type: number, minimum: -1, maximum: 1}
-        presetToken: {type: string}
-    CameraPreset:
-      type: object
-      required: [token, name]
-      properties:
-        token: {type: string}
-        name: {type: string}
     Rule:
       type: object
       required: [cameraId, name, detectorTypes, actions]

@@ -20,12 +20,19 @@ import (
 type Manager struct {
 	api        string
 	hls        string
+	playback   string
 	recordings string
 	http       *http.Client
 }
 
-func New(api, hls, recordings string) *Manager {
-	return &Manager{api: strings.TrimRight(api, "/"), hls: strings.TrimRight(hls, "/"), recordings: recordings, http: &http.Client{Timeout: 8 * time.Second}}
+func New(api, hls, playback, recordings string) *Manager {
+	return &Manager{
+		api:        strings.TrimRight(api, "/"),
+		hls:        strings.TrimRight(hls, "/"),
+		playback:   strings.TrimRight(playback, "/"),
+		recordings: recordings,
+		http:       &http.Client{Timeout: 30 * time.Second},
+	}
 }
 
 var mediaPathID = regexp.MustCompile(`^[A-Za-z0-9_-]+$`)
@@ -55,7 +62,7 @@ func (m *Manager) ConfigureCamera(ctx context.Context, id, rtspURI string) error
 		return fmt.Errorf("configure playable media path: %w", err)
 	}
 
-	transcode := fmt.Sprintf("ffmpeg -hide_banner -loglevel warning -rtsp_transport tcp -i rtsp://127.0.0.1:8554/%s -map 0:v:0 -map 0:a:0? -c:v copy -c:a aac -ar 48000 -ac 1 -b:a 64k -f rtsp -rtsp_transport tcp rtsp://127.0.0.1:8554/%s", sourcePath, outputPath)
+	transcode := fmt.Sprintf("ffmpeg -hide_banner -loglevel warning -fflags +genpts -use_wallclock_as_timestamps 1 -rtsp_transport tcp -i rtsp://127.0.0.1:8554/%s -map 0:v:0 -map 0:a:0? -c:v copy -c:a aac -profile:a aac_low -ar 48000 -ac 1 -b:a 64k -af aresample=async=1:first_pts=0 -muxdelay 0.1 -f rtsp -rtsp_transport tcp rtsp://127.0.0.1:8554/%s", sourcePath, outputPath)
 	source := map[string]any{
 		"source":            rtspURI,
 		"sourceOnDemand":    false,
@@ -72,10 +79,12 @@ func (m *Manager) ConfigureCamera(ctx context.Context, id, rtspURI string) error
 
 func (m *Manager) ensureInternalRTSP(ctx context.Context) error {
 	payload, err := json.Marshal(map[string]any{
-		"rtsp":           true,
-		"rtspAddress":    ":8554",
-		"rtspTransports": []string{"tcp"},
-		"hlsAlwaysRemux": false,
+		"rtsp":            true,
+		"rtspAddress":     ":8554",
+		"rtspTransports":  []string{"tcp"},
+		"hlsAlwaysRemux":  true,
+		"playback":        true,
+		"playbackAddress": ":9996",
 	})
 	if err != nil {
 		return err
@@ -194,7 +203,7 @@ func (m *Manager) MonitoringFrame(ctx context.Context, cameraID string) ([]byte,
 	frameContext, cancel := context.WithTimeout(ctx, 8*time.Second)
 	defer cancel()
 	input := m.hls + m.HLSPath(cameraID)
-	cmd := exec.CommandContext(frameContext, "ffmpeg", "-hide_banner", "-loglevel", "error", "-i", input, "-frames:v", "1", "-vf", "scale=320:-2", "-f", "image2pipe", "-c:v", "mjpeg", "pipe:1")
+	cmd := exec.CommandContext(frameContext, "ffmpeg", "-hide_banner", "-loglevel", "error", "-i", input, "-frames:v", "1", "-f", "image2pipe", "-c:v", "mjpeg", "-q:v", "2", "pipe:1")
 	frame, err := cmd.Output()
 	if err != nil {
 		return nil, fmt.Errorf("capture monitoring frame: %w", err)
@@ -213,17 +222,54 @@ func (m *Manager) MaterializeRecentClip(ctx context.Context, cameraID string, du
 	if duration <= 0 || duration > time.Minute {
 		return fmt.Errorf("recent clip duration must be between 0 and 60 seconds")
 	}
-	now := time.Now()
-	return m.materializeClipWindow(ctx, cameraID, now.Add(-duration), now, output, true)
+	if !mediaPathID.MatchString(cameraID) {
+		return fmt.Errorf("invalid camera ID for media path")
+	}
+	// Keep a small distance from the live edge: MediaMTX can only serve parts
+	// that have already been finalized. Its playback server assembles those
+	// fMP4 fragments into a standard MP4, avoiding fragile filesystem concat.
+	end := time.Now().UTC().Add(-3 * time.Second)
+	query := url.Values{
+		"path":     {"camera-" + cameraID},
+		"start":    {end.Add(-duration).Format(time.RFC3339Nano)},
+		"duration": {fmt.Sprintf("%.3f", duration.Seconds())},
+		"format":   {"mp4"},
+	}
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, m.playback+"/get?"+query.Encode(), nil)
+	if err != nil {
+		return err
+	}
+	resp, err := m.http.Do(req)
+	if err != nil {
+		return fmt.Errorf("request MediaMTX playback: %w", err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode/100 != 2 {
+		body, _ := io.ReadAll(io.LimitReader(resp.Body, 4<<10))
+		return mediaMTXResponseError(resp.Status, body, "")
+	}
+	file, err := os.OpenFile(output, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0o600)
+	if err != nil {
+		return err
+	}
+	_, copyErr := io.Copy(file, resp.Body)
+	closeErr := file.Close()
+	if copyErr != nil {
+		return fmt.Errorf("write recent clip: %w", copyErr)
+	}
+	if closeErr != nil {
+		return closeErr
+	}
+	return nil
 }
 
 // MaterializeClipWindow joins all rolling fragments covering a possibly
 // extended event window. This allows detections that overlap to share one clip.
 func (m *Manager) MaterializeClipWindow(ctx context.Context, cameraID string, from, to time.Time, output string) error {
-	return m.materializeClipWindow(ctx, cameraID, from, to, output, false)
+	return m.materializeClipWindow(ctx, cameraID, from, to, output)
 }
 
-func (m *Manager) materializeClipWindow(ctx context.Context, cameraID string, from, to time.Time, output string, latest bool) error {
+func (m *Manager) materializeClipWindow(ctx context.Context, cameraID string, from, to time.Time, output string) error {
 	dir := filepath.Join(m.recordings, "camera-"+cameraID)
 	entries, err := os.ReadDir(dir)
 	if err != nil {
@@ -261,14 +307,7 @@ func (m *Manager) materializeClipWindow(ctx context.Context, cameraID string, fr
 	if duration <= 0 {
 		return fmt.Errorf("invalid clip window")
 	}
-	args := []string{"-hide_banner", "-loglevel", "error", "-f", "concat", "-safe", "0"}
-	if latest {
-		// The current MediaMTX fragment is not readable until it is finalized.
-		// Seek from the end so the output is anchored to the newest complete
-		// fragment instead of the three-second boundary tolerance above.
-		args = append(args, "-sseof", fmt.Sprintf("-%.3f", duration.Seconds()))
-	}
-	args = append(args, "-i", list, "-t", fmt.Sprintf("%.3f", duration.Seconds()), "-c", "copy", "-y", output)
+	args := []string{"-hide_banner", "-loglevel", "error", "-f", "concat", "-safe", "0", "-i", list, "-t", fmt.Sprintf("%.3f", duration.Seconds()), "-c", "copy", "-y", output}
 	cmd := exec.CommandContext(ctx, "ffmpeg", args...)
 	return cmd.Run()
 }

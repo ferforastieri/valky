@@ -5,7 +5,7 @@ apiEncryption: false
 hls: true
 hlsAddress: :8888
 hlsEncryption: false
-hlsAlwaysRemux: false
+hlsAlwaysRemux: true
 hlsVariant: lowLatency
 hlsSegmentCount: 7
 hlsSegmentDuration: 1s
@@ -16,7 +16,8 @@ rtspTransports: [tcp]
 rtmp: false
 srt: false
 webrtc: false
-playback: false
+playback: true
+playbackAddress: :9996
 metrics: false
 pprof: false
 authMethod: internal
@@ -27,6 +28,7 @@ authInternalUsers:
       - action: read
       - action: publish
       - action: api
+      - action: playback
 paths:
   all_others:
     source: publisher

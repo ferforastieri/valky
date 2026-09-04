@@ -24,7 +24,7 @@ Valkyris transforma um servidor doméstico em uma central privada de monitoramen
 
 - Descoberta de capacidades e snapshots por ONVIF Profile S.
 - Live view LL-HLS autenticado, com uma única conexão RTSP por câmera e conversão apenas do áudio G.711 para AAC.
-- Movimento PTZ por pressionar e segurar, zoom e presets quando anunciados pela câmera.
+- Movimento PTZ por pressionar e segurar e zoom quando anunciado pela câmera.
 - Cadastro assíncrono: a câmera aparece imediatamente e o progresso ou erro fica persistido.
 - Regras para movimento e sons residenciais, com confiança, confirmações, agenda e cooldown.
 - Eventos com snapshot, reconhecimento, notificação e clipe com pré/pós-evento.
@@ -158,7 +158,7 @@ O arquivo [.env.example](.env.example) lista as variáveis suportadas. As princi
 | `VALKYRIS_DATABASE` | Caminho do banco SQLite. |
 | `VALKYRIS_TLS_CERT` / `VALKYRIS_TLS_KEY` | Identidade TLS do backend. |
 | `VALKYRIS_MASTER_KEY_FILE` | Chave usada para cifrar credenciais sensíveis. |
-| `VALKYRIS_MEDIA_URL` / `VALKYRIS_MEDIA_API` | Endereços internos do MediaMTX. |
+| `VALKYRIS_MEDIA_URL` / `VALKYRIS_MEDIA_API` / `VALKYRIS_MEDIA_PLAYBACK` | Endereços internos de HLS, configuração e reprodução do MediaMTX. |
 | `VALKYRIS_UPDATER_URL` / `VALKYRIS_UPDATER_TOKEN` | Canal privado do atualizador. |
 | `VALKYRIS_RELEASE_API` | Release estável consultada pelo backend. |
 

@@ -7,7 +7,6 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.ferforastieri.valkyris.core.model.Camera
 import com.ferforastieri.valkyris.core.model.CreateCameraRequest
-import com.ferforastieri.valkyris.core.model.CameraPreset
 import com.ferforastieri.valkyris.core.model.PTZCommand
 import com.ferforastieri.valkyris.core.media.DeviceMediaStore
 import com.ferforastieri.valkyris.core.network.ValkyrisApi
@@ -25,6 +24,8 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.supervisorScope
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import okhttp3.Request
 import java.util.concurrent.TimeUnit
 import java.time.LocalDateTime
@@ -167,8 +168,9 @@ class CameraLiveViewModel @Inject constructor(
     val snapshotLoading = _snapshotLoading.asStateFlow()
     private val _recordingLoading = MutableStateFlow(false)
     val recordingLoading = _recordingLoading.asStateFlow()
-    private val _presets = MutableStateFlow<List<CameraPreset>>(emptyList())
-    val presets = _presets.asStateFlow()
+    private val _preview = MutableStateFlow<Bitmap?>(null)
+    val preview = _preview.asStateFlow()
+    private val ptzMutex = Mutex()
     private var realtime: okhttp3.WebSocket? = null
     init {
         realtime = api.realtime({ refresh() })
@@ -176,7 +178,7 @@ class CameraLiveViewModel @Inject constructor(
             while (isActive) {
                 runCatching { api.cameras().firstOrNull { it.id == id } }.onSuccess { _camera.value = it }
                 if (_camera.value?.setupStatus in setOf("ready", "failed")) {
-                    if (_camera.value?.capabilities?.presets == true) loadPresets()
+                    if (_camera.value?.setupStatus == "ready") loadPreview()
                     break
                 }
                 delay(1_000)
@@ -186,10 +188,25 @@ class CameraLiveViewModel @Inject constructor(
     private fun refresh() {
         viewModelScope.launch { runCatching { api.cameras().firstOrNull { it.id == id } }.onSuccess { _camera.value = it } }
     }
-    fun move(pan: Double, tilt: Double, zoom: Double = 0.0) { viewModelScope.launch { runCatching { api.ptz(id, PTZCommand("move", pan, tilt, zoom)) } } }
-    fun stop() { viewModelScope.launch { runCatching { api.ptz(id, PTZCommand("stop")) } } }
-    fun goToPreset(token: String) { viewModelScope.launch { runCatching { api.ptz(id, PTZCommand("preset", presetToken = token)) } } }
-    fun loadPresets() { viewModelScope.launch { runCatching { api.cameraPresets(id) }.onSuccess { _presets.value = it } } }
+    private fun loadPreview() {
+        viewModelScope.launch(Dispatchers.IO) {
+            runCatching {
+                val request = Request.Builder().url(api.snapshotUrl(id))
+                    .header("Authorization", "Bearer ${api.token()}").build()
+                api.mediaHttpClient().newCall(request).execute().use { response ->
+                    if (!response.isSuccessful) return@runCatching null
+                    val bytes = response.body.bytes()
+                    BitmapFactory.decodeByteArray(bytes, 0, bytes.size)
+                }
+            }.getOrNull()?.let { _preview.value = it }
+        }
+    }
+    fun move(pan: Double, tilt: Double, zoom: Double = 0.0) {
+        viewModelScope.launch { ptzMutex.withLock { runCatching { api.ptz(id, PTZCommand("move", pan, tilt, zoom)) } } }
+    }
+    fun stop() {
+        viewModelScope.launch { ptzMutex.withLock { runCatching { api.ptz(id, PTZCommand("stop")) } } }
+    }
     fun captureSnapshot() {
         if (_snapshotLoading.value) return
         viewModelScope.launch {

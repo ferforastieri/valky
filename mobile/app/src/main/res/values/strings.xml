@@ -185,7 +185,6 @@
     <string name="fullscreen_camera">Abrir câmera em tela cheia</string>
     <string name="close_fullscreen">Fechar tela cheia</string>
     <string name="pinch_to_zoom">Use dois dedos para ampliar</string>
-    <string name="presets">Posições</string>
     <string name="mute">Silenciar</string>
     <string name="unmute">Ouvir</string>
     <string name="camera_position">Posição da câmera</string>
@@ -195,7 +194,6 @@
     <string name="zoom_out">Afastar</string>
     <string name="fixed_camera">Esta câmera não anunciou controles de movimento pelo ONVIF.</string>
     <string name="snapshot_unavailable">Não foi possível carregar a captura.</string>
-    <string name="no_presets">A câmera não retornou posições salvas.</string>
     <string name="move_up">Mover para cima</string>
     <string name="move_down">Mover para baixo</string>
     <string name="move_left">Mover para a esquerda</string>

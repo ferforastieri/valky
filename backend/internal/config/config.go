@@ -16,6 +16,7 @@ type Config struct {
 	MasterKeyFile   string
 	MediaURL        string
 	MediaAPI        string
+	MediaPlayback   string
 	RecordingsDir   string
 	ModelsDir       string
 	UpdaterURL      string
@@ -37,6 +38,7 @@ func Load() Config {
 		MasterKeyFile:   env("VALKYRIS_MASTER_KEY_FILE", filepath.Join(data, "secrets", "master.key")),
 		MediaURL:        env("VALKYRIS_MEDIA_URL", "http://localhost:8888"),
 		MediaAPI:        env("VALKYRIS_MEDIA_API", "http://localhost:9997"),
+		MediaPlayback:   env("VALKYRIS_MEDIA_PLAYBACK", "http://localhost:9996"),
 		RecordingsDir:   env("VALKYRIS_MEDIA_RECORDINGS", filepath.Join(data, "recordings")),
 		ModelsDir:       env("VALKYRIS_MODELS_DIR", "./models"),
 		UpdaterURL:      env("VALKYRIS_UPDATER_URL", "http://updater:8080"),

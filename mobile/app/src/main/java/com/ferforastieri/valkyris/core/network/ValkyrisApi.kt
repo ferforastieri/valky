@@ -191,7 +191,6 @@ class ValkyrisApi(
     }
 
     suspend fun cameras(): List<Camera> = get("/cameras")
-    suspend fun cameraPresets(cameraId: String): List<CameraPreset> = get("/cameras/$cameraId/presets")
 
     suspend fun createCamera(camera: CreateCameraRequest): Camera {
         val started: CameraOperation = post("/cameras", camera, R.string.notice_camera_created, announceError = true)
@@ -237,7 +236,7 @@ class ValkyrisApi(
 
     suspend fun ptz(cameraId: String, command: PTZCommand) {
         val current = requireNotNull(session())
-        executeUnit(current.fingerprint) {
+        executeUnit(current.fingerprint, announceError = true) {
             it.post(base() + "/cameras/$cameraId/ptz") {
                 bearerAuth(current.token)
                 contentType(ContentType.Application.Json)

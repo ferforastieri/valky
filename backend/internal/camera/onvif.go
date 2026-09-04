@@ -49,31 +49,59 @@ func (c *ONVIFClient) Probe(ctx context.Context, host string, port int, username
 	var response struct {
 		Profiles []struct {
 			Token string `xml:"token,attr"`
-			Audio any    `xml:"AudioEncoderConfiguration"`
-			PTZ   any    `xml:"PTZConfiguration"`
+			Video *struct {
+				Resolution struct {
+					Width  int `xml:"Width"`
+					Height int `xml:"Height"`
+				} `xml:"Resolution"`
+			} `xml:"VideoEncoderConfiguration"`
+			Audio *struct{} `xml:"AudioEncoderConfiguration"`
+			PTZ   *struct {
+				Token string `xml:"token,attr"`
+			} `xml:"PTZConfiguration"`
 		} `xml:"Body>GetProfilesResponse>Profiles"`
 	}
 	_ = xml.Unmarshal(profiles, &response)
 	profile := ""
-	if len(response.Profiles) > 0 {
-		profile = response.Profiles[0].Token
+	selected := -1
+	selectedPixels := -1
+	for index, candidate := range response.Profiles {
+		pixels := 0
+		if candidate.Video != nil {
+			pixels = candidate.Video.Resolution.Width * candidate.Video.Resolution.Height
+		}
+		if selected == -1 || pixels > selectedPixels {
+			selected = index
+			selectedPixels = pixels
+		}
+	}
+	if selected >= 0 {
+		profile = response.Profiles[selected].Token
 	}
 	profileText := string(profiles)
 	if profile == "" {
 		profile = attrAfter(profileText, "Profiles", "token")
 	}
-	caps.Audio = strings.Contains(profileText, "AudioEncoderConfiguration")
-	caps.PTZ = caps.PTZ && strings.Contains(profileText, "PTZConfiguration")
-	caps.Zoom = strings.Contains(profileText, "ZoomLimits")
+	if selected >= 0 {
+		caps.Audio = response.Profiles[selected].Audio != nil
+		caps.PTZ = caps.PTZ && response.Profiles[selected].PTZ != nil
+	} else {
+		caps.Audio = strings.Contains(profileText, "AudioEncoderConfiguration")
+		caps.PTZ = caps.PTZ && strings.Contains(profileText, "PTZConfiguration")
+	}
 	if caps.PTZ {
 		ptzURL := services.PTZ
 		if ptzURL == "" {
 			ptzURL = fmt.Sprintf("http://%s:%d/onvif/PTZ", host, port)
 			services.PTZ = ptzURL
 		}
-		presetPayload := fmt.Sprintf(`<tptz:GetPresets><tptz:ProfileToken>%s</tptz:ProfileToken></tptz:GetPresets>`, escape(profile))
-		_, presetErr := c.call(ctx, ptzURL, username, password, "http://www.onvif.org/ver20/ptz/wsdl/GetPresets", presetPayload)
-		caps.Presets = presetErr == nil
+		if selected >= 0 && response.Profiles[selected].PTZ != nil && response.Profiles[selected].PTZ.Token != "" {
+			optionsPayload := fmt.Sprintf(`<tptz:GetConfigurationOptions><tptz:ConfigurationToken>%s</tptz:ConfigurationToken></tptz:GetConfigurationOptions>`, escape(response.Profiles[selected].PTZ.Token))
+			if options, optionsErr := c.call(ctx, ptzURL, username, password, "http://www.onvif.org/ver20/ptz/wsdl/GetConfigurationOptions", optionsPayload); optionsErr == nil {
+				optionsText := string(options)
+				caps.Zoom = strings.Contains(optionsText, "ContinuousZoomVelocitySpace") || strings.Contains(optionsText, "RelativeZoomTranslationSpace")
+			}
+		}
 	}
 	if caps.Events && services.Events == "" {
 		services.Events = fmt.Sprintf("http://%s:%d/onvif/event_service", host, port)
@@ -90,75 +118,31 @@ func (c *ONVIFClient) PTZ(ctx context.Context, cam Camera, cred Credentials, com
 		_, err := c.call(ctx, endpoint, cred.Username, cred.Password, "http://www.onvif.org/ver20/ptz/wsdl/Stop", fmt.Sprintf(`<tptz:Stop><tptz:ProfileToken>%s</tptz:ProfileToken><tptz:PanTilt>true</tptz:PanTilt><tptz:Zoom>true</tptz:Zoom></tptz:Stop>`, escape(cam.ProfileToken)))
 		return err
 	}
-	if command.Action == "preset" {
-		if command.PresetToken == "" {
-			return fmt.Errorf("preset token is required")
-		}
-		payload := fmt.Sprintf(`<tptz:GotoPreset><tptz:ProfileToken>%s</tptz:ProfileToken><tptz:PresetToken>%s</tptz:PresetToken></tptz:GotoPreset>`, escape(cam.ProfileToken), escape(command.PresetToken))
-		_, err := c.call(ctx, endpoint, cred.Username, cred.Password, "http://www.onvif.org/ver20/ptz/wsdl/GotoPreset", payload)
-		return err
-	}
 	if command.Action != "move" && command.Action != "relative" {
 		return fmt.Errorf("unsupported PTZ action")
 	}
 	command.Pan = clamp(command.Pan)
 	command.Tilt = clamp(command.Tilt)
 	command.Zoom = clamp(command.Zoom)
+	panTilt := ""
+	zoom := ""
+	if command.Pan != 0 || command.Tilt != 0 {
+		panTilt = fmt.Sprintf(`<tt:PanTilt x="%.3f" y="%.3f"/>`, command.Pan, command.Tilt)
+	}
+	if command.Zoom != 0 {
+		zoom = fmt.Sprintf(`<tt:Zoom x="%.3f"/>`, command.Zoom)
+	}
+	if panTilt == "" && zoom == "" {
+		return fmt.Errorf("PTZ movement requires pan, tilt or zoom velocity")
+	}
 	action := "http://www.onvif.org/ver20/ptz/wsdl/ContinuousMove"
-	payload := fmt.Sprintf(`<tptz:ContinuousMove><tptz:ProfileToken>%s</tptz:ProfileToken><tptz:Velocity><tt:PanTilt x="%.3f" y="%.3f"/><tt:Zoom x="%.3f"/></tptz:Velocity></tptz:ContinuousMove>`, escape(cam.ProfileToken), command.Pan, command.Tilt, command.Zoom)
+	payload := fmt.Sprintf(`<tptz:ContinuousMove><tptz:ProfileToken>%s</tptz:ProfileToken><tptz:Velocity>%s%s</tptz:Velocity></tptz:ContinuousMove>`, escape(cam.ProfileToken), panTilt, zoom)
 	if command.Action == "relative" {
 		action = "http://www.onvif.org/ver20/ptz/wsdl/RelativeMove"
-		payload = fmt.Sprintf(`<tptz:RelativeMove><tptz:ProfileToken>%s</tptz:ProfileToken><tptz:Translation><tt:PanTilt x="%.3f" y="%.3f"/><tt:Zoom x="%.3f"/></tptz:Translation></tptz:RelativeMove>`, escape(cam.ProfileToken), command.Pan, command.Tilt, command.Zoom)
+		payload = fmt.Sprintf(`<tptz:RelativeMove><tptz:ProfileToken>%s</tptz:ProfileToken><tptz:Translation>%s%s</tptz:Translation></tptz:RelativeMove>`, escape(cam.ProfileToken), panTilt, zoom)
 	}
 	_, err := c.call(ctx, endpoint, cred.Username, cred.Password, action, payload)
 	return err
-}
-
-func (c *ONVIFClient) Presets(ctx context.Context, cam Camera, cred Credentials) ([]Preset, error) {
-	endpoint := cam.Services.PTZ
-	if endpoint == "" {
-		endpoint = fmt.Sprintf("http://%s:%d/onvif/PTZ", cam.Host, cam.Port)
-	}
-	payload := fmt.Sprintf(`<tptz:GetPresets><tptz:ProfileToken>%s</tptz:ProfileToken></tptz:GetPresets>`, escape(cam.ProfileToken))
-	body, err := c.call(ctx, endpoint, cred.Username, cred.Password, "http://www.onvif.org/ver20/ptz/wsdl/GetPresets", payload)
-	if err != nil {
-		return nil, err
-	}
-	decoder := xml.NewDecoder(bytes.NewReader(body))
-	presets := make([]Preset, 0)
-	for {
-		token, tokenErr := decoder.Token()
-		if tokenErr == io.EOF {
-			break
-		}
-		if tokenErr != nil {
-			return nil, tokenErr
-		}
-		start, ok := token.(xml.StartElement)
-		if !ok || start.Name.Local != "Preset" {
-			continue
-		}
-		preset := Preset{}
-		for _, attribute := range start.Attr {
-			if attribute.Name.Local == "token" {
-				preset.Token = attribute.Value
-			}
-		}
-		var value struct {
-			Name string `xml:"Name"`
-		}
-		if err = decoder.DecodeElement(&value, &start); err != nil {
-			return nil, err
-		}
-		preset.Name = strings.TrimSpace(value.Name)
-		if preset.Token != "" {
-			if preset.Name == "" {
-				preset.Name = "Preset " + preset.Token
-			}
-			presets = append(presets, preset)
-		}
-	}
-	return presets, nil
 }
 
 func (c *ONVIFClient) SnapshotURI(ctx context.Context, cam Camera, cred Credentials) (string, error) {

@@ -19,6 +19,7 @@ services:
       VALKYRIS_MASTER_KEY_FILE: /data/secrets/master.key
       VALKYRIS_MEDIA_URL: http://mediamtx:8888
       VALKYRIS_MEDIA_API: http://mediamtx:9997
+      VALKYRIS_MEDIA_PLAYBACK: http://mediamtx:9996
       VALKYRIS_MEDIA_RECORDINGS: /data/recordings
       VALKYRIS_UPDATER_URL: http://updater:8080
       VALKYRIS_UPDATER_TOKEN: ${VALKYRIS_UPDATER_TOKEN:-}
@@ -76,6 +77,7 @@ services:
     expose:
       - "8888"
       - "9997"
+      - "9996"
     networks: [valkyris]
     security_opt:
       - no-new-privileges:true

@@ -60,7 +60,7 @@ func main() {
 	}
 	cameraRepo := camera.NewRepository(db, vault)
 	onvif := camera.NewONVIFClient()
-	mediaManager := media.New(cfg.MediaAPI, cfg.MediaURL, cfg.RecordingsDir)
+	mediaManager := media.New(cfg.MediaAPI, cfg.MediaURL, cfg.MediaPlayback, cfg.RecordingsDir)
 	authManager := auth.NewManager(db, cfg.PairingLifetime)
 	rulesService := rules.NewService(db)
 	eventService := event.NewService(db)
@@ -79,7 +79,7 @@ func main() {
 	defer cancel()
 	go notifyService.Run(ctx)
 	go application.RunRetention(ctx, cfg.RetentionAge, cfg.RetentionBytes)
-	restoreMedia(ctx, cameraRepo, mediaManager, logger)
+	go restoreMedia(ctx, cameraRepo, mediaManager, logger)
 	apiServer.ResumeCameraSetups(ctx)
 	var classifier *detector.NativeClassifier
 	model := filepath.Join(cfg.ModelsDir, "model.int8.onnx")
@@ -122,9 +122,25 @@ func restoreMedia(ctx context.Context, repo *camera.Repository, m *media.Manager
 			continue
 		}
 		_, cred, e := repo.Get(ctx, cam.ID)
-		if e == nil {
-			if e = m.ConfigureCamera(ctx, cam.ID, cred.RTSPURI); e != nil {
+		if e != nil {
+			logger.Warn("load camera for media restore", "camera", cam.ID, "error", e)
+			continue
+		}
+		for attempt := 1; attempt <= 12; attempt++ {
+			e = m.ConfigureCamera(ctx, cam.ID, cred.RTSPURI)
+			if e == nil {
+				break
+			}
+			if attempt == 12 {
 				logger.Warn("restore media path", "camera", cam.ID, "error", e)
+				break
+			}
+			timer := time.NewTimer(time.Second)
+			select {
+			case <-ctx.Done():
+				timer.Stop()
+				return
+			case <-timer.C:
 			}
 		}
 	}
