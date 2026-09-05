@@ -93,6 +93,7 @@ class AlarmNotifier @Inject constructor(@param:ApplicationContext private val co
 
     private fun updateBadge() {
         if (Build.VERSION.SDK_INT < 23) return
+        if (Build.VERSION.SDK_INT >= 33 && ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) return
         val manager = context.getSystemService(NotificationManager::class.java)
         val count = manager.activeNotifications.count {
             it.id != SUMMARY_ID && it.notification.group == EVENT_GROUP
