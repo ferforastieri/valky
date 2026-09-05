@@ -36,7 +36,7 @@ import java.time.format.DateTimeFormatter
 @Composable
 fun EventsScreen(onEvent: (String) -> Unit = {}, onCamera: (String) -> Unit = {}, vm: EventsViewModel = hiltViewModel()) {
     val events = vm.events.collectAsStateWithLifecycle().value
-    EventsContent(events, onEvent, onCamera, onAcknowledge = vm::acknowledge)
+    EventsContent(events, onEvent, onCamera, onAcknowledge = vm::acknowledge, onAcknowledgeAll = vm::acknowledgeAll)
 }
 
 @Composable
@@ -45,24 +45,32 @@ fun EventsContent(
     onEvent: (String) -> Unit = {},
     onCamera: (String) -> Unit = {},
     onAcknowledge: (EventEntity) -> Unit = {},
+    onAcknowledgeAll: () -> Unit = {},
 ) {
     var unreadOnly by rememberSaveable { mutableStateOf(false) }
+    val hasUnread = events.any { it.acknowledgedAt == null }
     val visibleEvents = if (unreadOnly) events.filter { it.acknowledgedAt == null } else events
     Column(Modifier.fillMaxSize().padding(horizontal = 18.dp)) {
         Spacer(Modifier.height(10.dp))
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            FilterChip(
-                selected = !unreadOnly,
-                onClick = { unreadOnly = false },
-                label = { Text(stringResource(R.string.all_notifications)) },
-                leadingIcon = { Icon(Lucide.ListFilter, null, Modifier.size(16.dp)) },
-            )
-            FilterChip(
-                selected = unreadOnly,
-                onClick = { unreadOnly = true },
-                label = { Text(stringResource(R.string.unread_notifications)) },
-                leadingIcon = { Icon(Lucide.Eye, null, Modifier.size(16.dp)) },
-            )
+        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                FilterChip(
+                    selected = !unreadOnly,
+                    onClick = { unreadOnly = false },
+                    label = { Text(stringResource(R.string.all_notifications)) },
+                    leadingIcon = { Icon(Lucide.ListFilter, null, Modifier.size(16.dp)) },
+                )
+                FilterChip(
+                    selected = unreadOnly,
+                    onClick = { unreadOnly = true },
+                    label = { Text(stringResource(R.string.unread_notifications)) },
+                    leadingIcon = { Icon(Lucide.Eye, null, Modifier.size(16.dp)) },
+                )
+            }
+            Spacer(Modifier.weight(1f))
+            IconButton(onClick = onAcknowledgeAll, enabled = hasUnread) {
+                Icon(Lucide.Check, contentDescription = stringResource(R.string.mark_all_read))
+            }
         }
         Spacer(Modifier.height(8.dp))
         if (visibleEvents.isEmpty()) {

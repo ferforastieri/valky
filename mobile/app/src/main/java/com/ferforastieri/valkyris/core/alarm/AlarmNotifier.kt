@@ -73,7 +73,8 @@ class AlarmNotifier @Inject constructor(@param:ApplicationContext private val co
             .setPriority(NotificationCompat.PRIORITY_MAX)
             .setCategory(if (alarm) NotificationCompat.CATEGORY_ALARM else NotificationCompat.CATEGORY_EVENT)
             .setNumber(1)
-            .setGroup("valkyris-home-events")
+            .setGroup(EVENT_GROUP)
+            .setBadgeIconType(NotificationCompat.BADGE_ICON_SMALL)
             .apply {
                 if (cameraId.isNotBlank() && !opensCamera) addAction(0, context.getString(R.string.open_camera), cameraIntent)
                 if (opensCamera) addAction(0, context.getString(R.string.view_event), eventIntent)
@@ -82,14 +83,41 @@ class AlarmNotifier @Inject constructor(@param:ApplicationContext private val co
             .apply { if (alarm && canUseFullScreen) setFullScreenIntent(alarmIntent, true) }
             .build()
         NotificationManagerCompat.from(context).notify(eventId.hashCode(), notification)
+        updateBadge()
     }
 
     fun cancel(eventId: String) {
         NotificationManagerCompat.from(context).cancel(eventId.hashCode())
+        updateBadge()
+    }
+
+    private fun updateBadge() {
+        if (Build.VERSION.SDK_INT < 23) return
+        val manager = context.getSystemService(NotificationManager::class.java)
+        val count = manager.activeNotifications.count {
+            it.id != SUMMARY_ID && it.notification.group == EVENT_GROUP
+        }
+        if (count == 0) {
+            NotificationManagerCompat.from(context).cancel(SUMMARY_ID)
+            return
+        }
+        val summary = NotificationCompat.Builder(context, EVENTS)
+            .setSmallIcon(R.drawable.ic_notification)
+            .setContentTitle(context.getString(R.string.app_name))
+            .setContentText(context.getString(R.string.pending_alerts))
+            .setGroup(EVENT_GROUP)
+            .setGroupSummary(true)
+            .setNumber(count)
+            .setBadgeIconType(NotificationCompat.BADGE_ICON_SMALL)
+            .setOnlyAlertOnce(true)
+            .build()
+        NotificationManagerCompat.from(context).notify(SUMMARY_ID, summary)
     }
 
     companion object {
         const val EVENTS = "valkyris_events"
+        const val EVENT_GROUP = "valkyris-home-events"
+        const val SUMMARY_ID = 0x56414C
         const val ALARMS = "valkyris_alarms"
     }
 }

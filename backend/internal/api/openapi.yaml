@@ -117,6 +117,16 @@ paths:
     get:
       summary: List recent events
       responses: {'200': {description: Events in APIResponse.data, content: {application/json: {schema: {$ref: '#/components/schemas/APIResponse'}}}}}
+  /events/acknowledge-all:
+    post:
+      summary: Acknowledge all unacknowledged events
+      responses:
+        200:
+          description: Acknowledged count in APIResponse.data
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/APIResponse"
   /events/{id}:
     get:
       summary: Get event metadata

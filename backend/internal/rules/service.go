@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
+	"sort"
 	"strconv"
 	"strings"
 	"sync"
@@ -25,6 +26,9 @@ type Service struct {
 func NewService(s *store.Store) *Service { return &Service{store: s, pending: map[string]int{}} }
 
 func (s *Service) Create(ctx context.Context, r Rule) (Rule, error) {
+	r.Name = strings.TrimSpace(r.Name)
+	r.DetectorTypes = canonicalStrings(r.DetectorTypes)
+	r.Schedule.Days = canonicalInts(r.Schedule.Days)
 	if r.CameraID == "" || r.Name == "" || len(r.DetectorTypes) == 0 {
 		return r, fmt.Errorf("cameraId, name and detectorTypes are required")
 	}
@@ -47,8 +51,61 @@ func (s *Service) Create(ctx context.Context, r Rule) (Rule, error) {
 	det, _ := json.Marshal(r.DetectorTypes)
 	schedule, _ := json.Marshal(r.Schedule)
 	actions, _ := json.Marshal(r.Actions)
-	_, err := s.store.DB.ExecContext(ctx, `INSERT INTO rules(id,camera_id,name,detector_types_json,min_confidence,confirmations,cooldown_seconds,schedule_json,actions_json,enabled,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?)`, r.ID, r.CameraID, r.Name, string(det), r.MinConfidence, r.Confirmations, r.CooldownSeconds, string(schedule), string(actions), 1, r.CreatedAt.Format(time.RFC3339Nano), r.UpdatedAt.Format(time.RFC3339Nano))
-	return r, err
+	result, err := s.store.DB.ExecContext(ctx, `INSERT INTO rules(id,camera_id,name,detector_types_json,min_confidence,confirmations,cooldown_seconds,schedule_json,actions_json,enabled,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?) ON CONFLICT DO NOTHING`, r.ID, r.CameraID, r.Name, string(det), r.MinConfidence, r.Confirmations, r.CooldownSeconds, string(schedule), string(actions), 1, r.CreatedAt.Format(time.RFC3339Nano), r.UpdatedAt.Format(time.RFC3339Nano))
+	if err != nil {
+		return r, err
+	}
+	inserted, err := result.RowsAffected()
+	if err != nil {
+		return r, err
+	}
+	if inserted > 0 {
+		return r, nil
+	}
+	existing, err := scanRule(s.store.DB.QueryRowContext(ctx, `SELECT id,camera_id,name,detector_types_json,min_confidence,confirmations,cooldown_seconds,schedule_json,actions_json,enabled,last_triggered_at,created_at,updated_at FROM rules WHERE camera_id=? AND name=? AND detector_types_json=? AND min_confidence=? AND confirmations=? AND cooldown_seconds=? AND schedule_json=? AND actions_json=? LIMIT 1`, r.CameraID, r.Name, string(det), r.MinConfidence, r.Confirmations, r.CooldownSeconds, string(schedule), string(actions)))
+	if err != nil {
+		return r, fmt.Errorf("load existing idempotent rule: %w", err)
+	}
+	return existing, nil
+}
+
+func canonicalStrings(values []string) []string {
+	canonical := make([]string, 0, len(values))
+	for _, value := range values {
+		if value = strings.TrimSpace(value); value != "" {
+			canonical = append(canonical, value)
+		}
+	}
+	sort.Strings(canonical)
+	return compactStrings(canonical)
+}
+
+func canonicalInts(values []int) []int {
+	canonical := append([]int(nil), values...)
+	sort.Ints(canonical)
+	if len(canonical) == 0 {
+		return canonical
+	}
+	out := canonical[:1]
+	for _, value := range canonical[1:] {
+		if value != out[len(out)-1] {
+			out = append(out, value)
+		}
+	}
+	return out
+}
+
+func compactStrings(values []string) []string {
+	if len(values) == 0 {
+		return values
+	}
+	out := values[:1]
+	for _, value := range values[1:] {
+		if value != out[len(out)-1] {
+			out = append(out, value)
+		}
+	}
+	return out
 }
 
 func (s *Service) List(ctx context.Context, cameraID string) ([]Rule, error) {

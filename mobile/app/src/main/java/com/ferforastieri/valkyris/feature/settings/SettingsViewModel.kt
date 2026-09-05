@@ -2,8 +2,9 @@ package com.ferforastieri.valkyris.feature.settings
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.ferforastieri.valkyris.core.network.ValkyrisApi
+import com.ferforastieri.valkyris.core.action.MobileActionGate
 import com.ferforastieri.valkyris.core.model.RetentionSettings
+import com.ferforastieri.valkyris.core.network.ValkyrisApi
 import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -23,7 +24,10 @@ data class RetentionState(
 )
 
 @HiltViewModel
-class SettingsViewModel @Inject constructor(private val api: ValkyrisApi) : ViewModel() {
+class SettingsViewModel @Inject constructor(
+    private val api: ValkyrisApi,
+    private val actionGate: MobileActionGate,
+) : ViewModel() {
     private val _invitation = MutableStateFlow(InvitationState())
     val invitation = _invitation.asStateFlow()
     private val _retention = MutableStateFlow(RetentionState())
@@ -38,11 +42,16 @@ class SettingsViewModel @Inject constructor(private val api: ValkyrisApi) : View
     }
 
     fun createInvitation() {
+        if (!actionGate.tryAcquire()) return
+        _invitation.value = InvitationState(loading = true)
         viewModelScope.launch {
-            _invitation.value = InvitationState(loading = true)
-            runCatching { api.createPairingSession() }
-                .onSuccess { _invitation.value = InvitationState(uri = api.invitationUri(it)) }
-                .onFailure { _invitation.value = InvitationState(error = it.message) }
+            try {
+                runCatching { api.createPairingSession() }
+                    .onSuccess { _invitation.value = InvitationState(uri = api.invitationUri(it)) }
+                    .onFailure { _invitation.value = InvitationState(error = it.message) }
+            } finally {
+                actionGate.release()
+            }
         }
     }
 
@@ -51,15 +60,19 @@ class SettingsViewModel @Inject constructor(private val api: ValkyrisApi) : View
     }
 
     fun saveRetention(value: RetentionSettings, onSuccess: () -> Unit) {
-        if (_retention.value.saving) return
+        if (!actionGate.tryAcquire()) return
+        _retention.value = _retention.value.copy(saving = true)
         viewModelScope.launch {
-            _retention.value = _retention.value.copy(saving = true)
-            runCatching { api.updateRetention(value) }
-                .onSuccess {
-                    _retention.value = RetentionState(value = it, loading = false)
-                    onSuccess()
-                }
-                .onFailure { _retention.value = _retention.value.copy(saving = false) }
+            try {
+                runCatching { api.updateRetention(value) }
+                    .onSuccess {
+                        _retention.value = RetentionState(value = it, loading = false)
+                        onSuccess()
+                    }
+                    .onFailure { _retention.value = _retention.value.copy(saving = false) }
+            } finally {
+                actionGate.release()
+            }
         }
     }
 }

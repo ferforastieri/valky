@@ -1,10 +1,18 @@
 package com.ferforastieri.valkyris.navigation
 
 import androidx.compose.foundation.layout.*
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideOutHorizontally
+import androidx.compose.foundation.gestures.detectHorizontalDragGestures
+import androidx.compose.foundation.clickable
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.getValue
+import kotlin.math.abs
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.stringResource
@@ -49,6 +57,7 @@ private val destinations = listOf(
 @Composable
 fun ValkyrisApp(main: MainViewModel) {
     val paired by main.paired.collectAsStateWithLifecycle()
+    val actionBusy by main.actionBusy.collectAsStateWithLifecycle()
     val admin by main.admin.collectAsStateWithLifecycle()
     val update by main.updateInfo.collectAsStateWithLifecycle()
     val updating by main.updating.collectAsStateWithLifecycle()
@@ -70,6 +79,17 @@ fun ValkyrisApp(main: MainViewModel) {
                     updating = updating,
                     onUpdate = main::startUpdate,
                     onDismiss = main::dismissUpdate,
+                )
+            }
+            if (actionBusy) {
+                Box(
+                    Modifier
+                        .matchParentSize()
+                        .clickable(
+                            interactionSource = remember { androidx.compose.foundation.interaction.MutableInteractionSource() },
+                            indication = null,
+                            onClick = {},
+                        ),
                 )
             }
         }
@@ -137,7 +157,32 @@ private fun ConnectedValkyrisApp(main: MainViewModel) {
             }
         },
     ) { padding ->
-        NavHost(nav, "overview", Modifier.padding(padding)) {
+        val contentModifier = Modifier
+            .padding(padding)
+            .pointerInput(selectedIndex) {
+                var dragDistance = 0f
+                detectHorizontalDragGestures(
+                    onDragStart = { dragDistance = 0f },
+                    onHorizontalDrag = { _, distance -> dragDistance += distance },
+                    onDragCancel = { dragDistance = 0f },
+                    onDragEnd = {
+                        if (selectedIndex >= 0 && abs(dragDistance) >= 84f) {
+                            val offset = if (dragDistance < 0) 1 else -1
+                            val next = (selectedIndex + offset + destinations.size) % destinations.size
+                            nav.openTopLevel(destinations[next].route)
+                        }
+                    },
+                )
+            }
+        NavHost(
+            navController = nav,
+            startDestination = "overview",
+            modifier = contentModifier,
+            enterTransition = { slideInHorizontally(animationSpec = tween(280)) { it / 5 } },
+            exitTransition = { slideOutHorizontally(animationSpec = tween(280)) { -it / 5 } },
+            popEnterTransition = { slideInHorizontally(animationSpec = tween(280)) { -it / 5 } },
+            popExitTransition = { slideOutHorizontally(animationSpec = tween(280)) { it / 5 } },
+        ) {
             composable("overview") { OverviewScreen(onCamera = { nav.navigate("camera/$it") }, onEvent = { nav.navigate("event/$it") }) }
             composable("cameras") { CamerasScreen(onCamera = { nav.navigate("camera/$it") }) }
             composable("camera/{id}") { CameraLiveScreen(cameraId = it.arguments?.getString("id").orEmpty()) }
@@ -156,6 +201,9 @@ private fun ConnectedValkyrisApp(main: MainViewModel) {
 }
 
 private fun NavHostController.openTopLevel(route: String) {
+    if (route == "cameras" && currentDestination?.route == "camera/{id}") {
+        if (popBackStack("cameras", inclusive = false)) return
+    }
     if (route == "overview") {
         if (!popBackStack("overview", inclusive = false) && currentDestination?.route != "overview") {
             navigate("overview") { launchSingleTop = true }

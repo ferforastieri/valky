@@ -2694,3 +2694,17 @@ body {
     width: calc(100% - 20px);
   }
 }
+
+/* Carousel uses the same stacked-screen motion as the hero previews. */
+.carousel-track .carousel-slide {
+  transition: transform 0.5s cubic-bezier(0.2, 0.8, 0.2, 1), opacity 0.35s ease, filter 0.35s ease;
+}
+.carousel-track .carousel-slide.is-active {
+  transform: translateX(-50%) translate(-4px, 0) rotate(4deg) scale(1);
+}
+.carousel-track .carousel-slide.is-prev {
+  transform: translateX(-50%) translate(-8px, 30px) rotate(-9deg) scale(0.92);
+}
+.carousel-track .carousel-slide.is-next {
+  transform: translateX(-50%) translate(8px, 30px) rotate(9deg) scale(0.92);
+}

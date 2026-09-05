@@ -2,6 +2,7 @@ package com.ferforastieri.valkyris.feature.rules
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.ferforastieri.valkyris.core.action.MobileActionGate
 import com.ferforastieri.valkyris.core.database.RuleEntity
 import com.ferforastieri.valkyris.core.model.DetectorKind
 import com.ferforastieri.valkyris.core.model.Rule
@@ -17,6 +18,7 @@ import kotlinx.coroutines.launch
 @HiltViewModel
 class RulesViewModel @Inject constructor(
     private val repository: ValkyrisRepository,
+    private val actionGate: MobileActionGate,
 ) : ViewModel() {
     val rules = repository.cachedRules().stateIn(
         viewModelScope,
@@ -42,13 +44,17 @@ class RulesViewModel @Inject constructor(
     }
 
     fun create(rule: Rule, onComplete: (Boolean) -> Unit) {
-        if (_creating.value) return
+        if (!actionGate.tryAcquire()) return
+        _creating.value = true
         viewModelScope.launch {
-            _creating.value = true
-            val result = runCatching { repository.createRule(rule) }
-            _creating.value = false
-            onComplete(result.isSuccess)
-            if (result.isSuccess) runCatching { repository.refreshRules() }
+            try {
+                val result = runCatching { repository.createRule(rule) }
+                if (result.isSuccess) runCatching { repository.refreshRules() }
+                onComplete(result.isSuccess)
+            } finally {
+                _creating.value = false
+                actionGate.release()
+            }
         }
     }
 }

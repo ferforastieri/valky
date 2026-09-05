@@ -22,7 +22,7 @@ test('controles e navegação possuem nomes acessíveis', async () => {
   assert.match(pt, /href="\/en"/);
   assert.match(en, /href="\/pt-BR"/);
   assert.match(pt, /class="language-menu"/);
-  assert.match(pt, /href="\/pt-BR#top"/);
+  assert.match(pt, /href="\/pt-BR"/);
   assert.match(pt, /class="floating-dock"/);
   assert.doesNotMatch(pt, /<header[\s>]/);
   assert.doesNotMatch(pt, /<footer[\s>]/);
@@ -104,7 +104,7 @@ test('documentação é uma rota separada, localizada e completa', async () => {
   assert.match(ptDocs, /\/api\/v1\/cameras/);
   assert.match(ptDocs, /\/api\/v1\/realtime/);
   assert.match(ptDocs, /href="\/openapi.yaml"/);
-  assert.match(ptDocs, /href="\/pt-BR#top"/);
+  assert.match(ptDocs, /href="\/pt-BR"/);
   assert.match(ptDocs, /href="\/pt-BR#app"/);
   assert.match(ptDocs, /href="\/pt-BR#install"/);
   assert.match(ptDocs, /href="\/pt-BR\/docs" aria-current="page"/);

@@ -95,6 +95,14 @@ func (s *Service) Acknowledge(ctx context.Context, id, device string) error {
 	return nil
 }
 
+func (s *Service) AcknowledgeAll(ctx context.Context, device string) (int64, error) {
+	result, err := s.store.DB.ExecContext(ctx, `UPDATE events SET acknowledged_at=?,acknowledged_by=? WHERE acknowledged_at IS NULL`, time.Now().UTC().Format(time.RFC3339Nano), device)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected()
+}
+
 type scanner interface{ Scan(...any) error }
 
 func scan(row scanner) (Event, error) {

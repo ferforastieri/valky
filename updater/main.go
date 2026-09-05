@@ -95,12 +95,17 @@ func (u *updater) run(version string) {
 		slog.Error("save backend version", "error", err)
 		return
 	}
-	if err := runCompose(installDir, composeFile, envFile, version, "up", "-d", "--no-build", "--remove-orphans", "valkyris", "mediamtx"); err != nil {
+	// The updater runs inside a container and talks to the host Docker daemon.
+	// Recreating MediaMTX from here would resolve relative bind mounts on the
+	// Docker host as /workspace, rather than the real installation directory.
+	// MediaMTX and its configuration are therefore updated by the host-side
+	// installer only.
+	if err := runCompose(installDir, composeFile, envFile, version, "up", "-d", "--no-build", "--no-deps", "--remove-orphans", "valkyris"); err != nil {
 		slog.Error("activate backend update", "error", err)
 		if previousVersion != "" && releasePattern.MatchString(previousVersion) {
 			restoreErr := setEnvValue(envFile, "VALKYRIS_VERSION", previousVersion)
 			if restoreErr == nil {
-				restoreErr = runCompose(installDir, composeFile, envFile, previousVersion, "up", "-d", "--no-build", "--remove-orphans", "valkyris", "mediamtx")
+				restoreErr = runCompose(installDir, composeFile, envFile, previousVersion, "up", "-d", "--no-build", "--no-deps", "--remove-orphans", "valkyris")
 			}
 			if restoreErr != nil {
 				slog.Error("restore previous backend version", "error", restoreErr)

@@ -19,7 +19,7 @@ const languagePath = (target: Locale) => current === 'docs' ? `/${target}/docs` 
     <span class="dock-identity"><strong>Valkyris</strong><small>© 2026 Fernando Forastieri · MIT</small></span>
   </a>
   <div class="dock-links">
-    <a class="dock-link" href={`${homePath}#top`} aria-current={current === 'home' ? 'page' : undefined}><House size={17}/><span>{t.nav[0]}</span></a>
+    <a class="dock-link" href={homePath} aria-current={current === "home" ? "page" : undefined}><House size={17}/><span>{t.nav[0]}</span></a>
     <a class="dock-link" href={sectionPath('app')}><Smartphone size={17}/><span>{t.nav[1]}</span></a>
     <a class="dock-link" href={sectionPath('install')}><Download size={17}/><span>{t.nav[2]}</span></a>
     <a class="dock-link" href={`/${locale}/docs`} aria-current={current === 'docs' ? 'page' : undefined}><BookOpen size={17}/><span>{t.nav[3]}</span></a>

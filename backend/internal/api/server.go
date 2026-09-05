@@ -118,6 +118,7 @@ func (s *Server) Handler() http.Handler {
 	protected.HandleFunc("POST /rules", s.createRule)
 	protected.HandleFunc("DELETE /rules/{id}", s.deleteRule)
 	protected.HandleFunc("GET /events", s.listEvents)
+	protected.HandleFunc("POST /events/acknowledge-all", s.ackAllEvents)
 	protected.HandleFunc("GET /events/{id}", s.getEvent)
 	protected.HandleFunc("POST /events/{id}/acknowledge", s.ackEvent)
 	protected.HandleFunc("GET /events/{id}/snapshot", s.eventSnapshot)
@@ -516,6 +517,16 @@ func (s *Server) ackEvent(w http.ResponseWriter, r *http.Request) {
 	s.hub.Broadcast(map[string]any{"type": "event.acknowledged", "eventId": r.PathValue("id")})
 	writeSuccess(w, http.StatusOK, "Event acknowledged successfully", nil)
 }
+func (s *Server) ackAllEvents(w http.ResponseWriter, r *http.Request) {
+	count, err := s.events.AcknowledgeAll(r.Context(), auth.DeviceID(r.Context()))
+	if err != nil {
+		respond(w, nil, err)
+		return
+	}
+	s.hub.Broadcast(map[string]any{"type": "events.acknowledged_all", "count": count})
+	writeSuccess(w, http.StatusOK, "Events acknowledged successfully", map[string]int64{"acknowledged": count})
+}
+
 func (s *Server) eventClip(w http.ResponseWriter, r *http.Request) {
 	e, err := s.events.Get(r.Context(), r.PathValue("id"))
 	if err != nil {

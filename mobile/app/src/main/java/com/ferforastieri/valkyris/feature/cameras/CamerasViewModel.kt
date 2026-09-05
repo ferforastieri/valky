@@ -6,6 +6,7 @@ import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.ferforastieri.valkyris.core.model.Camera
+import com.ferforastieri.valkyris.core.action.MobileActionGate
 import com.ferforastieri.valkyris.core.model.CreateCameraRequest
 import com.ferforastieri.valkyris.core.model.PTZCommand
 import com.ferforastieri.valkyris.core.media.DeviceMediaStore
@@ -42,7 +43,10 @@ data class CamerasState(
 )
 
 @HiltViewModel
-class CamerasViewModel @Inject constructor(private val repository: ValkyrisRepository) : ViewModel() {
+class CamerasViewModel @Inject constructor(
+    private val repository: ValkyrisRepository,
+    private val actionGate: MobileActionGate,
+) : ViewModel() {
     private val api = repository.api
     private val _state = MutableStateFlow(CamerasState())
     val state = _state.asStateFlow()
@@ -122,25 +126,30 @@ class CamerasViewModel @Inject constructor(private val repository: ValkyrisRepos
     }
 
     fun add(input: CreateCameraRequest) {
+        if (!actionGate.tryAcquire()) return
+        _state.update { it.copy(creating = true, error = null) }
         viewModelScope.launch {
-            _state.update { it.copy(creating = true, error = null) }
-            runCatching { repository.createCamera(input) }
-                .onSuccess { _state.update { it.copy(creating = false) } }
-                .onFailure { error -> _state.update { it.copy(creating = false, error = error.message) } }
+            try {
+                runCatching { repository.createCamera(input) }
+                    .onSuccess { _state.update { it.copy(creating = false) } }
+                    .onFailure { error -> _state.update { it.copy(creating = false, error = error.message) } }
+            } finally {
+                actionGate.release()
+            }
         }
     }
 
     fun delete(id: String) {
-        if (id in _state.value.deleting) return
+        if (id in _state.value.deleting || !actionGate.tryAcquire()) return
+        _state.update { it.copy(deleting = it.deleting + id, error = null) }
         viewModelScope.launch {
-            _state.update { it.copy(deleting = it.deleting + id, error = null) }
-            runCatching { repository.deleteCamera(id) }
-                .onSuccess {
-                    _state.update { it.copy(deleting = it.deleting - id, snapshots = it.snapshots - id) }
-                }
-                .onFailure { error ->
-                    _state.update { it.copy(deleting = it.deleting - id, error = error.message) }
-                }
+            try {
+                runCatching { repository.deleteCamera(id) }
+                    .onSuccess { _state.update { it.copy(deleting = it.deleting - id, snapshots = it.snapshots - id) } }
+                    .onFailure { error -> _state.update { it.copy(deleting = it.deleting - id, error = error.message) } }
+            } finally {
+                actionGate.release()
+            }
         }
     }
 
@@ -159,6 +168,7 @@ class CamerasViewModel @Inject constructor(private val repository: ValkyrisRepos
 class CameraLiveViewModel @Inject constructor(
     private val api: ValkyrisApi,
     private val deviceMedia: DeviceMediaStore,
+    private val actionGate: MobileActionGate,
     saved: SavedStateHandle,
 ) : ViewModel() {
     val id: String = checkNotNull(saved["id"])
@@ -172,6 +182,7 @@ class CameraLiveViewModel @Inject constructor(
     val preview = _preview.asStateFlow()
     private val ptzMutex = Mutex()
     private var realtime: okhttp3.WebSocket? = null
+
     init {
         realtime = api.realtime({ refresh() })
         viewModelScope.launch {
@@ -185,14 +196,15 @@ class CameraLiveViewModel @Inject constructor(
             }
         }
     }
+
     private fun refresh() {
         viewModelScope.launch { runCatching { api.cameras().firstOrNull { it.id == id } }.onSuccess { _camera.value = it } }
     }
+
     private fun loadPreview() {
         viewModelScope.launch(Dispatchers.IO) {
             runCatching {
-                val request = Request.Builder().url(api.snapshotUrl(id))
-                    .header("Authorization", "Bearer ${api.token()}").build()
+                val request = Request.Builder().url(api.snapshotUrl(id)).header("Authorization", "Bearer ${api.token()}").build()
                 api.mediaHttpClient().newCall(request).execute().use { response ->
                     if (!response.isSuccessful) return@runCatching null
                     val bytes = response.body.bytes()
@@ -201,49 +213,59 @@ class CameraLiveViewModel @Inject constructor(
             }.getOrNull()?.let { _preview.value = it }
         }
     }
+
     fun move(pan: Double, tilt: Double, zoom: Double = 0.0) {
         viewModelScope.launch { ptzMutex.withLock { runCatching { api.ptz(id, PTZCommand("move", pan, tilt, zoom)) } } }
     }
+
     fun stop() {
         viewModelScope.launch { ptzMutex.withLock { runCatching { api.ptz(id, PTZCommand("stop")) } } }
     }
+
     fun captureSnapshot() {
-        if (_snapshotLoading.value) return
+        if (!actionGate.tryAcquire()) return
+        _snapshotLoading.value = true
         viewModelScope.launch {
-            _snapshotLoading.value = true
-            val bytes = runCatching { api.downloadCameraSnapshot(id) }.getOrElse {
+            try {
+                val bytes = runCatching { api.downloadCameraSnapshot(id) }.getOrElse { return@launch }
+                runCatching { deviceMedia.savePhoto(bytes, mediaName("jpg")) }
+                    .onSuccess { api.announce(R.string.snapshot_saved) }
+                    .onFailure { api.announce(R.string.media_save_failed, false) }
+            } finally {
                 _snapshotLoading.value = false
-                return@launch
+                actionGate.release()
             }
-            runCatching { deviceMedia.savePhoto(bytes, mediaName("jpg")) }
-                .onSuccess { api.announce(R.string.snapshot_saved) }
-                .onFailure { api.announce(R.string.media_save_failed, false) }
-            _snapshotLoading.value = false
         }
     }
+
     fun recordRecentClip() {
-        if (_recordingLoading.value) return
+        if (!actionGate.tryAcquire()) return
+        _recordingLoading.value = true
         viewModelScope.launch {
-            _recordingLoading.value = true
-            val bytes = runCatching { api.downloadRecentRecording(id) }.getOrElse {
+            try {
+                val bytes = runCatching { api.downloadRecentRecording(id) }.getOrElse { return@launch }
+                runCatching { deviceMedia.saveVideo(bytes, mediaName("mp4")) }
+                    .onSuccess { api.announce(R.string.recording_saved) }
+                    .onFailure { api.announce(R.string.media_save_failed, false) }
+            } finally {
                 _recordingLoading.value = false
-                return@launch
+                actionGate.release()
             }
-            runCatching { deviceMedia.saveVideo(bytes, mediaName("mp4")) }
-                .onSuccess { api.announce(R.string.recording_saved) }
-                .onFailure { api.announce(R.string.media_save_failed, false) }
-            _recordingLoading.value = false
         }
     }
+
     fun storagePermissionDenied() = api.announce(R.string.storage_permission_required, false)
+
     private fun mediaName(extension: String): String {
-        val cameraName = _camera.value?.name.orEmpty().replace(Regex("[^A-Za-z0-9_-]+"), "-").trim('-').ifBlank { "camera" }
+        val cameraName = _camera.value?.name.orEmpty().replace(Regex("[^A-Za-z0-9_-]+"), "-").replace(Regex("^-+|-+$"), "").ifBlank { "camera" }
         val timestamp = LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyyMMdd-HHmmss"))
         return "Valkyris-$cameraName-$timestamp.$extension"
     }
+
     fun liveUrl() = api.liveUrl(id)
     fun token() = api.token()
     fun httpClient() = api.mediaHttpClient()
+
     override fun onCleared() {
         realtime?.close(1000, "camera detail closed")
         super.onCleared()

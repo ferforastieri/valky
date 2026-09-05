@@ -54,6 +54,10 @@ class ValkyrisRepository @Inject constructor(
         api.acknowledge(eventId)
     }
 
+    suspend fun acknowledgeAll() {
+        api.acknowledgeAll()
+    }
+
     suspend fun createRule(rule: Rule): Rule {
         val created = api.createRule(rule)
         dao.saveRule(created.toEntity())

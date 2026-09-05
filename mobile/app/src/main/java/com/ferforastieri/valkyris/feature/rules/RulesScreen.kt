@@ -38,7 +38,7 @@ fun RulesScreen(vm: RulesViewModel = hiltViewModel()) {
     val detectors = vm.detectors.collectAsStateWithLifecycle().value
     val creating = vm.creating.collectAsStateWithLifecycle().value
     var show by remember { mutableStateOf(false) }
-    RulesContent(rules, cameras.isNotEmpty() && detectors.isNotEmpty(), creating, onAdd = { show = true })
+    RulesContent(rules, cameras.isNotEmpty() && detectors.isNotEmpty(), creating, onAdd = { if (!creating) show = true })
     if (show) QuickRuleDialog(cameras, detectors, creating, onDismiss = { if (!creating) show = false }) {
         vm.create(it) { success -> if (success) show = false }
     }
@@ -71,7 +71,7 @@ fun RulesContent(
       }
       if (canAdd) {
           FloatingActionButton(
-              onClick = onAdd,
+              onClick = { if (!creating) onAdd() },
               modifier = Modifier.align(Alignment.BottomEnd).padding(end = 20.dp, bottom = 18.dp),
               containerColor = MaterialTheme.colorScheme.secondary,
               contentColor = MaterialTheme.colorScheme.onSecondary,

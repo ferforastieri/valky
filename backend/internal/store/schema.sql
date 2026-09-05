@@ -45,6 +45,9 @@ CREATE TABLE IF NOT EXISTS rules (
   created_at TEXT NOT NULL,
   updated_at TEXT NOT NULL
 );
+CREATE UNIQUE INDEX IF NOT EXISTS idx_rules_idempotency
+  ON rules(camera_id,name,detector_types_json,min_confidence,confirmations,cooldown_seconds,schedule_json,actions_json);
+
 
 CREATE TABLE IF NOT EXISTS events (
   id TEXT PRIMARY KEY,

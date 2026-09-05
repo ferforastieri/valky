@@ -242,6 +242,17 @@ class ValkyrisApi(
         }
     }
 
+    suspend fun acknowledgeAll(announce: Boolean = true) {
+        val current = requireNotNull(session())
+        executeUnit(
+            current.fingerprint,
+            successNotice = R.string.notice_events_acknowledged.takeIf { announce },
+            announceError = announce,
+        ) {
+            it.post(base() + "/events/acknowledge-all") { bearerAuth(current.token) }
+        }
+    }
+
     suspend fun ptz(cameraId: String, command: PTZCommand) {
         val current = requireNotNull(session())
         executeUnit(current.fingerprint, announceError = true) {

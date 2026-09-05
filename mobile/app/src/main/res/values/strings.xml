@@ -208,6 +208,8 @@
     <string name="error_server">O servidor não conseguiu concluir a ação.</string>
     <string name="error_timeout">O servidor demorou demais para responder.</string>
     <string name="error_connection_interrupted">A conexão com o servidor foi interrompida.</string>
+    <string name="mark_all_read">Marcar todas como lidas</string>
+    <string name="notice_events_acknowledged">Todos os eventos foram reconhecidos.</string>
     <string name="error_connection">Não foi possível conectar ao servidor Valkyris.</string>
     <string name="error_action_failed">Não foi possível concluir esta ação.</string>
 </resources>
