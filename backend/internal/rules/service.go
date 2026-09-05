@@ -81,7 +81,8 @@ func canonicalStrings(values []string) []string {
 }
 
 func canonicalInts(values []int) []int {
-	canonical := append([]int(nil), values...)
+	canonical := make([]int, 0, len(values))
+	canonical = append(canonical, values...)
 	sort.Ints(canonical)
 	if len(canonical) == 0 {
 		return canonical
@@ -189,6 +190,9 @@ func scanRule(row scanner) (Rule, error) {
 	}
 	_ = json.Unmarshal([]byte(detector), &r.DetectorTypes)
 	_ = json.Unmarshal([]byte(schedule), &r.Schedule)
+	if r.Schedule.Days == nil {
+		r.Schedule.Days = []int{}
+	}
 	_ = json.Unmarshal([]byte(actions), &r.Actions)
 	r.Enabled = enabled == 1
 	r.LastTriggeredAt = store.NullTime(last)

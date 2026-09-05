@@ -1,9 +1,6 @@
 package com.ferforastieri.valkyris.navigation
 
 import androidx.compose.foundation.layout.*
-import androidx.compose.animation.core.tween
-import androidx.compose.animation.slideInHorizontally
-import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.clickable
 import androidx.compose.material3.*
@@ -178,10 +175,6 @@ private fun ConnectedValkyrisApp(main: MainViewModel) {
             navController = nav,
             startDestination = "overview",
             modifier = contentModifier,
-            enterTransition = { slideInHorizontally(animationSpec = tween(280)) { it / 5 } },
-            exitTransition = { slideOutHorizontally(animationSpec = tween(280)) { -it / 5 } },
-            popEnterTransition = { slideInHorizontally(animationSpec = tween(280)) { -it / 5 } },
-            popExitTransition = { slideOutHorizontally(animationSpec = tween(280)) { it / 5 } },
         ) {
             composable("overview") { OverviewScreen(onCamera = { nav.navigate("camera/$it") }, onEvent = { nav.navigate("event/$it") }) }
             composable("cameras") { CamerasScreen(onCamera = { nav.navigate("camera/$it") }) }

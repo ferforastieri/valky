@@ -37,7 +37,7 @@ class ValkyrisApi(
     private val session: () -> Session?,
     private val resolveString: (Int) -> String,
 ) {
-    private val json = Json { ignoreUnknownKeys = true; explicitNulls = false }
+    private val json = Json { ignoreUnknownKeys = true; explicitNulls = false; coerceInputValues = true }
     private val _notices = MutableSharedFlow<ApiNotice>(extraBufferCapacity = 32)
     val notices = _notices.asSharedFlow()
     private val apiClients = ConcurrentHashMap<String, HttpClient>()

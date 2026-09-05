@@ -35,6 +35,13 @@ func TestConfirmationsConfidenceAndCooldown(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	if rule.Schedule.Days == nil {
+		t.Fatal("created rule serialized an empty schedule as null")
+	}
+	listed, err := service.List(context.Background(), "cam")
+	if err != nil || len(listed) != 1 || listed[0].Schedule.Days == nil {
+		t.Fatalf("rule list did not normalize empty schedule days: %#v err=%v", listed, err)
+	}
 	now := time.Now().UTC()
 	if matched, _ := service.Match(context.Background(), Detection{CameraID: "cam", Type: "baby_cry", Confidence: .7, OccurredAt: now}); len(matched) != 0 {
 		t.Fatal("below-threshold detection matched")
