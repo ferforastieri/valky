@@ -92,3 +92,39 @@ func TestCreateIsIdempotent(t *testing.T) {
 		t.Fatalf("expected one rule, got %d", count)
 	}
 }
+
+func TestSimpleRuleTriggersOnceWithoutUserTuning(t *testing.T) {
+	db, err := store.Open(t.TempDir() + "/rules.db")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db.Close()
+	now := time.Now().UTC()
+	stamp := now.Format(time.RFC3339Nano)
+	if _, err = db.DB.Exec(`INSERT INTO cameras(id,name,host,username_enc,password_enc,rtsp_uri_enc,created_at,updated_at) VALUES('cam','Room','10.0.0.3',x'01',x'01',x'01',?,?)`, stamp, stamp); err != nil {
+		t.Fatal(err)
+	}
+	s := NewService(db)
+	for _, kind := range []string{"motion", "baby_cry", "dog_bark"} {
+		rule, err := s.Create(context.Background(), Rule{CameraID: "cam", Name: kind, DetectorTypes: []string{kind}})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if rule.Confirmations != 1 {
+			t.Fatalf("requires extra confirmations: %#v", rule)
+		}
+		d := Detection{CameraID: "cam", Type: kind, Confidence: .9, OccurredAt: now}
+		if kind == "motion" {
+			d.Confidence = .15
+			d.Metadata = map[string]any{"source": "visual_fallback"}
+		}
+		matched, err := s.Match(context.Background(), d)
+		if err != nil || len(matched) != 1 {
+			t.Fatalf("%s did not trigger: %#v %v", kind, matched, err)
+		}
+		matched, err = s.Match(context.Background(), d)
+		if err != nil || len(matched) != 0 {
+			t.Fatalf("%s cooldown failed: %#v %v", kind, matched, err)
+		}
+	}
+}

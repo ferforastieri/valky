@@ -16,6 +16,7 @@ import androidx.core.app.NotificationManagerCompat
 import androidx.core.content.ContextCompat
 import com.ferforastieri.valkyris.MainActivity
 import com.ferforastieri.valkyris.R
+import com.ferforastieri.valkyris.core.model.detectorLabelRes
 import dagger.hilt.android.qualifiers.ApplicationContext
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -41,6 +42,7 @@ class AlarmNotifier @Inject constructor(@param:ApplicationContext private val co
     }
 
     fun show(eventId: String, cameraId: String, type: String, confidence: Double, alarm: Boolean, opensCamera: Boolean) {
+        createChannels()
         if (Build.VERSION.SDK_INT >= 33 && ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) return
         val eventIntent = PendingIntent.getActivity(
             context,
@@ -65,8 +67,8 @@ class AlarmNotifier @Inject constructor(@param:ApplicationContext private val co
         val canUseFullScreen = !alarm || Build.VERSION.SDK_INT < 34 || manager.canUseFullScreenIntent()
         val notification = NotificationCompat.Builder(context, if (alarm) ALARMS else EVENTS)
             .setSmallIcon(R.drawable.ic_notification)
-            .setContentTitle(type.replace('_', ' ').replaceFirstChar { it.uppercase() })
-            .setContentText("${(confidence * 100).toInt()}% · Valkyris")
+            .setContentTitle(context.getString(detectorLabelRes(type)))
+            .setContentText(context.getString(if (alarm) R.string.notification_alarm_body else R.string.notification_event_body))
             .setContentIntent(open)
             .setOngoing(true)
             .setAutoCancel(false)
@@ -74,6 +76,7 @@ class AlarmNotifier @Inject constructor(@param:ApplicationContext private val co
             .setCategory(if (alarm) NotificationCompat.CATEGORY_ALARM else NotificationCompat.CATEGORY_EVENT)
             .setNumber(1)
             .setGroup(EVENT_GROUP)
+            .setGroupAlertBehavior(NotificationCompat.GROUP_ALERT_CHILDREN)
             .setBadgeIconType(NotificationCompat.BADGE_ICON_SMALL)
             .apply {
                 if (cameraId.isNotBlank() && !opensCamera) addAction(0, context.getString(R.string.open_camera), cameraIntent)
@@ -108,6 +111,7 @@ class AlarmNotifier @Inject constructor(@param:ApplicationContext private val co
             .setContentText(context.getString(R.string.pending_alerts))
             .setGroup(EVENT_GROUP)
             .setGroupSummary(true)
+            .setGroupAlertBehavior(NotificationCompat.GROUP_ALERT_CHILDREN)
             .setNumber(count)
             .setBadgeIconType(NotificationCompat.BADGE_ICON_SMALL)
             .setOnlyAlertOnce(true)

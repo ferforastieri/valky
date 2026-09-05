@@ -181,9 +181,26 @@ func (s *Service) deliver(ctx context.Context, id string, attempts int, endpoint
 		return
 	}
 	defer resp.Body.Close()
-	_, _ = io.Copy(io.Discard, io.LimitReader(resp.Body, 4096))
+	responseBody, _ := io.ReadAll(io.LimitReader(resp.Body, 4096))
 	if resp.StatusCode/100 != 2 {
-		s.fail(ctx, id, attempts, fmt.Errorf("push endpoint returned %s", resp.Status))
+		// Persist only structured codes, never tokens or the raw response body.
+		var failure struct {
+			Error struct {
+				Status  string `json:"status"`
+				Details []struct {
+					ErrorCode string `json:"errorCode"`
+				} `json:"details"`
+			} `json:"error"`
+		}
+		_ = json.Unmarshal(responseBody, &failure)
+		code := failure.Error.Status
+		for _, detail := range failure.Error.Details {
+			if detail.ErrorCode != "" {
+				code = detail.ErrorCode
+				break
+			}
+		}
+		s.fail(ctx, id, attempts, fmt.Errorf("FCM returned %s (%s)", resp.Status, code))
 		return
 	}
 	_, _ = s.store.DB.ExecContext(ctx, `UPDATE push_deliveries SET delivered_at=?,attempts=attempts+1,last_error=NULL WHERE id=?`, time.Now().UTC().Format(time.RFC3339Nano), id)

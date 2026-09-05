@@ -23,7 +23,7 @@ import com.ferforastieri.valkyris.core.model.Rule
 import com.ferforastieri.valkyris.core.model.RuleActions
 import com.ferforastieri.valkyris.core.model.RuleSchedule
 import java.time.ZoneId
-import kotlin.math.roundToInt
+import com.ferforastieri.valkyris.core.model.detectorLabelRes
 import com.composables.icons.lucide.Lucide
 import com.composables.icons.lucide.Mic
 import com.composables.icons.lucide.Plus
@@ -86,8 +86,6 @@ fun RulesContent(
 @Composable
 private fun RuleCard(rule: com.ferforastieri.valkyris.core.database.RuleEntity) {
     val identifiers = rule.detectorTypes.split(',').map(String::trim).filter(String::isNotBlank)
-    val detectorNames = mutableListOf<String>()
-    for (identifier in identifiers) detectorNames += detectorLabel(identifier)
     val critical = identifiers.any { it in setOf("scream", "glass_break", "smoke_alarm", "fire_alarm", "siren", "tamper") }
     val motion = identifiers.any { it == "motion" || it == "person" || it == "tamper" }
     val icon: ImageVector = when {
@@ -134,36 +132,11 @@ private fun RuleCard(rule: com.ferforastieri.valkyris.core.database.RuleEntity) 
                     }
                 }
                 Text(description, color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodySmall)
-                Text(
-                    stringResource(R.string.rule_detects, detectorNames.joinToString(" · ")),
-                    color = accent,
-                    style = MaterialTheme.typography.labelMedium,
-                    fontWeight = FontWeight.Medium,
-                )
             }
         }
     }
 }
 
-@Composable
-private fun detectorLabel(identifier: String): String = stringResource(
-    when (identifier) {
-        "motion" -> R.string.detector_motion
-        "person" -> R.string.detector_person
-        "tamper" -> R.string.detector_tamper
-        "baby_cry" -> R.string.detector_baby_cry
-        "crying" -> R.string.detector_crying
-        "scream" -> R.string.detector_scream
-        "glass_break" -> R.string.detector_glass_break
-        "smoke_alarm" -> R.string.detector_smoke_alarm
-        "fire_alarm" -> R.string.detector_fire_alarm
-        "siren" -> R.string.detector_siren
-        "doorbell" -> R.string.detector_doorbell
-        "knock" -> R.string.detector_knock
-        "dog_bark" -> R.string.detector_dog_bark
-        else -> R.string.detector_other
-    },
-)
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -171,8 +144,6 @@ private fun QuickRuleDialog(cameras: List<Camera>, detectors: List<DetectorKind>
     var camera by remember { mutableStateOf(cameras.firstOrNull()) }
     var detector by remember { mutableStateOf(detectors.firstOrNull()) }
     var name by remember { mutableStateOf("") }
-    var confidence by remember { mutableFloatStateOf(.65f) }
-    var confirmations by remember { mutableStateOf("2") }
     var cooldown by remember { mutableStateOf("60") }
     var scheduleStart by remember { mutableStateOf("") }
     var scheduleEnd by remember { mutableStateOf("") }
@@ -193,7 +164,7 @@ private fun QuickRuleDialog(cameras: List<Camera>, detectors: List<DetectorKind>
             Button(
                 onClick = {
                     val schedule = if (scheduleStart.isBlank()) RuleSchedule() else RuleSchedule((0..6).toList(), scheduleStart, scheduleEnd, ZoneId.systemDefault().id)
-                    onSave(Rule(cameraId = checkNotNull(camera).id, name = name, detectorTypes = listOf(checkNotNull(detector).id), minConfidence = confidence.toDouble(), confirmations = confirmations.toIntOrNull() ?: 2, cooldownSeconds = cooldown.toIntOrNull() ?: 60, schedule = schedule, actions = RuleActions(record, notify, alarm)))
+                    onSave(Rule(cameraId = checkNotNull(camera).id, name = name, detectorTypes = listOf(checkNotNull(detector).id), confirmations = 1, cooldownSeconds = cooldown.toIntOrNull() ?: 60, schedule = schedule, actions = RuleActions(record, notify, alarm)))
                 },
                 enabled = !saving && camera != null && detector != null && name.isNotBlank() && scheduleValid,
             ) {
@@ -209,15 +180,10 @@ private fun QuickRuleDialog(cameras: List<Camera>, detectors: List<DetectorKind>
                 }
                 OutlinedTextField(name, { name = it }, label = { Text(stringResource(R.string.rule_name)) }, modifier = Modifier.fillMaxWidth())
                 ExposedDropdownMenuBox(detectorExpanded, { detectorExpanded = it }) {
-                    OutlinedTextField(detector?.label.orEmpty(), {}, readOnly = true, label = { Text(stringResource(R.string.detector)) }, trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(detectorExpanded) }, modifier = Modifier.menuAnchor(MenuAnchorType.PrimaryNotEditable).fillMaxWidth())
-                    ExposedDropdownMenu(detectorExpanded, { detectorExpanded = false }) { detectors.forEach { item -> DropdownMenuItem({ Text(item.label) }, { detector = item; detectorExpanded = false }) } }
+                    OutlinedTextField(detector?.let { stringResource(detectorLabelRes(it.id)) }.orEmpty(), {}, readOnly = true, label = { Text(stringResource(R.string.detector)) }, trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(detectorExpanded) }, modifier = Modifier.menuAnchor(MenuAnchorType.PrimaryNotEditable).fillMaxWidth())
+                    ExposedDropdownMenu(detectorExpanded, { detectorExpanded = false }) { detectors.forEach { item -> DropdownMenuItem({ Text(stringResource(detectorLabelRes(item.id))) }, { detector = item; detectorExpanded = false }) } }
                 }
-                Text("${stringResource(R.string.confidence)}: ${(confidence * 100).roundToInt()}%", style = MaterialTheme.typography.labelLarge)
-                Slider(confidence, { confidence = it }, valueRange = .4f..1f)
-                Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                    OutlinedTextField(confirmations, { confirmations = it.filter(Char::isDigit).take(2) }, label = { Text(stringResource(R.string.confirmations)) }, modifier = Modifier.weight(1f))
-                    OutlinedTextField(cooldown, { cooldown = it.filter(Char::isDigit).take(5) }, label = { Text(stringResource(R.string.cooldown_seconds)) }, modifier = Modifier.weight(1f))
-                }
+                OutlinedTextField(cooldown, { cooldown = it.filter(Char::isDigit).take(5) }, label = { Text(stringResource(R.string.cooldown_seconds)) }, modifier = Modifier.fillMaxWidth())
                 OutlinedTextField(scheduleStart, { scheduleStart = it.take(5) }, label = { Text(stringResource(R.string.schedule_start)) }, modifier = Modifier.fillMaxWidth())
                 OutlinedTextField(scheduleEnd, { scheduleEnd = it.take(5) }, label = { Text(stringResource(R.string.schedule_end)) }, modifier = Modifier.fillMaxWidth())
                 RuleActionRow(record, { record = it }, stringResource(R.string.record_media))

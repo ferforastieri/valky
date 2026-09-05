@@ -1,4 +1,6 @@
 <resources>
+    <string name="notification_alarm_body">Attention needed. Tap to open the alert.</string>
+    <string name="notification_event_body">Activity detected. Tap to view details.</string>
     <string name="app_name">Valkyris</string>
     <string name="tagline">Your home speaks. Your data stays.</string>
     <string name="login_title">Sign in to your home</string>

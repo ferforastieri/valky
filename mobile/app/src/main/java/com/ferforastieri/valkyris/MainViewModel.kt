@@ -129,6 +129,8 @@ class MainViewModel @Inject constructor(
 
     fun signOut() { sessions.clear(); _admin.value = false; _paired.value = false; _updateInfo.value = null }
 
+    fun refreshPushRegistration() { if (_paired.value) push.registerCurrent() }
+
     fun checkForUpdates(force: Boolean = false) {
         if (!_paired.value) return
         val now = android.os.SystemClock.elapsedRealtime()

@@ -117,7 +117,7 @@ func (m *Monitor) monitorAudio(ctx context.Context, cameraID string) {
 		if err == nil {
 			results, classifyErr := m.Classifier.Classify(ctx, window)
 			if classifyErr == nil {
-				for _, result := range results {
+				for _, result := range uniqueResults(results) {
 					if result.Confidence >= 0.05 {
 						m.submit(ctx, rules.Detection{CameraID: cameraID, Type: result.Type, Confidence: result.Confidence, OccurredAt: time.Now().UTC(), Metadata: map[string]any{"source": "sherpa-onnx"}})
 					}
@@ -125,6 +125,8 @@ func (m *Monitor) monitorAudio(ctx context.Context, cameraID string) {
 			} else if ctx.Err() == nil {
 				m.Logger.Warn("classify audio", "camera", cameraID, "error", classifyErr)
 			}
+		} else if ctx.Err() == nil {
+			m.Logger.Warn("capture detector audio", "camera", cameraID, "error", err)
 		}
 		if !wait(ctx, 2*time.Second) {
 			return

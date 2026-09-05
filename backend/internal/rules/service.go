@@ -39,7 +39,7 @@ func (s *Service) Create(ctx context.Context, r Rule) (Rule, error) {
 		return r, fmt.Errorf("minConfidence must be between 0 and 1")
 	}
 	if r.Confirmations < 1 {
-		r.Confirmations = 2
+		r.Confirmations = 1
 	}
 	if r.CooldownSeconds < 1 {
 		r.CooldownSeconds = 60
@@ -154,7 +154,10 @@ func (s *Service) Match(ctx context.Context, d Detection) ([]Rule, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	for _, r := range all {
-		if !r.Enabled || d.Confidence < r.MinConfidence || !contains(r.DetectorTypes, d.Type) || !activeAt(r.Schedule, d.OccurredAt) {
+		// Video fallback reports a changed-pixel fraction, not an audio model
+		// probability. Its own motion threshold has already been applied.
+		visualMotion := d.Type == "motion" && d.Metadata["source"] == "visual_fallback"
+		if !r.Enabled || (!visualMotion && d.Confidence < r.MinConfidence) || !contains(r.DetectorTypes, d.Type) || !activeAt(r.Schedule, d.OccurredAt) {
 			continue
 		}
 		if r.LastTriggeredAt != nil && d.OccurredAt.Sub(*r.LastTriggeredAt) < time.Duration(r.CooldownSeconds)*time.Second {

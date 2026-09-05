@@ -39,6 +39,8 @@
     <string name="notification_channel_events">Alertas da casa</string>
     <string name="notification_channel_alarm">Alarmes críticos</string>
     <string name="notification_ready">Notificações prontas</string>
+    <string name="notification_alarm_body">Atenção necessária. Toque para abrir o alerta.</string>
+    <string name="notification_event_body">Atividade detectada. Toque para ver os detalhes.</string>
     <string name="alert_readiness_title">Deixe os alertas prontos</string>
     <string name="alert_readiness_body">O Valkyris precisa destes acessos para avisar mesmo com a tela bloqueada ou o celular em modo silencioso.</string>
     <string name="configure_permission">Configurar %1$s</string>

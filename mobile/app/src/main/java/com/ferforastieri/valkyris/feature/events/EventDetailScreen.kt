@@ -36,7 +36,7 @@ import com.composables.icons.lucide.Lucide
         val value=event
         if(value==null){Box(Modifier.fillMaxSize()){CircularProgressIndicator(Modifier.align(Alignment.Center))};return@Column}
         Column(Modifier.fillMaxSize().padding(horizontal=18.dp),verticalArrangement=Arrangement.spacedBy(14.dp)){
-            Text(value.type.replace('_',' ').replaceFirstChar{it.uppercase()},style=MaterialTheme.typography.headlineMedium,fontWeight=FontWeight.SemiBold)
+            Text(stringResource(com.ferforastieri.valkyris.core.model.detectorLabelRes(value.type)),style=MaterialTheme.typography.headlineMedium,fontWeight=FontWeight.SemiBold)
             Text("${(value.confidence*100).toInt()}% · ${value.occurredAt}",color=MaterialTheme.colorScheme.onSurfaceVariant)
             snapshot?.let{Surface(shape=RoundedCornerShape(20.dp)){Image(it.asImageBitmap(),null,Modifier.fillMaxWidth().aspectRatio(16/9f),contentScale=ContentScale.Crop)}}
             if(player!=null)AndroidView(factory={PlayerView(it).apply{this.player=player;useController=true;layoutParams=ViewGroup.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT,ViewGroup.LayoutParams.MATCH_PARENT)}},modifier=Modifier.fillMaxWidth().aspectRatio(16/9f))

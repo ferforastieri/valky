@@ -12,5 +12,5 @@ var Catalog = []Kind{
 }
 
 var AudioLabels = map[string]string{
-	"Baby cry, infant cry": "baby_cry", "Crying, sobbing": "crying", "Screaming": "scream", "Glass": "glass_break", "Glass breaking": "glass_break", "Smoke detector, smoke alarm": "smoke_alarm", "Fire alarm": "fire_alarm", "Siren": "siren", "Doorbell": "doorbell", "Knock": "knock", "Dog": "dog_bark", "Bark": "dog_bark",
+	"Baby cry, infant cry": "baby_cry", "Crying, sobbing": "crying", "Screaming": "scream", "Shatter": "glass_break", "Glass breaking": "glass_break", "Smoke detector, smoke alarm": "smoke_alarm", "Fire alarm": "fire_alarm", "Siren": "siren", "Doorbell": "doorbell", "Knock": "knock", "Bark": "dog_bark",
 }

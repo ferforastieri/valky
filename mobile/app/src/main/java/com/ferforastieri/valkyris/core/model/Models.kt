@@ -8,7 +8,7 @@ import kotlinx.serialization.Serializable
 @Serializable data class ValkyrisEvent(val id:String,val cameraId:String,val ruleId:String?=null,val type:String,val confidence:Double,val occurredAt:String,val snapshotPath:String?=null,val clipPath:String?=null,val acknowledgedAt:String?=null)
 @Serializable data class RuleActions(val record:Boolean=true,val notify:Boolean=true,val alarm:Boolean=false)
 @Serializable data class RuleSchedule(val days:List<Int> = emptyList(),val start:String="",val end:String="",val timezone:String="")
-@Serializable data class Rule(val id:String="",val cameraId:String,val name:String,val detectorTypes:List<String>,val minConfidence:Double=.65,val confirmations:Int=2,val cooldownSeconds:Int=60,val schedule:RuleSchedule=RuleSchedule(),val actions:RuleActions=RuleActions(),val enabled:Boolean=true)
+@Serializable data class Rule(val id:String="",val cameraId:String,val name:String,val detectorTypes:List<String>,val minConfidence:Double=.65,val confirmations:Int=1,val cooldownSeconds:Int=60,val schedule:RuleSchedule=RuleSchedule(),val actions:RuleActions=RuleActions(),val enabled:Boolean=true)
 @Serializable data class DetectorKind(val id:String,val label:String,val source:String)
 @Serializable data class AuthStatus(val initialized:Boolean)
 @Serializable data class LoginRequest(val password:String,val deviceName:String,val locale:String)

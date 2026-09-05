@@ -59,7 +59,9 @@ func (s *Service) Submit(ctx context.Context, d rules.Detection) ([]event.Event,
 		created = append(created, e)
 		s.Hub.Broadcast(map[string]any{"type": "event.created", "event": e})
 		if rule.Actions.Notify || rule.Actions.Alarm {
-			_ = s.Notify.Enqueue(ctx, e)
+			if err := s.Notify.Enqueue(ctx, e); err != nil {
+				s.Logger.Error("enqueue event notification", "event", e.ID, "error", err)
+			}
 		}
 		if rule.Actions.Record {
 			s.queueCapture(e)

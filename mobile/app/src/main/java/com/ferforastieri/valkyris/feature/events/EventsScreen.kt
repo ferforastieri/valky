@@ -121,7 +121,7 @@ private fun EventCard(event: EventEntity, onOpen: () -> Unit, onCamera: () -> Un
             }
             Spacer(Modifier.width(12.dp))
             Column(Modifier.weight(1f)) {
-                Text(event.type.replace('_', ' ').replaceFirstChar { it.uppercase() }, fontWeight = FontWeight.SemiBold)
+                Text(stringResource(com.ferforastieri.valkyris.core.model.detectorLabelRes(event.type)), fontWeight = FontWeight.SemiBold)
                 Text(formatTime(event.occurredAt), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 Text("${(event.confidence * 100).toInt()}% confidence", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }

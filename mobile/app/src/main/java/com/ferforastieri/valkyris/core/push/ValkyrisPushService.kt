@@ -1,6 +1,7 @@
 package com.ferforastieri.valkyris.core.push
 
 import android.util.Base64
+import android.util.Log
 import com.ferforastieri.valkyris.core.alarm.AlarmNotifier
 import com.google.firebase.messaging.FirebaseMessagingService
 import com.google.firebase.messaging.RemoteMessage
@@ -31,10 +32,10 @@ class ValkyrisPushService : FirebaseMessagingService() {
                 cameraId = payload.optString("cameraId"),
                 type = payload.optString("type", "event"),
                 confidence = payload.optDouble("confidence", 0.0),
-                alarm = payload.optBoolean("alarm", true),
+                alarm = payload.optBoolean("alarm", false),
                 opensCamera = payload.optString("target", "event") == "camera",
             )
-        }
+        }.onFailure { Log.w("ValkyrisPush", "Cannot display encrypted alert: ${it.javaClass.simpleName}") }
     }
 
     private fun open(encoded: String, secret: String): ByteArray {

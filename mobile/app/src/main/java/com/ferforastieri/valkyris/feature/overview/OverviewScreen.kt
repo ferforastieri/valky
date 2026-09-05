@@ -177,7 +177,7 @@ fun OverviewContent(
                         }
                         Spacer(Modifier.width(12.dp))
                         Column(Modifier.weight(1f)) {
-                            Text(event.type.replace('_', ' ').replaceFirstChar { it.uppercase() }, fontWeight = FontWeight.Medium)
+                            Text(stringResource(com.ferforastieri.valkyris.core.model.detectorLabelRes(event.type)), fontWeight = FontWeight.Medium)
                             Text(overviewTime(event.occurredAt), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                         }
                         Text("${(event.confidence * 100).toInt()}%", style = MaterialTheme.typography.labelMedium)
