@@ -1252,7 +1252,7 @@ body {
 @media (max-width: 760px) {
   body {
     padding-top: 0;
-    padding-bottom: 88px;
+    padding-bottom: 76px;
   }
   .floating-dock {
     top: auto;
