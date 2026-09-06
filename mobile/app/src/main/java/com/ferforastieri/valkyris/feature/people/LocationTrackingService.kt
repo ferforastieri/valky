@@ -9,7 +9,6 @@ import android.content.Context
 import android.content.Intent
 import android.content.SharedPreferences
 import android.content.pm.PackageManager
-import android.graphics.Color
 import android.location.Address
 import android.location.Geocoder
 import android.location.Location
@@ -143,7 +142,7 @@ class LocationTrackingService : Service(), LocationListener {
 
     private fun notification() = NotificationCompat.Builder(this, CHANNEL_ID)
         .setSmallIcon(R.drawable.ic_notification)
-        .setColor(Color.rgb(91, 91, 214))
+        .setColorized(false)
         .setCategory(NotificationCompat.CATEGORY_SERVICE)
         .setContentTitle("Valkyris · localização ativa")
         .setContentText("Este telefone aparece no mapa da família.")

@@ -22,11 +22,6 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         installSplashScreen()
         super.onCreate(savedInstanceState)
-        @Suppress("DEPRECATION")
-        setTaskDescription(android.app.ActivityManager.TaskDescription(
-            getString(com.ferforastieri.valkyris.R.string.app_name),
-            android.graphics.BitmapFactory.decodeResource(resources, com.ferforastieri.valkyris.R.drawable.valkyris_mark),
-        ))
         apkInstaller = ApkInstaller(this)
         viewModel.acceptLaunch(intent?.data, intent?.getStringExtra("eventId"), intent?.getStringExtra("cameraId"))
         enableEdgeToEdge()

@@ -44,8 +44,7 @@ CREATE TABLE IF NOT EXISTS rules (
   created_at TEXT NOT NULL,
   updated_at TEXT NOT NULL
 );
-CREATE UNIQUE INDEX IF NOT EXISTS idx_rules_idempotency
-  ON rules(camera_id,name,detector_types_json,confirmations,cooldown_seconds,schedule_json,actions_json);
+-- Rule idempotency is indexed after column migrations in store.Open.
 
 
 CREATE TABLE IF NOT EXISTS events (

@@ -122,7 +122,7 @@ fun PeopleScreen(vm: PeopleViewModel = hiltViewModel()) {
             }
         },
     )
-    placeEditor?.let { place -> PlaceEditor(place, busy, { placeEditor = null }) { value ->
+    placeEditor?.let { place -> AreaEditorSheet(busy, GeoPoint(place.latitude, place.longitude), { placeEditor = null }, initial = place) { value ->
         val done: (Boolean) -> Unit = { if (it) placeEditor = null }
         if (value.id.isBlank()) vm.createPlace(value, done) else vm.updatePlace(value, done)
     } }
@@ -192,25 +192,27 @@ private fun AreaEditorSheet(
     busy: Boolean,
     initialCenter: GeoPoint?,
     onDismiss: () -> Unit,
+    initial: TrackedPlace? = null,
     onSave: (TrackedPlace) -> Unit,
 ) {
-    var name by remember { mutableStateOf("") }
-    var radius by remember { mutableStateOf("100") }
-    var point by remember { mutableStateOf<GeoPoint?>(null) }
+    var name by remember(initial?.id) { mutableStateOf(initial?.name.orEmpty()) }
+    var radius by remember(initial?.id) { mutableStateOf(initial?.radiusMeters?.toInt()?.toString() ?: "100") }
+    var point by remember(initial?.id) { mutableStateOf(initial?.let { GeoPoint(it.latitude, it.longitude) }) }
     val radiusMeters = radius.toDoubleOrNull()
     val validRadius = radiusMeters != null && radiusMeters in 20.0..5000.0
 
     ValkyrisBottomSheet(
-        title = "Cadastrar área",
+        title = if (initial == null) "Cadastrar área" else "Editar área",
         onDismiss = onDismiss,
         dismissEnabled = !busy,
+        swipeToDismissEnabled = false,
         actions = {
             TextButton(onClick = onDismiss, enabled = !busy) { Text("Cancelar") }
             Button(
                 onClick = {
                     val selectedPoint = requireNotNull(point)
                     onSave(
-                        TrackedPlace(
+                        (initial ?: TrackedPlace(name = "", latitude = selectedPoint.latitude, longitude = selectedPoint.longitude)).copy(
                             name = name.trim(),
                             latitude = selectedPoint.latitude,
                             longitude = selectedPoint.longitude,
@@ -222,7 +224,7 @@ private fun AreaEditorSheet(
             ) { Text("Salvar") }
         },
     ) {
-        Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        Column(Modifier.fillMaxWidth().heightIn(max = 520.dp).imePadding().verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(10.dp)) {
             OutlinedTextField(
                 value = name,
                 onValueChange = { name = it },
@@ -269,7 +271,8 @@ private fun AreaPickerMap(
                 setTileSource(TileSourceFactory.MAPNIK)
                 setMultiTouchControls(true)
                 setOnTouchListener { view, event ->
-                    val captureGesture = event.pointerCount > 1 || event.actionMasked == MotionEvent.ACTION_POINTER_DOWN
+                    // Keep the entire gesture in the map, including the first finger and pinch release.
+                    val captureGesture = event.actionMasked != MotionEvent.ACTION_UP && event.actionMasked != MotionEvent.ACTION_CANCEL
                     var parent = view.parent
                     while (parent != null) {
                         parent.requestDisallowInterceptTouchEvent(captureGesture)
@@ -278,7 +281,7 @@ private fun AreaPickerMap(
                     false
                 }
                 controller.setZoom(13.5)
-                initialCenter?.let { controller.setCenter(it) }
+                controller.setCenter(selectedPoint ?: initialCenter ?: GeoPoint(-23.5505, -46.6333))
                 overlays.add(MapEventsOverlay(object : MapEventsReceiver {
                     override fun singleTapConfirmedHelper(point: GeoPoint?): Boolean {
                         point?.let(currentOnPointSelected)
@@ -298,9 +301,7 @@ private fun AreaPickerMap(
                     icon = ContextCompat.getDrawable(map.context, R.drawable.valkyris_map_marker)
                     setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_BOTTOM)
                 })
-                map.controller.setCenter(point)
             }
-            if (selectedPoint == null) initialCenter?.let { map.controller.setCenter(it) }
             map.invalidate()
         },
         modifier = modifier.background(MaterialTheme.colorScheme.surfaceVariant),
@@ -328,23 +329,6 @@ private fun UserCard(user: TrackedPerson, onHistory: () -> Unit) = Card(
             Text(user.lastLocatedAt?.let { "Atualizado ${formatTime(it)}" } ?: "Ainda sem localização", color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodySmall)
         }
         Icon(Lucide.History, "Abrir histórico", tint = MaterialTheme.colorScheme.onSurfaceVariant)
-    }
-}
-
-@Composable
-private fun PlaceEditor(initial: TrackedPlace, busy: Boolean, onDismiss: () -> Unit, onSave: (TrackedPlace) -> Unit) {
-    var name by remember { mutableStateOf(initial.name) }; var radius by remember { mutableStateOf(initial.radiusMeters.takeIf { it > 0 }?.toInt()?.toString() ?: "100") }
-    val radiusMeters = radius.toDoubleOrNull()
-    val validRadius = radiusMeters != null && radiusMeters in 20.0..5000.0
-    ValkyrisBottomSheet(title = "Cadastrar área", onDismiss = onDismiss, dismissEnabled = !busy, actions = {
-        TextButton(onClick = onDismiss, enabled = !busy) { Text("Cancelar") }
-        Button(onClick = { onSave(initial.copy(name = name.trim(), radiusMeters = requireNotNull(radiusMeters))) }, enabled = !busy && name.isNotBlank() && validRadius) { Text("Salvar") }
-    }) {
-        Column(Modifier.fillMaxWidth().verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-            OutlinedTextField(name, { name = it }, label = { Text("Nome") }, singleLine = true, modifier = Modifier.fillMaxWidth())
-            Text("O ponto foi escolhido no mapa. Você pode ajustar apenas o raio da área.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            OutlinedTextField(radius, { radius = it.filter(Char::isDigit) }, label = { Text("Raio em metros") }, supportingText = { Text("De 20 a 5.000 m") }, isError = radius.isNotBlank() && !validRadius, singleLine = true, modifier = Modifier.fillMaxWidth())
-        }
     }
 }
 

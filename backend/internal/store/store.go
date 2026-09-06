@@ -33,6 +33,7 @@ func Open(path string) (*Store, error) {
 		query  string
 		after  string
 	}{
+		{"rules", "motion_json", `ALTER TABLE rules ADD COLUMN motion_json TEXT NOT NULL DEFAULT 'null'`, ""},
 		{"cameras", "media_xaddr", `ALTER TABLE cameras ADD COLUMN media_xaddr TEXT NOT NULL DEFAULT ''`, ""},
 		{"cameras", "events_xaddr", `ALTER TABLE cameras ADD COLUMN events_xaddr TEXT NOT NULL DEFAULT ''`, ""},
 		{"cameras", "ptz_xaddr", `ALTER TABLE cameras ADD COLUMN ptz_xaddr TEXT NOT NULL DEFAULT ''`, ""},
@@ -85,6 +86,11 @@ func Open(path string) (*Store, error) {
 	if err = migrateRulesWithoutConfidence(ctx, db); err != nil {
 		db.Close()
 		return nil, err
+	}
+	// Include motion settings in idempotency without modifying existing rules.
+	if _, err = db.ExecContext(ctx, `CREATE UNIQUE INDEX IF NOT EXISTS idx_rules_motion_idempotency ON rules(camera_id,name,detector_types_json,confirmations,cooldown_seconds,schedule_json,actions_json,motion_json); DROP INDEX IF EXISTS idx_rules_idempotency;`); err != nil {
+		db.Close()
+		return nil, fmt.Errorf("index motion rules: %w", err)
 	}
 	// Pausing rules was removed from the interface. Normalize old accidental
 	// disabled values before serving the API again.

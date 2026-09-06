@@ -43,12 +43,13 @@ fun ValkyrisBottomSheet(
     title: String,
     onDismiss: () -> Unit,
     dismissEnabled: Boolean = true,
+    swipeToDismissEnabled: Boolean = true,
     actions: (@Composable FlowRowScope.() -> Unit)? = null,
     content: @Composable ColumnScope.() -> Unit,
 ) {
     val sheetState = rememberModalBottomSheetState(
         skipPartiallyExpanded = true,
-        confirmValueChange = { dismissEnabled || it != SheetValue.Hidden },
+        confirmValueChange = { (dismissEnabled && swipeToDismissEnabled) || it != SheetValue.Hidden },
     )
     ModalBottomSheet(
         onDismissRequest = { if (dismissEnabled) onDismiss() },
@@ -56,7 +57,7 @@ fun ValkyrisBottomSheet(
         containerColor = MaterialTheme.colorScheme.surface,
         contentColor = MaterialTheme.colorScheme.onSurface,
         shape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp),
-        dragHandle = { BottomSheetDefaults.DragHandle() },
+        dragHandle = { if (swipeToDismissEnabled) BottomSheetDefaults.DragHandle() else Spacer(Modifier.height(16.dp)) },
     ) {
         Row(
             modifier = Modifier.fillMaxWidth().padding(start = 20.dp, end = 12.dp, bottom = 10.dp),

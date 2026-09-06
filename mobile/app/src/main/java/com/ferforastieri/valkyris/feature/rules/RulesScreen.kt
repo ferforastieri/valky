@@ -20,6 +20,9 @@ import com.ferforastieri.valkyris.R
 import com.ferforastieri.valkyris.core.model.Camera
 import com.ferforastieri.valkyris.core.model.DetectorKind
 import com.ferforastieri.valkyris.core.model.Rule
+import com.ferforastieri.valkyris.core.model.RuleSchedule
+import com.ferforastieri.valkyris.core.model.MotionSettings
+import com.ferforastieri.valkyris.core.model.MotionRegion
 import com.ferforastieri.valkyris.core.model.RuleActions
 import com.ferforastieri.valkyris.core.model.detectorLabelRes
 import com.composables.icons.lucide.Lucide
@@ -43,12 +46,12 @@ fun RulesScreen(vm: RulesViewModel = hiltViewModel()) {
 
     RulesContent(rules, cameras.isNotEmpty() && detectors.isNotEmpty(), saving, onAdd = { creating = true }, onEdit = { editing = it }, onDelete = { deleting = it })
     if (creating) {
-        RuleEditorDialog(cameras, detectors, saving = saving, onDismiss = { if (!saving) creating = false }) {
+        RuleEditorDialog(cameras, detectors, saving = saving, preview = vm::preview, onDismiss = { if (!saving) creating = false }) {
             vm.create(it) { success -> if (success) creating = false }
         }
     }
     editing?.let { existing ->
-        RuleEditorDialog(cameras, detectors, existing, saving = saving, onDismiss = { if (!saving) editing = null }) {
+        RuleEditorDialog(cameras, detectors, existing, saving = saving, preview = vm::preview, onDismiss = { if (!saving) editing = null }) {
             vm.update(existing.id, it) { success -> if (success) editing = null }
         }
     }
@@ -84,8 +87,8 @@ fun CameraRulesSection(cameraId: String, vm: RulesViewModel = hiltViewModel()) {
             cameraRules.forEach { RuleCard(it, onEdit = { editing = it }, onDelete = { deleting = it }) }
         }
     }
-    if (creating) RuleEditorDialog(cameras, detectors, fixedCameraID = cameraId, saving = saving, onDismiss = { if (!saving) creating = false }) { vm.create(it) { success -> if (success) creating = false } }
-    editing?.let { existing -> RuleEditorDialog(cameras, detectors, existing, fixedCameraID = cameraId, saving = saving, onDismiss = { if (!saving) editing = null }) { vm.update(existing.id, it) { success -> if (success) editing = null } } }
+    if (creating) RuleEditorDialog(cameras, detectors, fixedCameraID = cameraId, saving = saving, preview = vm::preview, onDismiss = { if (!saving) creating = false }) { vm.create(it) { success -> if (success) creating = false } }
+    editing?.let { existing -> RuleEditorDialog(cameras, detectors, existing, fixedCameraID = cameraId, saving = saving, preview = vm::preview, onDismiss = { if (!saving) editing = null }) { vm.update(existing.id, it) { success -> if (success) editing = null } } }
     deleting?.let { rule -> DeleteRuleDialog(rule, saving, { deleting = null }) { vm.delete(rule.id) { if (it) deleting = null } } }
 }
 
@@ -151,6 +154,8 @@ fun RuleCard(rule: Rule, onEdit: () -> Unit, onDelete: () -> Unit) {
                     IconButton(onClick = onEdit) { Icon(Lucide.Pencil, stringResource(R.string.edit_rule)) }
                     IconButton(onClick = onDelete) { Icon(Lucide.Trash2, stringResource(R.string.remove_rule), tint = MaterialTheme.colorScheme.error) }
                 }
+                if (rule.schedule.start.isNotBlank()) Text("${rule.schedule.start}–${rule.schedule.end} · ${rule.schedule.timezone}", style = MaterialTheme.typography.bodySmall)
+                rule.motion?.let { Text("Região selecionada · movimento por ${it.minDurationSeconds} s", style = MaterialTheme.typography.bodySmall) }
             }
         }
     }
@@ -165,15 +170,29 @@ private fun DeleteRuleDialog(rule: Rule, busy: Boolean, onDismiss: () -> Unit, o
     confirmButton = { Button(onClick = onDelete, enabled = !busy, colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error, contentColor = MaterialTheme.colorScheme.onError)) { Text(stringResource(R.string.remove_rule)) } },
 )
 
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
-fun RuleEditorDialog(cameras: List<Camera>, detectors: List<DetectorKind>, existing: Rule? = null, fixedCameraID: String? = null, saving: Boolean, onDismiss: () -> Unit, onSave: (Rule) -> Unit) {
+fun RuleEditorDialog(cameras: List<Camera>, detectors: List<DetectorKind>, existing: Rule? = null, fixedCameraID: String? = null, saving: Boolean, onDismiss: () -> Unit, preview: (suspend (String) -> ByteArray)? = null, onSave: (Rule) -> Unit) {
     var camera by remember(existing?.id) { mutableStateOf(cameras.firstOrNull { it.id == existing?.cameraId } ?: cameras.firstOrNull()) }
     var detector by remember(existing?.id) { mutableStateOf(detectors.firstOrNull { it.id == existing?.detectorTypes?.firstOrNull() } ?: detectors.firstOrNull()) }
     var name by remember(existing?.id) { mutableStateOf(existing?.name.orEmpty()) }
     var record by remember(existing?.id) { mutableStateOf(existing?.actions?.record ?: true) }
     var notify by remember(existing?.id) { mutableStateOf(existing?.actions?.notify ?: true) }
     var alarm by remember(existing?.id) { mutableStateOf(existing?.actions?.alarm ?: false) }
+    var scheduled by remember(existing?.id) { mutableStateOf(!existing?.schedule?.start.isNullOrBlank()) }
+    var days by remember(existing?.id) { mutableStateOf(existing?.schedule?.days?.takeIf { it.isNotEmpty() } ?: (0..6).toList()) }
+    var start by remember(existing?.id) { mutableStateOf(existing?.schedule?.start?.ifBlank { "22:00" } ?: "22:00") }
+    var end by remember(existing?.id) { mutableStateOf(existing?.schedule?.end?.ifBlank { "06:00" } ?: "06:00") }
+    var timezone by remember(existing?.id) { mutableStateOf(existing?.schedule?.timezone?.ifBlank { java.time.ZoneId.systemDefault().id } ?: java.time.ZoneId.systemDefault().id) }
+    var regionEnabled by remember(existing?.id) { mutableStateOf(existing?.motion != null) }
+    var region by remember(existing?.id, fixedCameraID ?: camera?.id) { mutableStateOf(existing?.motion?.region?.takeIf { existing.cameraId == (fixedCameraID ?: camera?.id) }) }
+    var duration by remember(existing?.id) { mutableStateOf((existing?.motion?.minDurationSeconds ?: 10).toString()) }
+    var fraction by remember(existing?.id) { mutableStateOf((existing?.motion?.minChangedFraction ?: .05).toFloat()) }
+    var cooldown by remember(existing?.id) { mutableStateOf((existing?.cooldownSeconds ?: 60).toString()) }
+    val useRegion = detector?.id == "motion" && regionEnabled
+    val timePattern = Regex("([01][0-9]|2[0-3]):[0-5][0-9]")
+    val validSchedule = !scheduled || (days.isNotEmpty() && timePattern.matches(start) && timePattern.matches(end) && start != end && runCatching { java.time.ZoneId.of(timezone) }.isSuccess)
+    val validMotion = !useRegion || (region != null && duration.toIntOrNull() in 2..300)
     var cameraExpanded by remember { mutableStateOf(false) }
     var detectorExpanded by remember { mutableStateOf(false) }
 
@@ -181,6 +200,7 @@ fun RuleEditorDialog(cameras: List<Camera>, detectors: List<DetectorKind>, exist
         title = stringResource(if (existing == null) R.string.add_rule else R.string.edit_rule),
         onDismiss = onDismiss,
         dismissEnabled = !saving,
+        swipeToDismissEnabled = !useRegion,
         actions = {
             TextButton(onClick = onDismiss, enabled = !saving) { Text(stringResource(R.string.cancel)) }
             Button(
@@ -191,11 +211,14 @@ fun RuleEditorDialog(cameras: List<Camera>, detectors: List<DetectorKind>, exist
                         name = name,
                         detectorTypes = listOf(checkNotNull(detector).id),
                         confirmations = existing?.confirmations ?: 1,
+                        schedule = if (scheduled) RuleSchedule(days.sorted(), start, end, timezone) else RuleSchedule(),
+                        motion = if (useRegion) MotionSettings(checkNotNull(region), duration.toInt(), fraction.toDouble().coerceIn(.01, .5)) else null,
+                        cooldownSeconds = cooldown.toInt(),
                         actions = RuleActions(record, notify, alarm),
                         enabled = existing?.enabled ?: true,
                     ))
                 },
-                enabled = !saving && camera != null && detector != null && name.isNotBlank(),
+                enabled = !saving && camera != null && detector != null && name.isNotBlank() && validSchedule && validMotion && cooldown.toIntOrNull() in 10..3600,
             ) {
                 if (saving) CircularProgressIndicator(Modifier.size(18.dp), strokeWidth = 2.dp, color = MaterialTheme.colorScheme.onPrimary)
                 else Text(stringResource(R.string.save))
@@ -212,6 +235,33 @@ fun RuleEditorDialog(cameras: List<Camera>, detectors: List<DetectorKind>, exist
                 OutlinedTextField(detector?.let { stringResource(detectorLabelRes(it.id)) }.orEmpty(), {}, readOnly = true, label = { Text(stringResource(R.string.detector)) }, trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(detectorExpanded) }, modifier = Modifier.menuAnchor(MenuAnchorType.PrimaryNotEditable).fillMaxWidth())
                 ExposedDropdownMenu(detectorExpanded, { detectorExpanded = false }) { detectors.forEach { item -> DropdownMenuItem({ Text(stringResource(detectorLabelRes(item.id))) }, { detector = item; detectorExpanded = false }) } }
             }
+            RuleActionRow(scheduled, { scheduled = it }, "Limitar por horário")
+            if (scheduled) {
+                Text("Dias de início do período", style = MaterialTheme.typography.labelLarge)
+                FlowRow(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                    listOf(1,2,3,4,5,6,0).forEach { day ->
+                        FilterChip(selected = day in days, onClick = { days = if (day in days) days - day else days + day }, label = { Text(listOf("Dom","Seg","Ter","Qua","Qui","Sex","Sáb")[day]) })
+                    }
+                }
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    OutlinedTextField(start, { start = it }, label = { Text("Início · HH:mm") }, singleLine = true, modifier = Modifier.weight(1f))
+                    OutlinedTextField(end, { end = it }, label = { Text("Fim · HH:mm") }, singleLine = true, modifier = Modifier.weight(1f))
+                }
+                OutlinedTextField(timezone, { timezone = it }, label = { Text("Fuso horário") }, singleLine = true, modifier = Modifier.fillMaxWidth())
+                Text("Ex.: segunda, 22:00–06:00 inclui a madrugada de terça.", style = MaterialTheme.typography.bodySmall)
+                if (!validSchedule) Text("Selecione dias, horários distintos e um fuso válido (ex.: America/Sao_Paulo).", color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
+            }
+            if (detector?.id == "motion") {
+                RuleActionRow(regionEnabled, { regionEnabled = it }, "Movimento persistente em uma região")
+                if (regionEnabled) {
+                    MotionRegionEditor(fixedCameraID ?: camera?.id.orEmpty(), region, { region = it }, preview)
+                    OutlinedTextField(duration, { duration = it.filter(Char::isDigit) }, label = { Text("Tempo mínimo de movimento (segundos)") }, supportingText = { Text("De 2 a 300 s; pausas e perda de imagem reiniciam a contagem.") }, isError = duration.toIntOrNull() !in 2..300, singleLine = true, modifier = Modifier.fillMaxWidth())
+                    Text("Mudança mínima na região: ${(fraction * 100).toInt()}%", style = MaterialTheme.typography.labelLarge)
+                    Slider(value = fraction, onValueChange = { fraction = it }, valueRange = .01f.. .5f)
+                    Text("Valores menores detectam movimentos mais sutis. O alerta indica movimento na região, não identifica o bebê nem avalia risco, respiração ou postura.", style = MaterialTheme.typography.bodySmall)
+                }
+            }
+            OutlinedTextField(cooldown, { cooldown = it.filter(Char::isDigit) }, label = { Text("Intervalo entre alertas (segundos)") }, supportingText = { Text("De 10 a 3.600 s") }, isError = cooldown.toIntOrNull() !in 10..3600, singleLine = true, modifier = Modifier.fillMaxWidth())
             RuleActionRow(record, { record = it }, stringResource(R.string.record_media))
             RuleActionRow(notify, { notify = it }, stringResource(R.string.send_notification))
             RuleActionRow(alarm, { alarm = it }, stringResource(R.string.sound_alarm))

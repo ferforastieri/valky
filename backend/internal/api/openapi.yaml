@@ -394,11 +394,28 @@ components:
         cameraId: {type: string, format: uuid}
         name: {type: string}
         detectorTypes: {type: array, items: {type: string}}
-        confirmations: {type: integer, minimum: 1, default: 2}
-        cooldownSeconds: {type: integer, minimum: 1, default: 60}
+        confirmations: {type: integer, minimum: 1, default: 1}
+        cooldownSeconds: {type: integer, minimum: 10, maximum: 3600, default: 60}
         schedule: {$ref: '#/components/schemas/Schedule'}
+        motion: {$ref: '#/components/schemas/MotionSettings'}
         actions: {$ref: '#/components/schemas/Actions'}
         enabled: {type: boolean}
+    MotionSettings:
+      type: object
+      description: Optional sampled persistent motion in a fixed image region; not baby identification, pose recognition or medical risk detection. Only valid for the motion detector. Missing/null keeps ordinary motion detection.
+      required: [region, minDurationSeconds, minChangedFraction]
+      properties:
+        region:
+          type: object
+          required: [x, y, width, height]
+          properties:
+            x: {type: number, minimum: 0, maximum: 0.95}
+            y: {type: number, minimum: 0, maximum: 0.95}
+            width: {type: number, minimum: 0.05, maximum: 1}
+            height: {type: number, minimum: 0.05, maximum: 1}
+          description: Normalized image coordinates; x+width and y+height must not exceed 1.
+        minDurationSeconds: {type: integer, minimum: 2, maximum: 300, default: 10}
+        minChangedFraction: {type: number, minimum: 0.01, maximum: 0.5, default: 0.05}
     UserLocation:
       type: object
       required: [latitude, longitude]
@@ -434,6 +451,7 @@ components:
         radiusMeters: {type: number, minimum: 20, maximum: 5000}
     Schedule:
       type: object
+      description: Empty means always active. Otherwise days use Sunday=0 and identify the starting day of each interval; end is exclusive. Overnight intervals continue on the following day. Requires valid IANA timezone and distinct HH:mm start/end.
       properties:
         days: {type: array, items: {type: integer, minimum: 0, maximum: 6}}
         start: {type: string, pattern: '^\\d{2}:\\d{2}$'}

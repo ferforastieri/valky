@@ -175,10 +175,10 @@ fun CameraFailureSheet(camera:Camera,onDismiss:()->Unit,onEdit:(()->Unit)?=null,
             OutlinedTextField(name,{name=it},Modifier.fillMaxWidth(),label={Text(stringResource(R.string.camera_name))})
             Text(stringResource(R.string.camera_icon),style=MaterialTheme.typography.labelLarge)
             Column(verticalArrangement=Arrangement.spacedBy(8.dp)){
-                cameraIconOptions.chunked(2).forEach { row ->
+                cameraIconOptions.chunked(4).forEach { row ->
                     Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.spacedBy(8.dp)){
                         row.forEach { option -> CameraIconChoice(option,icon==option.value,{icon=option.value},Modifier.weight(1f)) }
-                        repeat(2-row.size){Spacer(Modifier.weight(1f))}
+                        repeat(4-row.size){Spacer(Modifier.weight(1f))}
                     }
                 }
             }
@@ -231,17 +231,17 @@ private data class CameraIconOption(val value:String,val label:Int,val image:Ima
 private fun CameraIconChoice(option:CameraIconOption,selected:Boolean,onClick:()->Unit,modifier:Modifier=Modifier){
     Surface(
         onClick=onClick,
-        modifier=modifier.height(92.dp),
+        modifier=modifier.height(64.dp),
         shape=MaterialTheme.shapes.medium,
         color=if(selected)MaterialTheme.colorScheme.secondaryContainer else MaterialTheme.colorScheme.surfaceVariant,
         border=androidx.compose.foundation.BorderStroke(1.dp,if(selected)MaterialTheme.colorScheme.secondary else MaterialTheme.colorScheme.outlineVariant),
     ){
-        Box(Modifier.fillMaxSize().padding(horizontal=10.dp,vertical=9.dp)){
-            Column(Modifier.align(Alignment.Center),horizontalAlignment=Alignment.CenterHorizontally,verticalArrangement=Arrangement.spacedBy(6.dp)){
+        Box(Modifier.fillMaxSize().padding(horizontal=4.dp,vertical=6.dp)){
+            Column(Modifier.align(Alignment.Center),horizontalAlignment=Alignment.CenterHorizontally,verticalArrangement=Arrangement.spacedBy(4.dp)){
                 Surface(shape=CircleShape,color=if(selected)MaterialTheme.colorScheme.secondary else MaterialTheme.colorScheme.surface){
-                    Icon(option.image,null,Modifier.padding(9.dp).size(24.dp),tint=if(selected)MaterialTheme.colorScheme.onSecondary else MaterialTheme.colorScheme.onSurface)
+                    Icon(option.image,null,Modifier.padding(3.dp).size(22.dp),tint=if(selected)MaterialTheme.colorScheme.onSecondary else MaterialTheme.colorScheme.onSurface)
                 }
-                Text(stringResource(option.label),style=MaterialTheme.typography.labelMedium,maxLines=1)
+                Text(stringResource(option.label),style=MaterialTheme.typography.labelSmall,maxLines=1,overflow=androidx.compose.ui.text.style.TextOverflow.Ellipsis)
             }
             if(selected)Icon(Lucide.Check,null,Modifier.align(Alignment.TopEnd).size(16.dp),tint=MaterialTheme.colorScheme.secondary)
         }

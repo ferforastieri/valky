@@ -32,6 +32,8 @@ class RulesViewModel @Inject constructor(
         }
     }
 
+    suspend fun preview(cameraId: String): ByteArray = repository.api.downloadCameraSnapshot(cameraId)
+
     fun refresh() {
         viewModelScope.launch { runCatching { repository.refreshRules() } }
     }

@@ -25,7 +25,10 @@ type DetectionSubmitter interface {
 }
 
 type Monitor struct {
-	Cameras    CameraLister
+	Cameras CameraLister
+	Rules   interface {
+		List(context.Context, string) ([]rules.Rule, error)
+	}
 	Media      *media.Manager
 	ONVIF      *camera.ONVIFClient
 	Classifier AudioClassifier
@@ -86,11 +89,9 @@ func (m *Monitor) monitorCamera(ctx context.Context, cam camera.Camera) {
 	if cam.Capabilities.Audio && m.Classifier != nil {
 		go m.monitorAudio(ctx, cam.ID)
 	}
-	if !cam.Capabilities.Events {
-		m.monitorVisual(ctx, cam.ID)
-		return
-	}
-	if m.ONVIF == nil {
+	// Region rules require frames even when the camera supplies ONVIF events.
+	go m.monitorVisual(ctx, cam.ID, !cam.Capabilities.Events)
+	if !cam.Capabilities.Events || m.ONVIF == nil {
 		<-ctx.Done()
 		return
 	}
@@ -136,23 +137,72 @@ func (m *Monitor) monitorAudio(ctx context.Context, cameraID string) {
 	}
 }
 
-func (m *Monitor) monitorVisual(ctx context.Context, cameraID string) {
+func (m *Monitor) monitorVisual(ctx context.Context, cameraID string, fallback bool) {
 	var previous []byte
+	var previousAt time.Time
 	for ctx.Err() == nil {
+		var regionRules []rules.Rule
+		if m.Rules != nil {
+			all, err := m.Rules.List(ctx, cameraID)
+			if err != nil {
+				m.Logger.Warn("load visual rules", "camera", cameraID, "error", err)
+				previous = nil
+				if !wait(ctx, 2*time.Second) {
+					return
+				}
+				continue
+			}
+			for _, r := range all {
+				if r.Enabled && r.Motion != nil && rules.ActiveAt(r.Schedule, time.Now()) {
+					regionRules = append(regionRules, r)
+				}
+			}
+		}
+		if !fallback && len(regionRules) == 0 {
+			previous = nil
+			if !wait(ctx, 2*time.Second) {
+				return
+			}
+			continue
+		}
 		frame, err := m.Media.MonitoringFrame(ctx, cameraID)
-		if err == nil && len(previous) > 0 {
-			score, scoreErr := FrameDifference(previous, frame)
-			if scoreErr == nil && score >= 0.12 {
-				m.submit(ctx, rules.Detection{CameraID: cameraID, Type: "motion", Confidence: score, OccurredAt: time.Now().UTC(), Metadata: map[string]any{"source": "visual_fallback"}})
+		now := time.Now().UTC()
+		if err == nil && len(previous) > 0 && now.Sub(previousAt) <= rules.MaxMotionSampleGap {
+			if fallback {
+				score, scoreErr := FrameDifference(previous, frame)
+				if scoreErr == nil && score >= .12 {
+					m.submit(ctx, rules.Detection{CameraID: cameraID, Type: "motion", Confidence: score, OccurredAt: now, Metadata: map[string]any{"source": "visual_fallback"}})
+				}
+			}
+			for _, r := range regionRules {
+				score, scoreErr := RegionDifference(previous, frame, r.Motion.Region)
+				if scoreErr != nil {
+					score = 0
+				}
+				m.submitRegion(ctx, cameraID, r, score, now)
+			}
+		} else {
+			// Failed/missing frames never count as evidence of continuing motion.
+			for _, r := range regionRules {
+				m.submitRegion(ctx, cameraID, r, 0, now)
 			}
 		}
 		if err == nil {
 			previous = frame
+			previousAt = now
+		} else {
+			previous = nil
 		}
 		if !wait(ctx, 2*time.Second) {
 			return
 		}
 	}
+}
+func (m *Monitor) submitRegion(ctx context.Context, cameraID string, r rules.Rule, score float64, at time.Time) {
+	m.submit(ctx, rules.Detection{CameraID: cameraID, Type: "motion", Confidence: score, OccurredAt: at,
+		Motion:   &rules.MotionSample{RuleID: r.ID, RuleUpdatedAt: r.UpdatedAt, ChangedFraction: score},
+		Metadata: map[string]any{"source": "visual_region", "changedFraction": score, "region": r.Motion.Region, "minDurationSeconds": r.Motion.MinDurationSeconds},
+	})
 }
 
 func (m *Monitor) submit(ctx context.Context, detection rules.Detection) {

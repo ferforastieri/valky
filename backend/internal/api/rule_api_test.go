@@ -51,4 +51,21 @@ func TestCreateRuleEndpoint(t *testing.T) {
 	if !envelope.Success || envelope.Data.ID == "" || envelope.Data.CameraID != "camera-1" {
 		t.Fatalf("unexpected create rule response: %+v", envelope)
 	}
+	// Advanced settings must survive the actual request/response boundary.
+	response = performJSON(t, server.Handler(), http.MethodPost, "/api/v1/rules", session.Token, rules.Rule{
+		CameraID: "camera-1", Name: "Berço à noite", DetectorTypes: []string{"motion"}, CooldownSeconds: 120,
+		Schedule: rules.Schedule{Days: []int{1, 2}, Start: "22:00", End: "06:00", Timezone: "America/Sao_Paulo"},
+		Motion:   &rules.MotionSettings{Region: rules.Region{X: .1, Y: .2, Width: .5, Height: .5}, MinDurationSeconds: 20, MinChangedFraction: .05},
+		Actions:  rules.Actions{Record: true, Notify: true},
+	})
+	if response.Code != http.StatusCreated {
+		t.Fatalf("advanced rule: %d %s", response.Code, response.Body.String())
+	}
+	if err = json.NewDecoder(response.Body).Decode(&envelope); err != nil {
+		t.Fatal(err)
+	}
+	if envelope.Data.Motion == nil || envelope.Data.Motion.MinDurationSeconds != 20 || envelope.Data.Schedule.Start != "22:00" || envelope.Data.CooldownSeconds != 120 {
+		t.Fatalf("lost advanced settings: %+v", envelope.Data)
+	}
+
 }

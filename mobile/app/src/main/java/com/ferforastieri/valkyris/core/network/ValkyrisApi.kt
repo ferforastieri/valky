@@ -424,6 +424,10 @@ class ValkyrisApi(
         cameraId = cameraId,
         name = name,
         detectorTypes = detectorTypes,
+        schedule = schedule,
+        motion = motion,
+        cooldownSeconds = cooldownSeconds,
+        confirmations = confirmations,
         actions = RuleActionsRequest(
             record = actions.record,
             notify = actions.notify,
