@@ -87,7 +87,7 @@ func (u *updater) run(version string) {
 	composeFile := filepath.Join(installDir, "compose.yaml")
 	envFile := filepath.Join(installDir, ".env")
 	previousVersion := readEnvValue(envFile, "VALKYRIS_VERSION")
-	if err := runCompose(installDir, composeFile, envFile, version, "pull", "valkyris", "updater"); err != nil {
+	if err := runCompose(installDir, composeFile, envFile, version, "pull", "valkyris"); err != nil {
 		slog.Error("pull Valkyris update", "error", err)
 		return
 	}
@@ -98,14 +98,15 @@ func (u *updater) run(version string) {
 	// The updater runs inside a container and talks to the host Docker daemon.
 	// Recreating MediaMTX from here would resolve relative bind mounts on the
 	// Docker host as /workspace, rather than the real installation directory.
-	// MediaMTX and its configuration are therefore updated by the host-side
-	// installer only.
-	if err := runCompose(installDir, composeFile, envFile, version, "up", "-d", "--no-build", "--no-deps", "--remove-orphans", "valkyris", "updater"); err != nil {
+	// MediaMTX, the updater, and their configuration are updated by the
+	// host-side installer only. Recreating this updater from its own process
+	// would terminate docker compose before it starts the replacement backend.
+	if err := runCompose(installDir, composeFile, envFile, version, "up", "-d", "--no-build", "--no-deps", "--remove-orphans", "valkyris"); err != nil {
 		slog.Error("activate Valkyris update", "error", err)
 		if previousVersion != "" && releasePattern.MatchString(previousVersion) {
 			restoreErr := setEnvValue(envFile, "VALKYRIS_VERSION", previousVersion)
 			if restoreErr == nil {
-				restoreErr = runCompose(installDir, composeFile, envFile, previousVersion, "up", "-d", "--no-build", "--no-deps", "--remove-orphans", "valkyris", "updater")
+				restoreErr = runCompose(installDir, composeFile, envFile, previousVersion, "up", "-d", "--no-build", "--no-deps", "--remove-orphans", "valkyris")
 			}
 			if restoreErr != nil {
 				slog.Error("restore previous backend version", "error", restoreErr)
