@@ -51,30 +51,32 @@ fun EventsContent(
     var unreadOnly by rememberSaveable { mutableStateOf(false) }
     val hasUnread = events.any { it.acknowledgedAt == null }
     val visibleEvents = if (unreadOnly) events.filter { it.acknowledgedAt == null } else events
-    Column(Modifier.fillMaxSize().padding(horizontal = 18.dp)) {
-        Spacer(Modifier.height(10.dp))
-        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                FilterChip(selected = !unreadOnly, onClick = { unreadOnly = false }, label = { Text(stringResource(R.string.all_notifications)) }, leadingIcon = { Icon(Lucide.ListFilter, null, Modifier.size(16.dp)) })
-                FilterChip(selected = unreadOnly, onClick = { unreadOnly = true }, label = { Text(stringResource(R.string.unread_notifications)) }, leadingIcon = { Icon(Lucide.Eye, null, Modifier.size(16.dp)) })
-            }
-            Spacer(Modifier.weight(1f))
-            IconButton(onClick = onAcknowledgeAll, enabled = hasUnread) { Icon(Lucide.Check, contentDescription = stringResource(R.string.mark_all_read)) }
-        }
-        Spacer(Modifier.height(8.dp))
-        if (visibleEvents.isEmpty()) {
-            Box(Modifier.fillMaxSize()) {
-                Column(Modifier.align(Alignment.Center), horizontalAlignment = Alignment.CenterHorizontally) {
-                    Icon(Lucide.BellOff, null, Modifier.size(42.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
-                    Spacer(Modifier.height(12.dp))
-                    Text(stringResource(if (unreadOnly) R.string.no_unread_notifications else R.string.no_events), fontWeight = FontWeight.SemiBold)
-                    Text(stringResource(if (unreadOnly) R.string.no_unread_notifications_body else R.string.no_events_body), color = MaterialTheme.colorScheme.onSurfaceVariant)
+    Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
+        Column(Modifier.fillMaxSize().padding(horizontal = 18.dp)) {
+            Spacer(Modifier.height(10.dp))
+            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    FilterChip(selected = !unreadOnly, onClick = { unreadOnly = false }, label = { Text(stringResource(R.string.all_notifications)) }, leadingIcon = { Icon(Lucide.ListFilter, null, Modifier.size(16.dp)) })
+                    FilterChip(selected = unreadOnly, onClick = { unreadOnly = true }, label = { Text(stringResource(R.string.unread_notifications)) }, leadingIcon = { Icon(Lucide.Eye, null, Modifier.size(16.dp)) })
                 }
+                Spacer(Modifier.weight(1f))
+                IconButton(onClick = onAcknowledgeAll, enabled = hasUnread) { Icon(Lucide.Check, contentDescription = stringResource(R.string.mark_all_read)) }
             }
-        } else {
-            LazyColumn(verticalArrangement = Arrangement.spacedBy(10.dp), contentPadding = PaddingValues(bottom = 24.dp)) {
-                items(visibleEvents, key = { it.id }) { event ->
-                    EventCard(event, onOpen = { onEvent(event.id) }, onCamera = { onCamera(event.cameraId) }, onAck = { onAcknowledge(event) })
+            Spacer(Modifier.height(8.dp))
+            if (visibleEvents.isEmpty()) {
+                Box(Modifier.fillMaxSize()) {
+                    Column(Modifier.align(Alignment.Center), horizontalAlignment = Alignment.CenterHorizontally) {
+                        Icon(Lucide.BellOff, null, Modifier.size(42.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Spacer(Modifier.height(12.dp))
+                        Text(stringResource(if (unreadOnly) R.string.no_unread_notifications else R.string.no_events), fontWeight = FontWeight.SemiBold)
+                        Text(stringResource(if (unreadOnly) R.string.no_unread_notifications_body else R.string.no_events_body), color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                }
+            } else {
+                LazyColumn(verticalArrangement = Arrangement.spacedBy(10.dp), contentPadding = PaddingValues(bottom = 24.dp)) {
+                    items(visibleEvents, key = { it.id }) { event ->
+                        EventCard(event, onOpen = { onEvent(event.id) }, onCamera = { onCamera(event.cameraId) }, onAck = { onAcknowledge(event) })
+                    }
                 }
             }
         }

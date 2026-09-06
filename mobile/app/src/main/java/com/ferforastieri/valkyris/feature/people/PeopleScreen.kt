@@ -13,6 +13,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -45,6 +46,7 @@ import org.osmdroid.views.overlay.Polygon
 @Composable
 fun PeopleScreen(vm: PeopleViewModel = hiltViewModel()) {
     val users by vm.people.collectAsStateWithLifecycle()
+    val me by vm.me.collectAsStateWithLifecycle()
     val places by vm.places.collectAsStateWithLifecycle()
     val history by vm.history.collectAsStateWithLifecycle()
     val busy by vm.busy.collectAsStateWithLifecycle()
@@ -97,6 +99,8 @@ fun PeopleScreen(vm: PeopleViewModel = hiltViewModel()) {
     }
     if (areaPickerOpen) AreaEditorSheet(
         busy = busy,
+        initialCenter = me?.takeIf { it.lastLatitude != null && it.lastLongitude != null }
+            ?.let { GeoPoint(it.lastLatitude!!, it.lastLongitude!!) },
         onDismiss = { areaPickerOpen = false },
         onSave = { value ->
             vm.createPlace(value) { created ->
@@ -142,7 +146,12 @@ private fun FamilyMap(users: List<TrackedPerson>, places: List<TrackedPlace>, mo
 }
 
 @Composable
-private fun AreaEditorSheet(busy: Boolean, onDismiss: () -> Unit, onSave: (TrackedPlace) -> Unit) {
+private fun AreaEditorSheet(
+    busy: Boolean,
+    initialCenter: GeoPoint?,
+    onDismiss: () -> Unit,
+    onSave: (TrackedPlace) -> Unit,
+) {
     var name by remember { mutableStateOf("") }
     var radius by remember { mutableStateOf("100") }
     var point by remember { mutableStateOf<GeoPoint?>(null) }
@@ -179,16 +188,6 @@ private fun AreaEditorSheet(busy: Boolean, onDismiss: () -> Unit, onSave: (Track
                 singleLine = true,
                 modifier = Modifier.fillMaxWidth(),
             )
-            Text(
-                "Toque diretamente no mapa para definir o local.",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-            AreaPickerMap(
-                selectedPoint = point,
-                onPointSelected = { point = it },
-                modifier = Modifier.fillMaxWidth().height(280.dp),
-            )
             OutlinedTextField(
                 value = radius,
                 onValueChange = { radius = it.filter(Char::isDigit) },
@@ -198,12 +197,28 @@ private fun AreaEditorSheet(busy: Boolean, onDismiss: () -> Unit, onSave: (Track
                 singleLine = true,
                 modifier = Modifier.fillMaxWidth(),
             )
+            Text(
+                "Toque diretamente no mapa para definir o local.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            AreaPickerMap(
+                selectedPoint = point,
+                initialCenter = initialCenter,
+                onPointSelected = { point = it },
+                modifier = Modifier.fillMaxWidth().height(250.dp).clip(MaterialTheme.shapes.large),
+            )
         }
     }
 }
 
 @Composable
-private fun AreaPickerMap(selectedPoint: GeoPoint?, onPointSelected: (GeoPoint) -> Unit, modifier: Modifier = Modifier) {
+private fun AreaPickerMap(
+    selectedPoint: GeoPoint?,
+    initialCenter: GeoPoint?,
+    onPointSelected: (GeoPoint) -> Unit,
+    modifier: Modifier = Modifier,
+) {
     val currentOnPointSelected by rememberUpdatedState(onPointSelected)
     AndroidView(
         factory = { context ->
@@ -212,7 +227,7 @@ private fun AreaPickerMap(selectedPoint: GeoPoint?, onPointSelected: (GeoPoint) 
                 setTileSource(TileSourceFactory.MAPNIK)
                 setMultiTouchControls(true)
                 controller.setZoom(13.5)
-                controller.setCenter(GeoPoint(-23.5505, -46.6333))
+                initialCenter?.let { controller.setCenter(it) }
                 overlays.add(MapEventsOverlay(object : MapEventsReceiver {
                     override fun singleTapConfirmedHelper(point: GeoPoint?): Boolean {
                         point?.let(currentOnPointSelected)
@@ -234,6 +249,7 @@ private fun AreaPickerMap(selectedPoint: GeoPoint?, onPointSelected: (GeoPoint) 
                 })
                 map.controller.setCenter(point)
             }
+            if (selectedPoint == null) initialCenter?.let { map.controller.setCenter(it) }
             map.invalidate()
         },
         modifier = modifier.background(MaterialTheme.colorScheme.surfaceVariant),

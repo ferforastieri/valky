@@ -32,7 +32,11 @@ import okhttp3.Response
 import okhttp3.WebSocket
 import okhttp3.WebSocketListener
 
-data class ApiNotice(@param:StringRes val messageRes: Int, val success: Boolean)
+data class ApiNotice(
+    @param:StringRes val messageRes: Int? = null,
+    val backendMessage: String? = null,
+    val success: Boolean,
+)
 
 class ValkyrisApi(
     private val session: () -> Session?,
@@ -79,6 +83,7 @@ class ValkyrisApi(
         fingerprint: String,
         @StringRes successNotice: Int? = null,
         announceError: Boolean = false,
+        announceBackend: Boolean = false,
         crossinline request: suspend (HttpClient) -> HttpResponse,
     ): T {
         try {
@@ -99,12 +104,12 @@ class ValkyrisApi(
                     val complete = envelope.error?.takeIf { it.isNotBlank() } ?: message
                     throw localizedError(complete, response.status.value)
                 }
-                successNotice?.let { publish(it, true) }
+                if (announceBackend) publishBackend(message, true) else successNotice?.let { publish(it, true) }
                 envelope.data ?: throw localizedError("Valkyris response did not include data: $message", response.status.value)
             }
         } catch (error: Throwable) {
             if (error is ApiException) {
-                if (announceError) publish(error.messageRes, false)
+                if (announceBackend) publishBackend(error.technicalMessage, false) else if (announceError) publish(error.messageRes, false)
                 throw error
             }
             val complete = buildString {
@@ -112,7 +117,7 @@ class ValkyrisApi(
                 error.message?.takeIf { it.isNotBlank() }?.let { append(": ").append(it) }
             }
             val localized = localizedError(complete, cause = error)
-            if (announceError) publish(localized.messageRes, false)
+            if (announceError && !announceBackend) publish(localized.messageRes, false)
             throw localized
         }
     }
@@ -123,7 +128,7 @@ class ValkyrisApi(
         announceError: Boolean = false,
         request: suspend (HttpClient) -> HttpResponse,
     ) {
-        execute<JsonElement>(fingerprint, successNotice, announceError, request)
+        execute<JsonElement>(fingerprint, successNotice, announceError, request = request)
     }
 
     private suspend inline fun <reified T> get(path: String): T {
@@ -138,9 +143,10 @@ class ValkyrisApi(
         body: B,
         @StringRes successNotice: Int? = null,
         announceError: Boolean = false,
+        announceBackend: Boolean = false,
     ): T {
         val current = requireNotNull(session())
-        return execute(current.fingerprint, successNotice, announceError) {
+        return execute(current.fingerprint, successNotice, announceError, announceBackend) {
             it.post(base() + path) {
                 bearerAuth(current.token)
                 contentType(ContentType.Application.Json)
@@ -154,9 +160,10 @@ class ValkyrisApi(
         body: B,
         @StringRes successNotice: Int? = null,
         announceError: Boolean = false,
+        announceBackend: Boolean = false,
     ): T {
         val current = requireNotNull(session())
-        return execute(current.fingerprint, successNotice, announceError) {
+        return execute(current.fingerprint, successNotice, announceError, announceBackend) {
             it.put(base() + path) {
                 bearerAuth(current.token)
                 contentType(ContentType.Application.Json)
@@ -232,11 +239,11 @@ class ValkyrisApi(
     suspend fun people(): List<TrackedPerson> = get("/people")
     suspend fun users(): List<TrackedPerson> = get("/users")
     suspend fun me(): TrackedPerson = get("/me")
-    suspend fun updateMe(user: TrackedPerson): TrackedPerson = put("/me", user, announceError = true)
+    suspend fun updateMe(user: TrackedPerson): TrackedPerson = put("/me", user, announceBackend = true)
     suspend fun changeHomePassword(currentPassword: String, newPassword: String): Map<String, Boolean> = post(
         "/me/password",
         ChangePasswordRequest(currentPassword, newPassword),
-        announceError = true,
+        announceBackend = true,
     )
     suspend fun updateUser(id: String, user: TrackedPerson): TrackedPerson = put("/users/$id", user, announceError = true)
     suspend fun createPerson(person: TrackedPerson): TrackedPerson = post("/people", person, announceError = true)
@@ -379,7 +386,11 @@ class ValkyrisApi(
     }
 
     private fun publish(@StringRes messageRes: Int, success: Boolean) {
-        _notices.tryEmit(ApiNotice(messageRes, success))
+        _notices.tryEmit(ApiNotice(messageRes = messageRes, success = success))
+    }
+
+    private fun publishBackend(message: String, success: Boolean) {
+        _notices.tryEmit(ApiNotice(backendMessage = message, success = success))
     }
 
     private fun localizedError(raw: String, status: Int? = null, cause: Throwable? = null): ApiException {

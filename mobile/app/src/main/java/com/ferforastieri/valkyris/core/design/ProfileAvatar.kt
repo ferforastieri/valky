@@ -3,6 +3,8 @@ package com.ferforastieri.valkyris.core.design
 import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
+import android.graphics.Canvas
+import android.graphics.Paint
 import android.net.Uri
 import android.util.Base64
 import androidx.compose.foundation.Image
@@ -56,14 +58,30 @@ fun profileMarkerDrawable(context: Context, avatarData: String) = avatarBitmap(a
 }
 
 fun encodeProfileAvatar(context: Context, uri: Uri): String? = runCatching {
-    val source = context.contentResolver.openInputStream(uri)?.use(BitmapFactory::decodeStream) ?: return null
-    val largestSide = maxOf(source.width, source.height).coerceAtLeast(1)
-    val scaled = if (largestSide > 512) {
-        val scale = 512f / largestSide
-        Bitmap.createScaledBitmap(source, (source.width * scale).toInt().coerceAtLeast(1), (source.height * scale).toInt().coerceAtLeast(1), true)
-    } else source
+    val source = loadProfileAvatar(context, uri) ?: return null
+    encodeProfileAvatar(source, 1f, 0f)
+}.getOrNull()
+
+fun loadProfileAvatar(context: Context, uri: Uri): Bitmap? = runCatching {
+    context.contentResolver.openInputStream(uri)?.use(BitmapFactory::decodeStream)
+}.getOrNull()
+
+fun encodeProfileAvatar(source: Bitmap, zoom: Float, rotation: Float): String? = runCatching {
+    val output = Bitmap.createBitmap(512, 512, Bitmap.Config.ARGB_8888)
+    val canvas = Canvas(output)
+    canvas.drawColor(android.graphics.Color.rgb(20, 29, 27))
+    val baseScale = 512f / minOf(source.width, source.height).coerceAtLeast(1)
+    canvas.translate(256f, 256f)
+    canvas.rotate(rotation)
+    canvas.scale(baseScale * zoom.coerceIn(1f, 4f), baseScale * zoom.coerceIn(1f, 4f))
+    canvas.drawBitmap(
+        source,
+        -source.width / 2f,
+        -source.height / 2f,
+        Paint(Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG),
+    )
     val bytes = ByteArrayOutputStream().use { output ->
-        check(scaled.compress(Bitmap.CompressFormat.JPEG, 82, output))
+        check(output.compress(Bitmap.CompressFormat.JPEG, 82, output))
         output.toByteArray()
     }
     if (bytes.size > 220_000) return null
