@@ -6,6 +6,7 @@ import android.app.NotificationManager
 import android.app.Service
 import android.content.Context
 import android.content.Intent
+import android.content.SharedPreferences
 import android.content.pm.PackageManager
 import android.location.Location
 import android.location.LocationListener
@@ -30,21 +31,29 @@ class LocationTrackingService : Service(), LocationListener {
     @Inject lateinit var api: ValkyrisApi
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private lateinit var locationManager: LocationManager
+    private lateinit var preferences: SharedPreferences
     private var personId = ""
 
     override fun onCreate() {
         super.onCreate()
         locationManager = getSystemService(LocationManager::class.java)
+        preferences = getSharedPreferences(PREFERENCES, Context.MODE_PRIVATE)
         createChannel()
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
-        personId = intent?.getStringExtra(EXTRA_PERSON_ID).orEmpty()
+        personId = intent?.getStringExtra(EXTRA_PERSON_ID).orEmpty().ifBlank { preferences.getString(EXTRA_PERSON_ID, "").orEmpty() }
         if (personId.isBlank() || !hasLocationPermission()) { stopSelf(); return START_NOT_STICKY }
+        preferences.edit().putString(EXTRA_PERSON_ID, personId).apply()
         startForeground(NOTIFICATION_ID, notification())
         runCatching {
-            locationManager.requestLocationUpdates(LocationManager.GPS_PROVIDER, 120_000L, 30f, this, Looper.getMainLooper())
-            locationManager.getLastKnownLocation(LocationManager.GPS_PROVIDER)?.let(::report)
+            locationManager.removeUpdates(this)
+            listOf(LocationManager.GPS_PROVIDER, LocationManager.NETWORK_PROVIDER).forEach { provider ->
+                if (locationManager.isProviderEnabled(provider)) {
+                    locationManager.requestLocationUpdates(provider, 120_000L, 30f, this, Looper.getMainLooper())
+                    locationManager.getLastKnownLocation(provider)?.let(::report)
+                }
+            }
         }
         return START_STICKY
     }
@@ -74,6 +83,7 @@ class LocationTrackingService : Service(), LocationListener {
         private const val CHANNEL_ID = "location-tracking"
         private const val NOTIFICATION_ID = 117
         private const val EXTRA_PERSON_ID = "person_id"
+        private const val PREFERENCES = "location_tracking"
         fun start(context: Context, personId: String) = ContextCompat.startForegroundService(context, Intent(context, LocationTrackingService::class.java).putExtra(EXTRA_PERSON_ID, personId))
     }
 }

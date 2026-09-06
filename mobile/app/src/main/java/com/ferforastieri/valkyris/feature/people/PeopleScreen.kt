@@ -2,6 +2,10 @@ package com.ferforastieri.valkyris.feature.people
 
 import android.Manifest
 import android.content.pm.PackageManager
+import android.content.Intent
+import android.net.Uri
+import android.os.Build
+import android.provider.Settings
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.core.content.ContextCompat
@@ -15,6 +19,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.viewinterop.AndroidView
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
@@ -32,6 +37,13 @@ import com.ferforastieri.valkyris.core.model.TrackedPlace
 import java.time.Instant
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
+import org.osmdroid.config.Configuration
+import org.osmdroid.events.MapEventsReceiver
+import org.osmdroid.tileprovider.tilesource.TileSourceFactory
+import org.osmdroid.util.GeoPoint
+import org.osmdroid.views.MapView
+import org.osmdroid.views.overlay.MapEventsOverlay
+import org.osmdroid.views.overlay.Marker
 
 @Composable
 fun PeopleScreen(vm: PeopleViewModel = hiltViewModel()) {
@@ -44,12 +56,28 @@ fun PeopleScreen(vm: PeopleViewModel = hiltViewModel()) {
     var placeEditor by remember { mutableStateOf<TrackedPlace?>(null) }
     var historyPerson by remember { mutableStateOf<TrackedPerson?>(null) }
     var pendingTracking by remember { mutableStateOf<TrackedPerson?>(null) }
-    val locationPermission = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
+    fun requestBackgroundOrStart(person: TrackedPerson) {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q || ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_BACKGROUND_LOCATION) == PackageManager.PERMISSION_GRANTED) {
+            LocationTrackingService.start(context, person.id); pendingTracking = null
+        } else if (Build.VERSION.SDK_INT == Build.VERSION_CODES.Q) {
+            pendingTracking = person
+        } else {
+            context.startActivity(Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.parse("package:${context.packageName}")))
+        }
+    }
+    val backgroundLocationPermission = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
         pendingTracking?.takeIf { granted }?.let { LocationTrackingService.start(context, it.id) }
         pendingTracking = null
     }
+    val locationPermission = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
+        pendingTracking?.takeIf { granted }?.let { person ->
+            if (Build.VERSION.SDK_INT == Build.VERSION_CODES.Q) backgroundLocationPermission.launch(Manifest.permission.ACCESS_BACKGROUND_LOCATION) else requestBackgroundOrStart(person)
+        }
+    }
     fun startTracking(person: TrackedPerson) {
-        if (ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED) LocationTrackingService.start(context, person.id)
+        if (ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED) {
+            if (Build.VERSION.SDK_INT == Build.VERSION_CODES.Q && ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_BACKGROUND_LOCATION) != PackageManager.PERMISSION_GRANTED) { pendingTracking = person; backgroundLocationPermission.launch(Manifest.permission.ACCESS_BACKGROUND_LOCATION) } else requestBackgroundOrStart(person)
+        }
         else { pendingTracking = person; locationPermission.launch(Manifest.permission.ACCESS_FINE_LOCATION) }
     }
 
@@ -129,11 +157,26 @@ fun PeopleScreen(vm: PeopleViewModel = hiltViewModel()) {
 }
 
 @Composable private fun PlaceEditor(initial: TrackedPlace, busy: Boolean, onDismiss: () -> Unit, onSave: (TrackedPlace) -> Unit) {
-    var name by remember(initial.id) { mutableStateOf(initial.name) }; var latitude by remember(initial.id) { mutableStateOf(initial.latitude.takeIf { it != 0.0 }?.toString().orEmpty()) }; var longitude by remember(initial.id) { mutableStateOf(initial.longitude.takeIf { it != 0.0 }?.toString().orEmpty()) }; var radius by remember(initial.id) { mutableStateOf(initial.radiusMeters.toInt().toString()) }
+    var name by remember(initial.id) { mutableStateOf(initial.name) }; var latitude by remember(initial.id) { mutableDoubleStateOf(initial.latitude.takeIf { it != 0.0 } ?: -23.5505) }; var longitude by remember(initial.id) { mutableDoubleStateOf(initial.longitude.takeIf { it != 0.0 } ?: -46.6333) }; var selected by remember(initial.id) { mutableStateOf(initial.latitude != 0.0 || initial.longitude != 0.0) }; var radius by remember(initial.id) { mutableStateOf(initial.radiusMeters.toInt().toString()) }
     ValkyrisBottomSheet(title = if (initial.id.isBlank()) "Cadastrar área" else "Editar área", onDismiss = onDismiss, dismissEnabled = !busy, actions = {
         TextButton(onClick = onDismiss, enabled = !busy) { Text("Cancelar") }
-        Button(onClick = { onSave(initial.copy(name = name.trim(), latitude = latitude.toDoubleOrNull() ?: 0.0, longitude = longitude.toDoubleOrNull() ?: 0.0, radiusMeters = radius.toDoubleOrNull() ?: 0.0)) }, enabled = !busy && name.isNotBlank() && latitude.toDoubleOrNull() != null && longitude.toDoubleOrNull() != null && radius.toDoubleOrNull() != null) { Text("Salvar") }
-    }) { Column(Modifier.fillMaxWidth().verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(10.dp)) { OutlinedTextField(name,{name=it},label={Text("Nome")},singleLine=true,modifier=Modifier.fillMaxWidth()); OutlinedTextField(latitude,{latitude=it},label={Text("Latitude")},singleLine=true,modifier=Modifier.fillMaxWidth()); OutlinedTextField(longitude,{longitude=it},label={Text("Longitude")},singleLine=true,modifier=Modifier.fillMaxWidth()); OutlinedTextField(radius,{radius=it},label={Text("Raio em metros")},singleLine=true,modifier=Modifier.fillMaxWidth()) } }
+        Button(onClick = { onSave(initial.copy(name = name.trim(), latitude = latitude, longitude = longitude, radiusMeters = radius.toDoubleOrNull() ?: 0.0)) }, enabled = !busy && name.isNotBlank() && selected && radius.toDoubleOrNull() != null) { Text("Salvar") }
+    }) { Column(Modifier.fillMaxWidth().verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(10.dp)) { OutlinedTextField(name,{name=it},label={Text("Nome")},singleLine=true,modifier=Modifier.fillMaxWidth()); Text("Toque e segure no mapa para posicionar a área.", style=MaterialTheme.typography.bodySmall, color=MaterialTheme.colorScheme.onSurfaceVariant); ZoneMap(latitude, longitude, selected) { lat, lon -> latitude=lat; longitude=lon; selected=true }; OutlinedTextField(radius,{radius=it},label={Text("Raio em metros")},singleLine=true,modifier=Modifier.fillMaxWidth()) } }
+}
+
+@Composable private fun ZoneMap(latitude: Double, longitude: Double, selected: Boolean, onPick: (Double, Double) -> Unit) {
+    val context = LocalContext.current
+    AndroidView(factory = { ctx ->
+        Configuration.getInstance().userAgentValue = ctx.packageName
+        MapView(ctx).apply {
+            setTileSource(TileSourceFactory.MAPNIK); setMultiTouchControls(true); controller.setZoom(15.0); controller.setCenter(GeoPoint(latitude, longitude))
+            overlays.add(MapEventsOverlay(object : MapEventsReceiver { override fun singleTapConfirmedHelper(p: GeoPoint?) = false; override fun longPressHelper(p: GeoPoint?): Boolean { p?.let { onPick(it.latitude, it.longitude) }; return true } }))
+        }
+    }, update = { map ->
+        map.overlays.removeAll { it is Marker && it.title == "zone-marker" }
+        if (selected) map.overlays.add(Marker(map).apply { position=GeoPoint(latitude,longitude); title="zone-marker"; setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_BOTTOM) })
+        map.invalidate()
+    }, modifier = Modifier.fillMaxWidth().height(270.dp))
 }
 
 @Composable private fun HistorySheet(person: TrackedPerson, history: List<PersonLocation>, onDismiss: () -> Unit) = ValkyrisBottomSheet(title = "Por onde ${person.name} passou", onDismiss = onDismiss) {
