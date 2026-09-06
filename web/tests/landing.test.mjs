@@ -14,14 +14,14 @@ test('publica as duas localizações com idioma correto', () => {
   assert.match(pt, /<html lang="pt-BR"/);
   assert.match(en, /<html lang="en"/);
   assert.match(pt, /curl -fsSL https:\/\/valkyris\.vercel\.app\/install\.sh \| sh/);
-  assert.match(root, /valkyris-locale/);
+  assert.match(root, /navigator\.languages/);
+  assert.match(root, /startsWith\('en'\)/);
 });
 
 test('controles e navegação possuem nomes acessíveis', async () => {
   assert.match(pt, /aria-label="[^"]+"/);
-  assert.match(pt, /href="\/en"/);
-  assert.match(en, /href="\/pt-BR"/);
-  assert.match(pt, /class="language-menu"/);
+  assert.doesNotMatch(pt, /class="language-menu"/);
+  assert.doesNotMatch(pt, /language-popover/);
   assert.match(pt, /href="\/pt-BR"/);
   assert.match(pt, /class="floating-dock"/);
   assert.doesNotMatch(pt, /<header[\s>]/);

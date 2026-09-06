@@ -108,7 +108,6 @@ const structuredData = {
     <script is:inline>
       const saved = localStorage.getItem('valkyris-theme');
       if (saved) document.documentElement.dataset.theme = saved;
-      localStorage.setItem('valkyris-locale', document.documentElement.lang);
     </script>
   </head>
   <body><slot /></body>

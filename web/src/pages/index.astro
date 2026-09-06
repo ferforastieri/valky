@@ -11,8 +11,8 @@
     <link rel="alternate" hreflang="x-default" href="https://valkyris.vercel.app/" />
     <title>Valkyris | Monitoramento residencial self-hosted</title>
     <script is:inline>
-      const saved = localStorage.getItem('valkyris-locale');
-      location.replace(saved === 'en' ? '/en' : '/pt-BR');
+      const preferred = navigator.languages?.[0] || navigator.language || '';
+      location.replace(preferred.toLowerCase().startsWith('en') ? '/en' : '/pt-BR');
     </script>
   </head>
   <body><a href="/pt-BR">Valkyris em Português</a></body>
