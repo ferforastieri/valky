@@ -1,6 +1,7 @@
 package com.ferforastieri.valkyris.feature.rules
 
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
@@ -9,6 +10,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.stringResource
@@ -22,7 +24,6 @@ import com.ferforastieri.valkyris.core.model.DetectorKind
 import com.ferforastieri.valkyris.core.model.Rule
 import com.ferforastieri.valkyris.core.model.RuleActions
 import com.ferforastieri.valkyris.core.model.detectorLabelRes
-import com.composables.icons.lucide.EllipsisVertical
 import com.composables.icons.lucide.Lucide
 import com.composables.icons.lucide.Mic
 import com.composables.icons.lucide.Plus
@@ -38,10 +39,10 @@ fun RulesScreen(vm: RulesViewModel = hiltViewModel()) {
     val detectors by vm.detectors.collectAsStateWithLifecycle()
     val saving by vm.saving.collectAsStateWithLifecycle()
     var creating by remember { mutableStateOf(false) }
-    var managing by remember { mutableStateOf<Rule?>(null) }
     var editing by remember { mutableStateOf<Rule?>(null) }
+    var deleting by remember { mutableStateOf<Rule?>(null) }
 
-    RulesContent(rules, cameras.isNotEmpty() && detectors.isNotEmpty(), saving, onAdd = { creating = true }, onManage = { managing = it })
+    RulesContent(rules, cameras.isNotEmpty() && detectors.isNotEmpty(), saving, onAdd = { creating = true }, onEdit = { editing = it }, onDelete = { deleting = it })
     if (creating) {
         RuleEditorDialog(cameras, detectors, saving = saving, onDismiss = { if (!saving) creating = false }) {
             vm.create(it) { success -> if (success) creating = false }
@@ -52,15 +53,7 @@ fun RulesScreen(vm: RulesViewModel = hiltViewModel()) {
             vm.update(existing.id, it) { success -> if (success) editing = null }
         }
     }
-    managing?.let { rule ->
-        RuleOptionsSheet(
-            rule = rule,
-            busy = saving,
-            onDismiss = { if (!saving) managing = null },
-            onEdit = { editing = rule; managing = null },
-            onDelete = { vm.delete(rule.id) { success -> if (success) managing = null } },
-        )
-    }
+    deleting?.let { rule -> DeleteRuleDialog(rule, saving, { deleting = null }) { vm.delete(rule.id) { if (it) deleting = null } } }
 }
 
 @Composable
@@ -70,8 +63,8 @@ fun CameraRulesSection(cameraId: String, vm: RulesViewModel = hiltViewModel()) {
     val detectors by vm.detectors.collectAsStateWithLifecycle()
     val saving by vm.saving.collectAsStateWithLifecycle()
     var creating by remember { mutableStateOf(false) }
-    var managing by remember { mutableStateOf<Rule?>(null) }
     var editing by remember { mutableStateOf<Rule?>(null) }
+    var deleting by remember { mutableStateOf<Rule?>(null) }
     val cameraRules = rules.filter { it.cameraId == cameraId }
     val cameraName = cameras.firstOrNull { it.id == cameraId }?.name.orEmpty()
 
@@ -89,12 +82,12 @@ fun CameraRulesSection(cameraId: String, vm: RulesViewModel = hiltViewModel()) {
                 TextButton(onClick = { creating = true }, enabled = detectors.isNotEmpty() && !saving) { Icon(Lucide.Plus, null, Modifier.size(17.dp)); Spacer(Modifier.width(4.dp)); Text(stringResource(R.string.add_rule)) }
             }
             if (cameraRules.isEmpty()) Text("Configure alertas para esta câmera.", color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodySmall)
-            cameraRules.forEach { RuleCard(it, onManage = { managing = it }) }
+            cameraRules.forEach { RuleCard(it, onEdit = { editing = it }, onDelete = { deleting = it }) }
         }
     }
     if (creating) RuleEditorDialog(cameras, detectors, fixedCameraID = cameraId, saving = saving, onDismiss = { if (!saving) creating = false }) { vm.create(it) { success -> if (success) creating = false } }
     editing?.let { existing -> RuleEditorDialog(cameras, detectors, existing, fixedCameraID = cameraId, saving = saving, onDismiss = { if (!saving) editing = null }) { vm.update(existing.id, it) { success -> if (success) editing = null } } }
-    managing?.let { rule -> RuleOptionsSheet(rule, saving, onDismiss = { if (!saving) managing = null }, onEdit = { editing = rule; managing = null }, onDelete = { vm.delete(rule.id) { success -> if (success) managing = null } }) }
+    deleting?.let { rule -> DeleteRuleDialog(rule, saving, { deleting = null }) { vm.delete(rule.id) { if (it) deleting = null } } }
 }
 
 @Composable
@@ -103,7 +96,8 @@ fun RulesContent(
     canAdd: Boolean = true,
     saving: Boolean = false,
     onAdd: () -> Unit = {},
-    onManage: (Rule) -> Unit = {},
+    onEdit: (Rule) -> Unit = {},
+    onDelete: (Rule) -> Unit = {},
 ) {
     Box(Modifier.fillMaxSize()) {
         Column(Modifier.fillMaxSize().padding(horizontal = 18.dp)) {
@@ -117,7 +111,7 @@ fun RulesContent(
                 }
             } else {
                 LazyColumn(verticalArrangement = Arrangement.spacedBy(10.dp), contentPadding = PaddingValues(bottom = 90.dp)) {
-                    items(rules, key = { it.id }) { rule -> RuleCard(rule, onManage = { onManage(rule) }) }
+                    items(rules, key = { it.id }) { rule -> RuleCard(rule, onEdit = { onEdit(rule) }, onDelete = { onDelete(rule) }) }
                 }
             }
         }
@@ -136,7 +130,7 @@ fun RulesContent(
 }
 
 @Composable
-fun RuleCard(rule: Rule, onManage: () -> Unit) {
+fun RuleCard(rule: Rule, onEdit: () -> Unit, onDelete: () -> Unit) {
     val critical = rule.detectorTypes.any { it in setOf("scream", "glass_break", "smoke_alarm", "fire_alarm", "siren", "tamper") }
     val motion = rule.detectorTypes.any { it == "motion" || it == "person" || it == "tamper" }
     val icon: ImageVector = when { critical -> Lucide.TriangleAlert; motion -> Lucide.Video; else -> Lucide.Mic }
@@ -156,10 +150,8 @@ fun RuleCard(rule: Rule, onManage: () -> Unit) {
             Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(5.dp)) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Text(rule.name, Modifier.weight(1f), fontWeight = FontWeight.SemiBold)
-                    Surface(shape = MaterialTheme.shapes.small, color = if (rule.enabled) MaterialTheme.colorScheme.secondary.copy(alpha = .18f) else MaterialTheme.colorScheme.surfaceVariant) {
-                        Text(stringResource(if (rule.enabled) R.string.rule_enabled else R.string.rule_disabled), Modifier.padding(horizontal = 8.dp, vertical = 3.dp), style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.SemiBold)
-                    }
-                    IconButton(onClick = onManage) { Icon(Lucide.EllipsisVertical, stringResource(R.string.edit_rule)) }
+                    IconButton(onClick = onEdit) { Icon(Lucide.SlidersHorizontal, stringResource(R.string.edit_rule)) }
+                    IconButton(onClick = onDelete) { Icon(Lucide.Trash2, stringResource(R.string.remove_rule), tint = MaterialTheme.colorScheme.error) }
                 }
                 Text(description, color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodySmall)
             }
@@ -168,24 +160,13 @@ fun RuleCard(rule: Rule, onManage: () -> Unit) {
 }
 
 @Composable
-fun RuleOptionsSheet(rule: Rule, busy: Boolean, onDismiss: () -> Unit, onEdit: () -> Unit, onDelete: () -> Unit) {
-    com.ferforastieri.valkyris.core.design.ValkyrisBottomSheet(
-        title = rule.name,
-        onDismiss = onDismiss,
-        dismissEnabled = !busy,
-        actions = {
-            TextButton(onClick = onEdit, enabled = !busy) { Text(stringResource(R.string.edit_rule)) }
-            Button(onClick = onDelete, enabled = !busy, colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error, contentColor = MaterialTheme.colorScheme.onError)) {
-                if (busy) CircularProgressIndicator(Modifier.size(18.dp), strokeWidth = 2.dp, color = MaterialTheme.colorScheme.onError)
-                else Icon(Lucide.Trash2, null)
-                Spacer(Modifier.width(7.dp))
-                Text(stringResource(R.string.remove_rule))
-            }
-        },
-    ) {
-        Text(stringResource(R.string.rule_detects, rule.detectorTypes.joinToString()), color = MaterialTheme.colorScheme.onSurfaceVariant)
-    }
-}
+private fun DeleteRuleDialog(rule: Rule, busy: Boolean, onDismiss: () -> Unit, onDelete: () -> Unit) = AlertDialog(
+    onDismissRequest = { if (!busy) onDismiss() },
+    title = { Text("Remover regra?") },
+    text = { Text("A regra “${rule.name}” será removida permanentemente.") },
+    dismissButton = { TextButton(onClick = onDismiss, enabled = !busy) { Text(stringResource(R.string.cancel)) } },
+    confirmButton = { Button(onClick = onDelete, enabled = !busy, colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error, contentColor = MaterialTheme.colorScheme.onError)) { Text(stringResource(R.string.remove_rule)) } },
+)
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -243,8 +224,8 @@ fun RuleEditorDialog(cameras: List<Camera>, detectors: List<DetectorKind>, exist
 
 @Composable
 private fun RuleActionRow(checked: Boolean, onChecked: (Boolean) -> Unit, label: String) {
-    Row(verticalAlignment = Alignment.CenterVertically) {
-        Switch(checked, onChecked)
+    Row(Modifier.fillMaxWidth().toggleable(value = checked, role = Role.Switch, onValueChange = onChecked), verticalAlignment = Alignment.CenterVertically) {
+        Switch(checked = checked, onCheckedChange = null)
         Spacer(Modifier.width(8.dp))
         Text(label)
     }

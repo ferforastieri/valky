@@ -26,8 +26,8 @@ class PeopleViewModel @Inject constructor(
     val busy = _busy.asStateFlow()
 
     init { refresh() }
-    fun refresh() = viewModelScope.launch { runCatching { repository.refreshPeople() }; runCatching { repository.refreshPlaces() } }
-    fun history(person: TrackedPerson) = viewModelScope.launch { _history.value = runCatching { repository.api.personHistory(person.id) }.getOrDefault(emptyList()) }
+    fun refresh() = viewModelScope.launch { runCatching { repository.refreshUsers() }; runCatching { repository.refreshPlaces() } }
+    fun history(person: TrackedPerson) = viewModelScope.launch { _history.value = runCatching { repository.api.userHistory(person.id) }.getOrDefault(emptyList()) }
     fun createPerson(person: TrackedPerson, done: (Boolean) -> Unit) = action(done) { repository.createPerson(person) }
     fun updatePerson(person: TrackedPerson, done: (Boolean) -> Unit) = action(done) { repository.updatePerson(person.id, person) }
     fun deletePerson(person: TrackedPerson, done: (Boolean) -> Unit = {}) = action(done) { repository.deletePerson(person.id) }

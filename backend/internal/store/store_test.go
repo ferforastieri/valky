@@ -61,6 +61,10 @@ func TestOpenPromotesLegacyDevicesWithoutChangingNewDefault(t *testing.T) {
 	if err = db.DB.QueryRow(`SELECT is_admin FROM devices WHERE id='legacy'`).Scan(&legacyAdmin); err != nil || legacyAdmin != 1 {
 		t.Fatalf("legacy device was not promoted: admin=%d err=%v", legacyAdmin, err)
 	}
+	var userID, userName string
+	if err = db.DB.QueryRow(`SELECT d.user_id,u.name FROM devices d JOIN users u ON u.id=d.user_id WHERE d.id='legacy'`).Scan(&userID, &userName); err != nil || userID == "" || userName != "Owner" {
+		t.Fatalf("legacy device was not linked to a user: id=%q name=%q err=%v", userID, userName, err)
+	}
 	if _, err = db.DB.Exec(`INSERT INTO devices(id,name,token_hash,created_at) VALUES('new','Guest',x'02','now')`); err != nil {
 		t.Fatal(err)
 	}

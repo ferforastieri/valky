@@ -118,7 +118,9 @@ func (m *Monitor) monitorAudio(ctx context.Context, cameraID string) {
 			results, classifyErr := m.Classifier.Classify(ctx, window)
 			if classifyErr == nil {
 				for _, result := range uniqueResults(results) {
-					if result.Confidence >= 0.05 {
+					// The rule service applies the detector-specific reliability
+					// threshold. Do not feed it noise from the classifier.
+					if result.Confidence >= 0.70 {
 						m.submit(ctx, rules.Detection{CameraID: cameraID, Type: result.Type, Confidence: result.Confidence, OccurredAt: time.Now().UTC(), Metadata: map[string]any{"source": "sherpa-onnx"}})
 					}
 				}

@@ -123,6 +123,38 @@ paths:
       summary: Delete an automation rule
       parameters: [{$ref: '#/components/parameters/id'}]
       responses: {'200': {description: Deleted with message envelope, content: {application/json: {schema: {$ref: '#/components/schemas/APIResponse'}}}}}
+  /users:
+    get:
+      summary: List family users linked to paired devices
+      responses: {'200': {description: Users in APIResponse.data, content: {application/json: {schema: {$ref: '#/components/schemas/APIResponse'}}}}}
+  /users/{id}/history:
+    get:
+      summary: List a family user's location history
+      parameters: [{$ref: '#/components/parameters/id'}]
+      responses: {'200': {description: Location history in APIResponse.data, content: {application/json: {schema: {$ref: '#/components/schemas/APIResponse'}}}}}
+  /me/location:
+    post:
+      summary: Record the authenticated device user's location
+      requestBody: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/UserLocation'}}}}
+      responses: {'200': {description: Location recorded, content: {application/json: {schema: {$ref: '#/components/schemas/APIResponse'}}}}}
+  /places:
+    get:
+      summary: List family alert areas
+      responses: {'200': {description: Places in APIResponse.data, content: {application/json: {schema: {$ref: '#/components/schemas/APIResponse'}}}}}
+    post:
+      summary: Create a family alert area as administrator
+      requestBody: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/Place'}}}}
+      responses: {'201': {description: Created, content: {application/json: {schema: {$ref: '#/components/schemas/APIResponse'}}}}}
+  /places/{id}:
+    put:
+      summary: Update a family alert area as administrator
+      parameters: [{$ref: '#/components/parameters/id'}]
+      requestBody: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/Place'}}}}
+      responses: {'200': {description: Updated, content: {application/json: {schema: {$ref: '#/components/schemas/APIResponse'}}}}}
+    delete:
+      summary: Delete a family alert area as administrator
+      parameters: [{$ref: '#/components/parameters/id'}]
+      responses: {'200': {description: Deleted, content: {application/json: {schema: {$ref: '#/components/schemas/APIResponse'}}}}}
   /events:
     get:
       summary: List recent events
@@ -338,6 +370,23 @@ components:
         schedule: {$ref: '#/components/schemas/Schedule'}
         actions: {$ref: '#/components/schemas/Actions'}
         enabled: {type: boolean}
+    UserLocation:
+      type: object
+      required: [latitude, longitude]
+      properties:
+        latitude: {type: number, minimum: -90, maximum: 90}
+        longitude: {type: number, minimum: -180, maximum: 180}
+        accuracy: {type: number, minimum: 0}
+        occurredAt: {type: string, format: date-time}
+    Place:
+      type: object
+      required: [name, latitude, longitude, radiusMeters]
+      properties:
+        id: {type: string, format: uuid}
+        name: {type: string}
+        latitude: {type: number, minimum: -90, maximum: 90}
+        longitude: {type: number, minimum: -180, maximum: 180}
+        radiusMeters: {type: number, minimum: 20, maximum: 5000}
     Schedule:
       type: object
       properties:

@@ -84,6 +84,7 @@ class ValkyrisRepository @Inject constructor(
     }
 
     suspend fun refreshPeople() = api.people().also { _people.value = it }
+    suspend fun refreshUsers() = api.users().also { _people.value = it }
     suspend fun refreshPlaces() = api.places().also { _places.value = it }
     suspend fun createPerson(person: TrackedPerson) = api.createPerson(person).also { created -> _people.update { (it + created).distinctBy(TrackedPerson::id) } }
     suspend fun updatePerson(id: String, person: TrackedPerson) = api.updatePerson(id, person).also { updated -> _people.update { it.map { current -> if (current.id == id) updated else current } } }

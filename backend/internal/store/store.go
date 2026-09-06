@@ -43,6 +43,7 @@ func Open(path string) (*Store, error) {
 		{"cameras", "icon", `ALTER TABLE cameras ADD COLUMN icon TEXT NOT NULL DEFAULT 'camera'`, ""},
 		// Devices paired by releases without roles were trusted setup devices.
 		{"devices", "is_admin", `ALTER TABLE devices ADD COLUMN is_admin INTEGER NOT NULL DEFAULT 0`, `UPDATE devices SET is_admin=1`},
+		{"devices", "user_id", `ALTER TABLE devices ADD COLUMN user_id TEXT REFERENCES users(id) ON DELETE SET NULL`, ""},
 	} {
 		exists, migrationErr := columnExists(ctx, db, migration.table, migration.column)
 		if migrationErr != nil {
@@ -73,15 +74,85 @@ func Open(path string) (*Store, error) {
 			}
 		}
 	}
+	if _, err = db.ExecContext(ctx, `CREATE INDEX IF NOT EXISTS idx_devices_user_id ON devices(user_id)`); err != nil {
+		db.Close()
+		return nil, fmt.Errorf("index device users: %w", err)
+	}
 	if err = migrateRulesWithoutConfidence(ctx, db); err != nil {
 		db.Close()
 		return nil, err
+	}
+	// Pausing rules was removed from the interface. Normalize old accidental
+	// disabled values before serving the API again.
+	if _, err = db.ExecContext(ctx, `UPDATE rules SET enabled=1 WHERE enabled=0`); err != nil {
+		db.Close()
+		return nil, fmt.Errorf("reactivate rules: %w", err)
 	}
 	if err = migrateEventsForTracking(ctx, db); err != nil {
 		db.Close()
 		return nil, err
 	}
+	if err = migrateUsersFromDevices(ctx, db); err != nil {
+		db.Close()
+		return nil, err
+	}
 	return &Store{DB: db}, nil
+}
+
+// Devices existed before family profiles. Keep every device intact and create
+// exactly one linked user for each legacy device that has no user yet.
+func migrateUsersFromDevices(ctx context.Context, db *sql.DB) error {
+	rows, err := db.QueryContext(ctx, `SELECT id,name,created_at FROM devices WHERE user_id IS NULL OR user_id=''`)
+	if err != nil {
+		return fmt.Errorf("find unlinked devices: %w", err)
+	}
+	defer rows.Close()
+	type legacyDevice struct{ id, name, createdAt string }
+	var devices []legacyDevice
+	for rows.Next() {
+		var deviceID, name, createdAt string
+		if err := rows.Scan(&deviceID, &name, &createdAt); err != nil {
+			return fmt.Errorf("scan unlinked device: %w", err)
+		}
+		devices = append(devices, legacyDevice{deviceID, name, createdAt})
+	}
+	if err := rows.Err(); err != nil {
+		return err
+	}
+	if err := rows.Close(); err != nil {
+		return err
+	}
+	for _, device := range devices {
+		userID := "user-" + device.id
+		var legacyPersonID string
+		err := db.QueryRowContext(ctx, `SELECT id FROM people WHERE device_id=? ORDER BY created_at LIMIT 1`, device.id).Scan(&legacyPersonID)
+		switch {
+		case err == nil:
+			userID = legacyPersonID
+			if _, err := db.ExecContext(ctx, `INSERT OR IGNORE INTO users(id,name,color,enabled,last_latitude,last_longitude,last_accuracy,last_located_at,created_at,updated_at)
+				SELECT id,name,color,enabled,last_latitude,last_longitude,last_accuracy,last_located_at,created_at,updated_at FROM people WHERE id=?`, legacyPersonID); err != nil {
+				return fmt.Errorf("migrate legacy person: %w", err)
+			}
+			if _, err := db.ExecContext(ctx, `INSERT OR IGNORE INTO user_locations(id,user_id,latitude,longitude,accuracy,occurred_at,created_at)
+				SELECT id,person_id,latitude,longitude,accuracy,occurred_at,created_at FROM person_locations WHERE person_id=?`, legacyPersonID); err != nil {
+				return fmt.Errorf("migrate legacy locations: %w", err)
+			}
+			if _, err := db.ExecContext(ctx, `INSERT OR IGNORE INTO user_place_memberships(user_id,place_id,inside,updated_at)
+				SELECT person_id,place_id,inside,updated_at FROM place_memberships WHERE person_id=?`, legacyPersonID); err != nil {
+				return fmt.Errorf("migrate legacy place memberships: %w", err)
+			}
+		case err == sql.ErrNoRows:
+			if _, err := db.ExecContext(ctx, `INSERT OR IGNORE INTO users(id,name,color,enabled,created_at,updated_at) VALUES(?,?,?,1,?,?)`, userID, device.name, "#5B5BD6", device.createdAt, device.createdAt); err != nil {
+				return fmt.Errorf("create user for device: %w", err)
+			}
+		default:
+			return fmt.Errorf("find legacy person for device: %w", err)
+		}
+		if _, err := db.ExecContext(ctx, `UPDATE devices SET user_id=? WHERE id=?`, userID, device.id); err != nil {
+			return fmt.Errorf("link device to user: %w", err)
+		}
+	}
+	return nil
 }
 
 // Tracking events use the same notification and acknowledgement lifecycle as

@@ -69,13 +69,13 @@ import com.composables.icons.lucide.ChevronLeft
 import com.composables.icons.lucide.ChevronRight
 import com.composables.icons.lucide.ChevronUp
 import com.composables.icons.lucide.Check
-import com.composables.icons.lucide.EllipsisVertical
 import com.composables.icons.lucide.Lucide
 import com.composables.icons.lucide.Mic
 import com.composables.icons.lucide.Maximize2
 import com.composables.icons.lucide.Minus
 import com.composables.icons.lucide.Move
 import com.composables.icons.lucide.Plus
+import com.composables.icons.lucide.SlidersHorizontal
 import com.composables.icons.lucide.Trash2
 import com.composables.icons.lucide.Video
 import com.composables.icons.lucide.VideoOff
@@ -88,15 +88,14 @@ import com.composables.icons.lucide.VolumeX
     val state by vm.state.collectAsStateWithLifecycle()
     var showAdd by remember{mutableStateOf(false)}
     var failedCameraId by remember{mutableStateOf<String?>(null)}
-    var managedCameraId by remember{mutableStateOf<String?>(null)}
     var editingCameraId by remember{mutableStateOf<String?>(null)}
+    var deletingCameraId by remember{mutableStateOf<String?>(null)}
     val failedCamera=state.cameras.firstOrNull{it.id==failedCameraId}
-    val managedCamera=state.cameras.firstOrNull{it.id==managedCameraId}
     val editingCamera=state.cameras.firstOrNull{it.id==editingCameraId}
     CamerasContent(state, onCamera={id->
         val camera=state.cameras.firstOrNull{it.id==id}
         if(camera?.setupStatus=="failed")failedCameraId=id else onCamera(id)
-    }, onManage={managedCameraId=it}, onAdd = { if (!state.creating) showAdd = true })
+    }, onEdit={editingCameraId=it}, onDelete={deletingCameraId=it}, onAdd = { if (!state.creating) showAdd = true })
     if(showAdd)CameraEditorDialog(onDismiss={showAdd=false},onSave={vm.add(it);showAdd=false})
     editingCamera?.let { camera ->
         CameraEditorDialog(
@@ -107,11 +106,19 @@ import com.composables.icons.lucide.VolumeX
         )
     }
     failedCamera?.let{camera->CameraFailureSheet(camera,onDismiss={failedCameraId=null},onEdit={editingCameraId=camera.id;failedCameraId=null},onDelete={vm.delete(camera.id);failedCameraId=null})}
-    managedCamera?.let{camera->CameraOptionsSheet(camera,camera.id in state.deleting || camera.id in state.updating,onDismiss={managedCameraId=null},onEdit={editingCameraId=camera.id;managedCameraId=null},onDelete={vm.delete(camera.id);managedCameraId=null})}
+    deletingCameraId?.let { id -> state.cameras.firstOrNull { it.id == id }?.let { camera ->
+        AlertDialog(
+            onDismissRequest = { if (id !in state.deleting) deletingCameraId = null },
+            title = { Text("Remover câmera?") },
+            text = { Text("A câmera “${camera.name}” e suas regras serão removidas permanentemente.") },
+            dismissButton = { TextButton(onClick = { deletingCameraId = null }, enabled = id !in state.deleting) { Text(stringResource(R.string.cancel)) } },
+            confirmButton = { Button(onClick = { vm.delete(id); deletingCameraId = null }, enabled = id !in state.deleting, colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error, contentColor = MaterialTheme.colorScheme.onError)) { Text(stringResource(R.string.remove_camera)) } },
+        )
+    } }
 }
 
 @Composable
-fun CamerasContent(state: CamerasState, onCamera: (String) -> Unit = {}, onManage: (String) -> Unit = {}, onAdd: () -> Unit = {}) {
+fun CamerasContent(state: CamerasState, onCamera: (String) -> Unit = {}, onEdit: (String) -> Unit = {}, onDelete: (String) -> Unit = {}, onAdd: () -> Unit = {}) {
     Box(Modifier.fillMaxSize()){
         Column(Modifier.fillMaxSize().padding(horizontal=18.dp)){
             Spacer(Modifier.height(10.dp))
@@ -121,7 +128,7 @@ fun CamerasContent(state: CamerasState, onCamera: (String) -> Unit = {}, onManag
             when{
                 state.loading->Box(Modifier.fillMaxSize()){CircularProgressIndicator(Modifier.align(Alignment.Center))}
                 state.cameras.isEmpty()->EmptyCameras()
-                else->LazyColumn(verticalArrangement=Arrangement.spacedBy(12.dp),contentPadding=PaddingValues(bottom=96.dp)){items(state.cameras,key={it.id}){camera->CameraCard(camera,state.snapshots[camera.id],onClick={onCamera(camera.id)},onManage={onManage(camera.id)})}}
+                else->LazyColumn(verticalArrangement=Arrangement.spacedBy(12.dp),contentPadding=PaddingValues(bottom=96.dp)){items(state.cameras,key={it.id}){camera->CameraCard(camera,state.snapshots[camera.id],onClick={onCamera(camera.id)},onEdit={onEdit(camera.id)},onDelete={onDelete(camera.id)})}}
             }
         }
         FloatingActionButton(
@@ -160,40 +167,6 @@ fun CameraFailureSheet(camera:Camera,onDismiss:()->Unit,onEdit:(()->Unit)?=null,
     }
 }
 
-@Composable
-private fun CameraOptionsSheet(camera:Camera,busy:Boolean,onDismiss:()->Unit,onEdit:()->Unit,onDelete:()->Unit){
-    com.ferforastieri.valkyris.core.design.ValkyrisBottomSheet(
-        title=stringResource(R.string.camera_options),
-        onDismiss=onDismiss,
-        dismissEnabled=!busy,
-        actions={
-            TextButton(onClick=onEdit, enabled=!busy){Text(stringResource(R.string.edit_camera))}
-            Button(
-                onClick=onDelete,
-                enabled=!busy,
-                colors=ButtonDefaults.buttonColors(containerColor=MaterialTheme.colorScheme.error,contentColor=MaterialTheme.colorScheme.onError),
-            ){
-                if(busy)CircularProgressIndicator(Modifier.size(18.dp),strokeWidth=2.dp,color=MaterialTheme.colorScheme.onError)
-                else Icon(Lucide.Trash2,null)
-                Spacer(Modifier.width(7.dp))
-                Text(if(busy)stringResource(R.string.saving_camera) else stringResource(R.string.remove_camera))
-            }
-        },
-    ){
-        Row(Modifier.fillMaxWidth(),verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(14.dp)){
-            Surface(shape=MaterialTheme.shapes.large,color=MaterialTheme.colorScheme.secondaryContainer){
-                Icon(cameraIcon(camera.icon),null,Modifier.padding(14.dp).size(30.dp),tint=MaterialTheme.colorScheme.onSecondaryContainer)
-            }
-            Column(Modifier.weight(1f)){
-                Text(camera.name,style=MaterialTheme.typography.titleMedium,fontWeight=FontWeight.SemiBold)
-                Text(camera.host,style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant)
-            }
-        }
-        Spacer(Modifier.height(18.dp))
-        Text(stringResource(R.string.remove_camera_body),style=MaterialTheme.typography.bodyMedium,color=MaterialTheme.colorScheme.onSurfaceVariant)
-    }
-}
-
 @Composable private fun CameraEditorDialog(camera:Camera?=null,saving:Boolean=false,onDismiss:()->Unit,onSave:(CreateCameraRequest)->Unit){
     var name by remember(camera?.id){mutableStateOf(camera?.name.orEmpty())};var icon by remember(camera?.id){mutableStateOf(camera?.icon?:"camera")};var host by remember(camera?.id){mutableStateOf(camera?.host.orEmpty())};var port by remember(camera?.id){mutableStateOf((camera?.port?:2020).toString())};var username by remember(camera?.id){mutableStateOf("")};var password by remember(camera?.id){mutableStateOf("")}
     val editing=camera!=null
@@ -229,7 +202,7 @@ private fun CameraOptionsSheet(camera:Camera,busy:Boolean,onDismiss:()->Unit,onE
 }
 
 @Composable
-private fun CameraCard(camera: Camera, snapshot: android.graphics.Bitmap?, onClick: () -> Unit, onManage: () -> Unit) {
+private fun CameraCard(camera: Camera, snapshot: android.graphics.Bitmap?, onClick: () -> Unit, onEdit: () -> Unit, onDelete: () -> Unit) {
     val ready = camera.setupStatus == "ready"
     val failed = camera.setupStatus == "failed"
     Card(onClick = onClick, modifier = Modifier.fillMaxWidth(), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface), border = androidx.compose.foundation.BorderStroke(1.dp, if (failed) MaterialTheme.colorScheme.error.copy(alpha = .45f) else MaterialTheme.colorScheme.outlineVariant), elevation = CardDefaults.cardElevation(defaultElevation = 6.dp)) {
@@ -257,7 +230,8 @@ private fun CameraCard(camera: Camera, snapshot: android.graphics.Bitmap?, onCli
                 }
                 if (camera.capabilities.audio) Icon(Lucide.Mic, null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
                 if (camera.capabilities.ptz) { Spacer(Modifier.width(8.dp)); Icon(Lucide.Move, null, tint = MaterialTheme.colorScheme.onSurfaceVariant) }
-                IconButton(onClick=onManage){Icon(Lucide.EllipsisVertical,stringResource(R.string.camera_options),tint=MaterialTheme.colorScheme.onSurfaceVariant)}
+                IconButton(onClick=onEdit){Icon(Lucide.SlidersHorizontal,stringResource(R.string.edit_camera),tint=MaterialTheme.colorScheme.onSurfaceVariant)}
+                IconButton(onClick=onDelete){Icon(Lucide.Trash2,stringResource(R.string.remove_camera),tint=MaterialTheme.colorScheme.error)}
             }
         }
     }

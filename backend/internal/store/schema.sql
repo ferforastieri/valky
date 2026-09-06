@@ -66,6 +66,21 @@ CREATE TABLE IF NOT EXISTS events (
 );
 CREATE INDEX IF NOT EXISTS idx_events_occurred ON events(occurred_at DESC);
 
+-- A user is the person shown on the family map. Devices are technical
+-- credentials and may be linked to the same user; they are not the profile.
+CREATE TABLE IF NOT EXISTS users (
+  id TEXT PRIMARY KEY,
+  name TEXT NOT NULL,
+  color TEXT NOT NULL DEFAULT '#5B5BD6',
+  enabled INTEGER NOT NULL DEFAULT 1,
+  last_latitude REAL,
+  last_longitude REAL,
+  last_accuracy REAL,
+  last_located_at TEXT,
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL
+);
+
 CREATE TABLE IF NOT EXISTS people (
   id TEXT PRIMARY KEY,
   name TEXT NOT NULL,
@@ -112,6 +127,7 @@ CREATE TABLE IF NOT EXISTS place_memberships (
 
 CREATE TABLE IF NOT EXISTS devices (
   id TEXT PRIMARY KEY,
+  user_id TEXT REFERENCES users(id) ON DELETE SET NULL,
   name TEXT NOT NULL,
   token_hash BLOB NOT NULL UNIQUE,
   is_admin INTEGER NOT NULL DEFAULT 0,
@@ -121,6 +137,24 @@ CREATE TABLE IF NOT EXISTS devices (
   enabled INTEGER NOT NULL DEFAULT 1,
   created_at TEXT NOT NULL,
   last_seen_at TEXT
+);
+CREATE TABLE IF NOT EXISTS user_locations (
+  id TEXT PRIMARY KEY,
+  user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  latitude REAL NOT NULL,
+  longitude REAL NOT NULL,
+  accuracy REAL NOT NULL DEFAULT 0,
+  occurred_at TEXT NOT NULL,
+  created_at TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_user_locations_user_time ON user_locations(user_id, occurred_at DESC);
+
+CREATE TABLE IF NOT EXISTS user_place_memberships (
+  user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  place_id TEXT NOT NULL REFERENCES places(id) ON DELETE CASCADE,
+  inside INTEGER NOT NULL DEFAULT 0,
+  updated_at TEXT NOT NULL,
+  PRIMARY KEY(user_id, place_id)
 );
 
 CREATE TABLE IF NOT EXISTS pairing_sessions (

@@ -33,7 +33,6 @@ class LocationTrackingService : Service(), LocationListener {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private lateinit var locationManager: LocationManager
     private lateinit var preferences: SharedPreferences
-    private var personId = ""
 
     override fun onCreate() {
         super.onCreate()
@@ -44,9 +43,8 @@ class LocationTrackingService : Service(), LocationListener {
 
     @SuppressLint("MissingPermission") // guarded by hasLocationPermission immediately below
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
-        personId = intent?.getStringExtra(EXTRA_PERSON_ID).orEmpty().ifBlank { preferences.getString(EXTRA_PERSON_ID, "").orEmpty() }
-        if (personId.isBlank() || !hasLocationPermission()) { stopSelf(); return START_NOT_STICKY }
-        preferences.edit().putString(EXTRA_PERSON_ID, personId).apply()
+        if (!hasLocationPermission()) { stopSelf(); return START_NOT_STICKY }
+        preferences.edit().putBoolean(TRACKING_ENABLED, true).apply()
         startForeground(NOTIFICATION_ID, notification())
         runCatching {
             locationManager.removeUpdates(this)
@@ -62,10 +60,9 @@ class LocationTrackingService : Service(), LocationListener {
 
     override fun onLocationChanged(location: Location) = report(location)
     private fun report(location: Location) {
-        if (personId.isBlank()) return
         scope.launch {
             runCatching {
-                api.reportLocation(personId, PersonLocation(
+                api.reportMyLocation(PersonLocation(
                     latitude = location.latitude,
                     longitude = location.longitude,
                     accuracy = location.accuracy.toDouble(),
@@ -84,8 +81,8 @@ class LocationTrackingService : Service(), LocationListener {
     companion object {
         private const val CHANNEL_ID = "location-tracking"
         private const val NOTIFICATION_ID = 117
-        private const val EXTRA_PERSON_ID = "person_id"
+        private const val TRACKING_ENABLED = "tracking_enabled"
         private const val PREFERENCES = "location_tracking"
-        fun start(context: Context, personId: String) = ContextCompat.startForegroundService(context, Intent(context, LocationTrackingService::class.java).putExtra(EXTRA_PERSON_ID, personId))
+        fun start(context: Context) = ContextCompat.startForegroundService(context, Intent(context, LocationTrackingService::class.java))
     }
 }

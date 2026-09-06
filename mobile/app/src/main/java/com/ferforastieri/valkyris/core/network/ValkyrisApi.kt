@@ -230,6 +230,7 @@ class ValkyrisApi(
     suspend fun updateRetention(settings: RetentionSettings): RetentionSettings = put("/settings/retention", settings, R.string.notice_retention_saved, announceError = true)
 
     suspend fun people(): List<TrackedPerson> = get("/people")
+    suspend fun users(): List<TrackedPerson> = get("/users")
     suspend fun createPerson(person: TrackedPerson): TrackedPerson = post("/people", person, announceError = true)
     suspend fun updatePerson(id: String, person: TrackedPerson): TrackedPerson = put("/people/$id", person, announceError = true)
     suspend fun deletePerson(id: String) {
@@ -245,6 +246,8 @@ class ValkyrisApi(
     }
     suspend fun personHistory(id: String): List<PersonLocation> = get("/people/$id/history?limit=200")
     suspend fun reportLocation(id: String, location: PersonLocation): Int = post<Map<String, Int>, PersonLocation>("/people/$id/locations", location)["transitions"] ?: 0
+    suspend fun userHistory(id: String): List<PersonLocation> = get("/users/$id/history?limit=200")
+    suspend fun reportMyLocation(location: PersonLocation): Int = post<Map<String, Int>, PersonLocation>("/me/location", location)["transitions"] ?: 0
 
     suspend fun events(): List<ValkyrisEvent> = get("/events?limit=100")
     suspend fun event(id: String): ValkyrisEvent = get("/events/$id")

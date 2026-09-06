@@ -24,7 +24,8 @@ Valkyris transforma um servidor doméstico em uma central privada de monitoramen
 - Live view LL-HLS autenticado, com uma única conexão RTSP por câmera e conversão apenas do áudio G.711 para AAC.
 - Movimento PTZ por pressionar e segurar e zoom quando anunciado pela câmera.
 - Cadastro assíncrono: a câmera aparece imediatamente e o progresso ou erro fica persistido.
-- Regras para movimento e sons residenciais, com confiança, confirmações, agenda e cooldown.
+- Regras para movimento e sons residenciais; a confiança mínima é aplicada internamente por detector, sem ajuste manual, e as regras ficam sempre ativas.
+- Mapa familiar com usuários vinculados aos dispositivos pareados, histórico de localização e alertas de entrada e saída de áreas.
 - Eventos com snapshot, reconhecimento, notificação e clipe com pré/pós-evento.
 - Credenciais de câmera cifradas com AES-256-GCM e tokens persistidos somente como hash.
 - Atualização do backend pelo app e download do APK assinado diretamente da release no GitHub.
@@ -200,6 +201,10 @@ Além do contrato completo em OpenAPI, as rotas adicionadas recentemente são:
 | --- | --- | --- | --- |
 | `PUT` | `/api/v1/cameras/{id}` | Autenticado | Edita uma câmera e reconfigura o stream se a conexão mudar. |
 | `PUT` | `/api/v1/rules/{id}` | Autenticado | Edita uma regra. |
+| `GET` | `/api/v1/users` | Autenticado | Lista os usuários da família vinculados aos dispositivos pareados. |
+| `GET` | `/api/v1/users/{id}/history` | Autenticado | Retorna o histórico de localização do usuário. |
+| `POST` | `/api/v1/me/location` | Autenticado | Registra a localização do usuário vinculado ao dispositivo atual. |
+| `GET · POST · PUT · DELETE` | `/api/v1/places` | Autenticado / Admin ao alterar | Lista áreas ou cria, altera e remove áreas de alerta. |
 | `POST` | `/api/v1/events/acknowledge-all` | Autenticado | Marca todos os eventos pendentes como lidos. |
 | `GET` | `/api/v1/settings/push` | Autenticado | Informa apenas se o FCM está configurado. |
 | `PUT` | `/api/v1/settings/push` | Administrador | Recebe `{ "serviceAccountBase64": "..." }`, valida e cifra a conta de serviço no SQLite. |

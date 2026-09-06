@@ -59,12 +59,15 @@ func (s *Service) Update(ctx context.Context, id string, r Rule) (Rule, error) {
 		return r, err
 	}
 	r.ID = id
+	// Rules have no paused state in the product. A stale client payload must
+	// never silently turn an edited rule off.
+	r.Enabled = true
 	r.UpdatedAt = time.Now().UTC()
 	det, _ := json.Marshal(r.DetectorTypes)
 	schedule, _ := json.Marshal(r.Schedule)
 	actions, _ := json.Marshal(r.Actions)
 	result, err := s.store.DB.ExecContext(ctx, `UPDATE rules SET camera_id=?,name=?,detector_types_json=?,confirmations=?,cooldown_seconds=?,schedule_json=?,actions_json=?,enabled=?,updated_at=? WHERE id=?`,
-		r.CameraID, r.Name, string(det), r.Confirmations, r.CooldownSeconds, string(schedule), string(actions), boolToInt(r.Enabled), r.UpdatedAt.Format(time.RFC3339Nano), id)
+		r.CameraID, r.Name, string(det), r.Confirmations, r.CooldownSeconds, string(schedule), string(actions), 1, r.UpdatedAt.Format(time.RFC3339Nano), id)
 	if err != nil {
 		return r, err
 	}
@@ -88,13 +91,6 @@ func normalizeRule(r *Rule) error {
 		r.Confirmations = 1
 	}
 	return nil
-}
-
-func boolToInt(value bool) int {
-	if value {
-		return 1
-	}
-	return 0
 }
 
 func canonicalStrings(values []string) []string {
@@ -174,6 +170,9 @@ func (s *Service) Delete(ctx context.Context, id string) error {
 }
 
 func (s *Service) Match(ctx context.Context, d Detection) ([]Rule, error) {
+	if !reliableDetection(d) {
+		return nil, nil
+	}
 	all, err := s.List(ctx, d.CameraID)
 	if err != nil {
 		return nil, err
@@ -203,6 +202,28 @@ func (s *Service) Match(ctx context.Context, d Detection) ([]Rule, error) {
 		matched = append(matched, r)
 	}
 	return matched, nil
+}
+
+// Confidence is an acquisition safeguard, not a user-tuned rule setting.
+// Keep the event value for inspection but reject weak detector output before
+// it can increment confirmations or create an alert.
+func reliableDetection(d Detection) bool {
+	source, _ := d.Metadata["source"].(string)
+	if source == "onvif" {
+		return d.Confidence >= .5
+	}
+	minimum := .70
+	switch d.Type {
+	case "motion", "person", "tamper":
+		minimum = .20
+	case "baby_cry", "crying", "scream":
+		minimum = .78
+	case "glass_break", "smoke_alarm", "fire_alarm", "siren":
+		minimum = .85
+	case "doorbell", "knock", "dog_bark":
+		minimum = .72
+	}
+	return d.Confidence >= minimum
 }
 
 type scanner interface{ Scan(...any) error }

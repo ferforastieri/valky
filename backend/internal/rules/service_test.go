@@ -46,7 +46,11 @@ func TestConfirmationsAndCooldown(t *testing.T) {
 	if matched, _ := service.Match(context.Background(), Detection{CameraID: "cam", Type: "baby_cry", Confidence: .05, OccurredAt: now}); len(matched) != 0 {
 		t.Fatal("first confirmation matched")
 	}
-	matched, err := service.Match(context.Background(), Detection{CameraID: "cam", Type: "baby_cry", Confidence: .05, OccurredAt: now.Add(time.Second)})
+	matched, err := service.Match(context.Background(), Detection{CameraID: "cam", Type: "baby_cry", Confidence: .90, OccurredAt: now.Add(time.Second)})
+	if err != nil || len(matched) != 0 {
+		t.Fatalf("first reliable confirmation did not remain pending: %#v err=%v", matched, err)
+	}
+	matched, err = service.Match(context.Background(), Detection{CameraID: "cam", Type: "baby_cry", Confidence: .90, OccurredAt: now.Add(2 * time.Second)})
 	if err != nil || len(matched) != 1 || matched[0].ID != rule.ID {
 		t.Fatalf("second confirmation did not match: %#v err=%v", matched, err)
 	}
@@ -112,7 +116,7 @@ func TestSimpleRuleTriggersOnceWithoutUserTuning(t *testing.T) {
 		}
 		d := Detection{CameraID: "cam", Type: kind, Confidence: .9, OccurredAt: now}
 		if kind == "motion" {
-			d.Confidence = .15
+			d.Confidence = .25
 			d.Metadata = map[string]any{"source": "visual_fallback"}
 		}
 		matched, err := s.Match(context.Background(), d)

@@ -154,18 +154,14 @@ func (m *Manager) Pair(ctx context.Context, req PairRequest) (PairResponse, erro
 		return PairResponse{}, fmt.Errorf("invalid or expired pairing code")
 	}
 
-	token, err := appcrypto.RandomToken(32)
-	if err != nil {
-		return PairResponse{}, err
-	}
-	deviceID := uuid.NewString()
 	now := time.Now().UTC().Format(time.RFC3339Nano)
 	tx, err := m.store.DB.BeginTx(ctx, nil)
 	if err != nil {
 		return PairResponse{}, err
 	}
 	defer tx.Rollback()
-	if _, err = tx.ExecContext(ctx, `INSERT INTO devices(id,name,token_hash,is_admin,locale,created_at,last_seen_at) VALUES(?,?,?,?,?,?,?)`, deviceID, req.DeviceName, appcrypto.Hash(token), 0, req.Locale, now, now); err != nil {
+	response, err := issueDevice(ctx, tx, req.DeviceName, req.Locale, false)
+	if err != nil {
 		return PairResponse{}, err
 	}
 	result, err := tx.ExecContext(ctx, `UPDATE pairing_sessions SET used_at=? WHERE id=? AND used_at IS NULL`, now, sessionID)
@@ -178,7 +174,7 @@ func (m *Manager) Pair(ctx context.Context, req PairRequest) (PairResponse, erro
 	if err = tx.Commit(); err != nil {
 		return PairResponse{}, err
 	}
-	return PairResponse{DeviceID: deviceID, Token: token, Admin: false}, nil
+	return response, nil
 }
 
 func (m *Manager) insertDevice(ctx context.Context, name, locale string, admin bool) (PairResponse, error) {
@@ -198,12 +194,16 @@ func issueDevice(ctx context.Context, exec contextExecer, name, locale string, a
 		return PairResponse{}, err
 	}
 	deviceID := uuid.NewString()
+	userID := uuid.NewString()
 	now := time.Now().UTC().Format(time.RFC3339Nano)
 	adminValue := 0
 	if admin {
 		adminValue = 1
 	}
-	_, err = exec.ExecContext(ctx, `INSERT INTO devices(id,name,token_hash,is_admin,locale,created_at,last_seen_at) VALUES(?,?,?,?,?,?,?)`, deviceID, name, appcrypto.Hash(token), adminValue, locale, now, now)
+	if _, err = exec.ExecContext(ctx, `INSERT INTO users(id,name,color,enabled,created_at,updated_at) VALUES(?,?,?,1,?,?)`, userID, name, "#5B5BD6", now, now); err != nil {
+		return PairResponse{}, err
+	}
+	_, err = exec.ExecContext(ctx, `INSERT INTO devices(id,user_id,name,token_hash,is_admin,locale,created_at,last_seen_at) VALUES(?,?,?,?,?,?,?,?)`, deviceID, userID, name, appcrypto.Hash(token), adminValue, locale, now, now)
 	if err != nil {
 		return PairResponse{}, err
 	}
