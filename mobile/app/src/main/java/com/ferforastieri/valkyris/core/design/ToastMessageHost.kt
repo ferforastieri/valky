@@ -89,7 +89,7 @@ fun ToastMessageHost(notices: Flow<ApiNotice>, modifier: Modifier = Modifier) {
                         )
                         Spacer(Modifier.width(9.dp))
                         Text(
-                            notice.backendMessage ?: stringResource(requireNotNull(notice.messageRes)),
+                            notice.message,
                             Modifier.weight(1f),
                             color = MaterialTheme.colorScheme.onSurface,
                             style = MaterialTheme.typography.bodySmall,

@@ -1,6 +1,7 @@
 package com.ferforastieri.valkyris.feature.people
 
 import android.graphics.Color as AndroidColor
+import android.view.MotionEvent
 import androidx.core.content.ContextCompat
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -226,6 +227,15 @@ private fun AreaPickerMap(
             MapView(context).apply {
                 setTileSource(TileSourceFactory.MAPNIK)
                 setMultiTouchControls(true)
+                setOnTouchListener { view, event ->
+                    val captureGesture = event.pointerCount > 1 || event.actionMasked == MotionEvent.ACTION_POINTER_DOWN
+                    var parent = view.parent
+                    while (parent != null) {
+                        parent.requestDisallowInterceptTouchEvent(captureGesture)
+                        parent = parent.parent
+                    }
+                    false
+                }
                 controller.setZoom(13.5)
                 initialCenter?.let { controller.setCenter(it) }
                 overlays.add(MapEventsOverlay(object : MapEventsReceiver {

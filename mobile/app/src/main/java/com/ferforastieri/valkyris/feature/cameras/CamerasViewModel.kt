@@ -12,7 +12,6 @@ import com.ferforastieri.valkyris.core.model.PTZCommand
 import com.ferforastieri.valkyris.core.media.DeviceMediaStore
 import com.ferforastieri.valkyris.core.network.ValkyrisApi
 import com.ferforastieri.valkyris.core.network.ValkyrisRepository
-import com.ferforastieri.valkyris.R
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -255,8 +254,6 @@ class CameraLiveViewModel @Inject constructor(
             try {
                 val bytes = runCatching { api.downloadCameraSnapshot(id) }.getOrElse { return@launch }
                 runCatching { deviceMedia.savePhoto(bytes, mediaName("jpg")) }
-                    .onSuccess { api.announce(R.string.snapshot_saved) }
-                    .onFailure { api.announce(R.string.media_save_failed, false) }
             } finally {
                 _snapshotLoading.value = false
                 actionGate.release()
@@ -271,8 +268,6 @@ class CameraLiveViewModel @Inject constructor(
             try {
                 val bytes = runCatching { api.downloadRecentRecording(id) }.getOrElse { return@launch }
                 runCatching { deviceMedia.saveVideo(bytes, mediaName("mp4")) }
-                    .onSuccess { api.announce(R.string.recording_saved) }
-                    .onFailure { api.announce(R.string.media_save_failed, false) }
             } finally {
                 _recordingLoading.value = false
                 actionGate.release()
@@ -280,7 +275,7 @@ class CameraLiveViewModel @Inject constructor(
         }
     }
 
-    fun storagePermissionDenied() = api.announce(R.string.storage_permission_required, false)
+    fun storagePermissionDenied() = Unit
 
     private fun mediaName(extension: String): String {
         val cameraName = _camera.value?.name.orEmpty().replace(Regex("[^A-Za-z0-9_-]+"), "-").replace(Regex("^-+|-+$"), "").ifBlank { "camera" }

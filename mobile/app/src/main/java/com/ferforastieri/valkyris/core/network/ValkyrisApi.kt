@@ -2,9 +2,7 @@ package com.ferforastieri.valkyris.core.network
 
 import android.net.Uri
 import android.util.Base64
-import androidx.annotation.StringRes
 import com.ferforastieri.valkyris.BuildConfig
-import com.ferforastieri.valkyris.R
 import com.ferforastieri.valkyris.core.model.*
 import com.ferforastieri.valkyris.core.security.Session
 import io.ktor.client.HttpClient
@@ -23,6 +21,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.security.MessageDigest
 import java.security.cert.X509Certificate
+import java.util.Locale
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.ConcurrentHashMap
 import javax.net.ssl.SSLContext
@@ -32,15 +31,10 @@ import okhttp3.Response
 import okhttp3.WebSocket
 import okhttp3.WebSocketListener
 
-data class ApiNotice(
-    @param:StringRes val messageRes: Int? = null,
-    val backendMessage: String? = null,
-    val success: Boolean,
-)
+data class ApiNotice(val message: String, val success: Boolean)
 
 class ValkyrisApi(
     private val session: () -> Session?,
-    private val resolveString: (Int) -> String,
 ) {
     private val json = Json { ignoreUnknownKeys = true; explicitNulls = false; coerceInputValues = true }
     private val _notices = MutableSharedFlow<ApiNotice>(extraBufferCapacity = 32)
@@ -81,8 +75,6 @@ class ValkyrisApi(
 
     private suspend inline fun <reified T> execute(
         fingerprint: String,
-        @StringRes successNotice: Int? = null,
-        announceError: Boolean = false,
         announceBackend: Boolean = false,
         crossinline request: suspend (HttpClient) -> HttpResponse,
     ): T {
@@ -104,51 +96,50 @@ class ValkyrisApi(
                     val complete = envelope.error?.takeIf { it.isNotBlank() } ?: message
                     throw localizedError(complete, response.status.value)
                 }
-                if (announceBackend) publishBackend(message, true) else successNotice?.let { publish(it, true) }
+                if (announceBackend) publishBackend(message, true)
                 envelope.data ?: throw localizedError("Valkyris response did not include data: $message", response.status.value)
             }
         } catch (error: Throwable) {
             if (error is ApiException) {
-                if (announceBackend) publishBackend(error.technicalMessage, false) else if (announceError) publish(error.messageRes, false)
+                if (announceBackend) publishBackend(error.technicalMessage, false)
                 throw error
             }
             val complete = buildString {
                 append(error::class.simpleName ?: "Network error")
                 error.message?.takeIf { it.isNotBlank() }?.let { append(": ").append(it) }
             }
-            val localized = localizedError(complete, cause = error)
-            if (announceError && !announceBackend) publish(localized.messageRes, false)
-            throw localized
+            throw localizedError(complete, cause = error)
         }
     }
 
     private suspend fun executeUnit(
         fingerprint: String,
-        @StringRes successNotice: Int? = null,
-        announceError: Boolean = false,
+        announceBackend: Boolean = false,
         request: suspend (HttpClient) -> HttpResponse,
     ) {
-        execute<JsonElement>(fingerprint, successNotice, announceError, request = request)
+        execute<JsonElement>(fingerprint, announceBackend, request)
     }
 
     private suspend inline fun <reified T> get(path: String): T {
         val current = requireNotNull(session())
         return execute(current.fingerprint) {
-            it.get(base() + path) { bearerAuth(current.token) }
+            it.get(base() + path) {
+                bearerAuth(current.token)
+                header(HttpHeaders.AcceptLanguage, Locale.getDefault().toLanguageTag())
+            }
         }
     }
 
     private suspend inline fun <reified T, reified B> post(
         path: String,
         body: B,
-        @StringRes successNotice: Int? = null,
-        announceError: Boolean = false,
         announceBackend: Boolean = false,
     ): T {
         val current = requireNotNull(session())
-        return execute(current.fingerprint, successNotice, announceError, announceBackend) {
+        return execute(current.fingerprint, announceBackend) {
             it.post(base() + path) {
                 bearerAuth(current.token)
+                header(HttpHeaders.AcceptLanguage, Locale.getDefault().toLanguageTag())
                 contentType(ContentType.Application.Json)
                 setBody(body)
             }
@@ -158,14 +149,13 @@ class ValkyrisApi(
     private suspend inline fun <reified T, reified B> put(
         path: String,
         body: B,
-        @StringRes successNotice: Int? = null,
-        announceError: Boolean = false,
         announceBackend: Boolean = false,
     ): T {
         val current = requireNotNull(session())
-        return execute(current.fingerprint, successNotice, announceError, announceBackend) {
+        return execute(current.fingerprint, announceBackend) {
             it.put(base() + path) {
                 bearerAuth(current.token)
+                header(HttpHeaders.AcceptLanguage, Locale.getDefault().toLanguageTag())
                 contentType(ContentType.Application.Json)
                 setBody(body)
             }
@@ -173,11 +163,14 @@ class ValkyrisApi(
     }
 
     suspend fun authStatus(baseUrl: String): AuthStatus = execute("") {
-        it.get(baseUrl.trimEnd('/') + "/api/v1/auth/status")
+        it.get(baseUrl.trimEnd('/') + "/api/v1/auth/status") {
+            header(HttpHeaders.AcceptLanguage, Locale.getDefault().toLanguageTag())
+        }
     }
 
     suspend fun login(baseUrl: String, request: LoginRequest, bootstrap: Boolean = false): PairResponse = execute("") {
         it.post(baseUrl.trimEnd('/') + if (bootstrap) "/api/v1/admin/bootstrap" else "/api/v1/login") {
+            header(HttpHeaders.AcceptLanguage, Locale.getDefault().toLanguageTag())
             contentType(ContentType.Application.Json)
             setBody(request)
         }
@@ -185,6 +178,7 @@ class ValkyrisApi(
 
     suspend fun pair(baseUrl: String, fingerprint: String, request: PairRequest): PairResponse = execute(fingerprint) {
         it.post(baseUrl.trimEnd('/') + "/api/v1/pair") {
+            header(HttpHeaders.AcceptLanguage, Locale.getDefault().toLanguageTag())
             contentType(ContentType.Application.Json)
             setBody(request)
         }
@@ -193,7 +187,10 @@ class ValkyrisApi(
     suspend fun createPairingSession(): PairingSession {
         val current = requireNotNull(session())
         return execute(current.fingerprint) {
-            it.post(base() + "/pairing-sessions") { bearerAuth(current.token) }
+            it.post(base() + "/pairing-sessions") {
+                bearerAuth(current.token)
+                header(HttpHeaders.AcceptLanguage, Locale.getDefault().toLanguageTag())
+            }
         }
     }
 
@@ -209,32 +206,34 @@ class ValkyrisApi(
     suspend fun cameras(): List<Camera> = get("/cameras")
 
     suspend fun createCamera(camera: CreateCameraRequest): Camera {
-        val started: CameraOperation = post("/cameras", camera, R.string.notice_camera_created, announceError = true)
+        val started: CameraOperation = post("/cameras", camera, announceBackend = true)
         return requireNotNull(started.camera) { "The server did not return the saved camera" }
     }
 
     suspend fun deleteCamera(id: String) {
         val current = requireNotNull(session())
-        executeUnit(current.fingerprint, R.string.notice_camera_deleted, announceError = true) {
-            it.delete(base() + "/cameras/$id") { bearerAuth(current.token) }
+        executeUnit(current.fingerprint, announceBackend = true) {
+            it.delete(base() + "/cameras/$id") {
+                bearerAuth(current.token)
+                header(HttpHeaders.AcceptLanguage, Locale.getDefault().toLanguageTag())
+            }
         }
     }
 
     suspend fun updateCamera(id: String, camera: CreateCameraRequest): Camera = put(
         "/cameras/$id",
         camera,
-        R.string.notice_camera_updated,
-        announceError = true,
+        announceBackend = true,
     )
 
 
     suspend fun updateInfo(): UpdateInfo = get("/system/update?clientVersion=${BuildConfig.VERSION_NAME.encodeURLParameter()}")
 
-    suspend fun startUpdate(): UpdateInfo = post("/system/update", UpdateRequest(BuildConfig.VERSION_NAME), R.string.notice_update_started, announceError = true)
+    suspend fun startUpdate(): UpdateInfo = post("/system/update", UpdateRequest(BuildConfig.VERSION_NAME), announceBackend = true)
 
     suspend fun retention(): RetentionSettings = get("/settings/retention")
 
-    suspend fun updateRetention(settings: RetentionSettings): RetentionSettings = put("/settings/retention", settings, R.string.notice_retention_saved, announceError = true)
+    suspend fun updateRetention(settings: RetentionSettings): RetentionSettings = put("/settings/retention", settings, announceBackend = true)
 
     suspend fun people(): List<TrackedPerson> = get("/people")
     suspend fun users(): List<TrackedPerson> = get("/users")
@@ -245,19 +244,37 @@ class ValkyrisApi(
         ChangePasswordRequest(currentPassword, newPassword),
         announceBackend = true,
     )
-    suspend fun updateUser(id: String, user: TrackedPerson): TrackedPerson = put("/users/$id", user, announceError = true)
-    suspend fun createPerson(person: TrackedPerson): TrackedPerson = post("/people", person, announceError = true)
-    suspend fun updatePerson(id: String, person: TrackedPerson): TrackedPerson = put("/people/$id", person, announceError = true)
+    suspend fun updateUser(id: String, user: TrackedPerson): TrackedPerson = put("/users/$id", user, announceBackend = true)
+    suspend fun createPerson(person: TrackedPerson): TrackedPerson = post("/people", person, announceBackend = true)
+    suspend fun updatePerson(id: String, person: TrackedPerson): TrackedPerson = put("/people/$id", person, announceBackend = true)
     suspend fun deletePerson(id: String) {
         val current = requireNotNull(session())
-        executeUnit(current.fingerprint, announceError = true) { it.delete(base() + "/people/$id") { bearerAuth(current.token) } }
+        executeUnit(current.fingerprint, announceBackend = true) {
+            it.delete(base() + "/people/$id") {
+                bearerAuth(current.token)
+                header(HttpHeaders.AcceptLanguage, Locale.getDefault().toLanguageTag())
+            }
+        }
     }
     suspend fun places(): List<TrackedPlace> = get("/places")
-    suspend fun createPlace(place: TrackedPlace): TrackedPlace = post("/places", place, announceError = true)
-    suspend fun updatePlace(id: String, place: TrackedPlace): TrackedPlace = put("/places/$id", place, announceError = true)
+    suspend fun createPlace(place: TrackedPlace): TrackedPlace = post(
+        "/places",
+        PlaceUpsertRequest(place.name, place.latitude, place.longitude, place.radiusMeters, place.enabled),
+        announceBackend = true,
+    )
+    suspend fun updatePlace(id: String, place: TrackedPlace): TrackedPlace = put(
+        "/places/$id",
+        PlaceUpsertRequest(place.name, place.latitude, place.longitude, place.radiusMeters, place.enabled),
+        announceBackend = true,
+    )
     suspend fun deletePlace(id: String) {
         val current = requireNotNull(session())
-        executeUnit(current.fingerprint, announceError = true) { it.delete(base() + "/places/$id") { bearerAuth(current.token) } }
+        executeUnit(current.fingerprint, announceBackend = true) {
+            it.delete(base() + "/places/$id") {
+                bearerAuth(current.token)
+                header(HttpHeaders.AcceptLanguage, Locale.getDefault().toLanguageTag())
+            }
+        }
     }
     suspend fun personHistory(id: String): List<PersonLocation> = get("/people/$id/history?limit=200")
     suspend fun reportLocation(id: String, location: PersonLocation): Int = post<Map<String, Int>, PersonLocation>("/people/$id/locations", location)["transitions"] ?: 0
@@ -271,21 +288,22 @@ class ValkyrisApi(
     suspend fun createRule(rule: Rule, announce: Boolean = true): Rule = post(
         "/rules",
         rule,
-        successNotice = R.string.notice_rule_created.takeIf { announce },
-        announceError = announce,
+        announceBackend = announce,
     )
 
     suspend fun updateRule(id: String, rule: Rule): Rule = put(
         "/rules/$id",
         rule,
-        R.string.notice_rule_updated,
-        announceError = true,
+        announceBackend = true,
     )
 
     suspend fun deleteRule(id: String) {
         val current = requireNotNull(session())
-        executeUnit(current.fingerprint, R.string.notice_rule_deleted, announceError = true) {
-            it.delete(base() + "/rules/$id") { bearerAuth(current.token) }
+        executeUnit(current.fingerprint, announceBackend = true) {
+            it.delete(base() + "/rules/$id") {
+                bearerAuth(current.token)
+                header(HttpHeaders.AcceptLanguage, Locale.getDefault().toLanguageTag())
+            }
         }
     }
 
@@ -293,10 +311,12 @@ class ValkyrisApi(
         val current = requireNotNull(session())
         executeUnit(
             current.fingerprint,
-            successNotice = R.string.notice_event_acknowledged.takeIf { announce },
-            announceError = announce,
+            announceBackend = announce,
         ) {
-            it.post(base() + "/events/$id/acknowledge") { bearerAuth(current.token) }
+            it.post(base() + "/events/$id/acknowledge") {
+                bearerAuth(current.token)
+                header(HttpHeaders.AcceptLanguage, Locale.getDefault().toLanguageTag())
+            }
         }
     }
 
@@ -304,18 +324,21 @@ class ValkyrisApi(
         val current = requireNotNull(session())
         executeUnit(
             current.fingerprint,
-            successNotice = R.string.notice_events_acknowledged.takeIf { announce },
-            announceError = announce,
+            announceBackend = announce,
         ) {
-            it.post(base() + "/events/acknowledge-all") { bearerAuth(current.token) }
+            it.post(base() + "/events/acknowledge-all") {
+                bearerAuth(current.token)
+                header(HttpHeaders.AcceptLanguage, Locale.getDefault().toLanguageTag())
+            }
         }
     }
 
     suspend fun ptz(cameraId: String, command: PTZCommand) {
         val current = requireNotNull(session())
-        executeUnit(current.fingerprint, announceError = true) {
+        executeUnit(current.fingerprint, announceBackend = true) {
             it.post(base() + "/cameras/$cameraId/ptz") {
                 bearerAuth(current.token)
+                header(HttpHeaders.AcceptLanguage, Locale.getDefault().toLanguageTag())
                 contentType(ContentType.Application.Json)
                 setBody(command)
             }
@@ -327,6 +350,7 @@ class ValkyrisApi(
         executeUnit(current.fingerprint) {
             it.post(base() + "/devices/push") {
                 bearerAuth(current.token)
+                header(HttpHeaders.AcceptLanguage, Locale.getDefault().toLanguageTag())
                 contentType(ContentType.Application.Json)
                 setBody(registration)
             }
@@ -338,7 +362,7 @@ class ValkyrisApi(
     suspend fun saveFirebaseServiceAccount(data: ByteArray): PushConfiguration = put(
         "/settings/push",
         FirebaseServiceAccountUpload(Base64.encodeToString(data, Base64.NO_WRAP)),
-        announceError = true,
+        announceBackend = true,
     )
 
     fun snapshotUrl(cameraId: String) = base() + "/cameras/$cameraId/snapshot"
@@ -352,11 +376,13 @@ class ValkyrisApi(
 
     suspend fun downloadRecentRecording(cameraId: String): ByteArray = downloadMedia(recordingUrl(cameraId))
 
-    fun announce(@StringRes messageRes: Int, success: Boolean = true) = publish(messageRes, success)
-
     private suspend fun downloadMedia(url: String): ByteArray = withContext(Dispatchers.IO) {
         try {
-            val request = Request.Builder().url(url).header("Authorization", "Bearer ${token()}").build()
+            val request = Request.Builder()
+                .url(url)
+                .header("Authorization", "Bearer ${token()}")
+                .header("Accept-Language", Locale.getDefault().toLanguageTag())
+                .build()
             mediaHttpClient().newCall(request).execute().use { response ->
                 if (!response.isSuccessful) {
                     val raw = response.body.string()
@@ -365,9 +391,7 @@ class ValkyrisApi(
                 response.body.bytes()
             }
         } catch (error: Throwable) {
-            val localized = if (error is ApiException) error else localizedError(error.message.orEmpty(), cause = error)
-            publish(localized.messageRes, false)
-            throw localized
+            throw if (error is ApiException) error else localizedError(error.message.orEmpty(), cause = error)
         }
     }
 
@@ -375,7 +399,11 @@ class ValkyrisApi(
         val current = requireNotNull(session())
         val wsUrl = current.baseUrl.replaceFirst("https://", "wss://").replaceFirst("http://", "ws://")
             .trimEnd('/') + "/api/v1/realtime"
-        val request = Request.Builder().url(wsUrl).header("Authorization", "Bearer ${current.token}").build()
+        val request = Request.Builder()
+            .url(wsUrl)
+            .header("Authorization", "Bearer ${current.token}")
+            .header("Accept-Language", Locale.getDefault().toLanguageTag())
+            .build()
         return pinnedClient(current.fingerprint).newWebSocket(request, object : WebSocketListener() {
             override fun onMessage(webSocket: WebSocket, text: String) = onMessage()
             override fun onFailure(webSocket: WebSocket, t: Throwable, response: Response?) {
@@ -385,40 +413,12 @@ class ValkyrisApi(
         })
     }
 
-    private fun publish(@StringRes messageRes: Int, success: Boolean) {
-        _notices.tryEmit(ApiNotice(messageRes = messageRes, success = success))
-    }
-
     private fun publishBackend(message: String, success: Boolean) {
-        _notices.tryEmit(ApiNotice(backendMessage = message, success = success))
+        _notices.tryEmit(ApiNotice(message = message, success = success))
     }
 
-    private fun localizedError(raw: String, status: Int? = null, cause: Throwable? = null): ApiException {
-        val messageRes = if (status == null) networkErrorNotice(raw) else errorNotice(status, raw)
-        return ApiException(resolveString(messageRes), status, cause, raw, messageRes)
-    }
-
-    @StringRes
-    private fun errorNotice(status: Int?, message: String): Int = when {
-        status == 400 -> R.string.error_invalid_request
-        status == 401 -> R.string.error_authentication
-        status == 403 -> R.string.error_permission
-        status == 404 -> R.string.error_not_found
-        status == 409 -> R.string.error_conflict
-        status != null && status >= 500 -> R.string.error_server
-        else -> networkErrorNotice(message)
-    }
-
-    @StringRes
-    private fun networkErrorNotice(message: String): Int {
-        val normalized = message.lowercase()
-        return when {
-            "timeout" in normalized || "timed out" in normalized -> R.string.error_timeout
-            "eof" in normalized || "connection reset" in normalized -> R.string.error_connection_interrupted
-            "unable to resolve" in normalized || "failed to connect" in normalized || "connectexception" in normalized -> R.string.error_connection
-            else -> R.string.error_action_failed
-        }
-    }
+    private fun localizedError(raw: String, status: Int? = null, cause: Throwable? = null) =
+        ApiException(raw, status, cause, raw)
 
     companion object {
         private const val HEADER_MESSAGE = "X-Valkyris-Message"
@@ -430,7 +430,6 @@ class ApiException(
     val status: Int? = null,
     cause: Throwable? = null,
     val technicalMessage: String = message,
-    @param:StringRes val messageRes: Int = R.string.error_action_failed,
 ) : Exception(message, cause)
 
 private class PinnedTrustManager(fingerprint: String) : X509TrustManager {

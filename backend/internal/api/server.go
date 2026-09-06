@@ -163,7 +163,7 @@ func (s *Server) Handler() http.Handler {
 	protected.Handle("POST /system/update", s.auth.RequireAdmin(http.HandlerFunc(s.startSystemUpdate)))
 	protected.Handle("/realtime", s.hub)
 	mux.Handle("/api/v1/", http.StripPrefix("/api/v1", s.auth.Middleware(protected)))
-	return requestLog(s.logger, securityHeaders(outcomeHeaders(mux)))
+	return requestLog(s.logger, securityHeaders(localizedResponses(outcomeHeaders(mux))))
 }
 func (s *Server) health(w http.ResponseWriter, r *http.Request) {
 	writeSuccess(w, http.StatusOK, "Valkyris is healthy", map[string]any{"status": "ok", "service": "valkyris", "time": time.Now().UTC()})
