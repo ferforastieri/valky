@@ -136,7 +136,7 @@ private fun FamilyMap(users: List<TrackedPerson>, places: List<TrackedPlace>, se
             val lat = user.lastLatitude ?: return@forEach; val lon = user.lastLongitude ?: return@forEach
             map.overlays.add(Marker(map).apply {
                 position = GeoPoint(lat, lon); title = user.name; snippet = user.lastLocatedAt?.let { "Atualizado ${formatTime(it)}" } ?: "Sem atualização"
-                icon = ContextCompat.getDrawable(context, R.drawable.valkyris_map_marker)
+                icon = ContextCompat.getDrawable(map.context, R.drawable.valkyris_map_marker)
                 setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_BOTTOM)
             })
         }
