@@ -98,6 +98,7 @@ fun ValkyrisApp(main: MainViewModel) {
 @Composable
 private fun ConnectedValkyrisApp(main: MainViewModel) {
     val nav = rememberNavController()
+    val admin by main.admin.collectAsStateWithLifecycle()
     val eventsViewModel: com.ferforastieri.valkyris.feature.events.EventsViewModel = androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel()
     val events by eventsViewModel.events.collectAsStateWithLifecycle()
     val unreadNotifications = events.count { it.acknowledgedAt == null }
