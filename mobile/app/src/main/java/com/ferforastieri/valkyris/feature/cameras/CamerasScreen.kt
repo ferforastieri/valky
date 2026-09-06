@@ -1,5 +1,3 @@
-@file:androidx.annotation.OptIn(androidx.media3.common.util.UnstableApi::class)
-
 package com.ferforastieri.valkyris.feature.cameras
 
 import android.Manifest
@@ -33,7 +31,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
@@ -48,18 +45,11 @@ import androidx.compose.ui.window.DialogProperties
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.compose.LifecycleResumeEffect
-import androidx.media3.common.MediaItem
-import androidx.media3.common.AudioAttributes
-import androidx.media3.common.C
-import androidx.media3.common.Player
-import androidx.media3.datasource.okhttp.OkHttpDataSource
-import androidx.media3.exoplayer.ExoPlayer
-import androidx.media3.exoplayer.hls.HlsMediaSource
-import androidx.media3.ui.PlayerView
 import com.ferforastieri.valkyris.R
 import com.ferforastieri.valkyris.core.design.SignalLine
 import com.ferforastieri.valkyris.core.design.ColorTokens
 import com.ferforastieri.valkyris.core.design.cameraIcon
+import com.ferforastieri.valkyris.core.media.WhepLiveController
 import com.ferforastieri.valkyris.core.model.Camera
 import com.ferforastieri.valkyris.core.model.CreateCameraRequest
 import com.ferforastieri.valkyris.feature.rules.CameraRulesSection
@@ -70,18 +60,18 @@ import com.composables.icons.lucide.ChevronRight
 import com.composables.icons.lucide.ChevronUp
 import com.composables.icons.lucide.Check
 import com.composables.icons.lucide.Lucide
-import com.composables.icons.lucide.Mic
 import com.composables.icons.lucide.Maximize2
 import com.composables.icons.lucide.Minus
 import com.composables.icons.lucide.Move
+import com.composables.icons.lucide.Pencil
 import com.composables.icons.lucide.Plus
-import com.composables.icons.lucide.SlidersHorizontal
 import com.composables.icons.lucide.Trash2
 import com.composables.icons.lucide.Video
 import com.composables.icons.lucide.VideoOff
 import com.composables.icons.lucide.X
 import com.composables.icons.lucide.Volume2
 import com.composables.icons.lucide.VolumeX
+import org.webrtc.SurfaceViewRenderer
 
 @Composable fun CamerasScreen(onCamera:(String)->Unit,vm:CamerasViewModel=hiltViewModel()){
     LifecycleResumeEffect(Unit) { vm.refresh();onPauseOrDispose {} }
@@ -149,7 +139,7 @@ fun CameraFailureSheet(camera:Camera,onDismiss:()->Unit,onEdit:(()->Unit)?=null,
         title=stringResource(R.string.camera_error_title),
         onDismiss=onDismiss,
         actions={
-            onEdit?.let { TextButton(onClick=it) { Text(stringResource(R.string.edit_camera)) } }
+            onEdit?.let { TextButton(onClick=it) { Icon(Lucide.Pencil, null); Spacer(Modifier.width(6.dp)); Text(stringResource(R.string.edit_camera)) } }
             onDelete?.let{TextButton(onClick=it,colors=ButtonDefaults.textButtonColors(contentColor=MaterialTheme.colorScheme.error)){Icon(Lucide.Trash2,null);Spacer(Modifier.width(6.dp));Text(stringResource(R.string.remove_camera))}}
             Button(onClick=onDismiss){Text(stringResource(R.string.close))}
         },
@@ -228,9 +218,7 @@ private fun CameraCard(camera: Camera, snapshot: android.graphics.Bitmap?, onCli
                     Text(camera.name, fontWeight = FontWeight.SemiBold)
                     Text(if (ready) camera.host else setupDescription(camera), color = if (failed) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodySmall, maxLines = 2)
                 }
-                if (camera.capabilities.audio) Icon(Lucide.Mic, null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
-                if (camera.capabilities.ptz) { Spacer(Modifier.width(8.dp)); Icon(Lucide.Move, null, tint = MaterialTheme.colorScheme.onSurfaceVariant) }
-                IconButton(onClick=onEdit){Icon(Lucide.SlidersHorizontal,stringResource(R.string.edit_camera),tint=MaterialTheme.colorScheme.onSurfaceVariant)}
+                IconButton(onClick=onEdit){Icon(Lucide.Pencil,stringResource(R.string.edit_camera),tint=MaterialTheme.colorScheme.onSurfaceVariant)}
                 IconButton(onClick=onDelete){Icon(Lucide.Trash2,stringResource(R.string.remove_camera),tint=MaterialTheme.colorScheme.error)}
             }
         }
@@ -350,6 +338,7 @@ private fun ReadyCameraContent(camera: Camera, vm: CameraLiveViewModel) {
     var muted by remember { mutableStateOf(false) }
     var showFullscreen by rememberSaveable { mutableStateOf(false) }
     var renderedFirstFrame by remember { mutableStateOf(false) }
+    var streamFailure by remember { mutableStateOf<String?>(null) }
     var pendingMediaAction by remember { mutableStateOf<MediaAction?>(null) }
     val storagePermission = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
         val action = pendingMediaAction
@@ -364,36 +353,35 @@ private fun ReadyCameraContent(camera: Camera, vm: CameraLiveViewModel) {
             storagePermission.launch(Manifest.permission.WRITE_EXTERNAL_STORAGE)
         } else if (action == MediaAction.Snapshot) vm.captureSnapshot() else vm.recordRecentClip()
     }
-    val player = remember {
-        val factory = OkHttpDataSource.Factory(vm.httpClient()).setDefaultRequestProperties(mapOf("Authorization" to "Bearer ${vm.token()}"))
-        ExoPlayer.Builder(context).setMediaSourceFactory(HlsMediaSource.Factory(factory)).build().apply {
-            setAudioAttributes(
-                AudioAttributes.Builder().setUsage(C.USAGE_MEDIA).setContentType(C.AUDIO_CONTENT_TYPE_MOVIE).build(),
-                true,
-            )
-            setHandleAudioBecomingNoisy(true)
-            setMediaItem(MediaItem.fromUri(vm.liveUrl()))
-            prepare()
-            playWhenReady = true
-        }
+    val controller = remember(vm.whepUrl()) {
+        WhepLiveController(
+            context = context,
+            http = vm.httpClient(),
+            endpoint = vm.whepUrl(),
+            token = vm.token(),
+            onFirstFrame = { renderedFirstFrame = true; streamFailure = null },
+            onFailure = { streamFailure = it },
+        )
     }
-    LaunchedEffect(muted) { player.volume = if(muted) 0f else 1f }
-    DisposableEffect(player) {
-        val listener = object : Player.Listener {
-            override fun onRenderedFirstFrame() { renderedFirstFrame = true }
-        }
-        player.addListener(listener)
-        onDispose {
-            player.removeListener(listener)
-            player.release()
-            vm.stop()
-        }
+    LaunchedEffect(muted) { controller.setMuted(muted) }
+    DisposableEffect(controller) {
+        controller.start()
+        onDispose { controller.close() }
     }
     Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal=18.dp),verticalArrangement=Arrangement.spacedBy(14.dp)) {
         Surface(Modifier.fillMaxWidth().aspectRatio(16/9f),RoundedCornerShape(22.dp),color=ColorTokens.BrandTile,border=androidx.compose.foundation.BorderStroke(1.dp,MaterialTheme.colorScheme.outlineVariant),shadowElevation=7.dp) {
             Box {
-                if (!showFullscreen) ZoomableLivePlayer(player,preview,renderedFirstFrame,{showFullscreen=true},Modifier.fillMaxSize())
+                if (!showFullscreen) ZoomableLivePlayer(controller,preview,renderedFirstFrame,{showFullscreen=true},Modifier.fillMaxSize())
                 else Box(Modifier.fillMaxSize().background(Color.Black))
+                streamFailure?.let { message ->
+                    Surface(
+                        modifier = Modifier.align(Alignment.Center).padding(20.dp),
+                        shape = RoundedCornerShape(14.dp),
+                        color = MaterialTheme.colorScheme.errorContainer.copy(alpha = .94f),
+                    ) {
+                        Text(message, Modifier.padding(14.dp), color = MaterialTheme.colorScheme.onErrorContainer, style = MaterialTheme.typography.bodySmall)
+                    }
+                }
                 Box(Modifier.fillMaxSize(),contentAlignment = Alignment.TopEnd) {
                     Surface(onClick={showFullscreen=true},modifier=Modifier.padding(10.dp), shape=CircleShape, color = Color.Black.copy(alpha = .48f)) {
                         Icon(Lucide.Maximize2, stringResource(R.string.fullscreen_camera), Modifier.padding(8.dp).size(18.dp), tint = Color.White)
@@ -433,25 +421,24 @@ private fun ReadyCameraContent(camera: Camera, vm: CameraLiveViewModel) {
         CameraRulesSection(camera.id)
         Spacer(Modifier.height(18.dp))
     }
-    if(showFullscreen) FullscreenLivePlayer(player,preview,renderedFirstFrame,camera.name,onDismiss={showFullscreen=false})
+    if(showFullscreen) FullscreenLivePlayer(controller,preview,renderedFirstFrame,camera.name,onDismiss={showFullscreen=false})
 }
 
 @Composable
-private fun LivePlayer(player: ExoPlayer, modifier: Modifier) {
+private fun LivePlayer(controller: WhepLiveController, modifier: Modifier) {
     AndroidView(
-        factory = { PlayerView(it).apply {
-            this.player = player
-            useController = false
-            setKeepContentOnPlayerReset(true)
-            setShutterBackgroundColor(Color.Transparent.toArgb())
+        factory = { context -> SurfaceViewRenderer(context).apply {
             layoutParams = ViewGroup.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT)
+            controller.bind(this)
         } },
+        update = { controller.bind(it) },
+        onRelease = { controller.unbind(it) },
         modifier = modifier,
     )
 }
 
 @Composable
-private fun ZoomableLivePlayer(player:ExoPlayer,preview:android.graphics.Bitmap?,rendered:Boolean,onOpen:()->Unit,modifier:Modifier=Modifier){
+private fun ZoomableLivePlayer(controller:WhepLiveController,preview:android.graphics.Bitmap?,rendered:Boolean,onOpen:()->Unit,modifier:Modifier=Modifier){
     var scale by remember { mutableFloatStateOf(1f) }
     var offset by remember { mutableStateOf(Offset.Zero) }
     Box(modifier.pointerInput(Unit){
@@ -461,7 +448,7 @@ private fun ZoomableLivePlayer(player:ExoPlayer,preview:android.graphics.Bitmap?
         }
     }.pointerInput(Unit){detectTapGestures(onTap={onOpen()},onDoubleTap={scale=1f;offset=Offset.Zero})}){
         Box(Modifier.fillMaxSize().graphicsLayer{scaleX=scale;scaleY=scale;translationX=offset.x;translationY=offset.y}){
-            LivePlayer(player,Modifier.fillMaxSize())
+            LivePlayer(controller,Modifier.fillMaxSize())
             if(!rendered)preview?.let{Image(it.asImageBitmap(),null,Modifier.fillMaxSize(),contentScale=ContentScale.Crop)}
         }
         if(!rendered&&preview==null)CircularProgressIndicator(Modifier.align(Alignment.Center).size(28.dp),strokeWidth=2.dp,color=Color.White)
@@ -469,7 +456,7 @@ private fun ZoomableLivePlayer(player:ExoPlayer,preview:android.graphics.Bitmap?
 }
 
 @Composable
-private fun FullscreenLivePlayer(player: ExoPlayer,preview:android.graphics.Bitmap?,rendered:Boolean,cameraName: String,onDismiss: () -> Unit) {
+private fun FullscreenLivePlayer(controller: WhepLiveController,preview:android.graphics.Bitmap?,rendered:Boolean,cameraName: String,onDismiss: () -> Unit) {
     val context=androidx.compose.ui.platform.LocalContext.current
     val activity=remember(context){context.findActivity()}
     DisposableEffect(activity){
@@ -496,7 +483,7 @@ private fun FullscreenLivePlayer(player: ExoPlayer,preview:android.graphics.Bitm
                     detectTapGestures(onDoubleTap={scale=1f;offset=Offset.Zero})
                 },
             ) {
-                LivePlayer(player, Modifier.fillMaxSize())
+                LivePlayer(controller, Modifier.fillMaxSize())
                 if(!rendered)preview?.let{Image(it.asImageBitmap(),null,Modifier.fillMaxSize(),contentScale=ContentScale.Crop)}
                 if(!rendered&&preview==null)CircularProgressIndicator(Modifier.align(Alignment.Center).size(30.dp),strokeWidth=2.dp,color=Color.White)
             }

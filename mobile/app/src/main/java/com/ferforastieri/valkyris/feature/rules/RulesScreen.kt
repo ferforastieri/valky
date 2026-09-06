@@ -24,6 +24,7 @@ import com.ferforastieri.valkyris.core.model.RuleActions
 import com.ferforastieri.valkyris.core.model.detectorLabelRes
 import com.composables.icons.lucide.Lucide
 import com.composables.icons.lucide.Mic
+import com.composables.icons.lucide.Pencil
 import com.composables.icons.lucide.Plus
 import com.composables.icons.lucide.SlidersHorizontal
 import com.composables.icons.lucide.Trash2
@@ -133,7 +134,6 @@ fun RuleCard(rule: Rule, onEdit: () -> Unit, onDelete: () -> Unit) {
     val motion = rule.detectorTypes.any { it == "motion" || it == "person" || it == "tamper" }
     val icon: ImageVector = when { critical -> Lucide.TriangleAlert; motion -> Lucide.Video; else -> Lucide.Mic }
     val accent: Color = if (critical) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.secondary
-    val description = stringResource(when { critical -> R.string.rule_critical_description; motion -> R.string.rule_motion_description; else -> R.string.rule_audio_description })
     Card(
         modifier = Modifier.fillMaxWidth(),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
@@ -145,13 +145,12 @@ fun RuleCard(rule: Rule, onEdit: () -> Unit, onDelete: () -> Unit) {
                 Icon(icon, null, Modifier.padding(11.dp).size(23.dp), tint = accent)
             }
             Spacer(Modifier.width(13.dp))
-            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(5.dp)) {
+            Column(Modifier.weight(1f)) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Text(rule.name, Modifier.weight(1f), fontWeight = FontWeight.SemiBold)
-                    IconButton(onClick = onEdit) { Icon(Lucide.SlidersHorizontal, stringResource(R.string.edit_rule)) }
+                    IconButton(onClick = onEdit) { Icon(Lucide.Pencil, stringResource(R.string.edit_rule)) }
                     IconButton(onClick = onDelete) { Icon(Lucide.Trash2, stringResource(R.string.remove_rule), tint = MaterialTheme.colorScheme.error) }
                 }
-                Text(description, color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodySmall)
             }
         }
     }

@@ -96,11 +96,20 @@ paths:
       responses:
         '200': {description: MP4 recording, content: {video/mp4: {schema: {type: string, contentEncoding: binary}}}}
         '502': {description: The rolling buffer is not ready, content: {application/json: {schema: {$ref: '#/components/schemas/APIError'}}}}
-  /cameras/{id}/live/index.m3u8:
-    get:
-      summary: Get the authenticated LL-HLS playlist
+  /cameras/{id}/live/webrtc/whep:
+    post:
+      summary: Start an authenticated WHEP session for the live WebRTC stream
       parameters: [{$ref: '#/components/parameters/id'}]
-      responses: {'200': {description: LL-HLS playlist}}
+      responses: {'201': {description: WebRTC SDP answer and session location}}
+  /cameras/{id}/live/webrtc/whep/{session}:
+    patch:
+      summary: Send WebRTC ICE updates to an authenticated WHEP session
+      parameters: [{$ref: '#/components/parameters/id'}, {$ref: '#/components/parameters/session'}]
+      responses: {'204': {description: ICE update accepted}}
+    delete:
+      summary: Close an authenticated WHEP session
+      parameters: [{$ref: '#/components/parameters/id'}, {$ref: '#/components/parameters/session'}]
+      responses: {'204': {description: WebRTC session closed}}
   /detectors:
     get:
       summary: List normalized detector types
@@ -279,6 +288,7 @@ components:
     bearerAuth: {type: http, scheme: bearer}
   parameters:
     id: {name: id, in: path, required: true, schema: {type: string, format: uuid}}
+    session: {name: session, in: path, required: true, schema: {type: string}}
   schemas:
     APIResponse:
       type: object
@@ -396,6 +406,7 @@ components:
         latitude: {type: number, minimum: -90, maximum: 90}
         longitude: {type: number, minimum: -180, maximum: 180}
         accuracy: {type: number, minimum: 0}
+        address: {type: string, maxLength: 320, description: Resolved address persisted with the location}
         occurredAt: {type: string, format: date-time}
     User:
       type: object
@@ -411,7 +422,7 @@ components:
       required: [currentPassword, newPassword]
       properties:
         currentPassword: {type: string, format: password}
-        newPassword: {type: string, format: password, minLength: 10}
+        newPassword: {type: string, format: password}
     Place:
       type: object
       required: [name, latitude, longitude, radiusMeters]
@@ -497,7 +508,7 @@ components:
       type: object
       required: [password, deviceName]
       properties:
-        password: {type: string, format: password, minLength: 10}
+        password: {type: string, format: password}
         deviceName: {type: string}
         locale: {type: string, default: pt-BR}
     PairRequest:

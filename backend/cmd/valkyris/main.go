@@ -61,7 +61,7 @@ func main() {
 	}
 	cameraRepo := camera.NewRepository(db, vault)
 	onvif := camera.NewONVIFClient()
-	mediaManager := media.New(cfg.MediaAPI, cfg.MediaURL, cfg.MediaPlayback, cfg.RecordingsDir)
+	mediaManager := media.New(cfg.MediaAPI, cfg.MediaRTSP, cfg.MediaWebRTC, cfg.MediaPlayback, cfg.RecordingsDir)
 	authManager := auth.NewManager(db, cfg.PairingLifetime)
 	rulesService := rules.NewService(db)
 	eventService := event.NewService(db)

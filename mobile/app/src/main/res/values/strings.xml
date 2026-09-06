@@ -5,7 +5,7 @@
     <string name="login_body">Informe o endereço HTTPS do seu Valkyris. No primeiro acesso, você criará a senha da casa.</string>
     <string name="server_url">Endereço do servidor</string>
     <string name="home_password">Senha da casa</string>
-    <string name="create_home_password">Crie uma senha com pelo menos 10 caracteres</string>
+    <string name="create_home_password">Crie a senha da casa</string>
     <string name="confirm_home_password">Confirme a senha</string>
     <string name="create_admin_body">Esta instalação ainda não tem administrador. Crie a senha da casa para assumir a administração.</string>
     <string name="login_admin_body">Esta casa já está configurada. Entre com a senha administrativa.</string>
@@ -128,7 +128,7 @@
     <string name="event_media_summary">Snapshots e clipes de 15 segundos</string>
     <string name="rtsp_uri">Endereço RTSP</string>
     <string name="add_camera_hint">Use o botão + para conectar uma câmera ONVIF.</string>
-    <string name="stream_private">LL-HLS · privado</string>
+    <string name="stream_private">WebRTC · privado</string>
     <string name="snapshot_preview">CAPTURA</string>
     <string name="stream_local">A transmissão permanece dentro da sua LAN ou VPN.</string>
     <string name="full_screen_alarms">Alarmes em tela cheia</string>

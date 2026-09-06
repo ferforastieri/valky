@@ -112,7 +112,7 @@ func (m *Monitor) monitorAudio(ctx context.Context, cameraID string) {
 	window := filepath.Join(dir, "audio.wav")
 	for ctx.Err() == nil {
 		captureCtx, cancel := context.WithTimeout(ctx, 18*time.Second)
-		err := captureAudio(captureCtx, m.Media.HLSBase()+m.Media.HLSPath(cameraID), window)
+		err := captureAudio(captureCtx, m.Media.RTSPURL(cameraID), window)
 		cancel()
 		if err == nil {
 			results, classifyErr := m.Classifier.Classify(ctx, window)

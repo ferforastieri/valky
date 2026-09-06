@@ -15,7 +15,6 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
@@ -24,6 +23,8 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.composables.icons.lucide.History
 import com.composables.icons.lucide.Lucide
 import com.composables.icons.lucide.MapPin
+import com.composables.icons.lucide.Pencil
+import com.composables.icons.lucide.Trash2
 import com.composables.icons.lucide.UserRound
 import com.ferforastieri.valkyris.core.design.ValkyrisBottomSheet
 import com.ferforastieri.valkyris.core.design.ProfileAvatar
@@ -54,45 +55,57 @@ fun PeopleScreen(vm: PeopleViewModel = hiltViewModel()) {
     var placeEditor by remember { mutableStateOf<TrackedPlace?>(null) }
     var historyUser by remember { mutableStateOf<TrackedPerson?>(null) }
     var areaPickerOpen by remember { mutableStateOf(false) }
+    var areasOpen by remember { mutableStateOf(false) }
+    var deletingPlace by remember { mutableStateOf<TrackedPlace?>(null) }
 
-    Box(Modifier.fillMaxSize()) {
-        Column(Modifier.fillMaxSize()) {
+    Column(Modifier.fillMaxSize().padding(horizontal = 18.dp)) {
+        Row(
+            Modifier.fillMaxWidth().padding(top = 14.dp, bottom = 12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Column {
+                Text("Localização", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.SemiBold)
+                Text("Onde a família está agora", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+        }
+        Surface(
+            modifier = Modifier.fillMaxWidth().height(285.dp),
+            shape = MaterialTheme.shapes.extraLarge,
+            color = MaterialTheme.colorScheme.surfaceVariant,
+            tonalElevation = 1.dp,
+        ) {
             FamilyMap(
                 users = users,
                 places = places,
-                modifier = Modifier.fillMaxWidth().weight(1.08f),
+                modifier = Modifier.fillMaxSize().clip(MaterialTheme.shapes.extraLarge),
             )
-            Surface(Modifier.fillMaxWidth().weight(.92f), color = MaterialTheme.colorScheme.background) {
-                LazyColumn(Modifier.fillMaxSize().padding(horizontal = 18.dp), contentPadding = PaddingValues(top = 14.dp, bottom = 98.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                    item {
-                        Button(
-                            onClick = { areaPickerOpen = true },
-                            modifier = Modifier.fillMaxWidth(),
-                        ) {
-                            Icon(Lucide.MapPin, null)
-                            Spacer(Modifier.width(8.dp))
-                            Text("Cadastrar área")
-                        }
-                    }
-                    item {
-                        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                            Column(Modifier.weight(1f)) {
-                                Text("Família", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold)
-                                Text("Perfis vinculados aos dispositivos autorizados", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                            }
-                        }
-                    }
-                    if (users.isEmpty()) item { EmptyUsers() }
-                    items(users, key = { it.id }) { user -> UserCard(user) { historyUser = user; vm.history(user) } }
-                    if (places.isNotEmpty()) {
-                        item { Text("Áreas", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold, modifier = Modifier.padding(top = 5.dp)) }
-                        items(places, key = { it.id }) { place ->
-                            ListItem(
-                                headlineContent = { Text(place.name) },
-                                supportingContent = { Text("Raio de ${place.radiusMeters.toInt()} m") },
-                                modifier = Modifier.clickable { placeEditor = place },
-                            )
-                        }
+        }
+        Surface(
+            modifier = Modifier.fillMaxWidth().weight(1f).padding(top = 14.dp),
+            shape = MaterialTheme.shapes.extraLarge,
+            color = MaterialTheme.colorScheme.surface,
+            border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+        ) {
+            LazyColumn(
+                Modifier.fillMaxSize().padding(horizontal = 16.dp),
+                contentPadding = PaddingValues(top = 16.dp, bottom = 98.dp),
+                verticalArrangement = Arrangement.spacedBy(10.dp),
+            ) {
+                item {
+                    Text("Família", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold)
+                }
+                if (users.isEmpty()) item { EmptyUsers() }
+                items(users, key = { it.id }) { user ->
+                    UserCard(user) { historyUser = user; vm.history(user) }
+                }
+                item {
+                    TextButton(
+                        onClick = { areasOpen = true },
+                        modifier = Modifier.fillMaxWidth(),
+                    ) {
+                        Icon(Lucide.MapPin, null, Modifier.size(18.dp))
+                        Spacer(Modifier.width(6.dp))
+                        Text(if (places.isEmpty()) "Áreas" else "Áreas (${places.size})")
                     }
                 }
             }
@@ -113,6 +126,29 @@ fun PeopleScreen(vm: PeopleViewModel = hiltViewModel()) {
         val done: (Boolean) -> Unit = { if (it) placeEditor = null }
         if (value.id.isBlank()) vm.createPlace(value, done) else vm.updatePlace(value, done)
     } }
+    if (areasOpen) AreasSheet(
+        places = places,
+        busy = busy,
+        onDismiss = { areasOpen = false },
+        onCreate = { areasOpen = false; areaPickerOpen = true },
+        onEdit = { areasOpen = false; placeEditor = it },
+        onDelete = { areasOpen = false; deletingPlace = it },
+    )
+    deletingPlace?.let { place ->
+        AlertDialog(
+            onDismissRequest = { if (!busy) deletingPlace = null },
+            title = { Text("Remover área?") },
+            text = { Text("A área “${place.name}” será removida permanentemente.") },
+            dismissButton = { TextButton(onClick = { deletingPlace = null }, enabled = !busy) { Text("Cancelar") } },
+            confirmButton = {
+                Button(
+                    onClick = { vm.deletePlace(place) { if (it) deletingPlace = null } },
+                    enabled = !busy,
+                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error, contentColor = MaterialTheme.colorScheme.onError),
+                ) { Text("Remover") }
+            },
+        )
+    }
     historyUser?.let { user -> HistorySheet(user, history) { historyUser = null } }
 }
 
@@ -141,7 +177,12 @@ private fun FamilyMap(users: List<TrackedPerson>, places: List<TrackedPlace>, mo
                 setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_BOTTOM)
             })
         }
-        users.firstOrNull { it.lastLatitude != null && it.lastLongitude != null }?.let { map.controller.setCenter(GeoPoint(it.lastLatitude!!, it.lastLongitude!!)) }
+        if (map.tag != "initial-location-center") {
+            users.firstOrNull { it.lastLatitude != null && it.lastLongitude != null }?.let {
+                map.controller.setCenter(GeoPoint(it.lastLatitude!!, it.lastLongitude!!))
+                map.tag = "initial-location-center"
+            }
+        }
         map.invalidate()
     }, modifier = modifier.background(MaterialTheme.colorScheme.surfaceVariant))
 }
@@ -275,14 +316,18 @@ private fun EmptyUsers() = Surface(shape = MaterialTheme.shapes.large, color = M
 }
 
 @Composable
-private fun UserCard(user: TrackedPerson, onHistory: () -> Unit) = Card(modifier = Modifier.fillMaxWidth(), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface), border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)) {
+private fun UserCard(user: TrackedPerson, onHistory: () -> Unit) = Card(
+    modifier = Modifier.fillMaxWidth().clickable(onClick = onHistory),
+    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+    border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+) {
     Row(Modifier.padding(15.dp), verticalAlignment = Alignment.CenterVertically) {
         ProfileAvatar(user.avatarData, user.name, Modifier.size(44.dp))
         Spacer(Modifier.width(12.dp)); Column(Modifier.weight(1f)) {
             Text(user.name, fontWeight = FontWeight.SemiBold)
             Text(user.lastLocatedAt?.let { "Atualizado ${formatTime(it)}" } ?: "Ainda sem localização", color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodySmall)
         }
-        IconButton(onClick = onHistory) { Icon(Lucide.History, "Histórico de localização") }
+        Icon(Lucide.History, "Abrir histórico", tint = MaterialTheme.colorScheme.onSurfaceVariant)
     }
 }
 
@@ -304,9 +349,51 @@ private fun PlaceEditor(initial: TrackedPlace, busy: Boolean, onDismiss: () -> U
 }
 
 @Composable
+private fun AreasSheet(
+    places: List<TrackedPlace>,
+    busy: Boolean,
+    onDismiss: () -> Unit,
+    onCreate: () -> Unit,
+    onEdit: (TrackedPlace) -> Unit,
+    onDelete: (TrackedPlace) -> Unit,
+) = ValkyrisBottomSheet(
+    title = "Áreas",
+    onDismiss = onDismiss,
+    actions = { Button(onClick = onCreate, enabled = !busy) { Text("Cadastrar área") } },
+) {
+    if (places.isEmpty()) {
+        Text("Nenhuma área cadastrada.", color = MaterialTheme.colorScheme.onSurfaceVariant)
+    } else {
+        Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            places.forEach { place ->
+                ListItem(
+                    headlineContent = { Text(place.name) },
+                    supportingContent = { Text("Raio de ${place.radiusMeters.toInt()} m") },
+                    trailingContent = {
+                        Row {
+                            IconButton(onClick = { onEdit(place) }) { Icon(Lucide.Pencil, "Editar área") }
+                            IconButton(onClick = { onDelete(place) }) { Icon(Lucide.Trash2, "Remover área", tint = MaterialTheme.colorScheme.error) }
+                        }
+                    },
+                )
+            }
+        }
+    }
+}
+
+@Composable
 private fun HistorySheet(user: TrackedPerson, history: List<PersonLocation>, onDismiss: () -> Unit) = ValkyrisBottomSheet(title = "Por onde ${user.name} passou", onDismiss = onDismiss) {
     if (history.isEmpty()) Text("Ainda não há localização registrada.", color = MaterialTheme.colorScheme.onSurfaceVariant)
-    else Column(Modifier.fillMaxWidth().heightIn(max = 460.dp).verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(10.dp)) { history.forEach { location -> ListItem(headlineContent = { Text("${"%.5f".format(location.latitude)}, ${"%.5f".format(location.longitude)}") }, supportingContent = { Text(formatTime(location.occurredAt)) }, leadingContent = { Icon(Lucide.MapPin, null) }) } }
+    else Column(Modifier.fillMaxWidth().heightIn(max = 460.dp).verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        history.forEach { location ->
+            ListItem(
+                headlineContent = { Text(location.address.ifBlank { "Endereço indisponível" }) },
+                supportingContent = { Text(formatHistoryTime(location.occurredAt)) },
+                leadingContent = { Icon(Lucide.MapPin, null) },
+            )
+        }
+    }
 }
 
 private fun formatTime(value: String) = runCatching { DateTimeFormatter.ofPattern("dd MMM · HH:mm").withZone(ZoneId.systemDefault()).format(Instant.parse(value)) }.getOrDefault(value)
+private fun formatHistoryTime(value: String) = runCatching { DateTimeFormatter.ofPattern("dd/MM/yyyy · HH:mm").withZone(ZoneId.systemDefault()).format(Instant.parse(value)) }.getOrDefault(value)

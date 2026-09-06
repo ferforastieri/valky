@@ -113,6 +113,21 @@ func TestAdministratorLoginAndAuthorization(t *testing.T) {
 	}
 }
 
+func TestAdministratorPasswordOnlyRequiresAValue(t *testing.T) {
+	db, err := store.Open(t.TempDir() + "/short-password.db")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db.Close()
+	manager := NewManager(db, time.Minute)
+	if _, err = manager.BootstrapAdmin(context.Background(), LoginRequest{Password: "x", DeviceName: "Pixel"}); err != nil {
+		t.Fatalf("non-empty password was rejected: %v", err)
+	}
+	if err = manager.ChangeAdminPassword(context.Background(), "x", "y"); err != nil {
+		t.Fatalf("non-empty replacement password was rejected: %v", err)
+	}
+}
+
 func TestAdministratorLoginReconnectsSamePhoneAndProfile(t *testing.T) {
 	db, err := store.Open(t.TempDir() + "/auth.db")
 	if err != nil {

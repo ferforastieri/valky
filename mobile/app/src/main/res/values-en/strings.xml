@@ -7,7 +7,7 @@
     <string name="login_body">Enter your Valkyris HTTPS address. On first access, you will create the home password.</string>
     <string name="server_url">Server address</string>
     <string name="home_password">Home password</string>
-    <string name="create_home_password">Create a password with at least 10 characters</string>
+    <string name="create_home_password">Create the home password</string>
     <string name="confirm_home_password">Confirm password</string>
     <string name="create_admin_body">This installation has no administrator yet. Create the home password to become its administrator.</string>
     <string name="login_admin_body">This home is already configured. Sign in with the administrator password.</string>
@@ -128,7 +128,7 @@
     <string name="event_media_summary">Snapshots and 15-second clips</string>
     <string name="rtsp_uri">RTSP address</string>
     <string name="add_camera_hint">Use the + button to connect an ONVIF camera.</string>
-    <string name="stream_private">LL-HLS · private</string>
+    <string name="stream_private">WebRTC · private</string>
     <string name="snapshot_preview">SNAPSHOT</string>
     <string name="stream_local">The stream stays inside your LAN or VPN.</string>
     <string name="full_screen_alarms">Full-screen alarms</string>

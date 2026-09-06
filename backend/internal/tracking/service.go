@@ -80,6 +80,7 @@ type UserLocation struct {
 	Latitude   float64   `json:"latitude"`
 	Longitude  float64   `json:"longitude"`
 	Accuracy   float64   `json:"accuracy"`
+	Address    string    `json:"address"`
 	OccurredAt time.Time `json:"occurredAt"`
 }
 
@@ -149,7 +150,7 @@ func (s *Service) UserHistory(ctx context.Context, userID string, limit int) ([]
 	if limit < 1 || limit > 500 {
 		limit = 100
 	}
-	rows, err := s.store.DB.QueryContext(ctx, `SELECT id,user_id,latitude,longitude,accuracy,occurred_at FROM user_locations WHERE user_id=? ORDER BY occurred_at DESC LIMIT ?`, userID, limit)
+	rows, err := s.store.DB.QueryContext(ctx, `SELECT id,user_id,latitude,longitude,accuracy,address,occurred_at FROM user_locations WHERE user_id=? ORDER BY occurred_at DESC LIMIT ?`, userID, limit)
 	if err != nil {
 		return nil, err
 	}
@@ -158,7 +159,7 @@ func (s *Service) UserHistory(ctx context.Context, userID string, limit int) ([]
 	for rows.Next() {
 		var location UserLocation
 		var occurredAt string
-		if err := rows.Scan(&location.ID, &location.UserID, &location.Latitude, &location.Longitude, &location.Accuracy, &occurredAt); err != nil {
+		if err := rows.Scan(&location.ID, &location.UserID, &location.Latitude, &location.Longitude, &location.Accuracy, &location.Address, &occurredAt); err != nil {
 			return nil, err
 		}
 		location.OccurredAt, _ = time.Parse(time.RFC3339Nano, occurredAt)
@@ -180,6 +181,10 @@ func (s *Service) ReportMyLocation(ctx context.Context, deviceID string, locatio
 	if !validCoordinate(location.Latitude, location.Longitude) || location.Accuracy < 0 || location.Accuracy > 10000 {
 		return nil, fmt.Errorf("location is invalid")
 	}
+	location.Address = strings.TrimSpace(location.Address)
+	if len([]rune(location.Address)) > 320 {
+		return nil, fmt.Errorf("location address is invalid")
+	}
 	now := time.Now().UTC()
 	if location.OccurredAt.IsZero() {
 		location.OccurredAt = now
@@ -193,7 +198,7 @@ func (s *Service) ReportMyLocation(ctx context.Context, deviceID string, locatio
 	}
 	defer tx.Rollback()
 	location.ID, location.UserID = uuid.NewString(), user.ID
-	if _, err = tx.ExecContext(ctx, `INSERT INTO user_locations(id,user_id,latitude,longitude,accuracy,occurred_at,created_at) VALUES(?,?,?,?,?,?,?)`, location.ID, location.UserID, location.Latitude, location.Longitude, location.Accuracy, location.OccurredAt.Format(time.RFC3339Nano), now.Format(time.RFC3339Nano)); err != nil {
+	if _, err = tx.ExecContext(ctx, `INSERT INTO user_locations(id,user_id,latitude,longitude,accuracy,address,occurred_at,created_at) VALUES(?,?,?,?,?,?,?,?)`, location.ID, location.UserID, location.Latitude, location.Longitude, location.Accuracy, location.Address, location.OccurredAt.Format(time.RFC3339Nano), now.Format(time.RFC3339Nano)); err != nil {
 		return nil, err
 	}
 	if _, err = tx.ExecContext(ctx, `UPDATE users SET last_latitude=?,last_longitude=?,last_accuracy=?,last_located_at=?,updated_at=? WHERE id=?`, location.Latitude, location.Longitude, location.Accuracy, location.OccurredAt.Format(time.RFC3339Nano), now.Format(time.RFC3339Nano), user.ID); err != nil {

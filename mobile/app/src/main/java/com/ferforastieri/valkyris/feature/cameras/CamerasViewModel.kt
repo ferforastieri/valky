@@ -283,7 +283,7 @@ class CameraLiveViewModel @Inject constructor(
         return "Valkyris-$cameraName-$timestamp.$extension"
     }
 
-    fun liveUrl() = api.liveUrl(id)
+    fun whepUrl() = api.whepUrl(id)
     fun token() = api.token()
     fun httpClient() = api.mediaHttpClient()
 

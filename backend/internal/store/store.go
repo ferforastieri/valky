@@ -45,6 +45,7 @@ func Open(path string) (*Store, error) {
 		{"devices", "is_admin", `ALTER TABLE devices ADD COLUMN is_admin INTEGER NOT NULL DEFAULT 0`, `UPDATE devices SET is_admin=1`},
 		{"devices", "user_id", `ALTER TABLE devices ADD COLUMN user_id TEXT REFERENCES users(id) ON DELETE SET NULL`, ""},
 		{"users", "avatar_data", `ALTER TABLE users ADD COLUMN avatar_data TEXT NOT NULL DEFAULT ''`, ""},
+		{"user_locations", "address", `ALTER TABLE user_locations ADD COLUMN address TEXT NOT NULL DEFAULT ''`, ""},
 		{"events", "clip_status", `ALTER TABLE events ADD COLUMN clip_status TEXT NOT NULL DEFAULT 'not_requested'`, `UPDATE events SET clip_status=CASE WHEN clip_path IS NULL OR clip_path='' THEN 'not_requested' ELSE 'ready' END`},
 		{"events", "clip_error", `ALTER TABLE events ADD COLUMN clip_error TEXT`, ""},
 	} {

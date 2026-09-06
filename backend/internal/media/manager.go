@@ -24,7 +24,8 @@ type cachedFrame struct {
 
 type Manager struct {
 	api        string
-	hls        string
+	rtsp       string
+	webrtc     string
 	playback   string
 	recordings string
 	http       *http.Client
@@ -32,10 +33,11 @@ type Manager struct {
 	previews   map[string]cachedFrame
 }
 
-func New(api, hls, playback, recordings string) *Manager {
+func New(api, rtsp, webrtc, playback, recordings string) *Manager {
 	return &Manager{
 		api:        strings.TrimRight(api, "/"),
-		hls:        strings.TrimRight(hls, "/"),
+		rtsp:       strings.TrimRight(rtsp, "/"),
+		webrtc:     strings.TrimRight(webrtc, "/"),
 		playback:   strings.TrimRight(playback, "/"),
 		recordings: recordings,
 		http:       &http.Client{Timeout: 30 * time.Second},
@@ -55,8 +57,8 @@ func (m *Manager) ConfigureCamera(ctx context.Context, id, rtspURI string) error
 	outputPath := "camera-" + id
 	sourcePath := outputPath + "-source"
 
-	// The app-facing path copies video without quality loss and normalizes the
-	// camera audio to AAC, a codec supported by LL-HLS and Android Media3.
+	// This is the only app-facing stream. Video stays untouched and audio is
+	// normalized to Opus, which MediaMTX can deliver through WebRTC.
 	output := map[string]any{
 		"source":                "publisher",
 		"record":                true,
@@ -70,7 +72,7 @@ func (m *Manager) ConfigureCamera(ctx context.Context, id, rtspURI string) error
 		return fmt.Errorf("configure playable media path: %w", err)
 	}
 
-	transcode := fmt.Sprintf("ffmpeg -hide_banner -loglevel warning -fflags +genpts -use_wallclock_as_timestamps 1 -rtsp_transport tcp -i rtsp://127.0.0.1:8554/%s -map 0:v:0 -map 0:a:0? -c:v copy -c:a aac -profile:a aac_low -ar 48000 -ac 1 -b:a 64k -af aresample=async=1:first_pts=0 -muxdelay 0.1 -f rtsp -rtsp_transport tcp rtsp://127.0.0.1:8554/%s", sourcePath, outputPath)
+	transcode := fmt.Sprintf("ffmpeg -hide_banner -loglevel warning -fflags +genpts -use_wallclock_as_timestamps 1 -rtsp_transport tcp -i rtsp://127.0.0.1:8554/%s -map 0:v:0 -map 0:a:0? -c:v copy -c:a libopus -ar 48000 -ac 1 -b:a 64k -af aresample=async=1:first_pts=0 -muxdelay 0.1 -f rtsp -rtsp_transport tcp rtsp://127.0.0.1:8554/%s", sourcePath, outputPath)
 	source := map[string]any{
 		"source":            rtspURI,
 		"sourceOnDemand":    false,
@@ -90,7 +92,6 @@ func (m *Manager) ensureInternalRTSP(ctx context.Context) error {
 		"rtsp":            true,
 		"rtspAddress":     ":8554",
 		"rtspTransports":  []string{"tcp"},
-		"hlsAlwaysRemux":  true,
 		"playback":        true,
 		"playbackAddress": ":9996",
 	})
@@ -199,8 +200,8 @@ func (m *Manager) removePath(ctx context.Context, name string) error {
 	return nil
 }
 
-func (m *Manager) HLSPath(id string) string { return "/camera-" + id + "/index.m3u8" }
-func (m *Manager) HLSBase() string          { return m.hls }
+func (m *Manager) WebRTCBase() string       { return m.webrtc }
+func (m *Manager) RTSPURL(id string) string { return m.rtsp + "/camera-" + id }
 
 func (m *Manager) CaptureSnapshot(ctx context.Context, rtspURI, output string) error {
 	if err := os.MkdirAll(filepath.Dir(output), 0o700); err != nil {
@@ -213,7 +214,7 @@ func (m *Manager) CaptureSnapshot(ctx context.Context, rtspURI, output string) e
 func (m *Manager) MonitoringFrame(ctx context.Context, cameraID string) ([]byte, error) {
 	frameContext, cancel := context.WithTimeout(ctx, 8*time.Second)
 	defer cancel()
-	input := m.hls + m.HLSPath(cameraID)
+	input := m.RTSPURL(cameraID)
 	cmd := exec.CommandContext(frameContext, "ffmpeg", "-hide_banner", "-loglevel", "error", "-i", input, "-frames:v", "1", "-f", "image2pipe", "-c:v", "mjpeg", "-q:v", "2", "pipe:1")
 	frame, err := cmd.Output()
 	if err != nil {

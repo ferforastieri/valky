@@ -147,6 +147,7 @@ CREATE TABLE IF NOT EXISTS user_locations (
   latitude REAL NOT NULL,
   longitude REAL NOT NULL,
   accuracy REAL NOT NULL DEFAULT 0,
+  address TEXT NOT NULL DEFAULT '',
   occurred_at TEXT NOT NULL,
   created_at TEXT NOT NULL
 );

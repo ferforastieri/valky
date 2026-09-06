@@ -99,7 +99,7 @@ fun OnboardingScreen(viewModel: MainViewModel) {
                         { url = it; viewModel.resetAuthStatus() },
                         Modifier.fillMaxWidth(),
                         label = { Text(stringResource(R.string.server_url)) },
-                        placeholder = { Text("https://valkyris.home.example.com") },
+                        placeholder = { Text("https://seu-dominio.exemplo") },
                         enabled = initialized == null && !connecting,
                         singleLine = true,
                     )
@@ -146,7 +146,7 @@ fun OnboardingScreen(viewModel: MainViewModel) {
                         },
                         modifier = Modifier.fillMaxWidth(),
                         enabled = !connecting && url.isNotBlank() && (
-                            initialized == null || userName.isNotBlank() && password.isNotBlank() && (initialized == true || password.length >= 10 && password == confirmation)
+                            initialized == null || userName.isNotBlank() && password.isNotBlank() && (initialized == true || password == confirmation)
                         ),
                     ) {
                         if (connecting) CircularProgressIndicator(Modifier.size(20.dp), strokeWidth = 2.dp)

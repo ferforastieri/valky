@@ -37,6 +37,36 @@ func TestOpenMigratesONVIFServiceAddresses(t *testing.T) {
 	}
 }
 
+func TestOpenMigratesLocationAddressWithoutDiscardingHistory(t *testing.T) {
+	path := t.TempDir() + "/legacy-locations.db"
+	legacy, err := sql.Open("sqlite", path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, err = legacy.Exec(`CREATE TABLE user_locations (
+      id TEXT PRIMARY KEY, user_id TEXT NOT NULL, latitude REAL NOT NULL,
+      longitude REAL NOT NULL, accuracy REAL NOT NULL DEFAULT 0,
+      occurred_at TEXT NOT NULL, created_at TEXT NOT NULL
+    ); INSERT INTO user_locations(id,user_id,latitude,longitude,accuracy,occurred_at,created_at)
+      VALUES('location-1','user-1',-23.55,-46.63,8,'2026-01-01T00:00:00Z','2026-01-01T00:00:00Z')`)
+	legacy.Close()
+	if err != nil {
+		t.Fatal(err)
+	}
+	db, err := Open(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db.Close()
+	if exists, checkErr := columnExists(context.Background(), db.DB, "user_locations", "address"); checkErr != nil || !exists {
+		t.Fatalf("address column was not migrated: exists=%v err=%v", exists, checkErr)
+	}
+	var id, address string
+	if err = db.DB.QueryRow(`SELECT id,address FROM user_locations WHERE id='location-1'`).Scan(&id, &address); err != nil || id != "location-1" || address != "" {
+		t.Fatalf("legacy history was not preserved: id=%q address=%q err=%v", id, address, err)
+	}
+}
+
 func TestOpenPromotesLegacyDevicesWithoutChangingNewDefault(t *testing.T) {
 	path := t.TempDir() + "/legacy-devices.db"
 	legacy, err := sql.Open("sqlite", path)

@@ -10,8 +10,10 @@ never receive camera passwords and MediaMTX is not published on a host port.
    capabilities, service addresses and the media profile token. A terminal error
    is sanitized and persisted on the camera instead of removing it.
 3. MediaMTX pulls the selected RTSP profile once. An internal FFmpeg process
-   copies H.264 without re-encoding, converts camera audio such as G.711 to AAC,
-   and republishes the normalized stream used by LL-HLS and the rolling fMP4 buffer.
+   copies H.264 without re-encoding, converts camera audio such as G.711 to Opus,
+   and republishes one normalized WebRTC stream while preserving the rolling fMP4
+   buffer used for event clips. WHEP signalling is authenticated by Go; after ICE
+   succeeds, media flows directly between MediaMTX and the phone.
 4. ONVIF events and local audio/video detectors submit normalized detections to
    the rule engine.
 5. Matching rules create an event, materialize a 5-second pre-roll and 10-second

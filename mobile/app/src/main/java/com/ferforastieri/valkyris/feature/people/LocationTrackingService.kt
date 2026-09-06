@@ -10,6 +10,8 @@ import android.content.Intent
 import android.content.SharedPreferences
 import android.content.pm.PackageManager
 import android.graphics.Color
+import android.location.Address
+import android.location.Geocoder
 import android.location.Location
 import android.location.LocationListener
 import android.location.LocationManager
@@ -25,7 +27,10 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import java.time.Instant
+import java.util.Locale
 import javax.inject.Inject
 
 @AndroidEntryPoint
@@ -34,6 +39,7 @@ class LocationTrackingService : Service(), LocationListener {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private lateinit var locationManager: LocationManager
     private lateinit var preferences: SharedPreferences
+    private val reportingMutex = Mutex()
 
     override fun onCreate() {
         super.onCreate()
@@ -51,7 +57,9 @@ class LocationTrackingService : Service(), LocationListener {
             locationManager.removeUpdates(this)
             listOf(LocationManager.GPS_PROVIDER, LocationManager.NETWORK_PROVIDER).forEach { provider ->
                 if (locationManager.isProviderEnabled(provider)) {
-                    locationManager.requestLocationUpdates(provider, 120_000L, 30f, this, Looper.getMainLooper())
+                    // Receive a reasonably fresh fix, but report it only when the
+                    // persisted five-minute/movement policy below allows it.
+                    locationManager.requestLocationUpdates(provider, CHECK_INTERVAL_MS, MOVEMENT_DISTANCE_METERS, this, Looper.getMainLooper())
                     locationManager.getLastKnownLocation(provider)?.let(::report)
                 }
             }
@@ -62,15 +70,61 @@ class LocationTrackingService : Service(), LocationListener {
     override fun onLocationChanged(location: Location) = report(location)
     private fun report(location: Location) {
         scope.launch {
-            runCatching {
-                api.reportMyLocation(PersonLocation(
-                    latitude = location.latitude,
-                    longitude = location.longitude,
-                    accuracy = location.accuracy.toDouble(),
-                    occurredAt = Instant.ofEpochMilli(location.time).toString(),
-                ))
+            reportingMutex.withLock {
+                if (!shouldReport(location)) return@withLock
+                val completed = runCatching {
+                    api.reportMyLocation(PersonLocation(
+                        latitude = location.latitude,
+                        longitude = location.longitude,
+                        accuracy = location.accuracy.toDouble(),
+                        address = resolveAddress(location),
+                        occurredAt = Instant.ofEpochMilli(location.time).toString(),
+                    ))
+                }.isSuccess
+                if (completed) persistReportedLocation(location)
             }
         }
+    }
+
+    private fun shouldReport(location: Location): Boolean {
+        val lastSentAt = preferences.getLong(LAST_SENT_AT, 0L)
+        if (lastSentAt == 0L || System.currentTimeMillis() - lastSentAt >= REPORT_INTERVAL_MS) return true
+        if (!preferences.contains(LAST_SENT_LATITUDE) || !preferences.contains(LAST_SENT_LONGITUDE)) return true
+        val lastLocation = Location("last-reported").apply {
+            latitude = Double.fromBits(preferences.getLong(LAST_SENT_LATITUDE, 0L))
+            longitude = Double.fromBits(preferences.getLong(LAST_SENT_LONGITUDE, 0L))
+        }
+        return lastLocation.distanceTo(location) >= MOVEMENT_DISTANCE_METERS
+    }
+
+    private fun persistReportedLocation(location: Location) {
+        preferences.edit()
+            .putLong(LAST_SENT_AT, System.currentTimeMillis())
+            .putLong(LAST_SENT_LATITUDE, location.latitude.toBits())
+            .putLong(LAST_SENT_LONGITUDE, location.longitude.toBits())
+            .apply()
+    }
+
+    @Suppress("DEPRECATION")
+    private fun resolveAddress(location: Location): String = runCatching {
+        if (!Geocoder.isPresent()) return@runCatching ""
+        val address = Geocoder(this, Locale.getDefault())
+            .getFromLocation(location.latitude, location.longitude, 1)
+            ?.firstOrNull()
+            ?: return@runCatching ""
+        address.displayAddress()
+    }.getOrDefault("")
+
+    private fun Address.displayAddress(): String {
+        val completeAddress = if (maxAddressLineIndex >= 0) {
+            (0..maxAddressLineIndex).mapNotNull { getAddressLine(it)?.trim()?.takeIf { value -> value.isNotBlank() } }.joinToString(", ")
+        } else ""
+        return completeAddress.ifBlank {
+            listOf(featureName, thoroughfare, subThoroughfare, locality, subAdminArea, adminArea, postalCode, countryName)
+                .mapNotNull { it?.trim()?.takeIf { value -> value.isNotBlank() } }
+                .distinct()
+                .joinToString(", ")
+        }.take(320)
     }
 
     override fun onDestroy() { runCatching { locationManager.removeUpdates(this) }; super.onDestroy() }
@@ -103,6 +157,12 @@ class LocationTrackingService : Service(), LocationListener {
         private const val NOTIFICATION_ID = 117
         private const val TRACKING_ENABLED = "tracking_enabled"
         private const val PREFERENCES = "location_tracking"
+        private const val LAST_SENT_AT = "last_sent_at"
+        private const val LAST_SENT_LATITUDE = "last_sent_latitude"
+        private const val LAST_SENT_LONGITUDE = "last_sent_longitude"
+        private const val REPORT_INTERVAL_MS = 5 * 60 * 1000L
+        private const val CHECK_INTERVAL_MS = 60 * 1000L
+        private const val MOVEMENT_DISTANCE_METERS = 50f
         fun start(context: Context) = ContextCompat.startForegroundService(context, Intent(context, LocationTrackingService::class.java))
     }
 }

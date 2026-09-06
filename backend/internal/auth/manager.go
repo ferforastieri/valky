@@ -55,8 +55,8 @@ type PairResponse struct {
 }
 
 func (m *Manager) ChangeAdminPassword(ctx context.Context, currentPassword, newPassword string) error {
-	if len(newPassword) < 10 {
-		return fmt.Errorf("password must have at least 10 characters")
+	if strings.TrimSpace(newPassword) == "" {
+		return fmt.Errorf("password is required")
 	}
 	var encoded string
 	if err := m.store.DB.QueryRowContext(ctx, `SELECT value FROM settings WHERE key='admin_password_hash'`).Scan(&encoded); err != nil {
@@ -87,8 +87,11 @@ func (m *Manager) AdminInitialized(ctx context.Context) (bool, error) {
 }
 
 func (m *Manager) BootstrapAdmin(ctx context.Context, req LoginRequest) (PairResponse, error) {
-	if len(req.Password) < 10 || req.DeviceName == "" {
-		return PairResponse{}, fmt.Errorf("password must have at least 10 characters")
+	if strings.TrimSpace(req.Password) == "" {
+		return PairResponse{}, fmt.Errorf("password is required")
+	}
+	if strings.TrimSpace(req.DeviceName) == "" {
+		return PairResponse{}, fmt.Errorf("device name is required")
 	}
 	tx, err := m.store.DB.BeginTx(ctx, nil)
 	if err != nil {

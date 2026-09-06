@@ -335,7 +335,7 @@ class ValkyrisApi(
 
     suspend fun ptz(cameraId: String, command: PTZCommand) {
         val current = requireNotNull(session())
-        executeUnit(current.fingerprint, announceBackend = true) {
+        executeUnit(current.fingerprint) {
             it.post(base() + "/cameras/$cameraId/ptz") {
                 bearerAuth(current.token)
                 header(HttpHeaders.AcceptLanguage, Locale.getDefault().toLanguageTag())
@@ -367,7 +367,7 @@ class ValkyrisApi(
 
     fun snapshotUrl(cameraId: String) = base() + "/cameras/$cameraId/snapshot"
     fun recordingUrl(cameraId: String) = base() + "/cameras/$cameraId/recording"
-    fun liveUrl(cameraId: String) = base() + "/cameras/$cameraId/live/index.m3u8"
+    fun whepUrl(cameraId: String) = base() + "/cameras/$cameraId/live/webrtc/whep"
     fun clipUrl(eventId: String) = base() + "/events/$eventId/clip"
     fun eventSnapshotUrl(eventId: String) = base() + "/events/$eventId/snapshot"
     fun token() = requireNotNull(session()).token

@@ -93,7 +93,6 @@ fun ProfileScreen(admin: Boolean, vm: ProfileViewModel = hiltViewModel()) {
                 ) {
                     ProfileAvatar(avatarData, "Foto de perfil", Modifier.size(104.dp))
                     OutlinedButton(onClick = { imagePicker.launch("image/*") }, enabled = !saving) { Text("Alterar foto") }
-                    Text("Este perfil representa você e o celular que está usando.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
             }
             OutlinedTextField(
@@ -113,7 +112,7 @@ fun ProfileScreen(admin: Boolean, vm: ProfileViewModel = hiltViewModel()) {
             Text("Senha da casa", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold, modifier = Modifier.padding(top = 12.dp))
             Text("Essa é a senha usada para entrar nesta instalação.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             OutlinedTextField(currentPassword, { currentPassword = it }, label = { Text("Senha atual") }, singleLine = true, visualTransformation = PasswordVisualTransformation(), modifier = Modifier.fillMaxWidth())
-            OutlinedTextField(newPassword, { newPassword = it }, label = { Text("Nova senha") }, supportingText = { Text("No mínimo 10 caracteres") }, singleLine = true, visualTransformation = PasswordVisualTransformation(), modifier = Modifier.fillMaxWidth())
+            OutlinedTextField(newPassword, { newPassword = it }, label = { Text("Nova senha") }, singleLine = true, visualTransformation = PasswordVisualTransformation(), modifier = Modifier.fillMaxWidth())
             OutlinedTextField(confirmation, { confirmation = it }, label = { Text("Confirmar nova senha") }, isError = confirmation.isNotEmpty() && confirmation != newPassword, singleLine = true, visualTransformation = PasswordVisualTransformation(), modifier = Modifier.fillMaxWidth())
             Button(
                 onClick = {
@@ -122,7 +121,7 @@ fun ProfileScreen(admin: Boolean, vm: ProfileViewModel = hiltViewModel()) {
                     newPassword = ""
                     confirmation = ""
                 },
-                enabled = !saving && currentPassword.isNotBlank() && newPassword.length >= 10 && newPassword == confirmation,
+                enabled = !saving && currentPassword.isNotBlank() && newPassword.isNotBlank() && newPassword == confirmation,
                 modifier = Modifier.fillMaxWidth(),
             ) { Text("Alterar senha") }
             }

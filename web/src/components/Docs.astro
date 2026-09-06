@@ -44,7 +44,7 @@ const endpoints = pt ? [
   ['POST','/api/v1/cameras/{id}/ptz','Autenticado','Move, para ou aplica zoom quando suportado.'],
   ['GET','/api/v1/cameras/{id}/snapshot','Autenticado','Retorna um frame JPEG do stream local atual.'],
   ['GET','/api/v1/cameras/{id}/recording','Autenticado','Baixa os últimos 10 segundos do buffer em MP4.'],
-  ['GET','/api/v1/cameras/{id}/live/index.m3u8','Autenticado','Entrega a playlist LL-HLS autenticada.'],
+  ['POST · PATCH · DELETE','/api/v1/cameras/{id}/live/webrtc/whep','Autenticado','Negocia e encerra o stream WebRTC autenticado.'],
   ['GET','/api/v1/detectors','Autenticado','Lista os tipos normalizados de detecção.'],
   ['GET · POST','/api/v1/rules','Autenticado','Lista ou cria regras de automação.'],
   ['PUT · DELETE','/api/v1/rules/{id}','Autenticado','Edita ou remove uma regra.'],
@@ -79,7 +79,7 @@ const endpoints = pt ? [
   ['POST','/api/v1/cameras/{id}/ptz','Authenticated','Moves, stops or zooms when supported.'],
   ['GET','/api/v1/cameras/{id}/snapshot','Authenticated','Returns a JPEG frame from the current local stream.'],
   ['GET','/api/v1/cameras/{id}/recording','Authenticated','Downloads the latest 10 seconds from the rolling buffer as MP4.'],
-  ['GET','/api/v1/cameras/{id}/live/index.m3u8','Authenticated','Serves the authenticated LL-HLS playlist.'],
+  ['POST · PATCH · DELETE','/api/v1/cameras/{id}/live/webrtc/whep','Authenticated','Negotiates and closes the authenticated WebRTC stream.'],
   ['GET','/api/v1/detectors','Authenticated','Lists normalized detector types.'],
   ['GET · POST','/api/v1/rules','Authenticated','Lists or creates automation rules.'],
   ['PUT · DELETE','/api/v1/rules/{id}','Authenticated','Edits or deletes a rule.'],
@@ -135,7 +135,7 @@ const endpoints = pt ? [
           <div class="docs-heading"><Boxes size={22}/><div><span>02</span><h2>{pt ? 'Arquitetura' : 'Architecture'}</h2></div></div>
           <div class="architecture-flow">
             <article><strong>{pt ? 'Câmera' : 'Camera'}</strong><small>ONVIF · RTSP</small></article><i>→</i>
-            <article><strong>MediaMTX</strong><small>LL-HLS · buffer · AAC</small></article><i>→</i>
+            <article><strong>MediaMTX</strong><small>WebRTC · buffer · Opus</small></article><i>→</i>
             <article><strong>Go + SQLite</strong><small>{pt ? 'regras · eventos' : 'rules · events'}</small></article><i>→</i>
             <article><strong>Android</strong><small>Compose · push</small></article>
           </div>
@@ -179,8 +179,9 @@ const endpoints = pt ? [
               ['VALKYRIS_TLS_CERT','/data/tls/server.crt',pt?'Certificado TLS.':'TLS certificate.'],
               ['VALKYRIS_TLS_KEY','/data/tls/server.key',pt?'Chave TLS.':'TLS key.'],
               ['VALKYRIS_MASTER_KEY_FILE','/data/secrets/master.key',pt?'Chave mestra de criptografia.':'Encryption master key.'],
-              ['VALKYRIS_MEDIA_URL','http://mediamtx:8888',pt?'Origem HLS interna.':'Internal HLS origin.'],
               ['VALKYRIS_MEDIA_API','http://mediamtx:9997',pt?'API interna do MediaMTX.':'Internal MediaMTX API.'],
+              ['VALKYRIS_MEDIA_RTSP','rtsp://mediamtx:8554',pt?'Stream interno para monitoramento e detectores.':'Internal stream for monitoring and detectors.'],
+              ['VALKYRIS_MEDIA_WEBRTC','http://mediamtx:8889',pt?'Origem WHEP interna; a mídia WebRTC segue direto ao celular após ICE.':'Internal WHEP origin; WebRTC media goes directly to the phone after ICE.'],
               ['VALKYRIS_MEDIA_PLAYBACK','http://mediamtx:9996',pt?'API interna para gerar clipes recentes.':'Internal API used to generate recent clips.'],
               ['VALKYRIS_UPDATER_URL','http://updater:8080',pt?'Atualizador interno.':'Internal updater.'],
               ['VALKYRIS_RELEASE_API','api.github.com/…/releases/latest',pt?'Release estável consultada.':'Stable release lookup.'],

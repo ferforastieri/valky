@@ -17,9 +17,10 @@ services:
       VALKYRIS_TLS_CERT: /data/tls/server.crt
       VALKYRIS_TLS_KEY: /data/tls/server.key
       VALKYRIS_MASTER_KEY_FILE: /data/secrets/master.key
-      VALKYRIS_MEDIA_URL: http://mediamtx:8888
       VALKYRIS_MEDIA_API: http://mediamtx:9997
       VALKYRIS_MEDIA_PLAYBACK: http://mediamtx:9996
+      VALKYRIS_MEDIA_WEBRTC: http://mediamtx:8889
+      VALKYRIS_MEDIA_RTSP: rtsp://mediamtx:8554
       VALKYRIS_MEDIA_RECORDINGS: /data/recordings
       VALKYRIS_UPDATER_URL: http://updater:8080
       VALKYRIS_UPDATER_TOKEN: ${VALKYRIS_UPDATER_TOKEN:-}
@@ -76,7 +77,8 @@ services:
           create_host_path: false
       - valkyris-data:/data
     expose:
-      - "8888"
+      - "8554"
+      - "8889"
       - "9997"
       - "9996"
     networks: [valkyris]

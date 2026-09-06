@@ -2,20 +2,20 @@ logLevel: info
 api: true
 apiAddress: :9997
 apiEncryption: false
-hls: true
-hlsAddress: :8888
-hlsEncryption: false
-hlsAlwaysRemux: true
-hlsVariant: lowLatency
-hlsSegmentCount: 7
-hlsSegmentDuration: 1s
-hlsPartDuration: 200ms
+hls: false
 rtsp: true
 rtspAddress: :8554
 rtspTransports: [tcp]
 rtmp: false
 srt: false
-webrtc: false
+webrtc: true
+webrtcAddress: :8889
+# Do not bind or publish a fixed media port. ICE uses this STUN server to try
+# UDP hole punching, so media can remain direct without router forwarding.
+webrtcLocalUDPAddress: ""
+webrtcLocalTCPAddress: ""
+webrtcICEServers2:
+  - url: stun:stun.l.google.com:19302
 playback: true
 playbackAddress: :9996
 metrics: false

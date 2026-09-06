@@ -13,6 +13,7 @@ import (
 	"net/http/httputil"
 	"net/url"
 	"os"
+	"path"
 	"path/filepath"
 	"strconv"
 	"strings"
@@ -122,7 +123,9 @@ func (s *Server) Handler() http.Handler {
 	protected.HandleFunc("POST /cameras/{id}/ptz", s.ptz)
 	protected.HandleFunc("GET /cameras/{id}/snapshot", s.snapshot)
 	protected.HandleFunc("GET /cameras/{id}/recording", s.recentRecording)
-	protected.HandleFunc("GET /cameras/{id}/live/{asset...}", s.live)
+	protected.HandleFunc("POST /cameras/{id}/live/webrtc/whep", s.liveWebRTC)
+	protected.HandleFunc("PATCH /cameras/{id}/live/webrtc/whep/{session}", s.liveWebRTC)
+	protected.HandleFunc("DELETE /cameras/{id}/live/webrtc/whep/{session}", s.liveWebRTC)
 	protected.HandleFunc("GET /detectors", s.detectors)
 	protected.HandleFunc("GET /rules", s.listRules)
 	protected.HandleFunc("POST /rules", s.createRule)
@@ -511,30 +514,79 @@ func (s *Server) recentRecording(w http.ResponseWriter, r *http.Request) {
 	setOutcomeHeaders(w, http.StatusOK, "Recent camera recording loaded")
 	http.ServeContent(w, r, "valkyris-recording.mp4", info.ModTime(), file)
 }
-func (s *Server) live(w http.ResponseWriter, r *http.Request) {
-	target, _ := url.Parse(s.media.HLSBase())
-	proxy := httputil.NewSingleHostReverseProxy(target)
+
+// liveWebRTC proxies only WHEP signalling. Once ICE connects, RTP/DTLS media
+// travels directly between MediaMTX and the authenticated phone.
+func (s *Server) liveWebRTC(w http.ResponseWriter, r *http.Request) {
 	id := r.PathValue("id")
-	asset := r.PathValue("asset")
-	if asset == "" {
-		asset = "index.m3u8"
+	cam, _, err := s.cameras.Get(r.Context(), id)
+	if err != nil {
+		respond(w, nil, err)
+		return
 	}
+	if cam.SetupStatus != "ready" {
+		writeError(w, http.StatusConflict, fmt.Errorf("camera stream is not ready"))
+		return
+	}
+	session := r.PathValue("session")
+	if session != "" && !safeWHEPSession(session) {
+		writeError(w, http.StatusBadRequest, fmt.Errorf("invalid WebRTC session"))
+		return
+	}
+	target, err := url.Parse(s.media.WebRTCBase())
+	if err != nil || target.Scheme == "" || target.Host == "" {
+		writeError(w, http.StatusServiceUnavailable, fmt.Errorf("WebRTC media service is unavailable"))
+		return
+	}
+	mediaPath := "/camera-" + id + "/whep"
+	if session != "" {
+		mediaPath += "/" + session
+	}
+	externalPath := "/api/v1/cameras/" + id + "/live/webrtc/whep"
+	r.Body = http.MaxBytesReader(w, r.Body, 128<<10)
+	proxy := httputil.NewSingleHostReverseProxy(target)
 	proxy.Director = func(req *http.Request) {
 		req.URL.Scheme = target.Scheme
 		req.URL.Host = target.Host
-		req.URL.Path = "/camera-" + id + "/" + asset
+		req.URL.Path = mediaPath
+		req.URL.RawPath = ""
+		req.URL.RawQuery = ""
 		req.Host = target.Host
 		req.Header.Del("Authorization")
 	}
 	proxy.ModifyResponse = func(response *http.Response) error {
-		response.Header.Set(messageHeader, "Authenticated live stream asset loaded")
-		response.Header.Set(successHeader, strconv.FormatBool(response.StatusCode < http.StatusBadRequest))
+		location := response.Header.Get("Location")
+		if location == "" {
+			return nil
+		}
+		parsed, parseErr := url.Parse(location)
+		if parseErr != nil {
+			return parseErr
+		}
+		last := path.Base(parsed.Path)
+		if !safeWHEPSession(last) {
+			return fmt.Errorf("MediaMTX returned an invalid WebRTC session location")
+		}
+		response.Header.Set("Location", externalPath+"/"+last)
 		return nil
 	}
-	proxy.ErrorHandler = func(writer http.ResponseWriter, _ *http.Request, err error) {
-		writeError(writer, http.StatusBadGateway, fmt.Errorf("live stream unavailable: %w", err))
+	proxy.ErrorHandler = func(writer http.ResponseWriter, _ *http.Request, proxyErr error) {
+		s.logger.Warn("proxy WebRTC signalling", "camera", id, "error", proxyErr)
+		writeError(writer, http.StatusBadGateway, fmt.Errorf("WebRTC media service is unavailable"))
 	}
 	proxy.ServeHTTP(w, r)
+}
+
+func safeWHEPSession(value string) bool {
+	if value == "" || len(value) > 128 {
+		return false
+	}
+	for _, character := range value {
+		if !(character >= 'a' && character <= 'z' || character >= 'A' && character <= 'Z' || character >= '0' && character <= '9' || character == '-' || character == '_') {
+			return false
+		}
+	}
+	return true
 }
 func (s *Server) detectors(w http.ResponseWriter, r *http.Request) {
 	writeSuccess(w, http.StatusOK, "Detector catalog loaded successfully", detector.Catalog)

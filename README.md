@@ -21,7 +21,7 @@
 Valkyris transforma um servidor doméstico em uma central privada de monitoramento. Uma única instalação pode gerenciar várias câmeras e autorizar vários celulares, sem cadastro público e sem expor RTSP, ONVIF ou o MediaMTX na internet.
 
 - Descoberta de capacidades e do perfil principal por ONVIF Profile S; previews são extraídos do stream local já conectado.
-- Live view LL-HLS autenticado, com uma única conexão RTSP por câmera e conversão apenas do áudio G.711 para AAC.
+- Live WebRTC autenticado, com uma única conexão RTSP por câmera e conversão apenas do áudio G.711 para Opus.
 - Movimento PTZ por pressionar e segurar e zoom quando anunciado pela câmera.
 - Cadastro assíncrono: a câmera aparece imediatamente e o progresso ou erro fica persistido.
 - Regras para movimento e sons residenciais; a confiança mínima é aplicada internamente por detector, sem ajuste manual, e as regras ficam sempre ativas.
@@ -37,7 +37,7 @@ Valkyris transforma um servidor doméstico em uma central privada de monitoramen
 Câmera ONVIF / RTSP
          │
          ▼
-  MediaMTX interno ─── LL-HLS autenticado ─── Android
+  MediaMTX interno ─── WebRTC direto ─── Android
          │
          ├── ONVIF: capabilities, eventos e PTZ
          ├── FFmpeg: snapshots, G.711 → AAC, detecção e buffer
@@ -52,7 +52,7 @@ O backend Go é o limite de segurança: o app nunca recebe a senha da câmera e 
 | Área | Tecnologias |
 | --- | --- |
 | Backend | Go 1.26, SQLite, ONVIF, FFmpeg, sherpa-onnx, WebSocket |
-| Mídia | MediaMTX, RTSP, LL-HLS, MP4 |
+| Mídia | MediaMTX, RTSP, WebRTC/WHEP, MP4 |
 | Android | Kotlin, Jetpack Compose, Material 3, Hilt, Room, DataStore, Ktor/OkHttp, Media3, Coil, Firebase Cloud Messaging |
 | Web | Astro, TypeScript, CSS, Lucide, geração estática para Vercel |
 | Distribuição | Docker Compose, GHCR multiarch (`amd64`/`arm64`), GitHub Actions, APK assinado |
@@ -157,7 +157,7 @@ O arquivo [.env.example](.env.example) lista as variáveis suportadas. As princi
 | `VALKYRIS_DATABASE` | Caminho do banco SQLite. |
 | `VALKYRIS_TLS_CERT` / `VALKYRIS_TLS_KEY` | Identidade TLS do backend. |
 | `VALKYRIS_MASTER_KEY_FILE` | Chave usada para cifrar credenciais sensíveis. |
-| `VALKYRIS_MEDIA_URL` / `VALKYRIS_MEDIA_API` / `VALKYRIS_MEDIA_PLAYBACK` | Endereços internos de HLS, configuração e reprodução do MediaMTX. |
+| `VALKYRIS_MEDIA_API` / `VALKYRIS_MEDIA_RTSP` / `VALKYRIS_MEDIA_WEBRTC` / `VALKYRIS_MEDIA_PLAYBACK` | Endereços internos de configuração, monitoramento RTSP, negociação WHEP/WebRTC e reprodução de clipes do MediaMTX. |
 | `VALKYRIS_UPDATER_URL` / `VALKYRIS_UPDATER_TOKEN` | Canal privado do atualizador. |
 | `VALKYRIS_RELEASE_API` | Release estável consultada pelo backend. |
 | `VALKYRIS_FIREBASE_CREDENTIALS_FILE` | Conta de serviço usada pelo backend para enviar alertas pelo FCM. |
