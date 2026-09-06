@@ -3,6 +3,7 @@ package tracking
 import (
 	"context"
 	"database/sql"
+	"encoding/base64"
 	"fmt"
 	"math"
 	"strings"
@@ -63,6 +64,7 @@ type User struct {
 	ID            string     `json:"id"`
 	Name          string     `json:"name"`
 	Color         string     `json:"color"`
+	AvatarData    string     `json:"avatarData,omitempty"`
 	Enabled       bool       `json:"enabled"`
 	LastLatitude  *float64   `json:"lastLatitude,omitempty"`
 	LastLongitude *float64   `json:"lastLongitude,omitempty"`
@@ -89,7 +91,7 @@ type UserTransition struct {
 }
 
 func (s *Service) ListUsers(ctx context.Context) ([]User, error) {
-	rows, err := s.store.DB.QueryContext(ctx, `SELECT id,name,color,enabled,last_latitude,last_longitude,last_accuracy,last_located_at,created_at,updated_at FROM users WHERE enabled=1 ORDER BY name COLLATE NOCASE`)
+	rows, err := s.store.DB.QueryContext(ctx, `SELECT id,name,color,avatar_data,enabled,last_latitude,last_longitude,last_accuracy,last_located_at,created_at,updated_at FROM users WHERE enabled=1 ORDER BY name COLLATE NOCASE`)
 	if err != nil {
 		return nil, err
 	}
@@ -108,7 +110,7 @@ func (s *Service) ListUsers(ctx context.Context) ([]User, error) {
 // CurrentUser returns the family profile owned by the authenticated phone.
 // A profile is never created separately from a device.
 func (s *Service) CurrentUser(ctx context.Context, deviceID string) (User, error) {
-	return scanUser(s.store.DB.QueryRowContext(ctx, `SELECT u.id,u.name,u.color,u.enabled,u.last_latitude,u.last_longitude,u.last_accuracy,u.last_located_at,u.created_at,u.updated_at FROM users u JOIN devices d ON d.user_id=u.id WHERE d.id=? AND d.enabled=1`, deviceID))
+	return scanUser(s.store.DB.QueryRowContext(ctx, `SELECT u.id,u.name,u.color,u.avatar_data,u.enabled,u.last_latitude,u.last_longitude,u.last_accuracy,u.last_located_at,u.created_at,u.updated_at FROM users u JOIN devices d ON d.user_id=u.id WHERE d.id=? AND d.enabled=1`, deviceID))
 }
 
 func (s *Service) UpdateUser(ctx context.Context, id string, in User) (User, error) {
@@ -120,15 +122,19 @@ func (s *Service) UpdateUser(ctx context.Context, id string, in User) (User, err
 	if color == "" {
 		color = "#5B5BD6"
 	}
+	avatarData := strings.TrimSpace(in.AvatarData)
+	if avatarData != "" && !validAvatarData(avatarData) {
+		return User{}, fmt.Errorf("profile photo is invalid")
+	}
 	now := time.Now().UTC().Format(time.RFC3339Nano)
-	result, err := s.store.DB.ExecContext(ctx, `UPDATE users SET name=?,color=?,updated_at=? WHERE id=?`, name, color, now, id)
+	result, err := s.store.DB.ExecContext(ctx, `UPDATE users SET name=?,color=?,avatar_data=?,updated_at=? WHERE id=?`, name, color, avatarData, now, id)
 	if err != nil {
 		return User{}, err
 	}
 	if affected, _ := result.RowsAffected(); affected == 0 {
 		return User{}, sql.ErrNoRows
 	}
-	return scanUser(s.store.DB.QueryRowContext(ctx, `SELECT id,name,color,enabled,last_latitude,last_longitude,last_accuracy,last_located_at,created_at,updated_at FROM users WHERE id=?`, id))
+	return scanUser(s.store.DB.QueryRowContext(ctx, `SELECT id,name,color,avatar_data,enabled,last_latitude,last_longitude,last_accuracy,last_located_at,created_at,updated_at FROM users WHERE id=?`, id))
 }
 
 func (s *Service) UpdateCurrentUser(ctx context.Context, deviceID string, in User) (User, error) {
@@ -470,7 +476,7 @@ func scanUser(row scanner) (User, error) {
 	var lat, lon, accuracy sql.NullFloat64
 	var located sql.NullString
 	var created, updated string
-	err := row.Scan(&user.ID, &user.Name, &user.Color, &enabled, &lat, &lon, &accuracy, &located, &created, &updated)
+	err := row.Scan(&user.ID, &user.Name, &user.Color, &user.AvatarData, &enabled, &lat, &lon, &accuracy, &located, &created, &updated)
 	if err != nil {
 		return user, err
 	}
@@ -488,6 +494,15 @@ func scanUser(row scanner) (User, error) {
 	user.CreatedAt, _ = time.Parse(time.RFC3339Nano, created)
 	user.UpdatedAt, _ = time.Parse(time.RFC3339Nano, updated)
 	return user, nil
+}
+
+func validAvatarData(value string) bool {
+	const prefix = "data:image/jpeg;base64,"
+	if !strings.HasPrefix(value, prefix) || len(value) > 300_000 {
+		return false
+	}
+	decoded, err := base64.StdEncoding.DecodeString(strings.TrimPrefix(value, prefix))
+	return err == nil && len(decoded) > 0 && len(decoded) <= 220_000
 }
 func scanPerson(row scanner) (Person, error) {
 	var p Person

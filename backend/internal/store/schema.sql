@@ -74,6 +74,7 @@ CREATE TABLE IF NOT EXISTS users (
   id TEXT PRIMARY KEY,
   name TEXT NOT NULL,
   color TEXT NOT NULL DEFAULT '#5B5BD6',
+  avatar_data TEXT NOT NULL DEFAULT '',
   enabled INTEGER NOT NULL DEFAULT 1,
   last_latitude REAL,
   last_longitude REAL,

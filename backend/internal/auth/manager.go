@@ -54,6 +54,25 @@ type PairResponse struct {
 	Admin    bool   `json:"admin"`
 }
 
+func (m *Manager) ChangeAdminPassword(ctx context.Context, currentPassword, newPassword string) error {
+	if len(newPassword) < 10 {
+		return fmt.Errorf("password must have at least 10 characters")
+	}
+	var encoded string
+	if err := m.store.DB.QueryRowContext(ctx, `SELECT value FROM settings WHERE key='admin_password_hash'`).Scan(&encoded); err != nil {
+		return err
+	}
+	if bcrypt.CompareHashAndPassword([]byte(encoded), []byte(currentPassword)) != nil {
+		return fmt.Errorf("current password is invalid")
+	}
+	hash, err := bcrypt.GenerateFromPassword([]byte(newPassword), bcrypt.DefaultCost)
+	if err != nil {
+		return err
+	}
+	_, err = m.store.DB.ExecContext(ctx, `UPDATE settings SET value=?,updated_at=? WHERE key='admin_password_hash'`, string(hash), time.Now().UTC().Format(time.RFC3339Nano))
+	return err
+}
+
 func NewManager(s *store.Store, lifetime time.Duration) *Manager {
 	return &Manager{store: s, lifetime: lifetime}
 }

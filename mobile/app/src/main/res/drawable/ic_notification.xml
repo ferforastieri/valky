@@ -1,6 +1,7 @@
 <vector xmlns:android="http://schemas.android.com/apk/res/android" android:width="24dp" android:height="24dp" android:viewportWidth="64" android:viewportHeight="64">
-    <!-- Monochrome notification rendering of the Valkyris shield/eye mark. -->
-    <path android:fillColor="#FFFFFFFF" android:pathData="M11.5,23.5L21,17.5L32,23.5L43,17.5L52.5,23.5V35.75C48.8,44.2 41.2,50.3 32,54.5C22.8,50.3 15.2,44.2 11.5,35.75Z" />
-    <path android:fillColor="#FF000000" android:pathData="M41.5,35A9.5,9.5 0,1 1,22.5 35A9.5,9.5 0,1 1,41.5 35" />
+    <!-- Status-bar icons must contain alpha only. This is the Valkyris shield
+         and eye drawn as a single white outline, without an opaque backdrop. -->
+    <path android:fillColor="@android:color/transparent" android:strokeColor="#FFFFFFFF" android:strokeWidth="4" android:strokeLineCap="round" android:strokeLineJoin="round" android:pathData="M11.5,23.5L21,17.5L32,23.5L43,17.5L52.5,23.5V35.75C48.8,44.2 41.2,50.3 32,54.5C22.8,50.3 15.2,44.2 11.5,35.75Z" />
+    <path android:fillColor="@android:color/transparent" android:strokeColor="#FFFFFFFF" android:strokeWidth="3.5" android:pathData="M41.5,35A9.5,9.5 0,1 1,22.5 35A9.5,9.5 0,1 1,41.5 35" />
     <path android:fillColor="#FFFFFFFF" android:pathData="M35.25,35A3.25,3.25 0,1 1,28.75 35A3.25,3.25 0,1 1,35.25 35" />
 </vector>

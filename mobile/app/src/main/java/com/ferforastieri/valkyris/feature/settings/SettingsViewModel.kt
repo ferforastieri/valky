@@ -4,7 +4,6 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.ferforastieri.valkyris.core.action.MobileActionGate
 import com.ferforastieri.valkyris.core.model.RetentionSettings
-import com.ferforastieri.valkyris.core.model.TrackedPerson
 import com.ferforastieri.valkyris.core.network.ValkyrisApi
 import com.ferforastieri.valkyris.core.network.ValkyrisRepository
 import com.ferforastieri.valkyris.core.push.FcmRegistration
@@ -45,9 +44,6 @@ class SettingsViewModel @Inject constructor(
     val retention = _retention.asStateFlow()
     private val _pushConfiguration = MutableStateFlow(PushConfigurationState())
     val pushConfiguration = _pushConfiguration.asStateFlow()
-    val profile = repository.me
-    private val _profileSaving = MutableStateFlow(false)
-    val profileSaving = _profileSaving.asStateFlow()
 
     init {
         viewModelScope.launch {
@@ -56,24 +52,6 @@ class SettingsViewModel @Inject constructor(
                 .onFailure { _retention.value = RetentionState(loading = false) }
         }
         refreshPushConfiguration()
-        refreshProfile()
-    }
-
-    fun refreshProfile() {
-        viewModelScope.launch { runCatching { repository.refreshMe() } }
-    }
-
-    fun saveProfile(profile: TrackedPerson, onSuccess: () -> Unit) {
-        if (!actionGate.tryAcquire()) return
-        _profileSaving.value = true
-        viewModelScope.launch {
-            try {
-                runCatching { repository.updateMe(profile) }.onSuccess { onSuccess() }
-            } finally {
-                _profileSaving.value = false
-                actionGate.release()
-            }
-        }
     }
 
     fun refreshPushConfiguration() {

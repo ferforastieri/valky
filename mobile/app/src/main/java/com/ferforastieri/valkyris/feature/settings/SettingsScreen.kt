@@ -53,9 +53,7 @@ import com.composables.icons.lucide.ShieldCheck
 import com.composables.icons.lucide.Smartphone
 import com.composables.icons.lucide.Sun
 import com.composables.icons.lucide.UserPlus
-import com.composables.icons.lucide.UserRound
 import com.ferforastieri.valkyris.feature.people.LocationTrackingService
-import com.ferforastieri.valkyris.core.model.TrackedPerson
 
 @Composable
 fun SettingsScreen(main: MainViewModel, viewModel: SettingsViewModel = hiltViewModel()) {
@@ -67,14 +65,11 @@ fun SettingsScreen(main: MainViewModel, viewModel: SettingsViewModel = hiltViewM
     val admin by main.admin.collectAsStateWithLifecycle()
     val invitation by viewModel.invitation.collectAsStateWithLifecycle()
     val retention by viewModel.retention.collectAsStateWithLifecycle()
-    val profile by viewModel.profile.collectAsStateWithLifecycle()
-    val profileSaving by viewModel.profileSaving.collectAsStateWithLifecycle()
     var showInvitation by remember { mutableStateOf(false) }
     var showPermissions by remember { mutableStateOf(false) }
     var showLanguage by remember { mutableStateOf(false) }
     var showTheme by remember { mutableStateOf(false) }
     var showRetention by remember { mutableStateOf(false) }
-    var showProfile by remember { mutableStateOf(false) }
     val notificationRequest = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) {
         permissionRefresh++
     }
@@ -116,8 +111,6 @@ fun SettingsScreen(main: MainViewModel, viewModel: SettingsViewModel = hiltViewM
         language = language,
         theme = theme,
         retention = retention.value,
-        profileName = profile?.name.orEmpty(),
-        onProfile = { if (profile != null) showProfile = true else viewModel.refreshProfile() },
         onInvite = { showInvitation = true },
         onPermissions = { showPermissions = true },
         onLanguage = { showLanguage = true },
@@ -193,16 +186,6 @@ fun SettingsScreen(main: MainViewModel, viewModel: SettingsViewModel = hiltViewM
             onDismiss = { if (!retention.saving) showRetention = false },
         )
     }
-    if (showProfile) {
-        profile?.let { current ->
-            ProfileSheet(
-                current = current,
-                saving = profileSaving,
-                onSave = { edited -> viewModel.saveProfile(edited) { showProfile = false } },
-                onDismiss = { if (!profileSaving) showProfile = false },
-            )
-        }
-    }
 }
 
 @Composable
@@ -214,14 +197,12 @@ fun SettingsContent(
     language: String,
     theme: String,
     retention: RetentionSettings = RetentionSettings(),
-    profileName: String = "",
     version: String = BuildConfig.VERSION_NAME,
     onInvite: () -> Unit = {},
     onPermissions: () -> Unit = {},
     onLanguage: () -> Unit = {},
     onTheme: () -> Unit = {},
     onRetention: () -> Unit = {},
-    onProfile: () -> Unit = {},
     onSignOut: () -> Unit = {},
 ) {
     Column(
@@ -232,12 +213,6 @@ fun SettingsContent(
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         val readyCount = listOf(notificationsAllowed, fullScreenAllowed, dndAllowed).count { it }
-        SettingsCard(
-            Lucide.UserRound,
-            "Meu perfil",
-            profileName.ifBlank { "Editar o usuário deste celular" },
-            onClick = onProfile,
-        )
         if (admin) {
             SettingsCard(
                 Lucide.UserPlus,
@@ -278,27 +253,6 @@ fun SettingsContent(
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
-    }
-}
-
-@Composable
-private fun ProfileSheet(current: TrackedPerson, saving: Boolean, onSave: (TrackedPerson) -> Unit, onDismiss: () -> Unit) {
-    var name by remember(current.id, current.name) { mutableStateOf(current.name) }
-    ValkyrisBottomSheet(
-        title = "Meu perfil",
-        onDismiss = onDismiss,
-        dismissEnabled = !saving,
-        actions = {
-            TextButton(onDismiss, enabled = !saving) { Text(stringResource(R.string.cancel)) }
-            Button(onClick = { onSave(current.copy(name = name.trim())) }, enabled = !saving && name.isNotBlank()) {
-                if (saving) { CircularProgressIndicator(Modifier.size(18.dp), strokeWidth = 2.dp); Spacer(Modifier.width(8.dp)) }
-                Text(stringResource(R.string.save))
-            }
-        },
-    ) {
-        Text("Este perfil representa você e o celular que está usando.", color = MaterialTheme.colorScheme.onSurfaceVariant)
-        Spacer(Modifier.height(14.dp))
-        OutlinedTextField(value = name, onValueChange = { name = it }, label = { Text("Nome") }, singleLine = true, modifier = Modifier.fillMaxWidth())
     }
 }
 

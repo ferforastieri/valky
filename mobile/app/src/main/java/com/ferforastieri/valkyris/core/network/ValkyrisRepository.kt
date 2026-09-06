@@ -96,6 +96,7 @@ class ValkyrisRepository @Inject constructor(
         _me.value = updated
         _people.update { people -> people.map { if (it.id == updated.id) updated else it } }
     }
+    suspend fun changeHomePassword(currentPassword: String, newPassword: String) = api.changeHomePassword(currentPassword, newPassword)
     suspend fun updateUser(id: String, person: TrackedPerson) = api.updateUser(id, person).also { updated ->
         _people.update { people -> people.map { if (it.id == id) updated else it } }
         if (_me.value?.id == id) _me.value = updated

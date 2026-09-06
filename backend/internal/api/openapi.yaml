@@ -151,6 +151,11 @@ paths:
       summary: Record the authenticated device user's location
       requestBody: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/UserLocation'}}}}
       responses: {'200': {description: Location recorded, content: {application/json: {schema: {$ref: '#/components/schemas/APIResponse'}}}}}
+  /me/password:
+    post:
+      summary: Change the administrator home password
+      requestBody: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/ChangePassword'}}}}
+      responses: {'200': {description: Password changed, content: {application/json: {schema: {$ref: '#/components/schemas/APIResponse'}}}}}
   /places:
     get:
       summary: List family alert areas
@@ -399,7 +404,14 @@ components:
         id: {type: string, format: uuid}
         name: {type: string}
         color: {type: string}
+        avatarData: {type: string, description: Reduced JPEG profile image encoded as a data URL}
         enabled: {type: boolean}
+    ChangePassword:
+      type: object
+      required: [currentPassword, newPassword]
+      properties:
+        currentPassword: {type: string, format: password}
+        newPassword: {type: string, format: password, minLength: 10}
     Place:
       type: object
       required: [name, latitude, longitude, radiusMeters]

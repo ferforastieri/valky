@@ -22,9 +22,10 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.composables.icons.lucide.History
 import com.composables.icons.lucide.Lucide
 import com.composables.icons.lucide.MapPin
-import com.composables.icons.lucide.Plus
 import com.composables.icons.lucide.UserRound
 import com.ferforastieri.valkyris.core.design.ValkyrisBottomSheet
+import com.ferforastieri.valkyris.core.design.ProfileAvatar
+import com.ferforastieri.valkyris.core.design.profileMarkerDrawable
 import com.ferforastieri.valkyris.R
 import com.ferforastieri.valkyris.core.model.PersonLocation
 import com.ferforastieri.valkyris.core.model.TrackedPerson
@@ -49,24 +50,27 @@ fun PeopleScreen(vm: PeopleViewModel = hiltViewModel()) {
     val busy by vm.busy.collectAsStateWithLifecycle()
     var placeEditor by remember { mutableStateOf<TrackedPlace?>(null) }
     var historyUser by remember { mutableStateOf<TrackedPerson?>(null) }
-    var selectingArea by remember { mutableStateOf(false) }
+    var areaPickerOpen by remember { mutableStateOf(false) }
 
     Box(Modifier.fillMaxSize()) {
         Column(Modifier.fillMaxSize()) {
             FamilyMap(
                 users = users,
                 places = places,
-                selectingArea = selectingArea,
-                onMapPoint = { point ->
-                    if (selectingArea) {
-                        selectingArea = false
-                        placeEditor = TrackedPlace(name = "", latitude = point.latitude, longitude = point.longitude)
-                    }
-                },
                 modifier = Modifier.fillMaxWidth().weight(1.08f),
             )
             Surface(Modifier.fillMaxWidth().weight(.92f), color = MaterialTheme.colorScheme.background) {
                 LazyColumn(Modifier.fillMaxSize().padding(horizontal = 18.dp), contentPadding = PaddingValues(top = 14.dp, bottom = 98.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    item {
+                        Button(
+                            onClick = { areaPickerOpen = true },
+                            modifier = Modifier.fillMaxWidth(),
+                        ) {
+                            Icon(Lucide.MapPin, null)
+                            Spacer(Modifier.width(8.dp))
+                            Text("Cadastrar área")
+                        }
+                    }
                     item {
                         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                             Column(Modifier.weight(1f)) {
@@ -90,11 +94,16 @@ fun PeopleScreen(vm: PeopleViewModel = hiltViewModel()) {
                 }
             }
         }
-        if (selectingArea) Surface(Modifier.align(Alignment.TopCenter).padding(16.dp), shape = MaterialTheme.shapes.large, color = MaterialTheme.colorScheme.primaryContainer, shadowElevation = 4.dp) {
-            Text("Toque no mapa para posicionar a área", Modifier.padding(horizontal = 16.dp, vertical = 11.dp), color = MaterialTheme.colorScheme.onPrimaryContainer)
-        }
-        ExtendedFloatingActionButton(onClick = { selectingArea = !selectingArea }, modifier = Modifier.align(Alignment.TopEnd).padding(16.dp), icon = { Icon(if (selectingArea) Lucide.MapPin else Lucide.Plus, null) }, text = { Text(if (selectingArea) "Cancelar" else "Área") })
     }
+    if (areaPickerOpen) AreaEditorSheet(
+        busy = busy,
+        onDismiss = { areaPickerOpen = false },
+        onSave = { value ->
+            vm.createPlace(value) { created ->
+                if (created) areaPickerOpen = false
+            }
+        },
+    )
     placeEditor?.let { place -> PlaceEditor(place, busy, { placeEditor = null }) { value ->
         val done: (Boolean) -> Unit = { if (it) placeEditor = null }
         if (value.id.isBlank()) vm.createPlace(value, done) else vm.updatePlace(value, done)
@@ -103,25 +112,11 @@ fun PeopleScreen(vm: PeopleViewModel = hiltViewModel()) {
 }
 
 @Composable
-private fun FamilyMap(users: List<TrackedPerson>, places: List<TrackedPlace>, selectingArea: Boolean, onMapPoint: (GeoPoint) -> Unit, modifier: Modifier = Modifier) {
-    val latestMapPoint = rememberUpdatedState(onMapPoint)
-    val latestSelectingArea = rememberUpdatedState(selectingArea)
+private fun FamilyMap(users: List<TrackedPerson>, places: List<TrackedPlace>, modifier: Modifier = Modifier) {
     AndroidView(factory = { context ->
         Configuration.getInstance().userAgentValue = context.packageName
         MapView(context).apply {
             setTileSource(TileSourceFactory.MAPNIK); setMultiTouchControls(true); controller.setZoom(13.5); controller.setCenter(GeoPoint(-23.5505, -46.6333))
-            overlays.add(MapEventsOverlay(object : MapEventsReceiver {
-                override fun singleTapConfirmedHelper(point: GeoPoint?): Boolean {
-                    if (!latestSelectingArea.value) return false
-                    point?.let { latestMapPoint.value(it) }
-                    return true
-                }
-                override fun longPressHelper(point: GeoPoint?): Boolean {
-                    if (!latestSelectingArea.value) return false
-                    point?.let { latestMapPoint.value(it) }
-                    return true
-                }
-            }))
         }
     }, update = { map ->
         map.overlays.removeAll { it is Marker || it is Polygon }
@@ -136,13 +131,113 @@ private fun FamilyMap(users: List<TrackedPerson>, places: List<TrackedPlace>, se
             val lat = user.lastLatitude ?: return@forEach; val lon = user.lastLongitude ?: return@forEach
             map.overlays.add(Marker(map).apply {
                 position = GeoPoint(lat, lon); title = user.name; snippet = user.lastLocatedAt?.let { "Atualizado ${formatTime(it)}" } ?: "Sem atualização"
-                icon = ContextCompat.getDrawable(map.context, R.drawable.valkyris_map_marker)
+                icon = profileMarkerDrawable(map.context, user.avatarData)
+                    ?: ContextCompat.getDrawable(map.context, R.drawable.valkyris_map_marker)
                 setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_BOTTOM)
             })
         }
         users.firstOrNull { it.lastLatitude != null && it.lastLongitude != null }?.let { map.controller.setCenter(GeoPoint(it.lastLatitude!!, it.lastLongitude!!)) }
         map.invalidate()
     }, modifier = modifier.background(MaterialTheme.colorScheme.surfaceVariant))
+}
+
+@Composable
+private fun AreaEditorSheet(busy: Boolean, onDismiss: () -> Unit, onSave: (TrackedPlace) -> Unit) {
+    var name by remember { mutableStateOf("") }
+    var radius by remember { mutableStateOf("100") }
+    var point by remember { mutableStateOf<GeoPoint?>(null) }
+    val radiusMeters = radius.toDoubleOrNull()
+    val validRadius = radiusMeters != null && radiusMeters in 20.0..5000.0
+
+    ValkyrisBottomSheet(
+        title = "Cadastrar área",
+        onDismiss = onDismiss,
+        dismissEnabled = !busy,
+        actions = {
+            TextButton(onClick = onDismiss, enabled = !busy) { Text("Cancelar") }
+            Button(
+                onClick = {
+                    val selectedPoint = requireNotNull(point)
+                    onSave(
+                        TrackedPlace(
+                            name = name.trim(),
+                            latitude = selectedPoint.latitude,
+                            longitude = selectedPoint.longitude,
+                            radiusMeters = requireNotNull(radiusMeters),
+                        ),
+                    )
+                },
+                enabled = !busy && name.isNotBlank() && validRadius && point != null,
+            ) { Text("Salvar") }
+        },
+    ) {
+        Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            OutlinedTextField(
+                value = name,
+                onValueChange = { name = it },
+                label = { Text("Nome") },
+                singleLine = true,
+                modifier = Modifier.fillMaxWidth(),
+            )
+            Text(
+                "Toque diretamente no mapa para definir o local.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            AreaPickerMap(
+                selectedPoint = point,
+                onPointSelected = { point = it },
+                modifier = Modifier.fillMaxWidth().height(280.dp),
+            )
+            OutlinedTextField(
+                value = radius,
+                onValueChange = { radius = it.filter(Char::isDigit) },
+                label = { Text("Raio em metros") },
+                supportingText = { Text("De 20 a 5.000 m") },
+                isError = radius.isNotBlank() && !validRadius,
+                singleLine = true,
+                modifier = Modifier.fillMaxWidth(),
+            )
+        }
+    }
+}
+
+@Composable
+private fun AreaPickerMap(selectedPoint: GeoPoint?, onPointSelected: (GeoPoint) -> Unit, modifier: Modifier = Modifier) {
+    val currentOnPointSelected by rememberUpdatedState(onPointSelected)
+    AndroidView(
+        factory = { context ->
+            Configuration.getInstance().userAgentValue = context.packageName
+            MapView(context).apply {
+                setTileSource(TileSourceFactory.MAPNIK)
+                setMultiTouchControls(true)
+                controller.setZoom(13.5)
+                controller.setCenter(GeoPoint(-23.5505, -46.6333))
+                overlays.add(MapEventsOverlay(object : MapEventsReceiver {
+                    override fun singleTapConfirmedHelper(point: GeoPoint?): Boolean {
+                        point?.let(currentOnPointSelected)
+                        return point != null
+                    }
+
+                    override fun longPressHelper(point: GeoPoint?): Boolean = false
+                }))
+            }
+        },
+        update = { map ->
+            map.overlays.removeAll { it is Marker }
+            selectedPoint?.let { point ->
+                map.overlays.add(Marker(map).apply {
+                    position = point
+                    title = "Local da área"
+                    icon = ContextCompat.getDrawable(map.context, R.drawable.valkyris_map_marker)
+                    setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_BOTTOM)
+                })
+                map.controller.setCenter(point)
+            }
+            map.invalidate()
+        },
+        modifier = modifier.background(MaterialTheme.colorScheme.surfaceVariant),
+    )
 }
 
 @Composable
@@ -156,7 +251,7 @@ private fun EmptyUsers() = Surface(shape = MaterialTheme.shapes.large, color = M
 @Composable
 private fun UserCard(user: TrackedPerson, onHistory: () -> Unit) = Card(modifier = Modifier.fillMaxWidth(), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface), border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)) {
     Row(Modifier.padding(15.dp), verticalAlignment = Alignment.CenterVertically) {
-        Surface(shape = MaterialTheme.shapes.medium, color = MaterialTheme.colorScheme.primaryContainer) { Icon(Lucide.UserRound, null, Modifier.padding(11.dp).size(22.dp), tint = MaterialTheme.colorScheme.primary) }
+        ProfileAvatar(user.avatarData, user.name, Modifier.size(44.dp))
         Spacer(Modifier.width(12.dp)); Column(Modifier.weight(1f)) {
             Text(user.name, fontWeight = FontWeight.SemiBold)
             Text(user.lastLocatedAt?.let { "Atualizado ${formatTime(it)}" } ?: "Ainda sem localização", color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodySmall)

@@ -227,4 +227,5 @@
     <string name="notice_rule_updated">Rule updated.</string>
     <string name="notice_rule_deleted">Rule removed.</string>
     <string name="people">People</string>
+    <string name="profile">Profile</string>
 </resources>

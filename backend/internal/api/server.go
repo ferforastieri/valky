@@ -64,6 +64,11 @@ type CameraOperation struct {
 	UpdatedAt time.Time      `json:"updatedAt"`
 }
 
+type changePasswordInput struct {
+	CurrentPassword string `json:"currentPassword"`
+	NewPassword     string `json:"newPassword"`
+}
+
 func NewServer(a *auth.Manager, c *camera.Repository, o *camera.ONVIFClient, m *media.Manager, r *rules.Service, e *event.Service, n *notify.Service, h *Hub, logger *slog.Logger) *Server {
 	return &Server{auth: a, cameras: c, onvif: o, media: m, rules: r, events: e, notify: n, hub: h, logger: logger, operations: make(map[string]CameraOperation)}
 }
@@ -134,6 +139,7 @@ func (s *Server) Handler() http.Handler {
 	protected.HandleFunc("GET /users/{id}/history", s.userHistory)
 	protected.HandleFunc("GET /me", s.currentUser)
 	protected.HandleFunc("PUT /me", s.updateCurrentUser)
+	protected.Handle("POST /me/password", s.auth.RequireAdmin(http.HandlerFunc(s.changeCurrentPassword)))
 	protected.HandleFunc("POST /me/location", s.reportMyLocation)
 	protected.HandleFunc("GET /places", s.listPlaces)
 	// Areas belong to the shared family map. Any authenticated family phone can
@@ -609,6 +615,17 @@ func (s *Server) updateCurrentUser(w http.ResponseWriter, r *http.Request) {
 	}
 	out, err := s.tracking.UpdateCurrentUser(r.Context(), auth.DeviceID(r.Context()), in)
 	respondWithMessage(w, out, err, "Family user updated successfully")
+}
+func (s *Server) changeCurrentPassword(w http.ResponseWriter, r *http.Request) {
+	var in changePasswordInput
+	if !decode(w, r, &in) {
+		return
+	}
+	if err := s.auth.ChangeAdminPassword(r.Context(), in.CurrentPassword, in.NewPassword); err != nil {
+		writeError(w, http.StatusBadRequest, err)
+		return
+	}
+	writeSuccess(w, http.StatusOK, "Home password changed successfully", map[string]bool{"changed": true})
 }
 func (s *Server) updateUser(w http.ResponseWriter, r *http.Request) {
 	if s.trackingUnavailable(w) {
