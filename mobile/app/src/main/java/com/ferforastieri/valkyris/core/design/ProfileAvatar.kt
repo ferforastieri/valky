@@ -80,9 +80,9 @@ fun encodeProfileAvatar(source: Bitmap, zoom: Float, rotation: Float): String? =
         -source.height / 2f,
         Paint(Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG),
     )
-    val bytes = ByteArrayOutputStream().use { output ->
-        check(output.compress(Bitmap.CompressFormat.JPEG, 82, output))
-        output.toByteArray()
+    val bytes = ByteArrayOutputStream().use { stream ->
+        check(output.compress(Bitmap.CompressFormat.JPEG, 82, stream))
+        stream.toByteArray()
     }
     if (bytes.size > 220_000) return null
     avatarPrefix + Base64.encodeToString(bytes, Base64.NO_WRAP)
