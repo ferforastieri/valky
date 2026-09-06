@@ -63,6 +63,16 @@ func normalizeIcon(icon string) string {
 	return "camera"
 }
 
+type UpdateInput struct {
+	Name     string `json:"name"`
+	Icon     string `json:"icon"`
+	Host     string `json:"host"`
+	Port     int    `json:"port"`
+	Username string `json:"username"`
+	Password string `json:"password"`
+	RTSPURI  string `json:"rtspUri"`
+}
+
 type PTZCommand struct {
 	Action string  `json:"action"`
 	Pan    float64 `json:"pan"`

@@ -107,6 +107,7 @@ func (s *Server) Handler() http.Handler {
 	protected.Handle("POST /pairing-sessions", s.auth.RequireAdmin(http.HandlerFunc(s.pairingSession)))
 	protected.HandleFunc("GET /cameras", s.listCameras)
 	protected.HandleFunc("POST /cameras", s.createCamera)
+	protected.HandleFunc("PUT /cameras/{id}", s.updateCamera)
 	protected.HandleFunc("GET /camera-operations/{id}", s.cameraOperation)
 	protected.HandleFunc("DELETE /cameras/{id}", s.deleteCamera)
 	protected.HandleFunc("POST /cameras/{id}/ptz", s.ptz)
@@ -116,6 +117,7 @@ func (s *Server) Handler() http.Handler {
 	protected.HandleFunc("GET /detectors", s.detectors)
 	protected.HandleFunc("GET /rules", s.listRules)
 	protected.HandleFunc("POST /rules", s.createRule)
+	protected.HandleFunc("PUT /rules/{id}", s.updateRule)
 	protected.HandleFunc("DELETE /rules/{id}", s.deleteRule)
 	protected.HandleFunc("GET /events", s.listEvents)
 	protected.HandleFunc("POST /events/acknowledge-all", s.ackAllEvents)
@@ -235,6 +237,38 @@ func (s *Server) createCamera(w http.ResponseWriter, r *http.Request) {
 	s.operationsMu.Unlock()
 	go s.completeCameraCreation(operation.ID, in)
 	writeSuccess(w, http.StatusAccepted, operation.Message, operation)
+}
+
+func (s *Server) updateCamera(w http.ResponseWriter, r *http.Request) {
+	var in camera.UpdateInput
+	if !decode(w, r, &in) {
+		return
+	}
+	id := r.PathValue("id")
+	cam, reconnect, err := s.cameras.Update(r.Context(), id, in)
+	if err != nil {
+		writeError(w, http.StatusBadRequest, err)
+		return
+	}
+	if reconnect {
+		if mediaErr := s.media.RemoveCamera(r.Context(), id); mediaErr != nil {
+			s.logger.Warn("remove previous camera stream", "camera", id, "error", mediaErr)
+		}
+		now := time.Now().UTC()
+		s.operationsMu.Lock()
+		s.operations[id] = CameraOperation{ID: id, Status: "pending", Message: "Camera updated; ONVIF validation will continue in the background", Camera: &cam, CreatedAt: now, UpdatedAt: now}
+		s.operationsMu.Unlock()
+		_, credentials, getErr := s.cameras.Get(r.Context(), id)
+		if getErr != nil {
+			writeError(w, http.StatusInternalServerError, getErr)
+			return
+		}
+		go s.completeCameraCreation(id, camera.CreateInput{Name: cam.Name, Icon: cam.Icon, Host: cam.Host, Port: cam.Port, Username: credentials.Username, Password: credentials.Password, RTSPURI: credentials.RTSPURI})
+	}
+	if s.hub != nil {
+		s.hub.Broadcast(map[string]any{"type": "camera.updated", "cameraId": id})
+	}
+	writeSuccess(w, http.StatusOK, "Camera updated successfully", cam)
 }
 
 func (s *Server) cameraOperation(w http.ResponseWriter, r *http.Request) {
@@ -491,6 +525,19 @@ func (s *Server) createRule(w http.ResponseWriter, r *http.Request) {
 	}
 	writeSuccess(w, http.StatusCreated, "Rule created successfully", out)
 }
+func (s *Server) updateRule(w http.ResponseWriter, r *http.Request) {
+	var in rules.Rule
+	if !decode(w, r, &in) {
+		return
+	}
+	out, err := s.rules.Update(r.Context(), r.PathValue("id"), in)
+	if err != nil {
+		writeError(w, http.StatusBadRequest, err)
+		return
+	}
+	writeSuccess(w, http.StatusOK, "Rule updated successfully", out)
+}
+
 func (s *Server) deleteRule(w http.ResponseWriter, r *http.Request) {
 	err := s.rules.Delete(r.Context(), r.PathValue("id"))
 	if err != nil {

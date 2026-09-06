@@ -37,6 +37,7 @@ data class CamerasState(
     val loading: Boolean = true,
     val creating: Boolean = false,
     val deleting: Set<String> = emptySet(),
+    val updating: Set<String> = emptySet(),
     val cameras: List<Camera> = emptyList(),
     val snapshots: Map<String, Bitmap> = emptyMap(),
     val error: String? = null,
@@ -134,6 +135,21 @@ class CamerasViewModel @Inject constructor(
                     .onSuccess { _state.update { it.copy(creating = false) } }
                     .onFailure { error -> _state.update { it.copy(creating = false, error = error.message) } }
             } finally {
+                actionGate.release()
+            }
+        }
+    }
+
+    fun update(id: String, input: CreateCameraRequest) {
+        if (id in _state.value.updating || !actionGate.tryAcquire()) return
+        _state.update { it.copy(updating = it.updating + id, error = null) }
+        viewModelScope.launch {
+            try {
+                runCatching { repository.updateCamera(id, input) }
+                    .onSuccess { refresh() }
+                    .onFailure { error -> _state.update { it.copy(error = error.message) } }
+            } finally {
+                _state.update { it.copy(updating = it.updating - id) }
                 actionGate.release()
             }
         }

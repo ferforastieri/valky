@@ -87,12 +87,12 @@ func (u *updater) run(version string) {
 	composeFile := filepath.Join(installDir, "compose.yaml")
 	envFile := filepath.Join(installDir, ".env")
 	previousVersion := readEnvValue(envFile, "VALKYRIS_VERSION")
-	if err := runCompose(installDir, composeFile, envFile, version, "pull", "valkyris"); err != nil {
-		slog.Error("pull backend update", "error", err)
+	if err := runCompose(installDir, composeFile, envFile, version, "pull", "valkyris", "updater"); err != nil {
+		slog.Error("pull Valkyris update", "error", err)
 		return
 	}
 	if err := setEnvValue(envFile, "VALKYRIS_VERSION", version); err != nil {
-		slog.Error("save backend version", "error", err)
+		slog.Error("save Valkyris version", "error", err)
 		return
 	}
 	// The updater runs inside a container and talks to the host Docker daemon.
@@ -100,12 +100,12 @@ func (u *updater) run(version string) {
 	// Docker host as /workspace, rather than the real installation directory.
 	// MediaMTX and its configuration are therefore updated by the host-side
 	// installer only.
-	if err := runCompose(installDir, composeFile, envFile, version, "up", "-d", "--no-build", "--no-deps", "--remove-orphans", "valkyris"); err != nil {
-		slog.Error("activate backend update", "error", err)
+	if err := runCompose(installDir, composeFile, envFile, version, "up", "-d", "--no-build", "--no-deps", "--remove-orphans", "valkyris", "updater"); err != nil {
+		slog.Error("activate Valkyris update", "error", err)
 		if previousVersion != "" && releasePattern.MatchString(previousVersion) {
 			restoreErr := setEnvValue(envFile, "VALKYRIS_VERSION", previousVersion)
 			if restoreErr == nil {
-				restoreErr = runCompose(installDir, composeFile, envFile, previousVersion, "up", "-d", "--no-build", "--no-deps", "--remove-orphans", "valkyris")
+				restoreErr = runCompose(installDir, composeFile, envFile, previousVersion, "up", "-d", "--no-build", "--no-deps", "--remove-orphans", "valkyris", "updater")
 			}
 			if restoreErr != nil {
 				slog.Error("restore previous backend version", "error", restoreErr)
@@ -113,7 +113,7 @@ func (u *updater) run(version string) {
 		}
 		return
 	}
-	slog.Info("Valkyris backend update completed", "version", version)
+	slog.Info("Valkyris update completed", "version", version)
 }
 
 func readEnvValue(path, key string) string {

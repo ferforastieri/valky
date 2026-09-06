@@ -4,7 +4,6 @@ plugins {
     id("org.jetbrains.kotlin.plugin.compose")
     id("com.google.devtools.ksp")
     id("com.google.dagger.hilt.android")
-    id("androidx.room")
     id("io.github.takahirom.roborazzi")
 }
 
@@ -55,8 +54,6 @@ android {
     testOptions.unitTests.isIncludeAndroidResources = true
 }
 
-room { schemaDirectory("$projectDir/schemas") }
-
 dependencies {
     val composeBom = platform("androidx.compose:compose-bom:2025.08.01")
     implementation(composeBom)
@@ -77,9 +74,6 @@ dependencies {
     ksp("com.google.dagger:hilt-compiler:2.60.1")
     implementation("androidx.hilt:hilt-navigation-compose:1.3.0")
 
-    implementation("androidx.room:room-runtime:2.8.4")
-    implementation("androidx.room:room-ktx:2.8.4")
-    ksp("androidx.room:room-compiler:2.8.4")
     implementation("androidx.datastore:datastore-preferences:1.2.0")
     implementation("androidx.appcompat:appcompat:1.7.1")
 

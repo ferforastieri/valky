@@ -46,16 +46,13 @@ import com.composables.icons.lucide.Mic
 import com.composables.icons.lucide.SlidersHorizontal
 import com.composables.icons.lucide.Video
 import com.ferforastieri.valkyris.R
-import com.ferforastieri.valkyris.core.database.EventEntity
 import com.ferforastieri.valkyris.core.design.cameraIcon
 import com.ferforastieri.valkyris.core.model.Camera as CameraModel
 import com.ferforastieri.valkyris.core.network.ValkyrisRepository
 import com.ferforastieri.valkyris.feature.cameras.CameraFailureSheet
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import java.time.Instant
 import java.time.ZoneId
@@ -68,8 +65,8 @@ data class OverviewState(val cameras: List<CameraModel> = emptyList(), val loadi
 class OverviewViewModel @Inject constructor(private val repository: ValkyrisRepository) : ViewModel() {
     private val _state = MutableStateFlow(OverviewState())
     val state = _state.asStateFlow()
-    val events = repository.cachedEvents().stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
-    val rules = repository.cachedRules().stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+    val events = repository.events
+    val rules = repository.rules
 
     init {
         viewModelScope.launch {
@@ -89,6 +86,9 @@ class OverviewViewModel @Inject constructor(private val repository: ValkyrisRepo
 fun OverviewScreen(
     onCamera: (String) -> Unit,
     onEvent: (String) -> Unit,
+    onCameras: () -> Unit,
+    onRules: () -> Unit,
+    onEvents: () -> Unit,
     viewModel: OverviewViewModel = hiltViewModel(),
 ) {
     LifecycleResumeEffect(Unit) { viewModel.refresh();onPauseOrDispose {} }
@@ -100,7 +100,7 @@ fun OverviewScreen(
     OverviewContent(state.cameras, rules.count { it.enabled }, events, onCamera = { id ->
         val camera = state.cameras.firstOrNull { it.id == id }
         if (camera?.setupStatus == "failed") failedCameraId = id else onCamera(id)
-    }, onEvent = onEvent)
+    }, onEvent = onEvent, onCameras = onCameras, onRules = onRules, onEvents = onEvents)
     failedCamera?.let { CameraFailureSheet(it, onDismiss = { failedCameraId = null }) }
 }
 
@@ -108,9 +108,12 @@ fun OverviewScreen(
 fun OverviewContent(
     cameras: List<CameraModel>,
     activeRules: Int,
-    events: List<EventEntity>,
+    events: List<com.ferforastieri.valkyris.core.model.ValkyrisEvent>,
     onCamera: (String) -> Unit = {},
     onEvent: (String) -> Unit = {},
+    onCameras: () -> Unit = {},
+    onRules: () -> Unit = {},
+    onEvents: () -> Unit = {},
 ) {
     val pending = events.count { it.acknowledgedAt == null }
     LazyColumn(
@@ -120,9 +123,9 @@ fun OverviewContent(
     ) {
         item {
             Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                MetricCard(Lucide.Camera, cameras.size.toString(), stringResource(R.string.cameras), Modifier.weight(1f), accent = true)
-                MetricCard(Lucide.SlidersHorizontal, activeRules.toString(), stringResource(R.string.rules), Modifier.weight(1f))
-                MetricCard(Lucide.Bell, pending.toString(), stringResource(R.string.pending_alerts), Modifier.weight(1f), pending > 0)
+                MetricCard(Lucide.Camera, cameras.size.toString(), stringResource(R.string.cameras), Modifier.weight(1f), onClick = onCameras, accent = true)
+                MetricCard(Lucide.SlidersHorizontal, activeRules.toString(), stringResource(R.string.rules), Modifier.weight(1f), onClick = onRules)
+                MetricCard(Lucide.Bell, pending.toString(), stringResource(R.string.pending_alerts), Modifier.weight(1f), onClick = onEvents, alarm = pending > 0)
             }
         }
         if (cameras.isNotEmpty()) {
@@ -189,8 +192,8 @@ fun OverviewContent(
 }
 
 @Composable
-private fun MetricCard(icon: androidx.compose.ui.graphics.vector.ImageVector, value: String, label: String, modifier: Modifier, alarm: Boolean = false, accent: Boolean = false) {
-    Surface(modifier, RoundedCornerShape(17.dp), MaterialTheme.colorScheme.surface, shadowElevation = 3.dp) {
+private fun MetricCard(icon: androidx.compose.ui.graphics.vector.ImageVector, value: String, label: String, modifier: Modifier, onClick: () -> Unit, alarm: Boolean = false, accent: Boolean = false) {
+    Card(onClick = onClick, modifier = modifier, shape = RoundedCornerShape(17.dp), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface), elevation = CardDefaults.cardElevation(defaultElevation = 3.dp)) {
         Column(Modifier.padding(12.dp)) {
             Icon(icon, null, Modifier.size(18.dp), tint = when { alarm -> MaterialTheme.colorScheme.error; accent -> MaterialTheme.colorScheme.secondary; else -> MaterialTheme.colorScheme.onSurfaceVariant })
             Spacer(Modifier.height(10.dp))

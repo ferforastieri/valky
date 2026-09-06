@@ -212,6 +212,14 @@ class ValkyrisApi(
         }
     }
 
+    suspend fun updateCamera(id: String, camera: CreateCameraRequest): Camera = put(
+        "/cameras/$id",
+        camera,
+        R.string.notice_camera_updated,
+        announceError = true,
+    )
+
+
     suspend fun updateInfo(): UpdateInfo = get("/system/update?clientVersion=${BuildConfig.VERSION_NAME.encodeURLParameter()}")
 
     suspend fun startUpdate(): UpdateInfo = post("/system/update", UpdateRequest(BuildConfig.VERSION_NAME), R.string.notice_update_started, announceError = true)
@@ -230,6 +238,20 @@ class ValkyrisApi(
         successNotice = R.string.notice_rule_created.takeIf { announce },
         announceError = announce,
     )
+
+    suspend fun updateRule(id: String, rule: Rule): Rule = put(
+        "/rules/$id",
+        rule,
+        R.string.notice_rule_updated,
+        announceError = true,
+    )
+
+    suspend fun deleteRule(id: String) {
+        val current = requireNotNull(session())
+        executeUnit(current.fingerprint, R.string.notice_rule_deleted, announceError = true) {
+            it.delete(base() + "/rules/$id") { bearerAuth(current.token) }
+        }
+    }
 
     suspend fun acknowledge(id: String, announce: Boolean = true) {
         val current = requireNotNull(session())

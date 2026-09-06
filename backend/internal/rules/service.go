@@ -26,23 +26,8 @@ type Service struct {
 func NewService(s *store.Store) *Service { return &Service{store: s, pending: map[string]int{}} }
 
 func (s *Service) Create(ctx context.Context, r Rule) (Rule, error) {
-	r.Name = strings.TrimSpace(r.Name)
-	r.DetectorTypes = canonicalStrings(r.DetectorTypes)
-	r.Schedule.Days = canonicalInts(r.Schedule.Days)
-	if r.CameraID == "" || r.Name == "" || len(r.DetectorTypes) == 0 {
-		return r, fmt.Errorf("cameraId, name and detectorTypes are required")
-	}
-	if r.MinConfidence == 0 {
-		r.MinConfidence = .65
-	}
-	if r.MinConfidence < 0 || r.MinConfidence > 1 {
-		return r, fmt.Errorf("minConfidence must be between 0 and 1")
-	}
-	if r.Confirmations < 1 {
-		r.Confirmations = 1
-	}
-	if r.CooldownSeconds < 1 {
-		r.CooldownSeconds = 60
+	if err := normalizeRule(&r); err != nil {
+		return r, err
 	}
 	r.ID = uuid.NewString()
 	r.Enabled = true
@@ -67,6 +52,55 @@ func (s *Service) Create(ctx context.Context, r Rule) (Rule, error) {
 		return r, fmt.Errorf("load existing idempotent rule: %w", err)
 	}
 	return existing, nil
+}
+
+func (s *Service) Update(ctx context.Context, id string, r Rule) (Rule, error) {
+	if err := normalizeRule(&r); err != nil {
+		return r, err
+	}
+	r.ID = id
+	r.UpdatedAt = time.Now().UTC()
+	det, _ := json.Marshal(r.DetectorTypes)
+	schedule, _ := json.Marshal(r.Schedule)
+	actions, _ := json.Marshal(r.Actions)
+	result, err := s.store.DB.ExecContext(ctx, `UPDATE rules SET camera_id=?,name=?,detector_types_json=?,min_confidence=?,confirmations=?,cooldown_seconds=?,schedule_json=?,actions_json=?,enabled=?,updated_at=? WHERE id=?`,
+		r.CameraID, r.Name, string(det), r.MinConfidence, r.Confirmations, r.CooldownSeconds, string(schedule), string(actions), boolToInt(r.Enabled), r.UpdatedAt.Format(time.RFC3339Nano), id)
+	if err != nil {
+		return r, err
+	}
+	if affected, _ := result.RowsAffected(); affected == 0 {
+		return r, sql.ErrNoRows
+	}
+	return scanRule(s.store.DB.QueryRowContext(ctx, `SELECT id,camera_id,name,detector_types_json,min_confidence,confirmations,cooldown_seconds,schedule_json,actions_json,enabled,last_triggered_at,created_at,updated_at FROM rules WHERE id=?`, id))
+}
+
+func normalizeRule(r *Rule) error {
+	r.Name = strings.TrimSpace(r.Name)
+	r.DetectorTypes = canonicalStrings(r.DetectorTypes)
+	// Scheduling is intentionally no longer configurable in the client. Rules
+	// run continuously and use a fixed one-minute cooldown.
+	r.Schedule = Schedule{Days: []int{}}
+	r.CooldownSeconds = 60
+	if r.CameraID == "" || r.Name == "" || len(r.DetectorTypes) == 0 {
+		return fmt.Errorf("cameraId, name and detectorTypes are required")
+	}
+	if r.MinConfidence == 0 {
+		r.MinConfidence = .65
+	}
+	if r.MinConfidence < 0 || r.MinConfidence > 1 {
+		return fmt.Errorf("minConfidence must be between 0 and 1")
+	}
+	if r.Confirmations < 1 {
+		r.Confirmations = 1
+	}
+	return nil
+}
+
+func boolToInt(value bool) int {
+	if value {
+		return 1
+	}
+	return 0
 }
 
 func canonicalStrings(values []string) []string {

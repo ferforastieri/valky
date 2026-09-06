@@ -1,2 +1,1 @@
--keep class androidx.room.** { *; }
 -dontwarn org.conscrypt.**

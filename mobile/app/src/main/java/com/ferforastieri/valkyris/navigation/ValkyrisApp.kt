@@ -103,8 +103,8 @@ private fun ConnectedValkyrisApp(main: MainViewModel) {
     val entry by nav.currentBackStackEntryAsState()
     val currentRoute = entry?.destination?.route
     val selectedIndex = destinations.indexOfFirst { it.route == currentRoute }
-    val showBottomBar = selectedIndex >= 0 || currentRoute == "events" || currentRoute == "camera/{id}"
-    val showTopBar = selectedIndex >= 0 || currentRoute == "events"
+    val showBottomBar = selectedIndex >= 0 || currentRoute == "events" || currentRoute == "event/{id}" || currentRoute == "camera/{id}"
+    val showTopBar = selectedIndex >= 0 || currentRoute == "events" || currentRoute == "event/{id}"
     val pendingEvent by main.pendingEvent.collectAsStateWithLifecycle()
     val pendingCamera by main.pendingCamera.collectAsStateWithLifecycle()
     LaunchedEffect(pendingEvent) {
@@ -129,7 +129,7 @@ private fun ConnectedValkyrisApp(main: MainViewModel) {
                     "cameras" -> stringResource(R.string.cameras)
                     "rules" -> stringResource(R.string.rules)
                     "settings" -> stringResource(R.string.settings)
-                    "events" -> stringResource(R.string.events)
+                    "events", "event/{id}" -> stringResource(R.string.events)
                     else -> stringResource(R.string.overview)
                 }
                 ValkyrisTopBar(
@@ -176,7 +176,15 @@ private fun ConnectedValkyrisApp(main: MainViewModel) {
             startDestination = "overview",
             modifier = contentModifier,
         ) {
-            composable("overview") { OverviewScreen(onCamera = { nav.navigate("camera/$it") }, onEvent = { nav.navigate("event/$it") }) }
+            composable("overview") {
+                OverviewScreen(
+                    onCamera = { nav.navigate("camera/$it") },
+                    onEvent = { nav.navigate("event/$it") },
+                    onCameras = { nav.openTopLevel("cameras") },
+                    onRules = { nav.openTopLevel("rules") },
+                    onEvents = { nav.navigate("events") { launchSingleTop = true } },
+                )
+            }
             composable("cameras") { CamerasScreen(onCamera = { nav.navigate("camera/$it") }) }
             composable("camera/{id}") { CameraLiveScreen(cameraId = it.arguments?.getString("id").orEmpty()) }
             composable("events") {
@@ -186,7 +194,7 @@ private fun ConnectedValkyrisApp(main: MainViewModel) {
                     vm = eventsViewModel,
                 )
             }
-            composable("event/{id}") { EventDetailScreen(onBack = { nav.popBackStack() }) }
+            composable("event/{id}") { EventDetailScreen() }
             composable("rules") { RulesScreen() }
             composable("settings") { SettingsScreen(main) }
         }

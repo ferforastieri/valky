@@ -16,14 +16,14 @@ import com.composables.icons.lucide.House
 import com.composables.icons.lucide.Lucide
 import com.composables.icons.lucide.Settings
 import com.composables.icons.lucide.SlidersHorizontal
-import com.ferforastieri.valkyris.core.database.EventEntity
-import com.ferforastieri.valkyris.core.database.RuleEntity
 import com.ferforastieri.valkyris.core.design.FloatingDock
 import com.ferforastieri.valkyris.core.design.ValkyrisTopBar
 import com.ferforastieri.valkyris.core.design.ValkyrisTheme
 import com.ferforastieri.valkyris.core.model.Camera as CameraModel
 import com.ferforastieri.valkyris.core.model.Capabilities
 import com.ferforastieri.valkyris.core.model.RetentionSettings
+import com.ferforastieri.valkyris.core.model.Rule as RuleModel
+import com.ferforastieri.valkyris.core.model.ValkyrisEvent
 import com.ferforastieri.valkyris.feature.overview.OverviewContent
 import com.ferforastieri.valkyris.feature.cameras.CamerasContent
 import com.ferforastieri.valkyris.feature.cameras.CamerasState
@@ -230,13 +230,13 @@ private object Samples {
         CameraModel("yard", "Quintal", "192.0.2.24", icon = "yard", capabilities = Capabilities(events = true, audio = true)),
     )
     val events = listOf(
-        EventEntity("1", "entry", "movimento na entrada", .94, "2026-09-04T20:41:08Z", null, null, null),
-        EventEntity("2", "yard", "campainha", .88, "2026-09-04T19:22:00Z", null, null, "2026-09-04T19:23:00Z"),
-        EventEntity("3", "yard", "latido", .82, "2026-09-04T18:06:00Z", null, null, "2026-09-04T18:07:00Z"),
+        ValkyrisEvent("1", "entry", type = "movimento na entrada", confidence = .94, occurredAt = "2026-09-04T20:41:08Z"),
+        ValkyrisEvent("2", "yard", type = "campainha", confidence = .88, occurredAt = "2026-09-04T19:22:00Z", acknowledgedAt = "2026-09-04T19:23:00Z"),
+        ValkyrisEvent("3", "yard", type = "latido", confidence = .82, occurredAt = "2026-09-04T18:06:00Z", acknowledgedAt = "2026-09-04T18:07:00Z"),
     )
     val rules = listOf(
-        RuleEntity("1", "entry", "Movimento na entrada", "motion", true),
-        RuleEntity("2", "yard", "Avisar quando o cachorro latir", "dog_bark", true),
-        RuleEntity("3", "entry", "Alarme de fumaça", "smoke_alarm", true),
+        RuleModel("1", "entry", "Movimento na entrada", listOf("motion")),
+        RuleModel("2", "yard", "Avisar quando o cachorro latir", listOf("dog_bark")),
+        RuleModel("3", "entry", "Alarme de fumaça", listOf("smoke_alarm")),
     )
 }

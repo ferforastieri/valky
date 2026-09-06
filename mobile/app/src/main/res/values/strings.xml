@@ -29,7 +29,7 @@
     <string name="events">Eventos</string>
     <string name="rules">Regras</string>
     <string name="settings">Ajustes</string>
-    <string name="live">Ao vivo</string>
+    <string name="live">AO VIVO</string>
     <string name="no_cameras">Nenhuma câmera adicionada</string>
     <string name="no_events">Tudo tranquilo por aqui</string>
     <string name="no_events_body">Os alertas detectados aparecerão nesta linha do tempo.</string>
@@ -214,4 +214,14 @@
     <string name="notice_events_acknowledged">Todos os eventos foram reconhecidos.</string>
     <string name="error_connection">Não foi possível conectar ao servidor Valkyris.</string>
     <string name="error_action_failed">Não foi possível concluir esta ação.</string>
+    <string name="edit_camera">Editar câmera</string>
+    <string name="saving_camera">Salvando…</string>
+    <string name="camera_password_optional">Senha da câmera (deixe em branco para manter)</string>
+    <string name="camera_edit_credentials_hint">Deixe usuário e senha em branco para manter as credenciais atuais.</string>
+    <string name="edit_rule">Editar regra</string>
+    <string name="remove_rule">Remover regra</string>
+    <string name="saving_rule">Salvando…</string>
+    <string name="notice_camera_updated">Câmera atualizada.</string>
+    <string name="notice_rule_updated">Regra atualizada.</string>
+    <string name="notice_rule_deleted">Regra removida.</string>
 </resources>

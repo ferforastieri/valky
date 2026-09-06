@@ -66,6 +66,71 @@ func (r *Repository) CreatePending(ctx context.Context, in CreateInput) (Camera,
 	return c, err
 }
 
+// Update changes a camera without exposing its stored credentials. Blank
+// credentials retain their existing values; a connection change starts setup again.
+func (r *Repository) Update(ctx context.Context, id string, in UpdateInput) (Camera, bool, error) {
+	current, credentials, err := r.Get(ctx, id)
+	if err != nil {
+		return Camera{}, false, err
+	}
+	in.Name = strings.TrimSpace(in.Name)
+	in.Host = strings.TrimSpace(in.Host)
+	if in.Name == "" || in.Host == "" {
+		return Camera{}, false, fmt.Errorf("name and host are required")
+	}
+	if in.Port == 0 {
+		in.Port = 2020
+	}
+	in.Icon = normalizeIcon(in.Icon)
+	username := strings.TrimSpace(in.Username)
+	if username == "" {
+		username = credentials.Username
+	}
+	password := in.Password
+	if password == "" {
+		password = credentials.Password
+	}
+	connectionChanged := in.Host != current.Host || in.Port != current.Port || username != credentials.Username || password != credentials.Password
+	rtspURI := strings.TrimSpace(in.RTSPURI)
+	if rtspURI == "" {
+		if connectionChanged {
+			rtspURI = defaultRTSPURI(in.Host, username, password)
+		} else {
+			rtspURI = credentials.RTSPURI
+		}
+	}
+	connectionChanged = connectionChanged || rtspURI != credentials.RTSPURI
+	now := time.Now().UTC().Format(time.RFC3339Nano)
+
+	var result sql.Result
+	if connectionChanged {
+		user, err := r.vault.EncryptString(username)
+		if err != nil {
+			return Camera{}, false, err
+		}
+		pass, err := r.vault.EncryptString(password)
+		if err != nil {
+			return Camera{}, false, err
+		}
+		rtsp, err := r.vault.EncryptString(rtspURI)
+		if err != nil {
+			return Camera{}, false, err
+		}
+		result, err = r.store.DB.ExecContext(ctx, `UPDATE cameras SET name=?,icon=?,host=?,port=?,username_enc=?,password_enc=?,rtsp_uri_enc=?,profile_token='',capabilities_json='{}',media_xaddr='',events_xaddr='',ptz_xaddr='',setup_status='pending',setup_step='queued',setup_error='',setup_updated_at=?,updated_at=? WHERE id=?`,
+			in.Name, in.Icon, in.Host, in.Port, user, pass, rtsp, now, now, id)
+	} else {
+		result, err = r.store.DB.ExecContext(ctx, `UPDATE cameras SET name=?,icon=?,host=?,port=?,updated_at=? WHERE id=?`, in.Name, in.Icon, in.Host, in.Port, now, id)
+	}
+	if err != nil {
+		return Camera{}, false, err
+	}
+	if affected, _ := result.RowsAffected(); affected == 0 {
+		return Camera{}, false, sql.ErrNoRows
+	}
+	updated, _, err := r.Get(ctx, id)
+	return updated, connectionChanged, err
+}
+
 func defaultRTSPURI(host, username, password string) string {
 	host = strings.TrimSpace(host)
 	if parsed, err := url.Parse(host); err == nil && parsed.Hostname() != "" {

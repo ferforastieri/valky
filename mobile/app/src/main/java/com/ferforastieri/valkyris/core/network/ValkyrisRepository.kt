@@ -1,38 +1,42 @@
 package com.ferforastieri.valkyris.core.network
 
-import com.ferforastieri.valkyris.core.database.EventEntity
-import com.ferforastieri.valkyris.core.database.RuleEntity
-import com.ferforastieri.valkyris.core.database.ValkyrisDao
 import com.ferforastieri.valkyris.core.model.Camera
 import com.ferforastieri.valkyris.core.model.CreateCameraRequest
 import com.ferforastieri.valkyris.core.model.Rule
+import com.ferforastieri.valkyris.core.model.ValkyrisEvent
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 
+// This repository intentionally keeps no persistent/offline cache. Every refresh
+// reads the current data from the Valkyris API.
 @Singleton
 class ValkyrisRepository @Inject constructor(
     val api: ValkyrisApi,
-    private val dao: ValkyrisDao,
 ) {
     private val _cameras = MutableStateFlow<List<Camera>>(emptyList())
     val cameras = _cameras.asStateFlow()
-
-    fun cachedEvents() = dao.events()
-    fun cachedRules() = dao.rules()
+    private val _events = MutableStateFlow<List<ValkyrisEvent>>(emptyList())
+    val events = _events.asStateFlow()
+    private val _rules = MutableStateFlow<List<Rule>>(emptyList())
+    val rules = _rules.asStateFlow()
 
     suspend fun refreshCameras(): List<Camera> {
-        val value = api.cameras()
-        _cameras.value = value
-        return value
+        return api.cameras().also { _cameras.value = it }
     }
 
     suspend fun createCamera(input: CreateCameraRequest): Camera {
-        val camera = api.createCamera(input)
-        _cameras.update { current -> (current + camera).distinctBy(Camera::id) }
-        return camera
+        return api.createCamera(input).also { camera ->
+            _cameras.update { current -> (current + camera).distinctBy(Camera::id) }
+        }
+    }
+
+    suspend fun updateCamera(id: String, input: CreateCameraRequest): Camera {
+        return api.updateCamera(id, input).also { camera ->
+            _cameras.update { current -> current.map { if (it.id == id) camera else it } }
+        }
     }
 
     suspend fun deleteCamera(id: String) {
@@ -40,14 +44,12 @@ class ValkyrisRepository @Inject constructor(
         _cameras.update { current -> current.filterNot { it.id == id } }
     }
 
-    suspend fun refreshEvents() {
-        val events = api.events()
-        dao.syncEvents(events.map { EventEntity(it.id, it.cameraId, it.type, it.confidence, it.occurredAt, it.snapshotPath, it.clipPath, it.acknowledgedAt) })
+    suspend fun refreshEvents(): List<ValkyrisEvent> {
+        return api.events().also { _events.value = it }
     }
 
-    suspend fun refreshRules() {
-        val rules = api.rules()
-        dao.replaceRules(rules.map(Rule::toEntity))
+    suspend fun refreshRules(): List<Rule> {
+        return api.rules().also { _rules.value = it }
     }
 
     suspend fun acknowledge(eventId: String) {
@@ -59,10 +61,19 @@ class ValkyrisRepository @Inject constructor(
     }
 
     suspend fun createRule(rule: Rule): Rule {
-        val created = api.createRule(rule)
-        dao.saveRule(created.toEntity())
-        return created
+        return api.createRule(rule).also { created ->
+            _rules.update { current -> (current + created).distinctBy(Rule::id) }
+        }
+    }
+
+    suspend fun updateRule(id: String, rule: Rule): Rule {
+        return api.updateRule(id, rule).also { updated ->
+            _rules.update { current -> current.map { if (it.id == id) updated else it } }
+        }
+    }
+
+    suspend fun deleteRule(id: String) {
+        api.deleteRule(id)
+        _rules.update { current -> current.filterNot { it.id == id } }
     }
 }
-
-private fun Rule.toEntity() = RuleEntity(id, cameraId, name, detectorTypes.joinToString(","), enabled)
