@@ -1,7 +1,6 @@
 package com.ferforastieri.valkyris.feature.rules
 
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
@@ -10,7 +9,6 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.stringResource
@@ -224,8 +222,8 @@ fun RuleEditorDialog(cameras: List<Camera>, detectors: List<DetectorKind>, exist
 
 @Composable
 private fun RuleActionRow(checked: Boolean, onChecked: (Boolean) -> Unit, label: String) {
-    Row(Modifier.fillMaxWidth().toggleable(value = checked, role = Role.Switch, onValueChange = onChecked), verticalAlignment = Alignment.CenterVertically) {
-        Switch(checked = checked, onCheckedChange = null)
+    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+        Switch(checked = checked, onCheckedChange = onChecked)
         Spacer(Modifier.width(8.dp))
         Text(label)
     }

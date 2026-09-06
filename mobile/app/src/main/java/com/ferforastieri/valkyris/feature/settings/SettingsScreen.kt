@@ -48,10 +48,12 @@ import com.composables.icons.lucide.Database
 import com.composables.icons.lucide.Languages
 import com.composables.icons.lucide.Lucide
 import com.composables.icons.lucide.Moon
+import com.composables.icons.lucide.MapPin
 import com.composables.icons.lucide.ShieldCheck
 import com.composables.icons.lucide.Smartphone
 import com.composables.icons.lucide.Sun
 import com.composables.icons.lucide.UserPlus
+import com.ferforastieri.valkyris.feature.people.LocationTrackingService
 
 @Composable
 fun SettingsScreen(main: MainViewModel, viewModel: SettingsViewModel = hiltViewModel()) {
@@ -71,6 +73,8 @@ fun SettingsScreen(main: MainViewModel, viewModel: SettingsViewModel = hiltViewM
     val notificationRequest = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) {
         permissionRefresh++
     }
+    val backgroundLocationRequest = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { permissionRefresh++ }
+    val foregroundLocationRequest = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { permissionRefresh++ }
 
     LifecycleEventEffect(Lifecycle.Event.ON_RESUME) {
         permissionRefresh++
@@ -86,6 +90,18 @@ fun SettingsScreen(main: MainViewModel, viewModel: SettingsViewModel = hiltViewM
         ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED
     val fullScreenAllowed = Build.VERSION.SDK_INT < 34 || manager.canUseFullScreenIntent()
     val dndAllowed = manager.isNotificationPolicyAccessGranted
+    val foregroundLocationAllowed = ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED
+    val backgroundLocationAllowed = Build.VERSION.SDK_INT < Build.VERSION_CODES.Q || ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_BACKGROUND_LOCATION) == PackageManager.PERMISSION_GRANTED
+    val locationAllowed = foregroundLocationAllowed && backgroundLocationAllowed
+
+    fun configureLocation() {
+        when {
+            !foregroundLocationAllowed -> foregroundLocationRequest.launch(Manifest.permission.ACCESS_FINE_LOCATION)
+            Build.VERSION.SDK_INT == Build.VERSION_CODES.Q && !backgroundLocationAllowed -> backgroundLocationRequest.launch(Manifest.permission.ACCESS_BACKGROUND_LOCATION)
+            Build.VERSION.SDK_INT >= Build.VERSION_CODES.R && !backgroundLocationAllowed -> context.startActivity(Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).setData(android.net.Uri.parse("package:${context.packageName}")))
+            else -> LocationTrackingService.start(context)
+        }
+    }
 
     SettingsContent(
         admin = admin,
@@ -130,6 +146,7 @@ fun SettingsScreen(main: MainViewModel, viewModel: SettingsViewModel = hiltViewM
             notificationsAllowed = notificationsAllowed,
             fullScreenAllowed = fullScreenAllowed,
             dndAllowed = dndAllowed,
+            locationAllowed = locationAllowed,
             onNotifications = {
                 if (Build.VERSION.SDK_INT >= 33 && !notificationsAllowed) {
                     notificationRequest.launch(Manifest.permission.POST_NOTIFICATIONS)
@@ -147,6 +164,7 @@ fun SettingsScreen(main: MainViewModel, viewModel: SettingsViewModel = hiltViewM
                 )
             },
             onDnd = { context.startActivity(Intent(Settings.ACTION_NOTIFICATION_POLICY_ACCESS_SETTINGS)) },
+            onLocation = ::configureLocation,
             onDismiss = { showPermissions = false },
         )
     }
@@ -308,9 +326,11 @@ fun PermissionsSheet(
     notificationsAllowed: Boolean,
     fullScreenAllowed: Boolean,
     dndAllowed: Boolean,
+    locationAllowed: Boolean = false,
     onNotifications: () -> Unit = {},
     onFullScreen: () -> Unit = {},
     onDnd: () -> Unit = {},
+    onLocation: () -> Unit = {},
     onDismiss: () -> Unit = {},
 ) {
     ValkyrisBottomSheet(
@@ -337,6 +357,13 @@ fun PermissionsSheet(
                 status = stringResource(if (fullScreenAllowed) R.string.permission_allowed else R.string.permission_required),
                 allowed = fullScreenAllowed,
                 onClick = onFullScreen,
+            )
+            PermissionOption(
+                icon = Lucide.MapPin,
+                title = "Localização em segundo plano",
+                status = if (locationAllowed) "Permitida" else "Necessária para mostrar este celular no mapa",
+                allowed = locationAllowed,
+                onClick = onLocation,
             )
             PermissionOption(
                 icon = Lucide.BellOff,

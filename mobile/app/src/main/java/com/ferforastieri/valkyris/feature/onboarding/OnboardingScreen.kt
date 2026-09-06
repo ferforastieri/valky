@@ -48,6 +48,7 @@ import com.journeyapps.barcodescanner.ScanOptions
 @Composable
 fun OnboardingScreen(viewModel: MainViewModel) {
     var url by remember { mutableStateOf("") }
+    var userName by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
     var confirmation by remember { mutableStateOf("") }
     val error by viewModel.error.collectAsStateWithLifecycle()
@@ -55,7 +56,7 @@ fun OnboardingScreen(viewModel: MainViewModel) {
     val initialized by viewModel.authInitialized.collectAsStateWithLifecycle()
     val scanPrompt = stringResource(R.string.scan_invite_prompt)
     val scanner = rememberLauncherForActivityResult(ScanContract()) { result ->
-        result.contents?.let { viewModel.acceptPairingLink(Uri.parse(it)) }
+        result.contents?.let { viewModel.acceptPairingLink(Uri.parse(it), userName) }
     }
 
     Column(
@@ -102,6 +103,15 @@ fun OnboardingScreen(viewModel: MainViewModel) {
                         enabled = initialized == null && !connecting,
                         singleLine = true,
                     )
+                    OutlinedTextField(
+                        userName,
+                        { userName = it },
+                        Modifier.fillMaxWidth(),
+                        label = { Text("Seu nome") },
+                        supportingText = { Text("Cada pessoa é vinculada ao próprio celular.") },
+                        enabled = !connecting,
+                        singleLine = true,
+                    )
                     if (initialized != null) {
                         Text(
                             stringResource(if (initialized == false) R.string.create_admin_body else R.string.login_admin_body),
@@ -132,11 +142,11 @@ fun OnboardingScreen(viewModel: MainViewModel) {
                     Button(
                         onClick = {
                             if (initialized == null) viewModel.inspectServer(url)
-                            else viewModel.login(url, password, bootstrap = initialized == false)
+                            else viewModel.login(url, password, bootstrap = initialized == false, userName = userName)
                         },
                         modifier = Modifier.fillMaxWidth(),
                         enabled = !connecting && url.isNotBlank() && (
-                            initialized == null || password.isNotBlank() && (initialized == true || password.length >= 10 && password == confirmation)
+                            initialized == null || userName.isNotBlank() && password.isNotBlank() && (initialized == true || password.length >= 10 && password == confirmation)
                         ),
                     ) {
                         if (connecting) CircularProgressIndicator(Modifier.size(20.dp), strokeWidth = 2.dp)
@@ -171,7 +181,7 @@ fun OnboardingScreen(viewModel: MainViewModel) {
                             )
                         },
                         modifier = Modifier.fillMaxWidth(),
-                        enabled = !connecting,
+                        enabled = !connecting && userName.isNotBlank(),
                     ) {
                         Icon(Lucide.ScanQrCode, null)
                         Text(stringResource(R.string.scan_invite), Modifier.padding(start = 8.dp))

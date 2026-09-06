@@ -1,16 +1,8 @@
 package com.ferforastieri.valkyris.feature.people
 
-import android.Manifest
-import android.content.Context
-import android.content.Intent
-import android.content.pm.PackageManager
 import android.graphics.Color as AndroidColor
-import android.net.Uri
-import android.os.Build
-import android.provider.Settings
-import androidx.activity.compose.rememberLauncherForActivityResult
-import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -24,7 +16,6 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
-import androidx.core.content.ContextCompat
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.composables.icons.lucide.History
@@ -50,34 +41,30 @@ import org.osmdroid.views.overlay.Polygon
 
 @Composable
 fun PeopleScreen(vm: PeopleViewModel = hiltViewModel()) {
-    val context = LocalContext.current
     val users by vm.people.collectAsStateWithLifecycle()
+    val me by vm.me.collectAsStateWithLifecycle()
     val places by vm.places.collectAsStateWithLifecycle()
     val history by vm.history.collectAsStateWithLifecycle()
     val busy by vm.busy.collectAsStateWithLifecycle()
     var placeEditor by remember { mutableStateOf<TrackedPlace?>(null) }
+    var editingUser by remember { mutableStateOf<TrackedPerson?>(null) }
     var historyUser by remember { mutableStateOf<TrackedPerson?>(null) }
-    var permissionSheet by remember { mutableStateOf(false) }
-    var mapPoint by remember { mutableStateOf<GeoPoint?>(null) }
-
-    val backgroundPermission = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
-        if (granted) { LocationTrackingService.start(context); permissionSheet = false }
-    }
-    val foregroundPermission = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) {
-        permissionSheet = true
-    }
-    fun enableTracking() {
-        when {
-            ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED -> foregroundPermission.launch(Manifest.permission.ACCESS_FINE_LOCATION)
-            Build.VERSION.SDK_INT == Build.VERSION_CODES.Q && ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_BACKGROUND_LOCATION) != PackageManager.PERMISSION_GRANTED -> backgroundPermission.launch(Manifest.permission.ACCESS_BACKGROUND_LOCATION)
-            Build.VERSION.SDK_INT >= Build.VERSION_CODES.R && ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_BACKGROUND_LOCATION) != PackageManager.PERMISSION_GRANTED -> context.startActivity(Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.parse("package:${context.packageName}")))
-            else -> { LocationTrackingService.start(context); permissionSheet = false }
-        }
-    }
+    var selectingArea by remember { mutableStateOf(false) }
 
     Box(Modifier.fillMaxSize()) {
         Column(Modifier.fillMaxSize()) {
-            FamilyMap(users, places, { point -> mapPoint = point; placeEditor = TrackedPlace(name = "", latitude = point.latitude, longitude = point.longitude) }, Modifier.fillMaxWidth().weight(1.08f))
+            FamilyMap(
+                users = users,
+                places = places,
+                selectingArea = selectingArea,
+                onMapPoint = { point ->
+                    if (selectingArea) {
+                        selectingArea = false
+                        placeEditor = TrackedPlace(name = "", latitude = point.latitude, longitude = point.longitude)
+                    }
+                },
+                modifier = Modifier.fillMaxWidth().weight(1.08f),
+            )
             Surface(Modifier.fillMaxWidth().weight(.92f), color = MaterialTheme.colorScheme.background) {
                 LazyColumn(Modifier.fillMaxSize().padding(horizontal = 18.dp), contentPadding = PaddingValues(top = 14.dp, bottom = 98.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
                     item {
@@ -86,55 +73,56 @@ fun PeopleScreen(vm: PeopleViewModel = hiltViewModel()) {
                                 Text("Família", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold)
                                 Text("Perfis vinculados aos dispositivos autorizados", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                             }
-                            TextButton(onClick = { permissionSheet = true }) { Icon(Lucide.MapPin, null, Modifier.size(17.dp)); Spacer(Modifier.width(5.dp)); Text("Rastrear") }
+                            me?.let { user -> IconButton(onClick = { editingUser = user }) { Icon(Lucide.SlidersHorizontal, "Editar meu perfil") } }
                         }
                     }
                     if (users.isEmpty()) item { EmptyUsers() }
-                    items(users, key = { it.id }) { user -> UserCard(user) { historyUser = user; vm.history(user) } }
+                    items(users, key = { it.id }) { user -> UserCard(user, canEdit = user.id == me?.id, onEdit = { editingUser = user }) { historyUser = user; vm.history(user) } }
                     if (places.isNotEmpty()) {
                         item { Text("Áreas", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold, modifier = Modifier.padding(top = 5.dp)) }
-                        items(places, key = { it.id }) { place -> Text("${place.name} · raio de ${place.radiusMeters.toInt()} m", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant) }
+                        items(places, key = { it.id }) { place ->
+                            ListItem(
+                                headlineContent = { Text(place.name) },
+                                supportingContent = { Text("Raio de ${place.radiusMeters.toInt()} m") },
+                                modifier = Modifier.clickable { placeEditor = place },
+                            )
+                        }
                     }
                 }
             }
         }
-        ExtendedFloatingActionButton(onClick = { placeEditor = TrackedPlace(name = "", latitude = mapPoint?.latitude ?: -23.5505, longitude = mapPoint?.longitude ?: -46.6333) }, modifier = Modifier.align(Alignment.TopEnd).padding(16.dp), icon = { Icon(Lucide.Plus, null) }, text = { Text("Área") })
+        if (selectingArea) Surface(Modifier.align(Alignment.TopCenter).padding(16.dp), shape = MaterialTheme.shapes.large, color = MaterialTheme.colorScheme.primaryContainer, shadowElevation = 4.dp) {
+            Text("Toque no mapa para posicionar a área", Modifier.padding(horizontal = 16.dp, vertical = 11.dp), color = MaterialTheme.colorScheme.onPrimaryContainer)
+        }
+        ExtendedFloatingActionButton(onClick = { selectingArea = !selectingArea }, modifier = Modifier.align(Alignment.TopEnd).padding(16.dp), icon = { Icon(if (selectingArea) Lucide.MapPin else Lucide.Plus, null) }, text = { Text(if (selectingArea) "Cancelar" else "Área") })
     }
-    if (permissionSheet) LocationPermissionSheet(context, { permissionSheet = false }, ::enableTracking)
-    placeEditor?.let { place -> PlaceEditor(place, busy, { placeEditor = null }) { value -> vm.createPlace(value) { if (it) placeEditor = null } } }
+    placeEditor?.let { place -> PlaceEditor(place, busy, { placeEditor = null }) { value ->
+        val done: (Boolean) -> Unit = { if (it) placeEditor = null }
+        if (value.id.isBlank()) vm.createPlace(value, done) else vm.updatePlace(value, done)
+    } }
+    editingUser?.let { user -> UserEditor(user, busy, { editingUser = null }) { value -> vm.updateMe(value) { if (it) editingUser = null } } }
     historyUser?.let { user -> HistorySheet(user, history) { historyUser = null } }
 }
 
 @Composable
-private fun LocationPermissionSheet(context: Context, onDismiss: () -> Unit, onContinue: () -> Unit) {
-    val foreground = ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED
-    val background = Build.VERSION.SDK_INT < Build.VERSION_CODES.Q || ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_BACKGROUND_LOCATION) == PackageManager.PERMISSION_GRANTED
-    val message = when {
-        !foreground -> "Permita a localização precisa para o Valkyris registrar este telefone."
-        !background && Build.VERSION.SDK_INT >= Build.VERSION_CODES.R -> "Agora escolha “Permitir o tempo todo” nas configurações do Android. Assim o mapa continua atualizado em segundo plano."
-        !background -> "Permita localização em segundo plano para manter o rastreamento quando o aplicativo estiver fechado."
-        else -> "O rastreamento deste telefone está pronto para ser ativado."
-    }
-    val action = when { !foreground -> "Permitir localização"; !background && Build.VERSION.SDK_INT >= Build.VERSION_CODES.R -> "Abrir configurações"; !background -> "Permitir em segundo plano"; else -> "Ativar rastreamento" }
-    ValkyrisBottomSheet(title = "Localização da família", onDismiss = onDismiss, actions = {
-        TextButton(onClick = onDismiss) { Text("Agora não") }
-        Button(onClick = onContinue) { Text(action) }
-    }) {
-        Text(message, color = MaterialTheme.colorScheme.onSurfaceVariant)
-        Spacer(Modifier.height(8.dp))
-        Text("A localização é enviada somente a este servidor e gera eventos de entrada e saída das áreas cadastradas.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-    }
-}
-
-@Composable
-private fun FamilyMap(users: List<TrackedPerson>, places: List<TrackedPlace>, onLongPress: (GeoPoint) -> Unit, modifier: Modifier = Modifier) {
+private fun FamilyMap(users: List<TrackedPerson>, places: List<TrackedPlace>, selectingArea: Boolean, onMapPoint: (GeoPoint) -> Unit, modifier: Modifier = Modifier) {
+    val latestMapPoint by rememberUpdatedState(onMapPoint)
+    val latestSelectingArea by rememberUpdatedState(selectingArea)
     AndroidView(factory = { context ->
         Configuration.getInstance().userAgentValue = context.packageName
         MapView(context).apply {
             setTileSource(TileSourceFactory.MAPNIK); setMultiTouchControls(true); controller.setZoom(13.5); controller.setCenter(GeoPoint(-23.5505, -46.6333))
             overlays.add(MapEventsOverlay(object : MapEventsReceiver {
-                override fun singleTapConfirmedHelper(point: GeoPoint?) = false
-                override fun longPressHelper(point: GeoPoint?): Boolean { point?.let(onLongPress); return true }
+                override fun singleTapConfirmedHelper(point: GeoPoint?): Boolean {
+                    if (!latestSelectingArea) return false
+                    point?.let { latestMapPoint(it) }
+                    return true
+                }
+                override fun longPressHelper(point: GeoPoint?): Boolean {
+                    if (!latestSelectingArea) return false
+                    point?.let { latestMapPoint(it) }
+                    return true
+                }
             }))
         }
     }, update = { map ->
@@ -167,13 +155,14 @@ private fun EmptyUsers() = Surface(shape = MaterialTheme.shapes.large, color = M
 }
 
 @Composable
-private fun UserCard(user: TrackedPerson, onHistory: () -> Unit) = Card(modifier = Modifier.fillMaxWidth(), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface), border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)) {
+private fun UserCard(user: TrackedPerson, canEdit: Boolean, onEdit: () -> Unit, onHistory: () -> Unit) = Card(modifier = Modifier.fillMaxWidth(), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface), border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)) {
     Row(Modifier.padding(15.dp), verticalAlignment = Alignment.CenterVertically) {
         Surface(shape = MaterialTheme.shapes.medium, color = MaterialTheme.colorScheme.primaryContainer) { Icon(Lucide.UserRound, null, Modifier.padding(11.dp).size(22.dp), tint = MaterialTheme.colorScheme.primary) }
         Spacer(Modifier.width(12.dp)); Column(Modifier.weight(1f)) {
             Text(user.name, fontWeight = FontWeight.SemiBold)
             Text(user.lastLocatedAt?.let { "Atualizado ${formatTime(it)}" } ?: "Ainda sem localização", color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodySmall)
         }
+        if (canEdit) IconButton(onClick = onEdit) { Icon(Lucide.SlidersHorizontal, "Editar perfil") }
         IconButton(onClick = onHistory) { Icon(Lucide.History, "Histórico de localização") }
     }
 }
@@ -189,6 +178,25 @@ private fun PlaceEditor(initial: TrackedPlace, busy: Boolean, onDismiss: () -> U
             OutlinedTextField(name, { name = it }, label = { Text("Nome") }, singleLine = true, modifier = Modifier.fillMaxWidth())
             Text("O ponto foi escolhido no mapa. Você pode ajustar apenas o raio da área.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             OutlinedTextField(radius, { radius = it.filter(Char::isDigit) }, label = { Text("Raio em metros") }, singleLine = true, modifier = Modifier.fillMaxWidth())
+        }
+    }
+}
+
+@Composable
+private fun UserEditor(initial: TrackedPerson, busy: Boolean, onDismiss: () -> Unit, onSave: (TrackedPerson) -> Unit) {
+    var name by remember(initial.id) { mutableStateOf(initial.name) }
+    ValkyrisBottomSheet(
+        title = "Editar perfil",
+        onDismiss = onDismiss,
+        dismissEnabled = !busy,
+        actions = {
+            TextButton(onClick = onDismiss, enabled = !busy) { Text("Cancelar") }
+            Button(onClick = { onSave(initial.copy(name = name.trim())) }, enabled = !busy && name.isNotBlank()) { Text("Salvar") }
+        },
+    ) {
+        Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            OutlinedTextField(name, { name = it }, label = { Text("Nome") }, singleLine = true, modifier = Modifier.fillMaxWidth())
+            Text("Este perfil está vinculado a este celular.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
     }
 }

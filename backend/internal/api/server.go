@@ -130,7 +130,10 @@ func (s *Server) Handler() http.Handler {
 	protected.HandleFunc("GET /people/{id}/history", s.personHistory)
 	protected.HandleFunc("POST /people/{id}/locations", s.reportLocation)
 	protected.HandleFunc("GET /users", s.listUsers)
+	protected.Handle("PUT /users/{id}", s.auth.RequireAdmin(http.HandlerFunc(s.updateUser)))
 	protected.HandleFunc("GET /users/{id}/history", s.userHistory)
+	protected.HandleFunc("GET /me", s.currentUser)
+	protected.HandleFunc("PUT /me", s.updateCurrentUser)
 	protected.HandleFunc("POST /me/location", s.reportMyLocation)
 	protected.HandleFunc("GET /places", s.listPlaces)
 	protected.Handle("POST /places", s.auth.RequireAdmin(http.HandlerFunc(s.createPlace)))
@@ -586,6 +589,35 @@ func (s *Server) listUsers(w http.ResponseWriter, r *http.Request) {
 	}
 	out, err := s.tracking.ListUsers(r.Context())
 	respondWithMessage(w, out, err, "Family users loaded successfully")
+}
+func (s *Server) currentUser(w http.ResponseWriter, r *http.Request) {
+	if s.trackingUnavailable(w) {
+		return
+	}
+	out, err := s.tracking.CurrentUser(r.Context(), auth.DeviceID(r.Context()))
+	respondWithMessage(w, out, err, "Current family user loaded successfully")
+}
+func (s *Server) updateCurrentUser(w http.ResponseWriter, r *http.Request) {
+	if s.trackingUnavailable(w) {
+		return
+	}
+	var in tracking.User
+	if !decode(w, r, &in) {
+		return
+	}
+	out, err := s.tracking.UpdateCurrentUser(r.Context(), auth.DeviceID(r.Context()), in)
+	respondWithMessage(w, out, err, "Family user updated successfully")
+}
+func (s *Server) updateUser(w http.ResponseWriter, r *http.Request) {
+	if s.trackingUnavailable(w) {
+		return
+	}
+	var in tracking.User
+	if !decode(w, r, &in) {
+		return
+	}
+	out, err := s.tracking.UpdateUser(r.Context(), r.PathValue("id"), in)
+	respondWithMessage(w, out, err, "Family user updated successfully")
 }
 func (s *Server) userHistory(w http.ResponseWriter, r *http.Request) {
 	if s.trackingUnavailable(w) {

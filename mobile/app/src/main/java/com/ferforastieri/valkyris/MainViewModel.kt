@@ -57,12 +57,12 @@ class MainViewModel @Inject constructor(
     val theme = preferences.theme.stateIn(viewModelScope, SharingStarted.Eagerly, "system")
     val language = preferences.language.stateIn(viewModelScope, SharingStarted.Eagerly, "system")
 
-    fun acceptPairingLink(uri: Uri?) {
+    fun acceptPairingLink(uri: Uri?, userName: String = "") {
         if (uri?.scheme != "valkyris" || uri.host != "pair") return
         val url = uri.getQueryParameter("url").orEmpty()
         val code = uri.getQueryParameter("code").orEmpty()
         val fingerprint = uri.getQueryParameter("fingerprint").orEmpty()
-        if (url.startsWith("https://") && code.isNotBlank()) pair(url, code, fingerprint)
+        if (url.startsWith("https://") && code.isNotBlank()) pair(url, code, fingerprint, userName)
     }
 
     fun acceptLaunch(uri: Uri?, eventId: String?, cameraId: String? = null) {
@@ -93,7 +93,7 @@ class MainViewModel @Inject constructor(
         }
     }
 
-    fun login(url: String, password: String, bootstrap: Boolean) {
+    fun login(url: String, password: String, bootstrap: Boolean, userName: String) {
         val base = url.trim().replace(Regex("/+$"), "")
         if (!base.startsWith("https://") || password.isBlank()) { _error.value = "Use um endereço HTTPS e informe a senha da casa."; return }
         if (!actionGate.tryAcquire()) return
@@ -101,7 +101,7 @@ class MainViewModel @Inject constructor(
         _error.value = null
         viewModelScope.launch {
             try {
-                runCatching { api.login(base, com.ferforastieri.valkyris.core.model.LoginRequest(password, android.os.Build.MODEL, Locale.getDefault().toLanguageTag()), bootstrap) }
+                runCatching { api.login(base, com.ferforastieri.valkyris.core.model.LoginRequest(password, android.os.Build.MODEL, userName.trim(), Locale.getDefault().toLanguageTag()), bootstrap) }
                     .onSuccess { sessions.save(Session(base, it.token, admin = it.admin)); _admin.value = it.admin; _paired.value = true; push.registerCurrent(); checkForUpdates(force = true) }
                     .onFailure { _error.value = it.message }
             } finally {
@@ -111,13 +111,13 @@ class MainViewModel @Inject constructor(
         }
     }
 
-    private fun pair(url: String, code: String, fingerprint: String) {
+    private fun pair(url: String, code: String, fingerprint: String, userName: String) {
         if (!actionGate.tryAcquire()) return
         _connecting.value = true
         _error.value = null
         viewModelScope.launch {
             try {
-                runCatching { api.pair(url, fingerprint, com.ferforastieri.valkyris.core.model.PairRequest(code, android.os.Build.MODEL, Locale.getDefault().toLanguageTag())) }
+                runCatching { api.pair(url, fingerprint, com.ferforastieri.valkyris.core.model.PairRequest(code, android.os.Build.MODEL, userName.trim(), Locale.getDefault().toLanguageTag())) }
                     .onSuccess { sessions.save(Session(url, it.token, fingerprint, it.admin)); _admin.value = it.admin; _paired.value = true; push.registerCurrent() }
                     .onFailure { _error.value = it.message }
             } finally {

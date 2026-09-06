@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"fmt"
 	"math"
+	"strings"
 	"time"
 
 	"github.com/ferforastieri/valkyris/backend/internal/store"
@@ -104,6 +105,40 @@ func (s *Service) ListUsers(ctx context.Context) ([]User, error) {
 	return users, rows.Err()
 }
 
+// CurrentUser returns the family profile owned by the authenticated phone.
+// A profile is never created separately from a device.
+func (s *Service) CurrentUser(ctx context.Context, deviceID string) (User, error) {
+	return scanUser(s.store.DB.QueryRowContext(ctx, `SELECT u.id,u.name,u.color,u.enabled,u.last_latitude,u.last_longitude,u.last_accuracy,u.last_located_at,u.created_at,u.updated_at FROM users u JOIN devices d ON d.user_id=u.id WHERE d.id=? AND d.enabled=1`, deviceID))
+}
+
+func (s *Service) UpdateUser(ctx context.Context, id string, in User) (User, error) {
+	name := strings.TrimSpace(in.Name)
+	if name == "" {
+		return User{}, fmt.Errorf("user name is required")
+	}
+	color := in.Color
+	if color == "" {
+		color = "#5B5BD6"
+	}
+	now := time.Now().UTC().Format(time.RFC3339Nano)
+	result, err := s.store.DB.ExecContext(ctx, `UPDATE users SET name=?,color=?,updated_at=? WHERE id=?`, name, color, now, id)
+	if err != nil {
+		return User{}, err
+	}
+	if affected, _ := result.RowsAffected(); affected == 0 {
+		return User{}, sql.ErrNoRows
+	}
+	return scanUser(s.store.DB.QueryRowContext(ctx, `SELECT id,name,color,enabled,last_latitude,last_longitude,last_accuracy,last_located_at,created_at,updated_at FROM users WHERE id=?`, id))
+}
+
+func (s *Service) UpdateCurrentUser(ctx context.Context, deviceID string, in User) (User, error) {
+	current, err := s.CurrentUser(ctx, deviceID)
+	if err != nil {
+		return User{}, err
+	}
+	return s.UpdateUser(ctx, current.ID, in)
+}
+
 func (s *Service) UserHistory(ctx context.Context, userID string, limit int) ([]UserLocation, error) {
 	if limit < 1 || limit > 500 {
 		limit = 100
@@ -129,7 +164,7 @@ func (s *Service) UserHistory(ctx context.Context, userID string, limit int) ([]
 // ReportMyLocation resolves the authenticated device to its linked user. The
 // caller can never choose another family member's profile.
 func (s *Service) ReportMyLocation(ctx context.Context, deviceID string, location UserLocation) ([]UserTransition, error) {
-	user, err := scanUser(s.store.DB.QueryRowContext(ctx, `SELECT u.id,u.name,u.color,u.enabled,u.last_latitude,u.last_longitude,u.last_accuracy,u.last_located_at,u.created_at,u.updated_at FROM users u JOIN devices d ON d.user_id=u.id WHERE d.id=? AND d.enabled=1`, deviceID))
+	user, err := s.CurrentUser(ctx, deviceID)
 	if err != nil {
 		return nil, err
 	}

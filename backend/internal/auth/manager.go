@@ -37,12 +37,14 @@ type PairingSession struct {
 type LoginRequest struct {
 	Password   string `json:"password"`
 	DeviceName string `json:"deviceName"`
+	UserName   string `json:"userName"`
 	Locale     string `json:"locale"`
 }
 
 type PairRequest struct {
 	Code       string `json:"code"`
 	DeviceName string `json:"deviceName"`
+	UserName   string `json:"userName"`
 	Locale     string `json:"locale"`
 }
 
@@ -86,7 +88,7 @@ func (m *Manager) BootstrapAdmin(ctx context.Context, req LoginRequest) (PairRes
 	if affected, _ := result.RowsAffected(); affected != 1 {
 		return PairResponse{}, fmt.Errorf("administrator is already configured")
 	}
-	response, err := issueDevice(ctx, tx, req.DeviceName, req.Locale, true)
+	response, err := issueDevice(ctx, tx, req.DeviceName, req.UserName, req.Locale, true)
 	if err != nil {
 		return PairResponse{}, err
 	}
@@ -103,7 +105,7 @@ func (m *Manager) LoginAdmin(ctx context.Context, req LoginRequest) (PairRespons
 		bcrypt.CompareHashAndPassword([]byte(encoded), []byte(req.Password)) != nil {
 		return PairResponse{}, fmt.Errorf("invalid credentials")
 	}
-	return m.insertDevice(ctx, req.DeviceName, req.Locale, true)
+	return m.insertDevice(ctx, req.DeviceName, req.UserName, req.Locale, true)
 }
 
 func (m *Manager) CreatePairing(ctx context.Context) (PairingSession, error) {
@@ -160,7 +162,7 @@ func (m *Manager) Pair(ctx context.Context, req PairRequest) (PairResponse, erro
 		return PairResponse{}, err
 	}
 	defer tx.Rollback()
-	response, err := issueDevice(ctx, tx, req.DeviceName, req.Locale, false)
+	response, err := issueDevice(ctx, tx, req.DeviceName, req.UserName, req.Locale, false)
 	if err != nil {
 		return PairResponse{}, err
 	}
@@ -177,17 +179,20 @@ func (m *Manager) Pair(ctx context.Context, req PairRequest) (PairResponse, erro
 	return response, nil
 }
 
-func (m *Manager) insertDevice(ctx context.Context, name, locale string, admin bool) (PairResponse, error) {
-	return issueDevice(ctx, m.store.DB, name, locale, admin)
+func (m *Manager) insertDevice(ctx context.Context, name, userName, locale string, admin bool) (PairResponse, error) {
+	return issueDevice(ctx, m.store.DB, name, userName, locale, admin)
 }
 
 type contextExecer interface {
 	ExecContext(context.Context, string, ...any) (sql.Result, error)
 }
 
-func issueDevice(ctx context.Context, exec contextExecer, name, locale string, admin bool) (PairResponse, error) {
+func issueDevice(ctx context.Context, exec contextExecer, name, userName, locale string, admin bool) (PairResponse, error) {
 	if locale == "" {
 		locale = "pt-BR"
+	}
+	if userName == "" {
+		userName = name
 	}
 	token, err := appcrypto.RandomToken(32)
 	if err != nil {
@@ -200,7 +205,7 @@ func issueDevice(ctx context.Context, exec contextExecer, name, locale string, a
 	if admin {
 		adminValue = 1
 	}
-	if _, err = exec.ExecContext(ctx, `INSERT INTO users(id,name,color,enabled,created_at,updated_at) VALUES(?,?,?,1,?,?)`, userID, name, "#5B5BD6", now, now); err != nil {
+	if _, err = exec.ExecContext(ctx, `INSERT INTO users(id,name,color,enabled,created_at,updated_at) VALUES(?,?,?,1,?,?)`, userID, userName, "#5B5BD6", now, now); err != nil {
 		return PairResponse{}, err
 	}
 	_, err = exec.ExecContext(ctx, `INSERT INTO devices(id,user_id,name,token_hash,is_admin,locale,created_at,last_seen_at) VALUES(?,?,?,?,?,?,?,?)`, deviceID, userID, name, appcrypto.Hash(token), adminValue, locale, now, now)

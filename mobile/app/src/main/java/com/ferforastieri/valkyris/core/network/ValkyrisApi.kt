@@ -231,6 +231,9 @@ class ValkyrisApi(
 
     suspend fun people(): List<TrackedPerson> = get("/people")
     suspend fun users(): List<TrackedPerson> = get("/users")
+    suspend fun me(): TrackedPerson = get("/me")
+    suspend fun updateMe(user: TrackedPerson): TrackedPerson = put("/me", user, announceError = true)
+    suspend fun updateUser(id: String, user: TrackedPerson): TrackedPerson = put("/users/$id", user, announceError = true)
     suspend fun createPerson(person: TrackedPerson): TrackedPerson = post("/people", person, announceError = true)
     suspend fun updatePerson(id: String, person: TrackedPerson): TrackedPerson = put("/people/$id", person, announceError = true)
     suspend fun deletePerson(id: String) {

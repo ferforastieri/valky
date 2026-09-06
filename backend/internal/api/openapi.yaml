@@ -127,11 +127,25 @@ paths:
     get:
       summary: List family users linked to paired devices
       responses: {'200': {description: Users in APIResponse.data, content: {application/json: {schema: {$ref: '#/components/schemas/APIResponse'}}}}}
+  /users/{id}:
+    put:
+      summary: Update a family user as administrator
+      parameters: [{$ref: '#/components/parameters/id'}]
+      requestBody: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/User'}}}}
+      responses: {'200': {description: Updated user, content: {application/json: {schema: {$ref: '#/components/schemas/APIResponse'}}}}}
   /users/{id}/history:
     get:
       summary: List a family user's location history
       parameters: [{$ref: '#/components/parameters/id'}]
       responses: {'200': {description: Location history in APIResponse.data, content: {application/json: {schema: {$ref: '#/components/schemas/APIResponse'}}}}}
+  /me:
+    get:
+      summary: Get the family user linked to the authenticated phone
+      responses: {'200': {description: Current user, content: {application/json: {schema: {$ref: '#/components/schemas/APIResponse'}}}}}
+    put:
+      summary: Update the family user linked to the authenticated phone
+      requestBody: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/User'}}}}
+      responses: {'200': {description: Updated user, content: {application/json: {schema: {$ref: '#/components/schemas/APIResponse'}}}}}
   /me/location:
     post:
       summary: Record the authenticated device user's location
@@ -378,6 +392,14 @@ components:
         longitude: {type: number, minimum: -180, maximum: 180}
         accuracy: {type: number, minimum: 0}
         occurredAt: {type: string, format: date-time}
+    User:
+      type: object
+      required: [name]
+      properties:
+        id: {type: string, format: uuid}
+        name: {type: string}
+        color: {type: string}
+        enabled: {type: boolean}
     Place:
       type: object
       required: [name, latitude, longitude, radiusMeters]

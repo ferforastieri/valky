@@ -19,6 +19,7 @@ class PeopleViewModel @Inject constructor(
     private val actionGate: MobileActionGate,
 ) : ViewModel() {
     val people = repository.people
+    val me = repository.me
     val places = repository.places
     private val _history = MutableStateFlow<List<PersonLocation>>(emptyList())
     val history = _history.asStateFlow()
@@ -26,11 +27,17 @@ class PeopleViewModel @Inject constructor(
     val busy = _busy.asStateFlow()
 
     init { refresh() }
-    fun refresh() = viewModelScope.launch { runCatching { repository.refreshUsers() }; runCatching { repository.refreshPlaces() } }
+    fun refresh() = viewModelScope.launch {
+        runCatching { repository.refreshUsers() }
+        runCatching { repository.refreshMe() }
+        runCatching { repository.refreshPlaces() }
+    }
     fun history(person: TrackedPerson) = viewModelScope.launch { _history.value = runCatching { repository.api.userHistory(person.id) }.getOrDefault(emptyList()) }
     fun createPerson(person: TrackedPerson, done: (Boolean) -> Unit) = action(done) { repository.createPerson(person) }
     fun updatePerson(person: TrackedPerson, done: (Boolean) -> Unit) = action(done) { repository.updatePerson(person.id, person) }
     fun deletePerson(person: TrackedPerson, done: (Boolean) -> Unit = {}) = action(done) { repository.deletePerson(person.id) }
+    fun updateMe(person: TrackedPerson, done: (Boolean) -> Unit) = action(done) { repository.updateMe(person) }
+    fun updateUser(person: TrackedPerson, done: (Boolean) -> Unit) = action(done) { repository.updateUser(person.id, person) }
     fun createPlace(place: TrackedPlace, done: (Boolean) -> Unit) = action(done) { repository.createPlace(place) }
     fun updatePlace(place: TrackedPlace, done: (Boolean) -> Unit) = action(done) { repository.updatePlace(place.id, place) }
     fun deletePlace(place: TrackedPlace, done: (Boolean) -> Unit = {}) = action(done) { repository.deletePlace(place.id) }

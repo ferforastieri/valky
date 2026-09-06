@@ -48,6 +48,7 @@ import com.composables.icons.lucide.Lucide
 import com.composables.icons.lucide.TriangleAlert
 import com.ferforastieri.valkyris.R
 import com.ferforastieri.valkyris.core.design.ValkyrisBottomSheet
+import com.ferforastieri.valkyris.feature.people.LocationTrackingService
 
 @Composable
 fun StartupAlertPermissions() {
@@ -62,6 +63,8 @@ fun StartupAlertPermissions() {
         refresh++
         dialogVisible = true
     }
+    val backgroundLocationRequest = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { refresh++; dialogVisible = true }
+    val foregroundLocationRequest = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { refresh++; dialogVisible = true }
     val firebaseAccountPicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
         uri ?: return@rememberLauncherForActivityResult
         runCatching {
@@ -79,9 +82,16 @@ fun StartupAlertPermissions() {
     val fullScreenAllowed = Build.VERSION.SDK_INT < 34 || manager.canUseFullScreenIntent()
     val dndAllowed = manager.isNotificationPolicyAccessGranted
     val firebaseConfigured = pushConfiguration.configured
-    val missingCount = listOf(notificationsAllowed, fullScreenAllowed, dndAllowed, firebaseConfigured).count { !it }
+    val foregroundLocationAllowed = ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED
+    val backgroundLocationAllowed = Build.VERSION.SDK_INT < Build.VERSION_CODES.Q || ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_BACKGROUND_LOCATION) == PackageManager.PERMISSION_GRANTED
+    val locationAllowed = foregroundLocationAllowed && backgroundLocationAllowed
+    val missingCount = listOf(notificationsAllowed, fullScreenAllowed, dndAllowed, firebaseConfigured, locationAllowed).count { !it }
 
-    LaunchedEffect(notificationsAllowed, firebaseConfigured, pushConfiguration.loading, startupHandled) {
+    LaunchedEffect(locationAllowed) {
+        if (locationAllowed) LocationTrackingService.start(context)
+    }
+
+    LaunchedEffect(notificationsAllowed, firebaseConfigured, locationAllowed, pushConfiguration.loading, startupHandled) {
         if (!startupHandled) {
             startupHandled = true
             if (Build.VERSION.SDK_INT >= 33 && !notificationsAllowed) {
@@ -97,6 +107,7 @@ fun StartupAlertPermissions() {
     if (!dialogVisible || missingCount == 0) return
 
     val nextTitle = when {
+        !locationAllowed -> "localização em segundo plano"
         !notificationsAllowed -> stringResource(R.string.notification_permission)
         !fullScreenAllowed -> stringResource(R.string.full_screen_alarms)
         else -> stringResource(R.string.do_not_disturb_access)
@@ -109,6 +120,10 @@ fun StartupAlertPermissions() {
             Button(
                 onClick = {
                     when {
+                        !foregroundLocationAllowed -> foregroundLocationRequest.launch(Manifest.permission.ACCESS_FINE_LOCATION)
+                        Build.VERSION.SDK_INT == Build.VERSION_CODES.Q && !backgroundLocationAllowed -> backgroundLocationRequest.launch(Manifest.permission.ACCESS_BACKGROUND_LOCATION)
+                        Build.VERSION.SDK_INT >= Build.VERSION_CODES.R && !backgroundLocationAllowed -> context.startActivity(Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).setData(Uri.parse("package:${context.packageName}")))
+                        !locationAllowed -> LocationTrackingService.start(context)
                         !firebaseConfigured -> firebaseAccountPicker.launch(arrayOf("application/json", "text/json"))
                         Build.VERSION.SDK_INT >= 33 && !notificationsAllowed ->
                             notificationRequest.launch(Manifest.permission.POST_NOTIFICATIONS)
@@ -121,7 +136,15 @@ fun StartupAlertPermissions() {
                     }
                 },
                 enabled = !pushConfiguration.saving,
-            ) { Text(if (!firebaseConfigured) stringResource(R.string.upload_firebase_account) else stringResource(R.string.configure_permission, nextTitle)) }
+            ) {
+                Text(
+                    when {
+                        !locationAllowed -> stringResource(R.string.configure_permission, nextTitle)
+                        !firebaseConfigured -> stringResource(R.string.upload_firebase_account)
+                        else -> stringResource(R.string.configure_permission, nextTitle)
+                    },
+                )
+            }
             if (firebaseConfigured) TextButton({ dialogVisible = false }) { Text(stringResource(R.string.not_now)) }
         },
     ) {
@@ -143,6 +166,7 @@ fun StartupAlertPermissions() {
             PermissionRow(stringResource(R.string.full_screen_alarms), fullScreenAllowed)
             PermissionRow(stringResource(R.string.do_not_disturb_access), dndAllowed)
             PermissionRow(stringResource(R.string.firebase_service_account), firebaseConfigured)
+            PermissionRow("Localização em segundo plano", locationAllowed)
         }
     }
 }

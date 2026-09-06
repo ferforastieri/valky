@@ -3,6 +3,8 @@ package com.ferforastieri.valkyris.navigation
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.clickable
+import androidx.compose.animation.EnterTransition
+import androidx.compose.animation.ExitTransition
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.input.pointer.pointerInput
@@ -175,6 +177,10 @@ private fun ConnectedValkyrisApp(main: MainViewModel) {
             navController = nav,
             startDestination = "overview",
             modifier = contentModifier,
+            enterTransition = { EnterTransition.None },
+            exitTransition = { ExitTransition.None },
+            popEnterTransition = { EnterTransition.None },
+            popExitTransition = { ExitTransition.None },
         ) {
             composable("overview") {
                 OverviewScreen(
