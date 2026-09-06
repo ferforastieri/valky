@@ -1,6 +1,7 @@
 package com.ferforastieri.valkyris.feature.people
 
 import android.Manifest
+import android.annotation.SuppressLint
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.Service
@@ -41,6 +42,7 @@ class LocationTrackingService : Service(), LocationListener {
         createChannel()
     }
 
+    @SuppressLint("MissingPermission") // guarded by hasLocationPermission immediately below
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         personId = intent?.getStringExtra(EXTRA_PERSON_ID).orEmpty().ifBlank { preferences.getString(EXTRA_PERSON_ID, "").orEmpty() }
         if (personId.isBlank() || !hasLocationPermission()) { stopSelf(); return START_NOT_STICKY }
