@@ -12,7 +12,6 @@ import (
 	"os/exec"
 	"path/filepath"
 	"regexp"
-	"sort"
 	"strings"
 	"sync"
 	"time"
@@ -257,16 +256,26 @@ func (m *Manager) MaterializeRecentClip(ctx context.Context, cameraID string, du
 	if duration <= 0 || duration > time.Minute {
 		return fmt.Errorf("recent clip duration must be between 0 and 60 seconds")
 	}
-	if !mediaPathID.MatchString(cameraID) {
-		return fmt.Errorf("invalid camera ID for media path")
-	}
 	// Keep a small distance from the live edge: MediaMTX can only serve parts
 	// that have already been finalized. Its playback server assembles those
 	// fMP4 fragments into a standard MP4, avoiding fragile filesystem concat.
 	end := time.Now().UTC().Add(-3 * time.Second)
+	return m.materializePlayback(ctx, cameraID, end.Add(-duration), duration, output)
+}
+
+// materializePlayback asks MediaMTX to assemble the recording timeline. It is
+// used for both manual and rule-triggered clips: directly concatenating fMP4
+// fragments is unreliable when a segment is still being finalized.
+func (m *Manager) materializePlayback(ctx context.Context, cameraID string, start time.Time, duration time.Duration, output string) error {
+	if !mediaPathID.MatchString(cameraID) {
+		return fmt.Errorf("invalid camera ID for media path")
+	}
+	if duration <= 0 {
+		return fmt.Errorf("invalid clip window")
+	}
 	query := url.Values{
 		"path":     {"camera-" + cameraID},
-		"start":    {end.Add(-duration).Format(time.RFC3339Nano)},
+		"start":    {start.UTC().Format(time.RFC3339Nano)},
 		"duration": {fmt.Sprintf("%.3f", duration.Seconds())},
 		"format":   {"mp4"},
 	}
@@ -282,6 +291,9 @@ func (m *Manager) MaterializeRecentClip(ctx context.Context, cameraID string, du
 	if resp.StatusCode/100 != 2 {
 		body, _ := io.ReadAll(io.LimitReader(resp.Body, 4<<10))
 		return mediaMTXResponseError(resp.Status, body, "")
+	}
+	if err := os.MkdirAll(filepath.Dir(output), 0o700); err != nil {
+		return err
 	}
 	file, err := os.OpenFile(output, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0o600)
 	if err != nil {
@@ -301,48 +313,6 @@ func (m *Manager) MaterializeRecentClip(ctx context.Context, cameraID string, du
 // MaterializeClipWindow joins all rolling fragments covering a possibly
 // extended event window. This allows detections that overlap to share one clip.
 func (m *Manager) MaterializeClipWindow(ctx context.Context, cameraID string, from, to time.Time, output string) error {
-	return m.materializeClipWindow(ctx, cameraID, from, to, output)
-}
-
-func (m *Manager) materializeClipWindow(ctx context.Context, cameraID string, from, to time.Time, output string) error {
-	dir := filepath.Join(m.recordings, "camera-"+cameraID)
-	entries, err := os.ReadDir(dir)
-	if err != nil {
-		return err
-	}
-	var files []string
-	for _, entry := range entries {
-		if entry.IsDir() {
-			continue
-		}
-		info, e := entry.Info()
-		if e == nil && info.ModTime().After(from.Add(-3*time.Second)) && info.ModTime().Before(to.Add(3*time.Second)) {
-			files = append(files, filepath.Join(dir, entry.Name()))
-		}
-	}
-	if len(files) == 0 {
-		return fmt.Errorf("no media fragments cover event window")
-	}
-	sort.Strings(files)
-	if err = os.MkdirAll(filepath.Dir(output), 0o700); err != nil {
-		return err
-	}
-	list := output + ".concat"
-	var content strings.Builder
-	for _, file := range files {
-		content.WriteString("file '")
-		content.WriteString(strings.ReplaceAll(file, "'", "'\\''"))
-		content.WriteString("'\n")
-	}
-	if err = os.WriteFile(list, []byte(content.String()), 0o600); err != nil {
-		return err
-	}
-	defer os.Remove(list)
 	duration := to.Sub(from)
-	if duration <= 0 {
-		return fmt.Errorf("invalid clip window")
-	}
-	args := []string{"-hide_banner", "-loglevel", "error", "-f", "concat", "-safe", "0", "-i", list, "-t", fmt.Sprintf("%.3f", duration.Seconds()), "-c", "copy", "-y", output}
-	cmd := exec.CommandContext(ctx, "ffmpeg", args...)
-	return cmd.Run()
+	return m.materializePlayback(ctx, cameraID, from, duration, output)
 }

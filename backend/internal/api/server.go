@@ -136,9 +136,11 @@ func (s *Server) Handler() http.Handler {
 	protected.HandleFunc("PUT /me", s.updateCurrentUser)
 	protected.HandleFunc("POST /me/location", s.reportMyLocation)
 	protected.HandleFunc("GET /places", s.listPlaces)
-	protected.Handle("POST /places", s.auth.RequireAdmin(http.HandlerFunc(s.createPlace)))
-	protected.Handle("PUT /places/{id}", s.auth.RequireAdmin(http.HandlerFunc(s.updatePlace)))
-	protected.Handle("DELETE /places/{id}", s.auth.RequireAdmin(http.HandlerFunc(s.deletePlace)))
+	// Areas belong to the shared family map. Any authenticated family phone can
+	// manage them, so selecting a point on the mobile map never fails on role.
+	protected.HandleFunc("POST /places", s.createPlace)
+	protected.HandleFunc("PUT /places/{id}", s.updatePlace)
+	protected.HandleFunc("DELETE /places/{id}", s.deletePlace)
 	protected.HandleFunc("GET /events", s.listEvents)
 	protected.HandleFunc("POST /events/acknowledge-all", s.ackAllEvents)
 	protected.HandleFunc("GET /events/{id}", s.getEvent)

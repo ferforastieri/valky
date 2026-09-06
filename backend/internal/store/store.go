@@ -44,6 +44,8 @@ func Open(path string) (*Store, error) {
 		// Devices paired by releases without roles were trusted setup devices.
 		{"devices", "is_admin", `ALTER TABLE devices ADD COLUMN is_admin INTEGER NOT NULL DEFAULT 0`, `UPDATE devices SET is_admin=1`},
 		{"devices", "user_id", `ALTER TABLE devices ADD COLUMN user_id TEXT REFERENCES users(id) ON DELETE SET NULL`, ""},
+		{"events", "clip_status", `ALTER TABLE events ADD COLUMN clip_status TEXT NOT NULL DEFAULT 'not_requested'`, `UPDATE events SET clip_status=CASE WHEN clip_path IS NULL OR clip_path='' THEN 'not_requested' ELSE 'ready' END`},
+		{"events", "clip_error", `ALTER TABLE events ADD COLUMN clip_error TEXT`, ""},
 	} {
 		exists, migrationErr := columnExists(ctx, db, migration.table, migration.column)
 		if migrationErr != nil {
@@ -178,11 +180,11 @@ func migrateEventsForTracking(ctx context.Context, db *sql.DB) error {
 			source TEXT NOT NULL DEFAULT 'camera',
 			subject_id TEXT NOT NULL DEFAULT '',
 			type TEXT NOT NULL, confidence REAL NOT NULL, occurred_at TEXT NOT NULL,
-			snapshot_path TEXT, clip_path TEXT, metadata_json TEXT NOT NULL DEFAULT '{}',
+			snapshot_path TEXT, clip_path TEXT, clip_status TEXT NOT NULL DEFAULT 'not_requested', clip_error TEXT, metadata_json TEXT NOT NULL DEFAULT '{}',
 			acknowledged_at TEXT, acknowledged_by TEXT, created_at TEXT NOT NULL
 		)`,
-		`INSERT INTO events(id,camera_id,rule_id,source,subject_id,type,confidence,occurred_at,snapshot_path,clip_path,metadata_json,acknowledged_at,acknowledged_by,created_at)
-		 SELECT id,camera_id,rule_id,'camera','',type,confidence,occurred_at,snapshot_path,clip_path,metadata_json,acknowledged_at,acknowledged_by,created_at FROM events_legacy`,
+		`INSERT INTO events(id,camera_id,rule_id,source,subject_id,type,confidence,occurred_at,snapshot_path,clip_path,clip_status,clip_error,metadata_json,acknowledged_at,acknowledged_by,created_at)
+		 SELECT id,camera_id,rule_id,'camera','',type,confidence,occurred_at,snapshot_path,clip_path,CASE WHEN clip_path IS NULL OR clip_path='' THEN 'not_requested' ELSE 'ready' END,NULL,metadata_json,acknowledged_at,acknowledged_by,created_at FROM events_legacy`,
 		`CREATE INDEX idx_events_occurred ON events(occurred_at DESC)`,
 		`CREATE TABLE push_deliveries (
 			id TEXT PRIMARY KEY, event_id TEXT NOT NULL REFERENCES events(id) ON DELETE CASCADE,

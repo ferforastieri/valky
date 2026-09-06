@@ -52,7 +52,11 @@ func (s *Service) Submit(ctx context.Context, d rules.Detection) ([]event.Event,
 		}
 		d.Metadata["alarm"] = rule.Actions.Alarm
 		ruleID := rule.ID
-		e, err := s.Events.Create(ctx, event.Event{CameraID: d.CameraID, RuleID: &ruleID, Type: d.Type, Confidence: d.Confidence, OccurredAt: d.OccurredAt, Metadata: d.Metadata})
+		clipStatus := "not_requested"
+		if rule.Actions.Record {
+			clipStatus = "processing"
+		}
+		e, err := s.Events.Create(ctx, event.Event{CameraID: d.CameraID, RuleID: &ruleID, Type: d.Type, Confidence: d.Confidence, OccurredAt: d.OccurredAt, ClipStatus: clipStatus, Metadata: d.Metadata})
 		if err != nil {
 			return created, err
 		}
@@ -140,6 +144,10 @@ func (s *Service) captureClip(group *captureGroup) {
 		cancel()
 		if err != nil {
 			s.Logger.Warn("clip materialization failed", "event", ids[0], "error", err)
+			for _, id := range ids {
+				_ = s.Events.SetClipFailed(context.Background(), id, err)
+				s.Hub.Broadcast(map[string]any{"type": "event.media_ready", "eventId": id})
+			}
 			return
 		}
 		for _, id := range ids {

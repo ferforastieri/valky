@@ -87,7 +87,9 @@ class EventDetailViewModel @Inject constructor(
                 val value = runCatching { api.event(id) }.getOrNull()
                 if (value != null) {
                     _event.value = value
-                    if (value.clipPath != null) break
+                    // A clip may be intentionally absent, or its preparation can
+                    // fail. Only a pending recording needs polling.
+                    if (value.clipStatus != "processing") break
                 }
                 delay(2_000)
             }

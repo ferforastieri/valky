@@ -1252,48 +1252,34 @@ body {
 @media (max-width: 760px) {
   body {
     padding-top: 0;
-    padding-bottom: 76px;
+    padding-bottom: 88px;
   }
   .floating-dock {
     top: auto;
-    bottom: 8px;
-    width: calc(100% - 16px);
+    bottom: 18px;
+    width: auto;
     min-height: 56px;
-    padding: 6px;
-    display: grid;
-    grid-template-columns: 36px minmax(0, 1fr) auto;
-    gap: 4px;
-    border-radius: 19px;
+    padding: 6px 7px;
+    display: flex;
+    gap: 0;
+    border-radius: 30px;
   }
-  .dock-brand {
-    border-right: 0;
-    padding: 0;
-    min-width: 0;
-  }
-  .dock-brand .brand-mark {
-    width: 36px;
-    height: 36px;
-    border-radius: 11px;
-  }
-  .dock-brand .brand-mark img {
-    width: 34px;
-    height: 34px;
-  }
-  .dock-identity {
-    display: none;
-  }
+  .dock-brand,
+  .dock-actions { display: none; }
   .dock-links {
-    display: grid;
-    grid-template-columns: repeat(4, minmax(0, 1fr));
-    gap: 2px;
-    width: 100%;
+    display: flex;
+    flex: 0 0 auto;
+    gap: 6px;
+    width: auto;
   }
   .dock-link {
-    min-width: 0;
-    min-height: 42px;
+    width: 44px;
+    min-width: 44px;
+    min-height: 44px;
+    height: 44px;
     padding: 0;
     gap: 0;
-    border-radius: 11px;
+    border-radius: 50%;
   }
   .dock-link span {
     display: none;
@@ -1301,22 +1287,6 @@ body {
   .dock-link svg {
     width: 19px;
     height: 19px;
-  }
-  .dock-actions {
-    justify-self: end;
-    gap: 2px;
-    padding: 0;
-  }
-  .dock-actions .icon-button {
-    width: 36px;
-    height: 42px;
-    border: 0;
-    background: transparent;
-    box-shadow: none;
-  }
-  .dock-actions .icon-button svg {
-    width: 18px;
-    height: 18px;
   }
 }
 

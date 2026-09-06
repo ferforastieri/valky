@@ -21,6 +21,8 @@ type Event struct {
 	OccurredAt     time.Time      `json:"occurredAt"`
 	SnapshotPath   string         `json:"snapshotPath,omitempty"`
 	ClipPath       string         `json:"clipPath,omitempty"`
+	ClipStatus     string         `json:"clipStatus"`
+	ClipError      string         `json:"clipError,omitempty"`
 	Metadata       map[string]any `json:"metadata"`
 	AcknowledgedAt *time.Time     `json:"acknowledgedAt,omitempty"`
 	AcknowledgedBy string         `json:"acknowledgedBy,omitempty"`
@@ -38,16 +40,19 @@ func (s *Service) Create(ctx context.Context, e Event) (Event, error) {
 	if e.Source == "" {
 		e.Source = "camera"
 	}
+	if e.ClipStatus == "" {
+		e.ClipStatus = "not_requested"
+	}
 	meta, _ := json.Marshal(e.Metadata)
 	var rule any
 	if e.RuleID != nil {
 		rule = *e.RuleID
 	}
-	_, err := s.store.DB.ExecContext(ctx, `INSERT INTO events(id,camera_id,rule_id,source,subject_id,type,confidence,occurred_at,snapshot_path,clip_path,metadata_json,created_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?)`, e.ID, nullable(e.CameraID), rule, e.Source, e.SubjectID, e.Type, e.Confidence, e.OccurredAt.Format(time.RFC3339Nano), nullable(e.SnapshotPath), nullable(e.ClipPath), string(meta), e.CreatedAt.Format(time.RFC3339Nano))
+	_, err := s.store.DB.ExecContext(ctx, `INSERT INTO events(id,camera_id,rule_id,source,subject_id,type,confidence,occurred_at,snapshot_path,clip_path,clip_status,clip_error,metadata_json,created_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?)`, e.ID, nullable(e.CameraID), rule, e.Source, e.SubjectID, e.Type, e.Confidence, e.OccurredAt.Format(time.RFC3339Nano), nullable(e.SnapshotPath), nullable(e.ClipPath), e.ClipStatus, nullable(e.ClipError), string(meta), e.CreatedAt.Format(time.RFC3339Nano))
 	return e, err
 }
 func (s *Service) SetMedia(ctx context.Context, id, snapshot, clip string) error {
-	_, err := s.store.DB.ExecContext(ctx, `UPDATE events SET snapshot_path=?,clip_path=? WHERE id=?`, nullable(snapshot), nullable(clip), id)
+	_, err := s.store.DB.ExecContext(ctx, `UPDATE events SET snapshot_path=?,clip_path=?,clip_status=CASE WHEN ?='' THEN clip_status ELSE 'ready' END,clip_error=NULL WHERE id=?`, nullable(snapshot), nullable(clip), clip, id)
 	return err
 }
 func (s *Service) SetSnapshot(ctx context.Context, id, snapshot string) error {
@@ -55,14 +60,25 @@ func (s *Service) SetSnapshot(ctx context.Context, id, snapshot string) error {
 	return err
 }
 func (s *Service) SetClip(ctx context.Context, id, clip string) error {
-	_, err := s.store.DB.ExecContext(ctx, `UPDATE events SET clip_path=? WHERE id=?`, nullable(clip), id)
+	_, err := s.store.DB.ExecContext(ctx, `UPDATE events SET clip_path=?,clip_status='ready',clip_error=NULL WHERE id=?`, nullable(clip), id)
+	return err
+}
+func (s *Service) SetClipFailed(ctx context.Context, id string, cause error) error {
+	message := "Não foi possível preparar o clipe."
+	if cause != nil && cause.Error() != "" {
+		message = cause.Error()
+		if len(message) > 240 {
+			message = message[:240]
+		}
+	}
+	_, err := s.store.DB.ExecContext(ctx, `UPDATE events SET clip_status='failed',clip_error=? WHERE id=?`, message, id)
 	return err
 }
 func (s *Service) List(ctx context.Context, cameraID string, limit int) ([]Event, error) {
 	if limit < 1 || limit > 200 {
 		limit = 50
 	}
-	q := `SELECT id,camera_id,rule_id,source,subject_id,type,confidence,occurred_at,snapshot_path,clip_path,metadata_json,acknowledged_at,acknowledged_by,created_at FROM events`
+	q := `SELECT id,camera_id,rule_id,source,subject_id,type,confidence,occurred_at,snapshot_path,clip_path,clip_status,clip_error,metadata_json,acknowledged_at,acknowledged_by,created_at FROM events`
 	var args []any
 	if cameraID != "" {
 		q += " WHERE camera_id=?"
@@ -86,7 +102,7 @@ func (s *Service) List(ctx context.Context, cameraID string, limit int) ([]Event
 	return out, rows.Err()
 }
 func (s *Service) Get(ctx context.Context, id string) (Event, error) {
-	return scan(s.store.DB.QueryRowContext(ctx, `SELECT id,camera_id,rule_id,source,subject_id,type,confidence,occurred_at,snapshot_path,clip_path,metadata_json,acknowledged_at,acknowledged_by,created_at FROM events WHERE id=?`, id))
+	return scan(s.store.DB.QueryRowContext(ctx, `SELECT id,camera_id,rule_id,source,subject_id,type,confidence,occurred_at,snapshot_path,clip_path,clip_status,clip_error,metadata_json,acknowledged_at,acknowledged_by,created_at FROM events WHERE id=?`, id))
 }
 func (s *Service) Acknowledge(ctx context.Context, id, device string) error {
 	result, err := s.store.DB.ExecContext(ctx, `UPDATE events SET acknowledged_at=?,acknowledged_by=? WHERE id=?`, time.Now().UTC().Format(time.RFC3339Nano), device, id)
@@ -112,10 +128,10 @@ type scanner interface{ Scan(...any) error }
 
 func scan(row scanner) (Event, error) {
 	var e Event
-	var cameraID, rule, snapshot, clip, ack, ackBy sql.NullString
+	var cameraID, rule, snapshot, clip, clipStatus, clipError, ack, ackBy sql.NullString
 	var source, subjectID string
 	var occurred, created, meta string
-	err := row.Scan(&e.ID, &cameraID, &rule, &source, &subjectID, &e.Type, &e.Confidence, &occurred, &snapshot, &clip, &meta, &ack, &ackBy, &created)
+	err := row.Scan(&e.ID, &cameraID, &rule, &source, &subjectID, &e.Type, &e.Confidence, &occurred, &snapshot, &clip, &clipStatus, &clipError, &meta, &ack, &ackBy, &created)
 	if err != nil {
 		return e, err
 	}
@@ -127,6 +143,8 @@ func scan(row scanner) (Event, error) {
 	e.SubjectID = subjectID
 	e.SnapshotPath = snapshot.String
 	e.ClipPath = clip.String
+	e.ClipStatus = clipStatus.String
+	e.ClipError = clipError.String
 	e.AcknowledgedAt = store.NullTime(ack)
 	e.AcknowledgedBy = ackBy.String
 	e.OccurredAt, _ = time.Parse(time.RFC3339Nano, occurred)

@@ -43,12 +43,10 @@ import org.osmdroid.views.overlay.Polygon
 @Composable
 fun PeopleScreen(vm: PeopleViewModel = hiltViewModel()) {
     val users by vm.people.collectAsStateWithLifecycle()
-    val me by vm.me.collectAsStateWithLifecycle()
     val places by vm.places.collectAsStateWithLifecycle()
     val history by vm.history.collectAsStateWithLifecycle()
     val busy by vm.busy.collectAsStateWithLifecycle()
     var placeEditor by remember { mutableStateOf<TrackedPlace?>(null) }
-    var editingUser by remember { mutableStateOf<TrackedPerson?>(null) }
     var historyUser by remember { mutableStateOf<TrackedPerson?>(null) }
     var selectingArea by remember { mutableStateOf(false) }
 
@@ -74,11 +72,10 @@ fun PeopleScreen(vm: PeopleViewModel = hiltViewModel()) {
                                 Text("Família", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold)
                                 Text("Perfis vinculados aos dispositivos autorizados", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                             }
-                            me?.let { user -> IconButton(onClick = { editingUser = user }) { Icon(Lucide.SlidersHorizontal, "Editar meu perfil") } }
                         }
                     }
                     if (users.isEmpty()) item { EmptyUsers() }
-                    items(users, key = { it.id }) { user -> UserCard(user, canEdit = user.id == me?.id, onEdit = { editingUser = user }) { historyUser = user; vm.history(user) } }
+                    items(users, key = { it.id }) { user -> UserCard(user) { historyUser = user; vm.history(user) } }
                     if (places.isNotEmpty()) {
                         item { Text("Áreas", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold, modifier = Modifier.padding(top = 5.dp)) }
                         items(places, key = { it.id }) { place ->
@@ -101,7 +98,6 @@ fun PeopleScreen(vm: PeopleViewModel = hiltViewModel()) {
         val done: (Boolean) -> Unit = { if (it) placeEditor = null }
         if (value.id.isBlank()) vm.createPlace(value, done) else vm.updatePlace(value, done)
     } }
-    editingUser?.let { user -> UserEditor(user, busy, { editingUser = null }) { value -> vm.updateMe(value) { if (it) editingUser = null } } }
     historyUser?.let { user -> HistorySheet(user, history) { historyUser = null } }
 }
 
@@ -156,14 +152,13 @@ private fun EmptyUsers() = Surface(shape = MaterialTheme.shapes.large, color = M
 }
 
 @Composable
-private fun UserCard(user: TrackedPerson, canEdit: Boolean, onEdit: () -> Unit, onHistory: () -> Unit) = Card(modifier = Modifier.fillMaxWidth(), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface), border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)) {
+private fun UserCard(user: TrackedPerson, onHistory: () -> Unit) = Card(modifier = Modifier.fillMaxWidth(), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface), border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)) {
     Row(Modifier.padding(15.dp), verticalAlignment = Alignment.CenterVertically) {
         Surface(shape = MaterialTheme.shapes.medium, color = MaterialTheme.colorScheme.primaryContainer) { Icon(Lucide.UserRound, null, Modifier.padding(11.dp).size(22.dp), tint = MaterialTheme.colorScheme.primary) }
         Spacer(Modifier.width(12.dp)); Column(Modifier.weight(1f)) {
             Text(user.name, fontWeight = FontWeight.SemiBold)
             Text(user.lastLocatedAt?.let { "Atualizado ${formatTime(it)}" } ?: "Ainda sem localização", color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodySmall)
         }
-        if (canEdit) IconButton(onClick = onEdit) { Icon(Lucide.SlidersHorizontal, "Editar perfil") }
         IconButton(onClick = onHistory) { Icon(Lucide.History, "Histórico de localização") }
     }
 }
@@ -179,25 +174,6 @@ private fun PlaceEditor(initial: TrackedPlace, busy: Boolean, onDismiss: () -> U
             OutlinedTextField(name, { name = it }, label = { Text("Nome") }, singleLine = true, modifier = Modifier.fillMaxWidth())
             Text("O ponto foi escolhido no mapa. Você pode ajustar apenas o raio da área.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             OutlinedTextField(radius, { radius = it.filter(Char::isDigit) }, label = { Text("Raio em metros") }, singleLine = true, modifier = Modifier.fillMaxWidth())
-        }
-    }
-}
-
-@Composable
-private fun UserEditor(initial: TrackedPerson, busy: Boolean, onDismiss: () -> Unit, onSave: (TrackedPerson) -> Unit) {
-    var name by remember(initial.id) { mutableStateOf(initial.name) }
-    ValkyrisBottomSheet(
-        title = "Editar perfil",
-        onDismiss = onDismiss,
-        dismissEnabled = !busy,
-        actions = {
-            TextButton(onClick = onDismiss, enabled = !busy) { Text("Cancelar") }
-            Button(onClick = { onSave(initial.copy(name = name.trim())) }, enabled = !busy && name.isNotBlank()) { Text("Salvar") }
-        },
-    ) {
-        Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-            OutlinedTextField(name, { name = it }, label = { Text("Nome") }, singleLine = true, modifier = Modifier.fillMaxWidth())
-            Text("Este perfil está vinculado a este celular.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
     }
 }

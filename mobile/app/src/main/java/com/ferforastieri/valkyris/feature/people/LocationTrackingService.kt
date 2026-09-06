@@ -76,7 +76,7 @@ class LocationTrackingService : Service(), LocationListener {
     override fun onBind(intent: Intent?): IBinder? = null
     private fun hasLocationPermission() = ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED
     private fun createChannel() { (getSystemService(NotificationManager::class.java)).createNotificationChannel(NotificationChannel(CHANNEL_ID, "Rastreamento Valkyris", NotificationManager.IMPORTANCE_LOW)) }
-    private fun notification() = NotificationCompat.Builder(this, CHANNEL_ID).setSmallIcon(R.drawable.ic_launcher).setContentTitle("Rastreamento ativo").setContentText("O Valkyris está registrando a localização deste telefone.").setOngoing(true).build()
+    private fun notification() = NotificationCompat.Builder(this, CHANNEL_ID).setSmallIcon(R.drawable.ic_notification).setContentTitle("Rastreamento ativo").setContentText("O Valkyris está registrando a localização deste telefone.").setOngoing(true).build()
 
     companion object {
         private const val CHANNEL_ID = "location-tracking"

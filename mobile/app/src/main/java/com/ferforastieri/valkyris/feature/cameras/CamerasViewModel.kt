@@ -72,7 +72,7 @@ class CamerasViewModel @Inject constructor(
         viewModelScope.launch {
             var cycles = 0
             while (isActive) {
-                delay(STATUS_REFRESH_MS)
+                delay(if (_state.value.cameras.isEmpty()) EMPTY_STATUS_REFRESH_MS else STATUS_REFRESH_MS)
                 runCatching { repository.refreshCameras() }
                 cycles++
                 if (cycles % SNAPSHOT_REFRESH_CYCLES == 0) refreshSnapshots()
@@ -95,9 +95,18 @@ class CamerasViewModel @Inject constructor(
 
     fun refresh() {
         viewModelScope.launch {
-            _state.update { it.copy(loading = it.cameras.isEmpty(), error = null) }
+            _state.update { it.copy(loading = true, error = null) }
             runCatching { repository.refreshCameras() }
-                .onSuccess { refreshSnapshots() }
+                .onSuccess { cameras ->
+                    _state.update { state ->
+                        state.copy(
+                            cameras = cameras,
+                            snapshots = state.snapshots.filterKeys { id -> cameras.any { it.id == id } },
+                            loading = false,
+                        )
+                    }
+                    refreshSnapshots()
+                }
                 .onFailure { error -> _state.update { it.copy(loading = false, error = error.message) } }
         }
     }
@@ -171,6 +180,7 @@ class CamerasViewModel @Inject constructor(
 
     private companion object {
         const val STATUS_REFRESH_MS = 2_000L
+        const val EMPTY_STATUS_REFRESH_MS = 15_000L
         const val SNAPSHOT_REFRESH_CYCLES = 8
     }
 

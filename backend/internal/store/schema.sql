@@ -59,6 +59,8 @@ CREATE TABLE IF NOT EXISTS events (
   occurred_at TEXT NOT NULL,
   snapshot_path TEXT,
   clip_path TEXT,
+  clip_status TEXT NOT NULL DEFAULT 'not_requested',
+  clip_error TEXT,
   metadata_json TEXT NOT NULL DEFAULT '{}',
   acknowledged_at TEXT,
   acknowledged_by TEXT,

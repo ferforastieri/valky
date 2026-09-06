@@ -32,7 +32,7 @@ fun EventDetailScreen(vm: EventDetailViewModel = hiltViewModel()) {
     val event by vm.event.collectAsStateWithLifecycle()
     val context = androidx.compose.ui.platform.LocalContext.current
     val player = remember(event?.clipPath) {
-        event?.takeIf { it.clipPath != null }?.let {
+        event?.takeIf { !it.clipPath.isNullOrBlank() }?.let {
             val data = OkHttpDataSource.Factory(vm.httpClient()).setDefaultRequestProperties(mapOf("Authorization" to ("Bearer " + vm.token())))
             ExoPlayer.Builder(context).build().apply {
                 setMediaSource(ProgressiveMediaSource.Factory(data).createMediaSource(MediaItem.fromUri(vm.clipUrl())))
@@ -58,11 +58,16 @@ fun EventDetailScreen(vm: EventDetailViewModel = hiltViewModel()) {
                 }
             }
         } else Surface(Modifier.fillMaxWidth().aspectRatio(16 / 9f), RoundedCornerShape(22.dp), color = MaterialTheme.colorScheme.surface, border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant), shadowElevation = 5.dp) {
-            if (player == null) {
+            if (player == null && value.clipStatus == "processing") {
                 Column(Modifier.fillMaxSize(), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center) {
                     CircularProgressIndicator(Modifier.size(30.dp), strokeWidth = 3.dp)
                     Spacer(Modifier.height(12.dp))
                     Text(stringResource(R.string.media_processing), color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+            } else if (player == null) {
+                Column(Modifier.fillMaxSize().padding(22.dp), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center) {
+                    Text(if (value.clipStatus == "failed") "Não foi possível preparar o clipe." else "Este alerta não tem clipe salvo.", fontWeight = FontWeight.SemiBold)
+                    value.clipError?.takeIf { it.isNotBlank() }?.let { Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant) }
                 }
             } else {
                 AndroidView(factory = { PlayerView(it).apply { this.player = player; useController = true; layoutParams = ViewGroup.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT) } }, modifier = Modifier.fillMaxSize())
