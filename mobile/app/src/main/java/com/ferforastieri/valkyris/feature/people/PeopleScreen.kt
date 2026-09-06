@@ -22,6 +22,7 @@ import com.composables.icons.lucide.History
 import com.composables.icons.lucide.Lucide
 import com.composables.icons.lucide.MapPin
 import com.composables.icons.lucide.Plus
+import com.composables.icons.lucide.SlidersHorizontal
 import com.composables.icons.lucide.UserRound
 import com.ferforastieri.valkyris.core.design.ValkyrisBottomSheet
 import com.ferforastieri.valkyris.core.model.PersonLocation
