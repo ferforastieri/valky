@@ -28,6 +28,8 @@ import com.composables.icons.lucide.Mic
 import com.composables.icons.lucide.Video
 import com.ferforastieri.valkyris.R
 import com.ferforastieri.valkyris.core.model.ValkyrisEvent
+import kotlinx.serialization.json.contentOrNull
+import kotlinx.serialization.json.jsonPrimitive
 import java.time.Instant
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
@@ -88,12 +90,12 @@ private fun EventCard(event: ValkyrisEvent, onOpen: () -> Unit, onCamera: () -> 
             }
             Spacer(Modifier.width(12.dp))
             Column(Modifier.weight(1f)) {
-                Text(stringResource(com.ferforastieri.valkyris.core.model.detectorLabelRes(event.type)), fontWeight = FontWeight.SemiBold)
+                Text(eventTitle(event), fontWeight = FontWeight.SemiBold)
                 Text(formatTime(event.occurredAt), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                Text((event.confidence * 100).toInt().toString() + "% confidence", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                if (event.source != "tracking") Text((event.confidence * 100).toInt().toString() + "% confidence", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
             Row(horizontalArrangement = Arrangement.spacedBy(2.dp), verticalAlignment = Alignment.CenterVertically) {
-                IconButton(onCamera) { Icon(Lucide.Video, stringResource(R.string.open_camera)) }
+                if (event.cameraId.isNotBlank()) IconButton(onCamera) { Icon(Lucide.Video, stringResource(R.string.open_camera)) }
                 if (event.acknowledgedAt == null) IconButton(onAck) { Icon(Lucide.Check, stringResource(R.string.acknowledge)) }
             }
         }
@@ -101,6 +103,7 @@ private fun EventCard(event: ValkyrisEvent, onOpen: () -> Unit, onCamera: () -> 
 }
 
 private fun eventIcon(type: String) = when {
+    type.startsWith("place_") -> Lucide.Bell
     type.contains("mov", ignoreCase = true) || type.contains("motion", ignoreCase = true) -> Lucide.Video
     type.contains("camp", ignoreCase = true) || type.contains("door", ignoreCase = true) -> Lucide.Bell
     else -> Lucide.Mic
@@ -109,3 +112,10 @@ private fun eventIcon(type: String) = when {
 private fun formatTime(value: String) = runCatching {
     DateTimeFormatter.ofPattern("dd MMM · HH:mm").withZone(ZoneId.systemDefault()).format(Instant.parse(value))
 }.getOrDefault(value)
+
+@Composable private fun eventTitle(event: ValkyrisEvent): String {
+    if (event.source != "tracking") return stringResource(com.ferforastieri.valkyris.core.model.detectorLabelRes(event.type))
+    val person = event.metadata["personName"]?.jsonPrimitive?.contentOrNull ?: "Pessoa"
+    val place = event.metadata["placeName"]?.jsonPrimitive?.contentOrNull ?: "uma área"
+    return if (event.type == "place_entered") "$person entrou em $place" else "$person saiu de $place"
+}

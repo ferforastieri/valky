@@ -62,6 +62,7 @@ import com.ferforastieri.valkyris.core.design.ColorTokens
 import com.ferforastieri.valkyris.core.design.cameraIcon
 import com.ferforastieri.valkyris.core.model.Camera
 import com.ferforastieri.valkyris.core.model.CreateCameraRequest
+import com.ferforastieri.valkyris.feature.rules.CameraRulesSection
 import com.composables.icons.lucide.Aperture
 import com.composables.icons.lucide.ChevronDown
 import com.composables.icons.lucide.ChevronLeft
@@ -455,6 +456,7 @@ private fun ReadyCameraContent(camera: Camera, vm: CameraLiveViewModel) {
         } else {
             Surface(Modifier.fillMaxWidth(),RoundedCornerShape(18.dp),MaterialTheme.colorScheme.surfaceVariant) { Text(stringResource(R.string.fixed_camera),Modifier.padding(16.dp),style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant) }
         }
+        CameraRulesSection(camera.id)
         Spacer(Modifier.height(18.dp))
     }
     if(showFullscreen) FullscreenLivePlayer(player,preview,renderedFirstFrame,camera.name,onDismiss={showFullscreen=false})

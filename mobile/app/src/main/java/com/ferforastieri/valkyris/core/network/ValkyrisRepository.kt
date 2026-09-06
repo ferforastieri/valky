@@ -4,6 +4,8 @@ import com.ferforastieri.valkyris.core.model.Camera
 import com.ferforastieri.valkyris.core.model.CreateCameraRequest
 import com.ferforastieri.valkyris.core.model.Rule
 import com.ferforastieri.valkyris.core.model.ValkyrisEvent
+import com.ferforastieri.valkyris.core.model.TrackedPerson
+import com.ferforastieri.valkyris.core.model.TrackedPlace
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -22,6 +24,10 @@ class ValkyrisRepository @Inject constructor(
     val events = _events.asStateFlow()
     private val _rules = MutableStateFlow<List<Rule>>(emptyList())
     val rules = _rules.asStateFlow()
+    private val _people = MutableStateFlow<List<TrackedPerson>>(emptyList())
+    val people = _people.asStateFlow()
+    private val _places = MutableStateFlow<List<TrackedPlace>>(emptyList())
+    val places = _places.asStateFlow()
 
     suspend fun refreshCameras(): List<Camera> {
         return api.cameras().also { _cameras.value = it }
@@ -76,4 +82,13 @@ class ValkyrisRepository @Inject constructor(
         api.deleteRule(id)
         _rules.update { current -> current.filterNot { it.id == id } }
     }
+
+    suspend fun refreshPeople() = api.people().also { _people.value = it }
+    suspend fun refreshPlaces() = api.places().also { _places.value = it }
+    suspend fun createPerson(person: TrackedPerson) = api.createPerson(person).also { created -> _people.update { (it + created).distinctBy(TrackedPerson::id) } }
+    suspend fun updatePerson(id: String, person: TrackedPerson) = api.updatePerson(id, person).also { updated -> _people.update { it.map { current -> if (current.id == id) updated else current } } }
+    suspend fun deletePerson(id: String) { api.deletePerson(id); _people.update { it.filterNot { person -> person.id == id } } }
+    suspend fun createPlace(place: TrackedPlace) = api.createPlace(place).also { created -> _places.update { (it + created).distinctBy(TrackedPlace::id) } }
+    suspend fun updatePlace(id: String, place: TrackedPlace) = api.updatePlace(id, place).also { updated -> _places.update { it.map { current -> if (current.id == id) updated else current } } }
+    suspend fun deletePlace(id: String) { api.deletePlace(id); _places.update { it.filterNot { place -> place.id == id } } }
 }

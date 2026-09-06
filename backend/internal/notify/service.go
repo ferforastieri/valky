@@ -164,7 +164,7 @@ func (s *Service) Run(ctx context.Context) {
 	}
 }
 func (s *Service) deliverBatch(ctx context.Context) {
-	rows, err := s.store.DB.QueryContext(ctx, `SELECT p.id,p.attempts,d.push_endpoint_enc,d.push_secret_enc,e.id,e.camera_id,e.type,e.confidence,e.occurred_at,e.metadata_json FROM push_deliveries p JOIN devices d ON d.id=p.device_id JOIN events e ON e.id=p.event_id WHERE p.delivered_at IS NULL AND p.next_attempt_at<=? AND p.attempts<10 ORDER BY p.created_at LIMIT 20`, time.Now().UTC().Format(time.RFC3339Nano))
+	rows, err := s.store.DB.QueryContext(ctx, `SELECT p.id,p.attempts,d.push_endpoint_enc,d.push_secret_enc,e.id,COALESCE(e.camera_id,''),e.type,e.confidence,e.occurred_at,e.metadata_json FROM push_deliveries p JOIN devices d ON d.id=p.device_id JOIN events e ON e.id=p.event_id WHERE p.delivered_at IS NULL AND p.next_attempt_at<=? AND p.attempts<10 ORDER BY p.created_at LIMIT 20`, time.Now().UTC().Format(time.RFC3339Nano))
 	if err != nil {
 		return
 	}

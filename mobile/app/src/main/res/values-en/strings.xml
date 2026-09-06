@@ -226,4 +226,5 @@
     <string name="notice_camera_updated">Camera updated.</string>
     <string name="notice_rule_updated">Rule updated.</string>
     <string name="notice_rule_deleted">Rule removed.</string>
+    <string name="people">People</string>
 </resources>

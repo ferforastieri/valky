@@ -3,8 +3,9 @@ package com.ferforastieri.valkyris.core.design
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
+import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.FlowRowScope
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -21,6 +22,7 @@ import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.SheetValue
 import androidx.compose.material3.Text
 import androidx.compose.material3.rememberModalBottomSheetState
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -35,13 +37,13 @@ import com.ferforastieri.valkyris.R
  * The single modal surface used by Valkyris. It supports swipe-to-dismiss,
  * outside-tap dismissal and an explicit close action in the top-right corner.
  */
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
 fun ValkyrisBottomSheet(
     title: String,
     onDismiss: () -> Unit,
     dismissEnabled: Boolean = true,
-    actions: (@Composable RowScope.() -> Unit)? = null,
+    actions: (@Composable FlowRowScope.() -> Unit)? = null,
     content: @Composable ColumnScope.() -> Unit,
 ) {
     val sheetState = rememberModalBottomSheetState(
@@ -76,10 +78,10 @@ fun ValkyrisBottomSheet(
         }
         Column(Modifier.fillMaxWidth().padding(horizontal = 20.dp), content = content)
         if (actions != null) {
-            Row(
+            FlowRow(
                 modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 16.dp),
                 horizontalArrangement = Arrangement.spacedBy(10.dp, Alignment.End),
-                verticalAlignment = Alignment.CenterVertically,
+                verticalArrangement = Arrangement.spacedBy(8.dp),
                 content = actions,
             )
         }

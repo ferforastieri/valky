@@ -77,7 +77,58 @@ func Open(path string) (*Store, error) {
 		db.Close()
 		return nil, err
 	}
+	if err = migrateEventsForTracking(ctx, db); err != nil {
+		db.Close()
+		return nil, err
+	}
 	return &Store{DB: db}, nil
+}
+
+// Tracking events use the same notification and acknowledgement lifecycle as
+// camera events. Older databases made events.camera_id mandatory, so rebuild
+// that table once to make the relation optional while preserving every event
+// and pending push delivery.
+func migrateEventsForTracking(ctx context.Context, db *sql.DB) error {
+	exists, err := columnExists(ctx, db, "events", "source")
+	if err != nil || exists {
+		return err
+	}
+	if _, err = db.ExecContext(ctx, `PRAGMA foreign_keys=OFF`); err != nil {
+		return fmt.Errorf("disable event migration foreign keys: %w", err)
+	}
+	defer db.ExecContext(context.Background(), `PRAGMA foreign_keys=ON`)
+	queries := []string{
+		`ALTER TABLE push_deliveries RENAME TO push_deliveries_legacy`,
+		`ALTER TABLE events RENAME TO events_legacy`,
+		`CREATE TABLE events (
+			id TEXT PRIMARY KEY,
+			camera_id TEXT REFERENCES cameras(id) ON DELETE CASCADE,
+			rule_id TEXT REFERENCES rules(id) ON DELETE SET NULL,
+			source TEXT NOT NULL DEFAULT 'camera',
+			subject_id TEXT NOT NULL DEFAULT '',
+			type TEXT NOT NULL, confidence REAL NOT NULL, occurred_at TEXT NOT NULL,
+			snapshot_path TEXT, clip_path TEXT, metadata_json TEXT NOT NULL DEFAULT '{}',
+			acknowledged_at TEXT, acknowledged_by TEXT, created_at TEXT NOT NULL
+		)`,
+		`INSERT INTO events(id,camera_id,rule_id,source,subject_id,type,confidence,occurred_at,snapshot_path,clip_path,metadata_json,acknowledged_at,acknowledged_by,created_at)
+		 SELECT id,camera_id,rule_id,'camera','',type,confidence,occurred_at,snapshot_path,clip_path,metadata_json,acknowledged_at,acknowledged_by,created_at FROM events_legacy`,
+		`CREATE INDEX idx_events_occurred ON events(occurred_at DESC)`,
+		`CREATE TABLE push_deliveries (
+			id TEXT PRIMARY KEY, event_id TEXT NOT NULL REFERENCES events(id) ON DELETE CASCADE,
+			device_id TEXT NOT NULL REFERENCES devices(id) ON DELETE CASCADE, attempts INTEGER NOT NULL DEFAULT 0,
+			next_attempt_at TEXT NOT NULL, delivered_at TEXT, last_error TEXT, created_at TEXT NOT NULL
+		)`,
+		`INSERT INTO push_deliveries(id,event_id,device_id,attempts,next_attempt_at,delivered_at,last_error,created_at)
+		 SELECT id,event_id,device_id,attempts,next_attempt_at,delivered_at,last_error,created_at FROM push_deliveries_legacy`,
+		`DROP TABLE push_deliveries_legacy`,
+		`DROP TABLE events_legacy`,
+	}
+	for _, query := range queries {
+		if _, err = db.ExecContext(ctx, query); err != nil {
+			return fmt.Errorf("migrate events for tracking: %w", err)
+		}
+	}
+	return nil
 }
 
 // Confidence remains attached to detected events for observability, but it is

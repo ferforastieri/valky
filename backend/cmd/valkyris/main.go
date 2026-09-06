@@ -31,6 +31,7 @@ import (
 	"github.com/ferforastieri/valkyris/backend/internal/preferences"
 	"github.com/ferforastieri/valkyris/backend/internal/rules"
 	"github.com/ferforastieri/valkyris/backend/internal/store"
+	"github.com/ferforastieri/valkyris/backend/internal/tracking"
 	"github.com/ferforastieri/valkyris/backend/internal/updates"
 )
 
@@ -75,6 +76,7 @@ func main() {
 	apiServer.SetSubmitter(application)
 	apiServer.SetUpdates(updates.New(version, cfg.ReleaseAPI, cfg.UpdaterURL, cfg.UpdaterToken))
 	apiServer.SetPreferences(preferencesService)
+	apiServer.SetTracking(tracking.New(db))
 	ctx, cancel := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer cancel()
 	go notifyService.Run(ctx)

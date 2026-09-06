@@ -50,8 +50,10 @@ CREATE UNIQUE INDEX IF NOT EXISTS idx_rules_idempotency
 
 CREATE TABLE IF NOT EXISTS events (
   id TEXT PRIMARY KEY,
-  camera_id TEXT NOT NULL REFERENCES cameras(id) ON DELETE CASCADE,
+  camera_id TEXT REFERENCES cameras(id) ON DELETE CASCADE,
   rule_id TEXT REFERENCES rules(id) ON DELETE SET NULL,
+  source TEXT NOT NULL DEFAULT 'camera',
+  subject_id TEXT NOT NULL DEFAULT '',
   type TEXT NOT NULL,
   confidence REAL NOT NULL,
   occurred_at TEXT NOT NULL,
@@ -63,6 +65,50 @@ CREATE TABLE IF NOT EXISTS events (
   created_at TEXT NOT NULL
 );
 CREATE INDEX IF NOT EXISTS idx_events_occurred ON events(occurred_at DESC);
+
+CREATE TABLE IF NOT EXISTS people (
+  id TEXT PRIMARY KEY,
+  name TEXT NOT NULL,
+  color TEXT NOT NULL DEFAULT '#5B5BD6',
+  device_id TEXT NOT NULL DEFAULT '',
+  enabled INTEGER NOT NULL DEFAULT 1,
+  last_latitude REAL,
+  last_longitude REAL,
+  last_accuracy REAL,
+  last_located_at TEXT,
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS places (
+  id TEXT PRIMARY KEY,
+  name TEXT NOT NULL,
+  latitude REAL NOT NULL,
+  longitude REAL NOT NULL,
+  radius_meters REAL NOT NULL,
+  enabled INTEGER NOT NULL DEFAULT 1,
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS person_locations (
+  id TEXT PRIMARY KEY,
+  person_id TEXT NOT NULL REFERENCES people(id) ON DELETE CASCADE,
+  latitude REAL NOT NULL,
+  longitude REAL NOT NULL,
+  accuracy REAL NOT NULL DEFAULT 0,
+  occurred_at TEXT NOT NULL,
+  created_at TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_person_locations_person_time ON person_locations(person_id, occurred_at DESC);
+
+CREATE TABLE IF NOT EXISTS place_memberships (
+  person_id TEXT NOT NULL REFERENCES people(id) ON DELETE CASCADE,
+  place_id TEXT NOT NULL REFERENCES places(id) ON DELETE CASCADE,
+  inside INTEGER NOT NULL DEFAULT 0,
+  updated_at TEXT NOT NULL,
+  PRIMARY KEY(person_id, place_id)
+);
 
 CREATE TABLE IF NOT EXISTS devices (
   id TEXT PRIMARY KEY,

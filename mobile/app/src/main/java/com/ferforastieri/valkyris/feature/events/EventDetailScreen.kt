@@ -21,6 +21,8 @@ import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.exoplayer.source.ProgressiveMediaSource
 import androidx.media3.ui.PlayerView
 import com.ferforastieri.valkyris.R
+import kotlinx.serialization.json.contentOrNull
+import kotlinx.serialization.json.jsonPrimitive
 import java.time.Instant
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
@@ -47,7 +49,15 @@ fun EventDetailScreen(vm: EventDetailViewModel = hiltViewModel()) {
         return
     }
     Column(Modifier.fillMaxSize().padding(horizontal = 18.dp, vertical = 10.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
-        Surface(Modifier.fillMaxWidth().aspectRatio(16 / 9f), RoundedCornerShape(22.dp), color = MaterialTheme.colorScheme.surface, border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant), shadowElevation = 5.dp) {
+        if (value.source == "tracking") {
+            Surface(Modifier.fillMaxWidth(), RoundedCornerShape(22.dp), color = MaterialTheme.colorScheme.primaryContainer, border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)) {
+                Column(Modifier.padding(22.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text(if (value.type == "place_entered") "Chegou à área" else "Saiu da área", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+                    Text("${value.metadata["personName"]?.jsonPrimitive?.contentOrNull ?: "Pessoa"} · ${value.metadata["placeName"]?.jsonPrimitive?.contentOrNull ?: "Área"}", color = MaterialTheme.colorScheme.onPrimaryContainer)
+                    Text(eventTime(value.occurredAt), color = MaterialTheme.colorScheme.onPrimaryContainer)
+                }
+            }
+        } else Surface(Modifier.fillMaxWidth().aspectRatio(16 / 9f), RoundedCornerShape(22.dp), color = MaterialTheme.colorScheme.surface, border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant), shadowElevation = 5.dp) {
             if (player == null) {
                 Column(Modifier.fillMaxSize(), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center) {
                     CircularProgressIndicator(Modifier.size(30.dp), strokeWidth = 3.dp)
@@ -59,8 +69,8 @@ fun EventDetailScreen(vm: EventDetailViewModel = hiltViewModel()) {
             }
         }
         Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-            Text(stringResource(com.ferforastieri.valkyris.core.model.detectorLabelRes(value.type)), style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold)
-            Text((value.confidence * 100).toInt().toString() + "% · " + eventTime(value.occurredAt), color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Text(if (value.source == "tracking") "Alerta de localização" else stringResource(com.ferforastieri.valkyris.core.model.detectorLabelRes(value.type)), style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold)
+            Text(if (value.source == "tracking") eventTime(value.occurredAt) else (value.confidence * 100).toInt().toString() + "% · " + eventTime(value.occurredAt), color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
         if (value.acknowledgedAt == null) {
             Button(onClick = vm::acknowledge, modifier = Modifier.fillMaxWidth()) { Text(stringResource(R.string.acknowledge)) }

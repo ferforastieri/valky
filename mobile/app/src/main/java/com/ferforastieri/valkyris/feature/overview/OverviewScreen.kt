@@ -43,7 +43,7 @@ import com.composables.icons.lucide.Bell
 import com.composables.icons.lucide.Camera
 import com.composables.icons.lucide.Lucide
 import com.composables.icons.lucide.Mic
-import com.composables.icons.lucide.SlidersHorizontal
+import com.composables.icons.lucide.UserRound
 import com.composables.icons.lucide.Video
 import com.ferforastieri.valkyris.R
 import com.ferforastieri.valkyris.core.design.cameraIcon
@@ -67,6 +67,7 @@ class OverviewViewModel @Inject constructor(private val repository: ValkyrisRepo
     val state = _state.asStateFlow()
     val events = repository.events
     val rules = repository.rules
+    val people = repository.people
 
     init {
         viewModelScope.launch {
@@ -79,7 +80,7 @@ class OverviewViewModel @Inject constructor(private val repository: ValkyrisRepo
         }
     }
 
-    fun refresh() { viewModelScope.launch { runCatching { repository.refreshCameras() };runCatching { repository.refreshEvents() };runCatching { repository.refreshRules() } } }
+    fun refresh() { viewModelScope.launch { runCatching { repository.refreshCameras() };runCatching { repository.refreshEvents() };runCatching { repository.refreshRules() };runCatching { repository.refreshPeople() } } }
 }
 
 @Composable
@@ -87,32 +88,32 @@ fun OverviewScreen(
     onCamera: (String) -> Unit,
     onEvent: (String) -> Unit,
     onCameras: () -> Unit,
-    onRules: () -> Unit,
+    onPeople: () -> Unit,
     onEvents: () -> Unit,
     viewModel: OverviewViewModel = hiltViewModel(),
 ) {
     LifecycleResumeEffect(Unit) { viewModel.refresh();onPauseOrDispose {} }
     val state = viewModel.state.collectAsStateWithLifecycle().value
     val events = viewModel.events.collectAsStateWithLifecycle().value
-    val rules = viewModel.rules.collectAsStateWithLifecycle().value
+    val people = viewModel.people.collectAsStateWithLifecycle().value
     var failedCameraId by remember { mutableStateOf<String?>(null) }
     val failedCamera = state.cameras.firstOrNull { it.id == failedCameraId }
-    OverviewContent(state.cameras, rules.count { it.enabled }, events, onCamera = { id ->
+    OverviewContent(state.cameras, people.count { it.enabled }, events, onCamera = { id ->
         val camera = state.cameras.firstOrNull { it.id == id }
         if (camera?.setupStatus == "failed") failedCameraId = id else onCamera(id)
-    }, onEvent = onEvent, onCameras = onCameras, onRules = onRules, onEvents = onEvents)
+    }, onEvent = onEvent, onCameras = onCameras, onPeople = onPeople, onEvents = onEvents)
     failedCamera?.let { CameraFailureSheet(it, onDismiss = { failedCameraId = null }) }
 }
 
 @Composable
 fun OverviewContent(
     cameras: List<CameraModel>,
-    activeRules: Int,
+    trackedPeople: Int,
     events: List<com.ferforastieri.valkyris.core.model.ValkyrisEvent>,
     onCamera: (String) -> Unit = {},
     onEvent: (String) -> Unit = {},
     onCameras: () -> Unit = {},
-    onRules: () -> Unit = {},
+    onPeople: () -> Unit = {},
     onEvents: () -> Unit = {},
 ) {
     val pending = events.count { it.acknowledgedAt == null }
@@ -124,7 +125,7 @@ fun OverviewContent(
         item {
             Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                 MetricCard(Lucide.Camera, cameras.size.toString(), stringResource(R.string.cameras), Modifier.weight(1f), onClick = onCameras, accent = true)
-                MetricCard(Lucide.SlidersHorizontal, activeRules.toString(), stringResource(R.string.rules), Modifier.weight(1f), onClick = onRules)
+                MetricCard(Lucide.UserRound, trackedPeople.toString(), stringResource(R.string.people), Modifier.weight(1f), onClick = onPeople)
                 MetricCard(Lucide.Bell, pending.toString(), stringResource(R.string.pending_alerts), Modifier.weight(1f), onClick = onEvents, alarm = pending > 0)
             }
         }

@@ -229,6 +229,23 @@ class ValkyrisApi(
 
     suspend fun updateRetention(settings: RetentionSettings): RetentionSettings = put("/settings/retention", settings, R.string.notice_retention_saved, announceError = true)
 
+    suspend fun people(): List<TrackedPerson> = get("/people")
+    suspend fun createPerson(person: TrackedPerson): TrackedPerson = post("/people", person, announceError = true)
+    suspend fun updatePerson(id: String, person: TrackedPerson): TrackedPerson = put("/people/$id", person, announceError = true)
+    suspend fun deletePerson(id: String) {
+        val current = requireNotNull(session())
+        executeUnit(current.fingerprint, announceError = true) { it.delete(base() + "/people/$id") { bearerAuth(current.token) } }
+    }
+    suspend fun places(): List<TrackedPlace> = get("/places")
+    suspend fun createPlace(place: TrackedPlace): TrackedPlace = post("/places", place, announceError = true)
+    suspend fun updatePlace(id: String, place: TrackedPlace): TrackedPlace = put("/places/$id", place, announceError = true)
+    suspend fun deletePlace(id: String) {
+        val current = requireNotNull(session())
+        executeUnit(current.fingerprint, announceError = true) { it.delete(base() + "/places/$id") { bearerAuth(current.token) } }
+    }
+    suspend fun personHistory(id: String): List<PersonLocation> = get("/people/$id/history?limit=200")
+    suspend fun reportLocation(id: String, location: PersonLocation): Int = post<Map<String, Int>, PersonLocation>("/people/$id/locations", location)["transitions"] ?: 0
+
     suspend fun events(): List<ValkyrisEvent> = get("/events?limit=100")
     suspend fun event(id: String): ValkyrisEvent = get("/events/$id")
     suspend fun rules(): List<Rule> = get("/rules")

@@ -28,7 +28,7 @@ import com.ferforastieri.valkyris.feature.cameras.CamerasScreen
 import com.ferforastieri.valkyris.feature.events.EventDetailScreen
 import com.ferforastieri.valkyris.feature.events.EventsScreen
 import com.ferforastieri.valkyris.feature.onboarding.OnboardingScreen
-import com.ferforastieri.valkyris.feature.rules.RulesScreen
+import com.ferforastieri.valkyris.feature.people.PeopleScreen
 import com.ferforastieri.valkyris.feature.settings.SettingsScreen
 import com.ferforastieri.valkyris.feature.settings.StartupAlertPermissions
 import com.ferforastieri.valkyris.core.design.ToastMessageHost
@@ -39,7 +39,7 @@ import com.ferforastieri.valkyris.feature.overview.OverviewScreen
 import com.composables.icons.lucide.House
 import com.composables.icons.lucide.Lucide
 import com.composables.icons.lucide.Settings
-import com.composables.icons.lucide.SlidersHorizontal
+import com.composables.icons.lucide.UserRound
 import com.composables.icons.lucide.Video
 
 private data class Destination(val route: String, val label: Int, val icon: ImageVector)
@@ -47,7 +47,7 @@ private data class Destination(val route: String, val label: Int, val icon: Imag
 private val destinations = listOf(
     Destination("overview", R.string.overview, Lucide.House),
     Destination("cameras", R.string.cameras, Lucide.Video),
-    Destination("rules", R.string.rules, Lucide.SlidersHorizontal),
+    Destination("people", R.string.people, Lucide.UserRound),
     Destination("settings", R.string.settings, Lucide.Settings),
 )
 
@@ -127,7 +127,7 @@ private fun ConnectedValkyrisApp(main: MainViewModel) {
             if (showTopBar) {
                 val title = when (currentRoute) {
                     "cameras" -> stringResource(R.string.cameras)
-                    "rules" -> stringResource(R.string.rules)
+                    "people" -> stringResource(R.string.people)
                     "settings" -> stringResource(R.string.settings)
                     "events", "event/{id}" -> stringResource(R.string.events)
                     else -> stringResource(R.string.overview)
@@ -181,7 +181,7 @@ private fun ConnectedValkyrisApp(main: MainViewModel) {
                     onCamera = { nav.navigate("camera/$it") },
                     onEvent = { nav.navigate("event/$it") },
                     onCameras = { nav.openTopLevel("cameras") },
-                    onRules = { nav.openTopLevel("rules") },
+                    onPeople = { nav.openTopLevel("people") },
                     onEvents = { nav.navigate("events") { launchSingleTop = true } },
                 )
             }
@@ -195,7 +195,7 @@ private fun ConnectedValkyrisApp(main: MainViewModel) {
                 )
             }
             composable("event/{id}") { EventDetailScreen() }
-            composable("rules") { RulesScreen() }
+            composable("people") { PeopleScreen() }
             composable("settings") { SettingsScreen(main) }
         }
     }

@@ -48,7 +48,7 @@ fun RulesScreen(vm: RulesViewModel = hiltViewModel()) {
         }
     }
     editing?.let { existing ->
-        RuleEditorDialog(cameras, detectors, existing, saving, onDismiss = { if (!saving) editing = null }) {
+        RuleEditorDialog(cameras, detectors, existing, saving = saving, onDismiss = { if (!saving) editing = null }) {
             vm.update(existing.id, it) { success -> if (success) editing = null }
         }
     }
@@ -61,6 +61,40 @@ fun RulesScreen(vm: RulesViewModel = hiltViewModel()) {
             onDelete = { vm.delete(rule.id) { success -> if (success) managing = null } },
         )
     }
+}
+
+@Composable
+fun CameraRulesSection(cameraId: String, vm: RulesViewModel = hiltViewModel()) {
+    val rules by vm.rules.collectAsStateWithLifecycle()
+    val cameras by vm.cameras.collectAsStateWithLifecycle()
+    val detectors by vm.detectors.collectAsStateWithLifecycle()
+    val saving by vm.saving.collectAsStateWithLifecycle()
+    var creating by remember { mutableStateOf(false) }
+    var managing by remember { mutableStateOf<Rule?>(null) }
+    var editing by remember { mutableStateOf<Rule?>(null) }
+    val cameraRules = rules.filter { it.cameraId == cameraId }
+    val cameraName = cameras.firstOrNull { it.id == cameraId }?.name.orEmpty()
+
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+        border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+    ) {
+        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                Column(Modifier.weight(1f)) {
+                    Text(stringResource(R.string.rules), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+                    Text(if (cameraRules.isEmpty()) stringResource(R.string.no_rules) else "${cameraRules.size} ativa(s)", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+                TextButton(onClick = { creating = true }, enabled = detectors.isNotEmpty() && !saving) { Icon(Lucide.Plus, null, Modifier.size(17.dp)); Spacer(Modifier.width(4.dp)); Text(stringResource(R.string.add_rule)) }
+            }
+            if (cameraRules.isEmpty()) Text("Configure alertas para esta câmera.", color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodySmall)
+            cameraRules.forEach { RuleCard(it, onManage = { managing = it }) }
+        }
+    }
+    if (creating) RuleEditorDialog(cameras, detectors, fixedCameraID = cameraId, saving = saving, onDismiss = { if (!saving) creating = false }) { vm.create(it) { success -> if (success) creating = false } }
+    editing?.let { existing -> RuleEditorDialog(cameras, detectors, existing, fixedCameraID = cameraId, saving = saving, onDismiss = { if (!saving) editing = null }) { vm.update(existing.id, it) { success -> if (success) editing = null } } }
+    managing?.let { rule -> RuleOptionsSheet(rule, saving, onDismiss = { if (!saving) managing = null }, onEdit = { editing = rule; managing = null }, onDelete = { vm.delete(rule.id) { success -> if (success) managing = null } }) }
 }
 
 @Composable
@@ -102,7 +136,7 @@ fun RulesContent(
 }
 
 @Composable
-private fun RuleCard(rule: Rule, onManage: () -> Unit) {
+fun RuleCard(rule: Rule, onManage: () -> Unit) {
     val critical = rule.detectorTypes.any { it in setOf("scream", "glass_break", "smoke_alarm", "fire_alarm", "siren", "tamper") }
     val motion = rule.detectorTypes.any { it == "motion" || it == "person" || it == "tamper" }
     val icon: ImageVector = when { critical -> Lucide.TriangleAlert; motion -> Lucide.Video; else -> Lucide.Mic }
@@ -134,7 +168,7 @@ private fun RuleCard(rule: Rule, onManage: () -> Unit) {
 }
 
 @Composable
-private fun RuleOptionsSheet(rule: Rule, busy: Boolean, onDismiss: () -> Unit, onEdit: () -> Unit, onDelete: () -> Unit) {
+fun RuleOptionsSheet(rule: Rule, busy: Boolean, onDismiss: () -> Unit, onEdit: () -> Unit, onDelete: () -> Unit) {
     com.ferforastieri.valkyris.core.design.ValkyrisBottomSheet(
         title = rule.name,
         onDismiss = onDismiss,
@@ -155,7 +189,7 @@ private fun RuleOptionsSheet(rule: Rule, busy: Boolean, onDismiss: () -> Unit, o
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun RuleEditorDialog(cameras: List<Camera>, detectors: List<DetectorKind>, existing: Rule? = null, saving: Boolean, onDismiss: () -> Unit, onSave: (Rule) -> Unit) {
+fun RuleEditorDialog(cameras: List<Camera>, detectors: List<DetectorKind>, existing: Rule? = null, fixedCameraID: String? = null, saving: Boolean, onDismiss: () -> Unit, onSave: (Rule) -> Unit) {
     var camera by remember(existing?.id) { mutableStateOf(cameras.firstOrNull { it.id == existing?.cameraId } ?: cameras.firstOrNull()) }
     var detector by remember(existing?.id) { mutableStateOf(detectors.firstOrNull { it.id == existing?.detectorTypes?.firstOrNull() } ?: detectors.firstOrNull()) }
     var name by remember(existing?.id) { mutableStateOf(existing?.name.orEmpty()) }
@@ -175,7 +209,7 @@ private fun RuleEditorDialog(cameras: List<Camera>, detectors: List<DetectorKind
                 onClick = {
                     onSave(Rule(
                         id = existing?.id.orEmpty(),
-                        cameraId = checkNotNull(camera).id,
+                        cameraId = fixedCameraID ?: checkNotNull(camera).id,
                         name = name,
                         detectorTypes = listOf(checkNotNull(detector).id),
                         confirmations = existing?.confirmations ?: 1,
@@ -191,7 +225,7 @@ private fun RuleEditorDialog(cameras: List<Camera>, detectors: List<DetectorKind
         },
     ) {
         Column(Modifier.fillMaxWidth().heightIn(max = 520.dp).imePadding().verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-            ExposedDropdownMenuBox(cameraExpanded, { cameraExpanded = it }) {
+            if (fixedCameraID == null) ExposedDropdownMenuBox(cameraExpanded, { cameraExpanded = it }) {
                 OutlinedTextField(camera?.name.orEmpty(), {}, readOnly = true, label = { Text(stringResource(R.string.cameras)) }, trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(cameraExpanded) }, modifier = Modifier.menuAnchor(MenuAnchorType.PrimaryNotEditable).fillMaxWidth())
                 ExposedDropdownMenu(cameraExpanded, { cameraExpanded = false }) { cameras.forEach { item -> DropdownMenuItem({ Text(item.name) }, { camera = item; cameraExpanded = false }) } }
             }
