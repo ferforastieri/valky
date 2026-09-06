@@ -1,6 +1,7 @@
 package com.ferforastieri.valkyris.feature.people
 
 import android.graphics.Color as AndroidColor
+import androidx.core.content.ContextCompat
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -22,9 +23,9 @@ import com.composables.icons.lucide.History
 import com.composables.icons.lucide.Lucide
 import com.composables.icons.lucide.MapPin
 import com.composables.icons.lucide.Plus
-import com.composables.icons.lucide.SlidersHorizontal
 import com.composables.icons.lucide.UserRound
 import com.ferforastieri.valkyris.core.design.ValkyrisBottomSheet
+import com.ferforastieri.valkyris.R
 import com.ferforastieri.valkyris.core.model.PersonLocation
 import com.ferforastieri.valkyris.core.model.TrackedPerson
 import com.ferforastieri.valkyris.core.model.TrackedPlace
@@ -103,21 +104,21 @@ fun PeopleScreen(vm: PeopleViewModel = hiltViewModel()) {
 
 @Composable
 private fun FamilyMap(users: List<TrackedPerson>, places: List<TrackedPlace>, selectingArea: Boolean, onMapPoint: (GeoPoint) -> Unit, modifier: Modifier = Modifier) {
-    val latestMapPoint by rememberUpdatedState(onMapPoint)
-    val latestSelectingArea by rememberUpdatedState(selectingArea)
+    val latestMapPoint = rememberUpdatedState(onMapPoint)
+    val latestSelectingArea = rememberUpdatedState(selectingArea)
     AndroidView(factory = { context ->
         Configuration.getInstance().userAgentValue = context.packageName
         MapView(context).apply {
             setTileSource(TileSourceFactory.MAPNIK); setMultiTouchControls(true); controller.setZoom(13.5); controller.setCenter(GeoPoint(-23.5505, -46.6333))
             overlays.add(MapEventsOverlay(object : MapEventsReceiver {
                 override fun singleTapConfirmedHelper(point: GeoPoint?): Boolean {
-                    if (!latestSelectingArea) return false
-                    point?.let { latestMapPoint(it) }
+                    if (!latestSelectingArea.value) return false
+                    point?.let { latestMapPoint.value(it) }
                     return true
                 }
                 override fun longPressHelper(point: GeoPoint?): Boolean {
-                    if (!latestSelectingArea) return false
-                    point?.let { latestMapPoint(it) }
+                    if (!latestSelectingArea.value) return false
+                    point?.let { latestMapPoint.value(it) }
                     return true
                 }
             }))
@@ -135,6 +136,7 @@ private fun FamilyMap(users: List<TrackedPerson>, places: List<TrackedPlace>, se
             val lat = user.lastLatitude ?: return@forEach; val lon = user.lastLongitude ?: return@forEach
             map.overlays.add(Marker(map).apply {
                 position = GeoPoint(lat, lon); title = user.name; snippet = user.lastLocatedAt?.let { "Atualizado ${formatTime(it)}" } ?: "Sem atualização"
+                icon = ContextCompat.getDrawable(context, R.drawable.valkyris_map_marker)
                 setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_BOTTOM)
             })
         }
@@ -166,14 +168,16 @@ private fun UserCard(user: TrackedPerson, onHistory: () -> Unit) = Card(modifier
 @Composable
 private fun PlaceEditor(initial: TrackedPlace, busy: Boolean, onDismiss: () -> Unit, onSave: (TrackedPlace) -> Unit) {
     var name by remember { mutableStateOf(initial.name) }; var radius by remember { mutableStateOf(initial.radiusMeters.takeIf { it > 0 }?.toInt()?.toString() ?: "100") }
+    val radiusMeters = radius.toDoubleOrNull()
+    val validRadius = radiusMeters != null && radiusMeters in 20.0..5000.0
     ValkyrisBottomSheet(title = "Cadastrar área", onDismiss = onDismiss, dismissEnabled = !busy, actions = {
         TextButton(onClick = onDismiss, enabled = !busy) { Text("Cancelar") }
-        Button(onClick = { onSave(initial.copy(name = name.trim(), radiusMeters = radius.toDoubleOrNull() ?: 0.0)) }, enabled = !busy && name.isNotBlank() && radius.toDoubleOrNull() != null) { Text("Salvar") }
+        Button(onClick = { onSave(initial.copy(name = name.trim(), radiusMeters = requireNotNull(radiusMeters))) }, enabled = !busy && name.isNotBlank() && validRadius) { Text("Salvar") }
     }) {
         Column(Modifier.fillMaxWidth().verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(10.dp)) {
             OutlinedTextField(name, { name = it }, label = { Text("Nome") }, singleLine = true, modifier = Modifier.fillMaxWidth())
             Text("O ponto foi escolhido no mapa. Você pode ajustar apenas o raio da área.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            OutlinedTextField(radius, { radius = it.filter(Char::isDigit) }, label = { Text("Raio em metros") }, singleLine = true, modifier = Modifier.fillMaxWidth())
+            OutlinedTextField(radius, { radius = it.filter(Char::isDigit) }, label = { Text("Raio em metros") }, supportingText = { Text("De 20 a 5.000 m") }, isError = radius.isNotBlank() && !validRadius, singleLine = true, modifier = Modifier.fillMaxWidth())
         }
     }
 }

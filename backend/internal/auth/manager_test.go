@@ -112,3 +112,33 @@ func TestAdministratorLoginAndAuthorization(t *testing.T) {
 		t.Fatalf("administrator request returned %d", response.Code)
 	}
 }
+
+func TestAdministratorLoginReconnectsSamePhoneAndProfile(t *testing.T) {
+	db, err := store.Open(t.TempDir() + "/auth.db")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db.Close()
+	manager := NewManager(db, time.Minute)
+	first, err := manager.BootstrapAdmin(context.Background(), LoginRequest{Password: "correct horse battery staple", DeviceName: "Pixel", UserName: "Fernando"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	second, err := manager.LoginAdmin(context.Background(), LoginRequest{Password: "correct horse battery staple", DeviceName: "Pixel", UserName: "Fernando"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if second.DeviceID != first.DeviceID {
+		t.Fatalf("reinstall created another device: %s != %s", second.DeviceID, first.DeviceID)
+	}
+	var users, devices int
+	if err := db.DB.QueryRow(`SELECT COUNT(*) FROM users`).Scan(&users); err != nil {
+		t.Fatal(err)
+	}
+	if err := db.DB.QueryRow(`SELECT COUNT(*) FROM devices`).Scan(&devices); err != nil {
+		t.Fatal(err)
+	}
+	if users != 1 || devices != 1 {
+		t.Fatalf("want one profile/device, got users=%d devices=%d", users, devices)
+	}
+}

@@ -105,7 +105,38 @@ func (m *Manager) LoginAdmin(ctx context.Context, req LoginRequest) (PairRespons
 		bcrypt.CompareHashAndPassword([]byte(encoded), []byte(req.Password)) != nil {
 		return PairResponse{}, fmt.Errorf("invalid credentials")
 	}
-	return m.insertDevice(ctx, req.DeviceName, req.UserName, req.Locale, true)
+	// A phone can lose its local session during an app reinstall. Reuse the
+	// matching administrator device/profile and rotate its token instead of
+	// creating a second family member with the same phone and name.
+	return m.reconnectAdminDevice(ctx, req.DeviceName, req.UserName, req.Locale)
+}
+
+func (m *Manager) reconnectAdminDevice(ctx context.Context, name, userName, locale string) (PairResponse, error) {
+	if userName == "" {
+		userName = name
+	}
+	if locale == "" {
+		locale = "pt-BR"
+	}
+	var deviceID string
+	err := m.store.DB.QueryRowContext(ctx, `SELECT d.id FROM devices d JOIN users u ON u.id=d.user_id
+		WHERE d.enabled=1 AND d.is_admin=1 AND d.name=? AND u.name=?
+		ORDER BY d.last_seen_at DESC LIMIT 1`, name, userName).Scan(&deviceID)
+	if err == sql.ErrNoRows {
+		return m.insertDevice(ctx, name, userName, locale, true)
+	}
+	if err != nil {
+		return PairResponse{}, err
+	}
+	token, err := appcrypto.RandomToken(32)
+	if err != nil {
+		return PairResponse{}, err
+	}
+	_, err = m.store.DB.ExecContext(ctx, `UPDATE devices SET token_hash=?,locale=?,last_seen_at=? WHERE id=?`, appcrypto.Hash(token), locale, time.Now().UTC().Format(time.RFC3339Nano), deviceID)
+	if err != nil {
+		return PairResponse{}, err
+	}
+	return PairResponse{DeviceID: deviceID, Token: token, Admin: true}, nil
 }
 
 func (m *Manager) CreatePairing(ctx context.Context) (PairingSession, error) {
