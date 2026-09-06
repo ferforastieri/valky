@@ -41,8 +41,65 @@ type Registration struct {
 	Secret string `json:"secret"`
 }
 
+type Configuration struct {
+	Configured bool `json:"configured"`
+}
+
+const firebaseServiceAccountKey = "firebase_service_account_enc"
+
 func NewService(s *store.Store, v *appcrypto.Vault, credentialsFile string) *Service {
 	return &Service{store: s, vault: v, http: &http.Client{Timeout: 10 * time.Second}, credentialsFile: credentialsFile, fcmEndpoint: "https://fcm.googleapis.com"}
+}
+
+// Configure stores the service account encrypted in the existing private
+// database. It is intentionally never written to logs, files, releases, or
+// container environment variables.
+func (s *Service) Configure(ctx context.Context, data []byte) error {
+	if len(data) == 0 || len(data) > 256<<10 {
+		return fmt.Errorf("Firebase service account must be between 1 and 256 KiB")
+	}
+	credentials, err := parseCredentials(data)
+	if err != nil {
+		return err
+	}
+	sealed, err := s.vault.EncryptString(string(data))
+	if err != nil {
+		return err
+	}
+	now := time.Now().UTC().Format(time.RFC3339Nano)
+	if _, err = s.store.DB.ExecContext(ctx, `INSERT INTO settings(key,value,updated_at) VALUES(?,?,?) ON CONFLICT(key) DO UPDATE SET value=excluded.value,updated_at=excluded.updated_at`, firebaseServiceAccountKey, sealed, now); err != nil {
+		return err
+	}
+	s.tokenMu.Lock()
+	s.projectID = credentials.ProjectID
+	s.tokenSource = credentials.TokenSource
+	s.tokenMu.Unlock()
+	return nil
+}
+
+func (s *Service) Configuration(ctx context.Context) (Configuration, error) {
+	var sealed []byte
+	err := s.store.DB.QueryRowContext(ctx, `SELECT value FROM settings WHERE key=?`, firebaseServiceAccountKey).Scan(&sealed)
+	if err == nil {
+		if _, err = s.vault.DecryptString(sealed); err != nil {
+			return Configuration{}, fmt.Errorf("read stored Firebase credentials: %w", err)
+		}
+		return Configuration{Configured: true}, nil
+	}
+	if err != sql.ErrNoRows {
+		return Configuration{}, err
+	}
+	if s.credentialsFile == "" {
+		return Configuration{}, nil
+	}
+	info, err := os.Stat(s.credentialsFile)
+	if os.IsNotExist(err) {
+		return Configuration{}, nil
+	}
+	if err != nil {
+		return Configuration{}, err
+	}
+	return Configuration{Configured: !info.IsDir() && info.Size() > 0}, nil
 }
 
 func (s *Service) Register(ctx context.Context, deviceID string, r Registration) error {
@@ -210,19 +267,13 @@ func (s *Service) accessToken(ctx context.Context) (string, error) {
 	s.tokenMu.Lock()
 	defer s.tokenMu.Unlock()
 	if s.tokenSource == nil {
-		if s.credentialsFile == "" {
-			return "", fmt.Errorf("FCM is not configured: VALKYRIS_FIREBASE_CREDENTIALS_FILE is empty")
-		}
-		data, err := os.ReadFile(s.credentialsFile)
+		data, err := s.credentialsData(ctx)
 		if err != nil {
-			return "", fmt.Errorf("read Firebase credentials: %w", err)
+			return "", err
 		}
-		credentials, err := google.CredentialsFromJSON(context.Background(), data, "https://www.googleapis.com/auth/firebase.messaging")
+		credentials, err := parseCredentials(data)
 		if err != nil {
-			return "", fmt.Errorf("parse Firebase credentials: %w", err)
-		}
-		if credentials.ProjectID == "" {
-			return "", fmt.Errorf("Firebase credentials do not contain project_id")
+			return "", err
 		}
 		s.projectID = credentials.ProjectID
 		s.tokenSource = credentials.TokenSource
@@ -232,6 +283,40 @@ func (s *Service) accessToken(ctx context.Context) (string, error) {
 		return "", fmt.Errorf("authorize Firebase messaging: %w", err)
 	}
 	return token.AccessToken, nil
+}
+
+func (s *Service) credentialsData(ctx context.Context) ([]byte, error) {
+	var sealed []byte
+	err := s.store.DB.QueryRowContext(ctx, `SELECT value FROM settings WHERE key=?`, firebaseServiceAccountKey).Scan(&sealed)
+	if err == nil {
+		plain, decryptErr := s.vault.DecryptString(sealed)
+		if decryptErr != nil {
+			return nil, fmt.Errorf("read stored Firebase credentials: %w", decryptErr)
+		}
+		return []byte(plain), nil
+	}
+	if err != sql.ErrNoRows {
+		return nil, err
+	}
+	if s.credentialsFile == "" {
+		return nil, fmt.Errorf("FCM is not configured")
+	}
+	data, err := os.ReadFile(s.credentialsFile)
+	if err != nil {
+		return nil, fmt.Errorf("read Firebase credentials: %w", err)
+	}
+	return data, nil
+}
+
+func parseCredentials(data []byte) (*google.Credentials, error) {
+	credentials, err := google.CredentialsFromJSON(context.Background(), data, "https://www.googleapis.com/auth/firebase.messaging")
+	if err != nil {
+		return nil, fmt.Errorf("parse Firebase credentials: %w", err)
+	}
+	if credentials.ProjectID == "" {
+		return nil, fmt.Errorf("Firebase credentials do not contain project_id")
+	}
+	return credentials, nil
 }
 func (s *Service) fail(ctx context.Context, id string, attempts int, err error) {
 	delay := time.Duration(1<<min(attempts, 8)) * time.Minute

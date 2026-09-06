@@ -69,6 +69,11 @@ paths:
         '200': {description: Current operation state, content: {application/json: {schema: {$ref: '#/components/schemas/CameraOperationResponse'}}}}
         '404': {description: Operation not found or expired, content: {application/json: {schema: {$ref: '#/components/schemas/APIError'}}}}
   /cameras/{id}:
+    put:
+      summary: Update a camera and restart its setup when connection values change
+      parameters: [{$ref: '#/components/parameters/id'}]
+      requestBody: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/CameraInput'}}}}
+      responses: {'200': {description: Updated camera operation, content: {application/json: {schema: {$ref: '#/components/schemas/CameraOperationResponse'}}}}}
     delete:
       summary: Remove a camera
       parameters: [{$ref: '#/components/parameters/id'}]
@@ -109,6 +114,11 @@ paths:
       requestBody: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/Rule'}}}}
       responses: {'201': {description: Created, content: {application/json: {schema: {$ref: '#/components/schemas/APIResponse'}}}}}
   /rules/{id}:
+    put:
+      summary: Update an automation rule
+      parameters: [{$ref: '#/components/parameters/id'}]
+      requestBody: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/Rule'}}}}
+      responses: {'200': {description: Updated rule, content: {application/json: {schema: {$ref: '#/components/schemas/APIResponse'}}}}}
     delete:
       summary: Delete an automation rule
       parameters: [{$ref: '#/components/parameters/id'}]
@@ -167,6 +177,22 @@ paths:
       responses:
         '200': {description: Retention settings saved, content: {application/json: {schema: {$ref: '#/components/schemas/RetentionSettingsResponse'}}}}
         '400': {description: Invalid limits, content: {application/json: {schema: {$ref: '#/components/schemas/APIError'}}}}
+        '403': {description: Administrator access required, content: {application/json: {schema: {$ref: '#/components/schemas/APIError'}}}}
+  /settings/push:
+    get:
+      summary: Read whether a Firebase service account is configured
+      responses:
+        '200': {description: Push configuration status, content: {application/json: {schema: {$ref: '#/components/schemas/PushConfigurationResponse'}}}}
+    put:
+      summary: Store an encrypted Firebase service account as the administrator
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/FirebaseServiceAccountUpload'}
+      responses:
+        '200': {description: Firebase service account stored, content: {application/json: {schema: {$ref: '#/components/schemas/PushConfigurationResponse'}}}}
+        '400': {description: Invalid service account, content: {application/json: {schema: {$ref: '#/components/schemas/APIError'}}}}
         '403': {description: Administrator access required, content: {application/json: {schema: {$ref: '#/components/schemas/APIError'}}}}
   /detections:
     post:
@@ -343,6 +369,23 @@ components:
       properties:
         token: {type: string, description: Firebase Cloud Messaging registration token}
         secret: {type: string}
+    FirebaseServiceAccountUpload:
+      type: object
+      required: [serviceAccountBase64]
+      properties:
+        serviceAccountBase64: {type: string, contentEncoding: base64, description: Firebase service account JSON encoded as Base64}
+    PushConfiguration:
+      type: object
+      required: [configured]
+      properties:
+        configured: {type: boolean}
+    PushConfigurationResponse:
+      type: object
+      required: [success, message, data]
+      properties:
+        success: {type: boolean, const: true}
+        message: {type: string}
+        data: {$ref: '#/components/schemas/PushConfiguration'}
     RetentionSettings:
       type: object
       required: [maxAgeDays, maxStorageGB]

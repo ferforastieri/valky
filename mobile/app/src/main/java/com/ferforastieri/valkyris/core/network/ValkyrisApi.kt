@@ -1,6 +1,7 @@
 package com.ferforastieri.valkyris.core.network
 
 import android.net.Uri
+import android.util.Base64
 import androidx.annotation.StringRes
 import com.ferforastieri.valkyris.BuildConfig
 import com.ferforastieri.valkyris.R
@@ -296,6 +297,14 @@ class ValkyrisApi(
             }
         }
     }
+
+    suspend fun pushConfiguration(): PushConfiguration = get("/settings/push")
+
+    suspend fun saveFirebaseServiceAccount(data: ByteArray): PushConfiguration = put(
+        "/settings/push",
+        FirebaseServiceAccountUpload(Base64.encodeToString(data, Base64.NO_WRAP)),
+        announceError = true,
+    )
 
     fun snapshotUrl(cameraId: String) = base() + "/cameras/$cameraId/snapshot"
     fun recordingUrl(cameraId: String) = base() + "/cameras/$cameraId/recording"

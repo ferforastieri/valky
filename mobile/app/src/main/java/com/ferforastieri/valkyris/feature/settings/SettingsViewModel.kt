@@ -5,6 +5,7 @@ import androidx.lifecycle.viewModelScope
 import com.ferforastieri.valkyris.core.action.MobileActionGate
 import com.ferforastieri.valkyris.core.model.RetentionSettings
 import com.ferforastieri.valkyris.core.network.ValkyrisApi
+import com.ferforastieri.valkyris.core.push.FcmRegistration
 import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -23,21 +24,57 @@ data class RetentionState(
     val saving: Boolean = false,
 )
 
+data class PushConfigurationState(
+    val configured: Boolean = true,
+    val loading: Boolean = true,
+    val saving: Boolean = false,
+)
+
 @HiltViewModel
 class SettingsViewModel @Inject constructor(
     private val api: ValkyrisApi,
     private val actionGate: MobileActionGate,
+    private val push: FcmRegistration,
 ) : ViewModel() {
     private val _invitation = MutableStateFlow(InvitationState())
     val invitation = _invitation.asStateFlow()
     private val _retention = MutableStateFlow(RetentionState())
     val retention = _retention.asStateFlow()
+    private val _pushConfiguration = MutableStateFlow(PushConfigurationState())
+    val pushConfiguration = _pushConfiguration.asStateFlow()
 
     init {
         viewModelScope.launch {
             runCatching { api.retention() }
                 .onSuccess { _retention.value = RetentionState(value = it, loading = false) }
                 .onFailure { _retention.value = RetentionState(loading = false) }
+        }
+        refreshPushConfiguration()
+    }
+
+    fun refreshPushConfiguration() {
+        viewModelScope.launch {
+            runCatching { api.pushConfiguration() }
+                .onSuccess { _pushConfiguration.value = PushConfigurationState(configured = it.configured, loading = false) }
+                // Do not block the application while the server is temporarily unreachable.
+                .onFailure { _pushConfiguration.value = PushConfigurationState(configured = true, loading = false) }
+        }
+    }
+
+    fun saveFirebaseServiceAccount(data: ByteArray) {
+        if (data.isEmpty() || data.size > 256 * 1024 || !actionGate.tryAcquire()) return
+        _pushConfiguration.value = _pushConfiguration.value.copy(saving = true)
+        viewModelScope.launch {
+            try {
+                runCatching { api.saveFirebaseServiceAccount(data) }
+                    .onSuccess {
+                        _pushConfiguration.value = PushConfigurationState(configured = it.configured, loading = false)
+                        push.registerCurrent()
+                    }
+                    .onFailure { _pushConfiguration.value = _pushConfiguration.value.copy(saving = false) }
+            } finally {
+                actionGate.release()
+            }
         }
     }
 

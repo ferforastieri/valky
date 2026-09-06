@@ -46,6 +46,8 @@
     <string name="configure_permission">Configure %1$s</string>
     <string name="not_now">Not now</string>
     <string name="notification_permission">Notification permission</string>
+    <string name="firebase_service_account">Firebase service account</string>
+    <string name="upload_firebase_account">Upload Firebase account</string>
     <string name="permissions">Permissions</string>
     <string name="permissions_summary">%1$d of 3 permissions active</string>
     <string name="language">Language</string>

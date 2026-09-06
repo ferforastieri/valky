@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	_ "embed"
+	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -126,6 +127,8 @@ func (s *Server) Handler() http.Handler {
 	protected.HandleFunc("GET /events/{id}/snapshot", s.eventSnapshot)
 	protected.HandleFunc("GET /events/{id}/clip", s.eventClip)
 	protected.HandleFunc("POST /devices/push", s.push)
+	protected.HandleFunc("GET /settings/push", s.getPushConfiguration)
+	protected.Handle("PUT /settings/push", s.auth.RequireAdmin(http.HandlerFunc(s.setPushConfiguration)))
 	protected.HandleFunc("GET /settings/retention", s.getRetention)
 	protected.Handle("PUT /settings/retention", s.auth.RequireAdmin(http.HandlerFunc(s.setRetention)))
 	protected.HandleFunc("POST /detections", s.submitDetection)
@@ -621,6 +624,36 @@ func (s *Server) push(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeSuccess(w, http.StatusOK, "Push device registered successfully", nil)
+}
+func (s *Server) getPushConfiguration(w http.ResponseWriter, r *http.Request) {
+	if s.notify == nil {
+		writeError(w, http.StatusServiceUnavailable, fmt.Errorf("push service is not configured"))
+		return
+	}
+	status, err := s.notify.Configuration(r.Context())
+	respondWithMessage(w, status, err, "Push configuration loaded")
+}
+func (s *Server) setPushConfiguration(w http.ResponseWriter, r *http.Request) {
+	if s.notify == nil {
+		writeError(w, http.StatusServiceUnavailable, fmt.Errorf("push service is not configured"))
+		return
+	}
+	var in struct {
+		ServiceAccountBase64 string `json:"serviceAccountBase64"`
+	}
+	if !decode(w, r, &in) {
+		return
+	}
+	data, err := base64.StdEncoding.DecodeString(in.ServiceAccountBase64)
+	if err != nil {
+		writeError(w, http.StatusBadRequest, fmt.Errorf("serviceAccountBase64 must be valid base64"))
+		return
+	}
+	if err = s.notify.Configure(r.Context(), data); err != nil {
+		writeError(w, http.StatusBadRequest, err)
+		return
+	}
+	writeSuccess(w, http.StatusOK, "Firebase service account saved", notify.Configuration{Configured: true})
 }
 func (s *Server) getRetention(w http.ResponseWriter, r *http.Request) {
 	if s.preferences == nil {

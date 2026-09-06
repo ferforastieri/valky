@@ -169,14 +169,7 @@ O Valkyris não exige aplicativo auxiliar no celular. O APK recebe mensagens de 
 
 1. No Firebase Console, crie um projeto, adicione o aplicativo Android `com.ferforastieri.valkyris` e baixe `google-services.json`.
 2. Codifique esse arquivo em base64 e cadastre o conteúdo no secret do GitHub `FIREBASE_ANDROID_CONFIG_BASE64`; ele será incluído no APK durante a release.
-3. Em **Configurações do projeto → Contas de serviço**, gere uma chave privada JSON e copie-a para o servidor sem adicioná-la ao Git:
-
-```bash
-cd ~/.local/share/valkyris
-docker compose cp /CAMINHO/firebase-service-account.json valkyris:/data/secrets/firebase-service-account.json
-docker compose exec -u root valkyris sh -c 'chown valkyris:valkyris /data/secrets/firebase-service-account.json && chmod 600 /data/secrets/firebase-service-account.json'
-docker compose restart valkyris
-```
+3. Em **Configurações do projeto → Contas de serviço**, gere uma chave privada JSON. No primeiro sheet de alertas do app, escolha essa chave: o administrador a envia por TLS, o backend valida e cifra o JSON no SQLite. A conta nunca é retornada pela API, registrada no Git ou incluída na imagem.
 
 O APK registra o token FCM automaticamente depois do login. No app, basta conceder a permissão de notificações; não existe configuração ou tentativa manual de registro. A chave de conta de serviço é privada e deve permanecer somente no servidor.
 
@@ -198,6 +191,18 @@ Exemplo autenticado:
 curl -k https://SEU_SERVIDOR:8443/api/v1/cameras \
   -H 'Authorization: Bearer SEU_TOKEN'
 ```
+
+### Endpoints recentes
+
+Além do contrato completo em OpenAPI, as rotas adicionadas recentemente são:
+
+| Método | Rota | Acesso | Finalidade |
+| --- | --- | --- | --- |
+| `PUT` | `/api/v1/cameras/{id}` | Autenticado | Edita uma câmera e reconfigura o stream se a conexão mudar. |
+| `PUT` | `/api/v1/rules/{id}` | Autenticado | Edita uma regra. |
+| `POST` | `/api/v1/events/acknowledge-all` | Autenticado | Marca todos os eventos pendentes como lidos. |
+| `GET` | `/api/v1/settings/push` | Autenticado | Informa apenas se o FCM está configurado. |
+| `PUT` | `/api/v1/settings/push` | Administrador | Recebe `{ "serviceAccountBase64": "..." }`, valida e cifra a conta de serviço no SQLite. |
 
 Respostas JSON seguem um envelope consistente:
 

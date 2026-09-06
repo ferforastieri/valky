@@ -40,6 +40,8 @@ import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LifecycleEventEffect
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import com.composables.icons.lucide.BellRing
 import com.composables.icons.lucide.Check
 import com.composables.icons.lucide.Lucide
@@ -50,6 +52,8 @@ import com.ferforastieri.valkyris.core.design.ValkyrisBottomSheet
 @Composable
 fun StartupAlertPermissions() {
     val context = LocalContext.current
+    val settings: SettingsViewModel = hiltViewModel()
+    val pushConfiguration by settings.pushConfiguration.collectAsStateWithLifecycle()
     val manager = context.getSystemService(NotificationManager::class.java)
     var refresh by remember { mutableIntStateOf(0) }
     var dialogVisible by remember { mutableStateOf(false) }
@@ -57,6 +61,13 @@ fun StartupAlertPermissions() {
     val notificationRequest = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) {
         refresh++
         dialogVisible = true
+    }
+    val firebaseAccountPicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+        uri ?: return@rememberLauncherForActivityResult
+        runCatching {
+            context.contentResolver.openInputStream(uri)?.use { input -> input.readBytes() }
+                ?: error("Cannot read Firebase service account")
+        }.onSuccess { settings.saveFirebaseServiceAccount(it) }
     }
 
     LifecycleEventEffect(Lifecycle.Event.ON_RESUME) { refresh++ }
@@ -67,16 +78,19 @@ fun StartupAlertPermissions() {
         ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED
     val fullScreenAllowed = Build.VERSION.SDK_INT < 34 || manager.canUseFullScreenIntent()
     val dndAllowed = manager.isNotificationPolicyAccessGranted
-    val missingCount = listOf(notificationsAllowed, fullScreenAllowed, dndAllowed).count { !it }
+    val firebaseConfigured = pushConfiguration.configured
+    val missingCount = listOf(notificationsAllowed, fullScreenAllowed, dndAllowed, firebaseConfigured).count { !it }
 
-    LaunchedEffect(notificationsAllowed, startupHandled) {
+    LaunchedEffect(notificationsAllowed, firebaseConfigured, pushConfiguration.loading, startupHandled) {
         if (!startupHandled) {
             startupHandled = true
             if (Build.VERSION.SDK_INT >= 33 && !notificationsAllowed) {
                 notificationRequest.launch(Manifest.permission.POST_NOTIFICATIONS)
-            } else if (missingCount > 0) {
+            } else if (!pushConfiguration.loading && missingCount > 0) {
                 dialogVisible = true
             }
+        } else if (!pushConfiguration.loading && missingCount > 0) {
+            dialogVisible = true
         }
     }
 
@@ -90,11 +104,12 @@ fun StartupAlertPermissions() {
     ValkyrisBottomSheet(
         title = stringResource(R.string.alert_readiness_title),
         onDismiss = { dialogVisible = false },
+        dismissEnabled = firebaseConfigured,
         actions = {
-            TextButton({ dialogVisible = false }) { Text(stringResource(R.string.not_now)) }
             Button(
                 onClick = {
                     when {
+                        !firebaseConfigured -> firebaseAccountPicker.launch(arrayOf("application/json", "text/json"))
                         Build.VERSION.SDK_INT >= 33 && !notificationsAllowed ->
                             notificationRequest.launch(Manifest.permission.POST_NOTIFICATIONS)
                         Build.VERSION.SDK_INT >= 34 && !fullScreenAllowed ->
@@ -105,7 +120,9 @@ fun StartupAlertPermissions() {
                         !dndAllowed -> context.startActivity(Intent(Settings.ACTION_NOTIFICATION_POLICY_ACCESS_SETTINGS))
                     }
                 },
-            ) { Text(stringResource(R.string.configure_permission, nextTitle)) }
+                enabled = !pushConfiguration.saving,
+            ) { Text(if (!firebaseConfigured) stringResource(R.string.upload_firebase_account) else stringResource(R.string.configure_permission, nextTitle)) }
+            if (firebaseConfigured) TextButton({ dialogVisible = false }) { Text(stringResource(R.string.not_now)) }
         },
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
@@ -125,6 +142,7 @@ fun StartupAlertPermissions() {
             PermissionRow(stringResource(R.string.notification_permission), notificationsAllowed)
             PermissionRow(stringResource(R.string.full_screen_alarms), fullScreenAllowed)
             PermissionRow(stringResource(R.string.do_not_disturb_access), dndAllowed)
+            PermissionRow(stringResource(R.string.firebase_service_account), firebaseConfigured)
         }
     }
 }
