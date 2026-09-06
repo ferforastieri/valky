@@ -140,7 +140,9 @@ private fun FamilyMap(users: List<TrackedPerson>, places: List<TrackedPlace>, on
     }, update = { map ->
         map.overlays.removeAll { it is Marker || it is Polygon }
         places.forEach { place ->
-            val circle = Polygon.asCircle(GeoPoint(place.latitude, place.longitude), place.radiusMeters)
+            val circle = Polygon().apply {
+                setPoints(Polygon.pointsAsCircle(GeoPoint(place.latitude, place.longitude), place.radiusMeters))
+            }
             circle.fillColor = AndroidColor.argb(36, 91, 91, 214); circle.strokeColor = AndroidColor.rgb(91, 91, 214); circle.title = place.name
             map.overlays.add(circle)
         }
