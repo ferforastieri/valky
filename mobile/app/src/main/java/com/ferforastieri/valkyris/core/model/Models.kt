@@ -10,6 +10,8 @@ import kotlinx.serialization.json.JsonElement
 @Serializable data class RuleActions(val record:Boolean=true,val notify:Boolean=true,val alarm:Boolean=false)
 @Serializable data class RuleSchedule(val days:List<Int> = emptyList(),val start:String="",val end:String="",val timezone:String="")
 @Serializable data class Rule(val id:String="",val cameraId:String,val name:String,val detectorTypes:List<String>,val confirmations:Int=1,val cooldownSeconds:Int=60,val schedule:RuleSchedule=RuleSchedule(),val actions:RuleActions=RuleActions(),val enabled:Boolean=true)
+@Serializable data class RuleActionsRequest(val record:Boolean,val notify:Boolean,val alarm:Boolean)
+@Serializable data class RuleUpsertRequest(val cameraId:String,val name:String,val detectorTypes:List<String>,val actions:RuleActionsRequest)
 @Serializable data class DetectorKind(val id:String,val label:String,val source:String)
 @Serializable data class AuthStatus(val initialized:Boolean)
 @Serializable data class LoginRequest(val password:String,val deviceName:String,val userName:String="",val locale:String)

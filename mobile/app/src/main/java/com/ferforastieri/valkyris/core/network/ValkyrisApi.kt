@@ -287,13 +287,13 @@ class ValkyrisApi(
     suspend fun detectors(): List<DetectorKind> = get("/detectors")
     suspend fun createRule(rule: Rule, announce: Boolean = true): Rule = post(
         "/rules",
-        rule,
+        rule.toUpsertRequest(),
         announceBackend = announce,
     )
 
     suspend fun updateRule(id: String, rule: Rule): Rule = put(
         "/rules/$id",
-        rule,
+        rule.toUpsertRequest(),
         announceBackend = true,
     )
 
@@ -419,6 +419,17 @@ class ValkyrisApi(
 
     private fun localizedError(raw: String, status: Int? = null, cause: Throwable? = null) =
         ApiException(raw, status, cause, raw)
+
+    private fun Rule.toUpsertRequest() = RuleUpsertRequest(
+        cameraId = cameraId,
+        name = name,
+        detectorTypes = detectorTypes,
+        actions = RuleActionsRequest(
+            record = actions.record,
+            notify = actions.notify,
+            alarm = actions.alarm,
+        ),
+    )
 
     companion object {
         private const val HEADER_MESSAGE = "X-Valkyris-Message"
