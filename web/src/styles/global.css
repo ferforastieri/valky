@@ -807,13 +807,6 @@ p {
 }
 .language-menu > summary.icon-button {
   display: flex;
-  gap: 2px;
-}
-.language-chevron {
-  transition: transform 180ms ease;
-}
-.language-menu[open] .language-chevron {
-  transform: rotate(180deg);
 }
 .language-popover {
   position: absolute;
@@ -876,9 +869,6 @@ p {
   color: var(--signal);
 }
 @media (max-width: 760px) {
-  .language-chevron {
-    display: none;
-  }
   .language-popover {
     top: auto;
     right: -80px;

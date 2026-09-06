@@ -1,5 +1,5 @@
 ---
-import { BookOpen, Check, ChevronDown, CodeXml, Download, House, Languages, Moon, Smartphone, Sun } from '@lucide/astro';
+import { BookOpen, Check, CodeXml, Download, House, Languages, Moon, Smartphone, Sun } from '@lucide/astro';
 import { copy, type Locale } from '../content/copy';
 
 interface Props {
@@ -26,7 +26,7 @@ const languagePath = (target: Locale) => current === 'docs' ? `/${target}/docs` 
   </div>
   <div class="dock-actions">
     <details class="language-menu">
-      <summary class="icon-button" aria-label={locale === 'pt-BR' ? 'Escolher idioma' : 'Choose language'}><Languages size={18}/><ChevronDown class="language-chevron" size={12}/></summary>
+      <summary class="icon-button" aria-label={locale === 'pt-BR' ? 'Escolher idioma' : 'Choose language'}><Languages size={18}/></summary>
       <div class="language-popover" role="menu" aria-label={locale === 'pt-BR' ? 'Idiomas disponíveis' : 'Available languages'}>
         <p>{locale === 'pt-BR' ? 'Idioma' : 'Language'}</p>
         <a href={languagePath('pt-BR')} role="menuitem" aria-current={locale === 'pt-BR' ? 'true' : undefined}><span><strong>Português</strong><small>Brasil</small></span>{locale === 'pt-BR' && <Check size={16}/>}</a>
