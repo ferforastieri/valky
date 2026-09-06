@@ -36,7 +36,7 @@ func (s *Service) Create(ctx context.Context, r Rule) (Rule, error) {
 	det, _ := json.Marshal(r.DetectorTypes)
 	schedule, _ := json.Marshal(r.Schedule)
 	actions, _ := json.Marshal(r.Actions)
-	result, err := s.store.DB.ExecContext(ctx, `INSERT INTO rules(id,camera_id,name,detector_types_json,min_confidence,confirmations,cooldown_seconds,schedule_json,actions_json,enabled,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?) ON CONFLICT DO NOTHING`, r.ID, r.CameraID, r.Name, string(det), r.MinConfidence, r.Confirmations, r.CooldownSeconds, string(schedule), string(actions), 1, r.CreatedAt.Format(time.RFC3339Nano), r.UpdatedAt.Format(time.RFC3339Nano))
+	result, err := s.store.DB.ExecContext(ctx, `INSERT INTO rules(id,camera_id,name,detector_types_json,confirmations,cooldown_seconds,schedule_json,actions_json,enabled,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?,?,?) ON CONFLICT DO NOTHING`, r.ID, r.CameraID, r.Name, string(det), r.Confirmations, r.CooldownSeconds, string(schedule), string(actions), 1, r.CreatedAt.Format(time.RFC3339Nano), r.UpdatedAt.Format(time.RFC3339Nano))
 	if err != nil {
 		return r, err
 	}
@@ -47,7 +47,7 @@ func (s *Service) Create(ctx context.Context, r Rule) (Rule, error) {
 	if inserted > 0 {
 		return r, nil
 	}
-	existing, err := scanRule(s.store.DB.QueryRowContext(ctx, `SELECT id,camera_id,name,detector_types_json,min_confidence,confirmations,cooldown_seconds,schedule_json,actions_json,enabled,last_triggered_at,created_at,updated_at FROM rules WHERE camera_id=? AND name=? AND detector_types_json=? AND min_confidence=? AND confirmations=? AND cooldown_seconds=? AND schedule_json=? AND actions_json=? LIMIT 1`, r.CameraID, r.Name, string(det), r.MinConfidence, r.Confirmations, r.CooldownSeconds, string(schedule), string(actions)))
+	existing, err := scanRule(s.store.DB.QueryRowContext(ctx, `SELECT id,camera_id,name,detector_types_json,confirmations,cooldown_seconds,schedule_json,actions_json,enabled,last_triggered_at,created_at,updated_at FROM rules WHERE camera_id=? AND name=? AND detector_types_json=? AND confirmations=? AND cooldown_seconds=? AND schedule_json=? AND actions_json=? LIMIT 1`, r.CameraID, r.Name, string(det), r.Confirmations, r.CooldownSeconds, string(schedule), string(actions)))
 	if err != nil {
 		return r, fmt.Errorf("load existing idempotent rule: %w", err)
 	}
@@ -63,15 +63,15 @@ func (s *Service) Update(ctx context.Context, id string, r Rule) (Rule, error) {
 	det, _ := json.Marshal(r.DetectorTypes)
 	schedule, _ := json.Marshal(r.Schedule)
 	actions, _ := json.Marshal(r.Actions)
-	result, err := s.store.DB.ExecContext(ctx, `UPDATE rules SET camera_id=?,name=?,detector_types_json=?,min_confidence=?,confirmations=?,cooldown_seconds=?,schedule_json=?,actions_json=?,enabled=?,updated_at=? WHERE id=?`,
-		r.CameraID, r.Name, string(det), r.MinConfidence, r.Confirmations, r.CooldownSeconds, string(schedule), string(actions), boolToInt(r.Enabled), r.UpdatedAt.Format(time.RFC3339Nano), id)
+	result, err := s.store.DB.ExecContext(ctx, `UPDATE rules SET camera_id=?,name=?,detector_types_json=?,confirmations=?,cooldown_seconds=?,schedule_json=?,actions_json=?,enabled=?,updated_at=? WHERE id=?`,
+		r.CameraID, r.Name, string(det), r.Confirmations, r.CooldownSeconds, string(schedule), string(actions), boolToInt(r.Enabled), r.UpdatedAt.Format(time.RFC3339Nano), id)
 	if err != nil {
 		return r, err
 	}
 	if affected, _ := result.RowsAffected(); affected == 0 {
 		return r, sql.ErrNoRows
 	}
-	return scanRule(s.store.DB.QueryRowContext(ctx, `SELECT id,camera_id,name,detector_types_json,min_confidence,confirmations,cooldown_seconds,schedule_json,actions_json,enabled,last_triggered_at,created_at,updated_at FROM rules WHERE id=?`, id))
+	return scanRule(s.store.DB.QueryRowContext(ctx, `SELECT id,camera_id,name,detector_types_json,confirmations,cooldown_seconds,schedule_json,actions_json,enabled,last_triggered_at,created_at,updated_at FROM rules WHERE id=?`, id))
 }
 
 func normalizeRule(r *Rule) error {
@@ -83,12 +83,6 @@ func normalizeRule(r *Rule) error {
 	r.CooldownSeconds = 60
 	if r.CameraID == "" || r.Name == "" || len(r.DetectorTypes) == 0 {
 		return fmt.Errorf("cameraId, name and detectorTypes are required")
-	}
-	if r.MinConfidence == 0 {
-		r.MinConfidence = .65
-	}
-	if r.MinConfidence < 0 || r.MinConfidence > 1 {
-		return fmt.Errorf("minConfidence must be between 0 and 1")
 	}
 	if r.Confirmations < 1 {
 		r.Confirmations = 1
@@ -144,7 +138,7 @@ func compactStrings(values []string) []string {
 }
 
 func (s *Service) List(ctx context.Context, cameraID string) ([]Rule, error) {
-	query := `SELECT id,camera_id,name,detector_types_json,min_confidence,confirmations,cooldown_seconds,schedule_json,actions_json,enabled,last_triggered_at,created_at,updated_at FROM rules`
+	query := `SELECT id,camera_id,name,detector_types_json,confirmations,cooldown_seconds,schedule_json,actions_json,enabled,last_triggered_at,created_at,updated_at FROM rules`
 	var args []any
 	if cameraID != "" {
 		query += " WHERE camera_id=?"
@@ -188,10 +182,7 @@ func (s *Service) Match(ctx context.Context, d Detection) ([]Rule, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	for _, r := range all {
-		// Video fallback reports a changed-pixel fraction, not an audio model
-		// probability. Its own motion threshold has already been applied.
-		visualMotion := d.Type == "motion" && d.Metadata["source"] == "visual_fallback"
-		if !r.Enabled || (!visualMotion && d.Confidence < r.MinConfidence) || !contains(r.DetectorTypes, d.Type) || !activeAt(r.Schedule, d.OccurredAt) {
+		if !r.Enabled || !contains(r.DetectorTypes, d.Type) || !activeAt(r.Schedule, d.OccurredAt) {
 			continue
 		}
 		if r.LastTriggeredAt != nil && d.OccurredAt.Sub(*r.LastTriggeredAt) < time.Duration(r.CooldownSeconds)*time.Second {
@@ -221,7 +212,7 @@ func scanRule(row scanner) (Rule, error) {
 	var detector, schedule, actions, created, updated string
 	var enabled int
 	var last sql.NullString
-	err := row.Scan(&r.ID, &r.CameraID, &r.Name, &detector, &r.MinConfidence, &r.Confirmations, &r.CooldownSeconds, &schedule, &actions, &enabled, &last, &created, &updated)
+	err := row.Scan(&r.ID, &r.CameraID, &r.Name, &detector, &r.Confirmations, &r.CooldownSeconds, &schedule, &actions, &enabled, &last, &created, &updated)
 	if err != nil {
 		return r, err
 	}

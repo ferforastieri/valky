@@ -307,7 +307,6 @@ components:
         cameraId: {type: string, format: uuid}
         name: {type: string}
         detectorTypes: {type: array, items: {type: string}}
-        minConfidence: {type: number, minimum: 0, maximum: 1, default: 0.65}
         confirmations: {type: integer, minimum: 1, default: 2}
         cooldownSeconds: {type: integer, minimum: 1, default: 60}
         schedule: {$ref: '#/components/schemas/Schedule'}

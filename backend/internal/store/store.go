@@ -73,7 +73,36 @@ func Open(path string) (*Store, error) {
 			}
 		}
 	}
+	if err = migrateRulesWithoutConfidence(ctx, db); err != nil {
+		db.Close()
+		return nil, err
+	}
 	return &Store{DB: db}, nil
+}
+
+// Confidence remains attached to detected events for observability, but it is
+// deliberately not a rule criterion. This migration preserves every rule and
+// rebuilds the idempotency index without the retired column.
+func migrateRulesWithoutConfidence(ctx context.Context, db *sql.DB) error {
+	exists, err := columnExists(ctx, db, "rules", "min_confidence")
+	if err != nil || !exists {
+		return err
+	}
+	tx, err := db.BeginTx(ctx, nil)
+	if err != nil {
+		return fmt.Errorf("begin rules confidence migration: %w", err)
+	}
+	defer tx.Rollback()
+	for _, query := range []string{
+		`DROP INDEX IF EXISTS idx_rules_idempotency`,
+		`ALTER TABLE rules DROP COLUMN min_confidence`,
+		`CREATE UNIQUE INDEX idx_rules_idempotency ON rules(camera_id,name,detector_types_json,confirmations,cooldown_seconds,schedule_json,actions_json)`,
+	} {
+		if _, err = tx.ExecContext(ctx, query); err != nil {
+			return fmt.Errorf("migrate rules without confidence: %w", err)
+		}
+	}
+	return tx.Commit()
 }
 
 func columnExists(ctx context.Context, db *sql.DB, table, column string) (bool, error) {

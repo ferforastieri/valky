@@ -69,3 +69,32 @@ func TestOpenPromotesLegacyDevicesWithoutChangingNewDefault(t *testing.T) {
 		t.Fatalf("new device did not retain least-privilege default: admin=%d err=%v", newAdmin, err)
 	}
 }
+
+func TestOpenRemovesRuleConfidenceCriterion(t *testing.T) {
+	path := t.TempDir() + "/legacy-rules.db"
+	legacy, err := sql.Open("sqlite", path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, err = legacy.Exec(`CREATE TABLE rules (
+      id TEXT PRIMARY KEY, camera_id TEXT NOT NULL, name TEXT NOT NULL,
+      detector_types_json TEXT NOT NULL, min_confidence REAL NOT NULL,
+      confirmations INTEGER NOT NULL, cooldown_seconds INTEGER NOT NULL,
+      schedule_json TEXT NOT NULL, actions_json TEXT NOT NULL,
+      enabled INTEGER NOT NULL DEFAULT 1, last_triggered_at TEXT,
+      created_at TEXT NOT NULL, updated_at TEXT NOT NULL
+    ); CREATE UNIQUE INDEX idx_rules_idempotency
+      ON rules(camera_id,name,detector_types_json,min_confidence,confirmations,cooldown_seconds,schedule_json,actions_json)`)
+	legacy.Close()
+	if err != nil {
+		t.Fatal(err)
+	}
+	db, err := Open(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db.Close()
+	if exists, checkErr := columnExists(context.Background(), db.DB, "rules", "min_confidence"); checkErr != nil || exists {
+		t.Fatalf("confidence column was not removed: exists=%v err=%v", exists, checkErr)
+	}
+}

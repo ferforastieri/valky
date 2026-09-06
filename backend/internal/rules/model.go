@@ -18,7 +18,6 @@ type Rule struct {
 	CameraID        string     `json:"cameraId"`
 	Name            string     `json:"name"`
 	DetectorTypes   []string   `json:"detectorTypes"`
-	MinConfidence   float64    `json:"minConfidence"`
 	Confirmations   int        `json:"confirmations"`
 	CooldownSeconds int        `json:"cooldownSeconds"`
 	Schedule        Schedule   `json:"schedule"`

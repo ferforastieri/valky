@@ -20,7 +20,7 @@ func TestActiveAtOvernight(t *testing.T) {
 	}
 }
 
-func TestConfirmationsConfidenceAndCooldown(t *testing.T) {
+func TestConfirmationsAndCooldown(t *testing.T) {
 	db, err := store.Open(t.TempDir() + "/rules.db")
 	if err != nil {
 		t.Fatal(err)
@@ -31,7 +31,7 @@ func TestConfirmationsConfidenceAndCooldown(t *testing.T) {
 		t.Fatal(err)
 	}
 	service := NewService(db)
-	rule, err := service.Create(context.Background(), Rule{CameraID: "cam", Name: "Baby", DetectorTypes: []string{"baby_cry"}, MinConfidence: .8, Confirmations: 2, CooldownSeconds: 60})
+	rule, err := service.Create(context.Background(), Rule{CameraID: "cam", Name: "Baby", DetectorTypes: []string{"baby_cry"}, Confirmations: 2, CooldownSeconds: 60})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -43,13 +43,10 @@ func TestConfirmationsConfidenceAndCooldown(t *testing.T) {
 		t.Fatalf("rule list did not normalize empty schedule days: %#v err=%v", listed, err)
 	}
 	now := time.Now().UTC()
-	if matched, _ := service.Match(context.Background(), Detection{CameraID: "cam", Type: "baby_cry", Confidence: .7, OccurredAt: now}); len(matched) != 0 {
-		t.Fatal("below-threshold detection matched")
-	}
-	if matched, _ := service.Match(context.Background(), Detection{CameraID: "cam", Type: "baby_cry", Confidence: .9, OccurredAt: now}); len(matched) != 0 {
+	if matched, _ := service.Match(context.Background(), Detection{CameraID: "cam", Type: "baby_cry", Confidence: .05, OccurredAt: now}); len(matched) != 0 {
 		t.Fatal("first confirmation matched")
 	}
-	matched, err := service.Match(context.Background(), Detection{CameraID: "cam", Type: "baby_cry", Confidence: .9, OccurredAt: now.Add(time.Second)})
+	matched, err := service.Match(context.Background(), Detection{CameraID: "cam", Type: "baby_cry", Confidence: .05, OccurredAt: now.Add(time.Second)})
 	if err != nil || len(matched) != 1 || matched[0].ID != rule.ID {
 		t.Fatalf("second confirmation did not match: %#v err=%v", matched, err)
 	}
@@ -72,12 +69,12 @@ func TestCreateIsIdempotent(t *testing.T) {
 		t.Fatal(err)
 	}
 	service := NewService(db)
-	input := Rule{CameraID: "cam", Name: "Baby", DetectorTypes: []string{"baby_cry", "motion"}, MinConfidence: .8, Confirmations: 2, CooldownSeconds: 60}
+	input := Rule{CameraID: "cam", Name: "Baby", DetectorTypes: []string{"baby_cry", "motion"}, Confirmations: 2, CooldownSeconds: 60}
 	first, err := service.Create(context.Background(), input)
 	if err != nil {
 		t.Fatal(err)
 	}
-	second, err := service.Create(context.Background(), Rule{CameraID: "cam", Name: " Baby ", DetectorTypes: []string{"motion", "baby_cry"}, MinConfidence: .8, Confirmations: 2, CooldownSeconds: 60})
+	second, err := service.Create(context.Background(), Rule{CameraID: "cam", Name: " Baby ", DetectorTypes: []string{"motion", "baby_cry"}, Confirmations: 2, CooldownSeconds: 60})
 	if err != nil {
 		t.Fatal(err)
 	}

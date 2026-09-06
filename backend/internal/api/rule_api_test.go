@@ -35,7 +35,7 @@ func TestCreateRuleEndpoint(t *testing.T) {
 
 	response := performJSON(t, server.Handler(), http.MethodPost, "/api/v1/rules", session.Token, rules.Rule{
 		CameraID: "camera-1", Name: "Baby alert", DetectorTypes: []string{"baby_cry"},
-		MinConfidence: .65, Confirmations: 2, CooldownSeconds: 60,
+		Confirmations: 2, CooldownSeconds: 60,
 		Actions: rules.Actions{Record: true, Notify: true},
 	})
 	if response.Code != http.StatusCreated {

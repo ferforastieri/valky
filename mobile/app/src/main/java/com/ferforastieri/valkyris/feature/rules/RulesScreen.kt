@@ -178,7 +178,6 @@ private fun RuleEditorDialog(cameras: List<Camera>, detectors: List<DetectorKind
                         cameraId = checkNotNull(camera).id,
                         name = name,
                         detectorTypes = listOf(checkNotNull(detector).id),
-                        minConfidence = existing?.minConfidence ?: .65,
                         confirmations = existing?.confirmations ?: 1,
                         actions = RuleActions(record, notify, alarm),
                         enabled = existing?.enabled ?: true,

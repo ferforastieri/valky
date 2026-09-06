@@ -35,7 +35,6 @@ CREATE TABLE IF NOT EXISTS rules (
   camera_id TEXT NOT NULL REFERENCES cameras(id) ON DELETE CASCADE,
   name TEXT NOT NULL,
   detector_types_json TEXT NOT NULL,
-  min_confidence REAL NOT NULL,
   confirmations INTEGER NOT NULL,
   cooldown_seconds INTEGER NOT NULL,
   schedule_json TEXT NOT NULL,
@@ -46,7 +45,7 @@ CREATE TABLE IF NOT EXISTS rules (
   updated_at TEXT NOT NULL
 );
 CREATE UNIQUE INDEX IF NOT EXISTS idx_rules_idempotency
-  ON rules(camera_id,name,detector_types_json,min_confidence,confirmations,cooldown_seconds,schedule_json,actions_json);
+  ON rules(camera_id,name,detector_types_json,confirmations,cooldown_seconds,schedule_json,actions_json);
 
 
 CREATE TABLE IF NOT EXISTS events (
