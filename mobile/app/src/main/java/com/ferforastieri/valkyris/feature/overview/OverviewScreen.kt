@@ -80,7 +80,7 @@ class OverviewViewModel @Inject constructor(private val repository: ValkyrisRepo
         }
     }
 
-    fun refresh() { viewModelScope.launch { runCatching { repository.refreshCameras() };runCatching { repository.refreshEvents() };runCatching { repository.refreshRules() };runCatching { repository.refreshPeople() } } }
+    fun refresh() { viewModelScope.launch { runCatching { repository.refreshCameras() };runCatching { repository.refreshEvents() };runCatching { repository.refreshRules() };runCatching { repository.refreshUsers() } } }
 }
 
 @Composable

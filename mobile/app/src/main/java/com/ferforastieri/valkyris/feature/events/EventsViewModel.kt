@@ -30,9 +30,9 @@ class EventsViewModel @Inject constructor(
     }
 
     private fun connectRealtime() {
-        realtime = repository.api.realtime({ refresh() }) {
+        realtime = repository.api.realtime({ refresh() }, {
             if (active) viewModelScope.launch { delay(5_000); if (active) { connectRealtime(); refresh() } }
-        }
+        }, eventPrefix = "event")
     }
 
     fun refresh() {

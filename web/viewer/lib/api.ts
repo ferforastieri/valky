@@ -108,7 +108,6 @@ export const clock = (value: string): string =>
       }).format(new Date(value))
     : "—";
 export const key = (value: string) => encodeURIComponent(value);
-const sessionKey = "valkyris-viewer-session";
 export class API {
   token = "";
   constructor() {

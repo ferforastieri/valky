@@ -35,30 +35,6 @@ import com.composables.icons.lucide.TriangleAlert
 import com.composables.icons.lucide.Video
 
 @Composable
-fun RulesScreen(vm: RulesViewModel = hiltViewModel()) {
-    val rules by vm.rules.collectAsStateWithLifecycle()
-    val cameras by vm.cameras.collectAsStateWithLifecycle()
-    val detectors by vm.detectors.collectAsStateWithLifecycle()
-    val saving by vm.saving.collectAsStateWithLifecycle()
-    var creating by remember { mutableStateOf(false) }
-    var editing by remember { mutableStateOf<Rule?>(null) }
-    var deleting by remember { mutableStateOf<Rule?>(null) }
-
-    RulesContent(rules, cameras.isNotEmpty() && detectors.isNotEmpty(), saving, onAdd = { creating = true }, onEdit = { editing = it }, onDelete = { deleting = it })
-    if (creating) {
-        RuleEditorDialog(cameras, detectors, saving = saving, preview = vm::preview, onDismiss = { if (!saving) creating = false }) {
-            vm.create(it) { success -> if (success) creating = false }
-        }
-    }
-    editing?.let { existing ->
-        RuleEditorDialog(cameras, detectors, existing, saving = saving, preview = vm::preview, onDismiss = { if (!saving) editing = null }) {
-            vm.update(existing.id, it) { success -> if (success) editing = null }
-        }
-    }
-    deleting?.let { rule -> DeleteRuleDialog(rule, saving, { deleting = null }) { vm.delete(rule.id) { if (it) deleting = null } } }
-}
-
-@Composable
 fun CameraRulesSection(cameraId: String, vm: RulesViewModel = hiltViewModel()) {
     val rules by vm.rules.collectAsStateWithLifecycle()
     val cameras by vm.cameras.collectAsStateWithLifecycle()

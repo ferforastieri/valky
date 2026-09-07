@@ -68,7 +68,7 @@ const cameraName = (id?: string) =>
   cameras.find((c) => c.id === id)?.name || "Câmera";
 const eventName = (event: Event) =>
   event.source === "tracking"
-    ? `${String(event.metadata?.personName || "Pessoa")} ${event.type === "place_entered" ? "entrou em" : "saiu de"} ${String(event.metadata?.placeName || "uma área")}`
+    ? `${String(event.metadata?.personName || "Pessoa")} ${event.type === "place_entered" ? "chegou em" : "saiu de"} ${String(event.metadata?.placeName || "uma área")}`
     : labels[event.type] || event.type;
 const eventSource = (event: Event) =>
   event.source === "tracking"
@@ -198,7 +198,7 @@ function render() {
       .then(({ familyMap }) => {
         if (version !== pageVersion) return;
         viewCleanups.push(
-          familyMap($("#family-map"), page === "family" ? people : [], places),
+          familyMap($("#family-map"), people, places),
         );
       })
       .catch(() => {
@@ -330,7 +330,6 @@ async function renderSystem(version: number) {
           "Limite de mídia",
           retention ? `${retention.maxStorageGB} GB` : "Indisponível",
         ],
-        ["Permissão desta sessão", "Apenas consulta"],
         ["Validade da sessão", "30 dias, renovados durante o uso"],
       ],
     )}<p class="notice" style="margin-top:20px">Gerencie câmeras, regras, áreas e atualizações pelo aplicativo.</p></section>`;
@@ -359,7 +358,7 @@ async function cameraDetails(id: string) {
   if (!c) return;
   openDetails(c.name, "CÂMERA");
   $("#detail-body").innerHTML =
-    `<div class="media-stage"><video id="live-video" autoplay muted controls playsinline></video></div><p id="live-status" class="notice" role="status">Conectando…</p><div class="media-actions"><button id="show-image">Consultar imagem</button><button id="restart-live">Reconectar vídeo</button></div>${dl(
+    `<div class="media-stage"><video id="live-video" autoplay muted controls playsinline></video></div><p id="live-status" class="notice" role="status">Conectando…</p><div class="media-actions"><button id="restart-live">Reconectar vídeo</button></div>${dl(
       [
         [
           "Estado",
@@ -382,7 +381,7 @@ async function cameraDetails(id: string) {
   const connect = () => {
     stop();
     try {
-      stop = live(api, id, $<HTMLVideoElement>("#live-video"), (text) => {
+      stop = live(id, $<HTMLVideoElement>("#live-video"), (text) => {
         const status = $("#live-status");
         if (status) status.textContent = text;
       });
@@ -394,14 +393,7 @@ async function cameraDetails(id: string) {
   connect();
   modalCleanups.push(() => stop());
   $("#restart-live").onclick = connect;
-  $("#show-image").onclick = () => {
-    stop();
-    $("#detail-body .media-stage").innerHTML =
-      `<img data-snapshot="${e(id)}" alt="Imagem de ${e(c.name)}" hidden/>`;
-    $<HTMLButtonElement>("#restart-live").disabled = true;
-    $("#live-status").textContent = "Imagem pontual da câmera.";
-    void snapshots($("#detail-body"), modalController.signal, modalCleanups);
-  };
+
 }
 async function eventDetails(id: string) {
   const version = openDetails("Evento", "ACONTECIMENTO");
@@ -565,9 +557,6 @@ async function refresh(force = false) {
   $("#global-error").textContent = failures.length
     ? "Alguns dados não puderam ser atualizados. Tentaremos novamente automaticamente."
     : "";
-  if (!failures.length)
-    $("#last-sync").textContent =
-      `Atualizado às ${clock(new Date().toISOString())}`;
   $("#count-cameras").textContent = String(cameras.length);
   $("#count-events").textContent = String(
     events.filter((ev) => !ev.acknowledgedAt).length || "",

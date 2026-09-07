@@ -1,7 +1,5 @@
-import type { API } from "./api";
 import { key } from "./api";
 export function live(
-  api: API,
   cameraId: string,
   video: HTMLVideoElement,
   onStatus: (value: string) => void,
@@ -40,13 +38,13 @@ export function live(
   pc.onconnectionstatechange = () => {
     if (pc.connectionState === "failed")
       onStatus(
-        "Sem conexão de vídeo. Confira a rede ou consulte a imagem da câmera.",
+        "Não foi possível conectar o vídeo. Verifique a rede e tente reconectar.",
       );
   };
   timer = setTimeout(
     () =>
       onStatus(
-        "O vídeo não conectou. WebRTC precisa alcançar o servidor de mídia; você pode consultar a imagem abaixo.",
+        "O vídeo ainda não conectou. Verifique se a rede permite alcançar o servidor de mídia.",
       ),
     18000,
   );
@@ -68,6 +66,9 @@ export function live(
         };
       });
       if (closed) return;
+      const offer = pc.localDescription?.sdp;
+      if (!offer?.split(/\r?\n/).some((line) => line.startsWith("a=candidate:")))
+        throw new Error("Não foi possível obter um endereço de rede para conectar a câmera.");
       const response = await fetch(
         `/api/v1/cameras/${key(cameraId)}/live/webrtc/whep`,
         {
@@ -76,7 +77,7 @@ export function live(
             "X-Valkyris-Viewer": "1",
             "Content-Type": "application/sdp",
           },
-          body: pc.localDescription?.sdp,
+          body: offer,
           signal: AbortSignal.any([
             controller.signal,
             AbortSignal.timeout(15000),

@@ -10,7 +10,6 @@ import (
 	"time"
 
 	"github.com/ferforastieri/valkyris/backend/internal/api"
-	"github.com/ferforastieri/valkyris/backend/internal/camera"
 	"github.com/ferforastieri/valkyris/backend/internal/event"
 	"github.com/ferforastieri/valkyris/backend/internal/media"
 	"github.com/ferforastieri/valkyris/backend/internal/notify"
@@ -21,7 +20,6 @@ import (
 type Service struct {
 	Rules         *rules.Service
 	Events        *event.Service
-	Cameras       *camera.Repository
 	Media         *media.Manager
 	Notify        *notify.Service
 	Hub           *api.Hub
@@ -105,13 +103,9 @@ func (s *Service) queueCapture(e event.Event) {
 func (s *Service) captureSnapshot(e event.Event) {
 	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
 	defer cancel()
-	_, cred, err := s.Cameras.Get(ctx, e.CameraID)
-	if err != nil {
-		return
-	}
 	dir := filepath.Join(s.DataDir, "events", e.ID)
 	snapshot := filepath.Join(dir, "snapshot.jpg")
-	if err = s.Media.CaptureSnapshot(ctx, cred.RTSPURI, snapshot); err != nil {
+	if err := s.Media.CaptureSnapshot(ctx, s.Media.RTSPURL(e.CameraID), snapshot); err != nil {
 		s.Logger.Warn("snapshot capture failed", "event", e.ID, "error", err)
 		return
 	}

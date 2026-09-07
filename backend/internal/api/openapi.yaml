@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: Valkyris API
-  version: 1.0.5
+  version: 2.0.0
   description: Local-first home camera monitoring API. JSON responses use a success/message/data envelope; every response also includes X-Valkyris-Success and X-Valkyris-Message headers.
 servers:
   - url: https://valkyris.local:8443/api/v1
@@ -27,6 +27,15 @@ paths:
         '201': {description: Administrator created, content: {application/json: {schema: {$ref: '#/components/schemas/APIResponse'}}}}
         '409': {description: Administrator already configured}
   /viewer-session:
+    get:
+      summary: Restore the current read-only browser session
+      security:
+        - viewerCookie: []
+      parameters:
+        - {in: header, name: X-Valkyris-Viewer, required: true, schema: {type: string, const: '1'}}
+      responses:
+        '200': {description: Active session with readOnly true; cookie renewed during use}
+        '401': {description: Invalid or expired session}
     delete:
       summary: Revoke the current read-only browser session
       responses:
@@ -165,7 +174,17 @@ paths:
     post:
       summary: Record the authenticated device user's location
       requestBody: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/UserLocation'}}}}
-      responses: {'200': {description: Location recorded, content: {application/json: {schema: {$ref: '#/components/schemas/APIResponse'}}}}}
+      responses:
+        '200':
+          description: Reading accepted; pending confirmations require additional fresh readings
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success: {type: boolean}
+                  message: {type: string}
+                  data: {$ref: '#/components/schemas/LocationReportResult'}
   /me/password:
     post:
       summary: Change the administrator home password
@@ -291,6 +310,11 @@ paths:
       responses: {'101': {description: Switching Protocols}}
 components:
   securitySchemes:
+    viewerCookie:
+      type: apiKey
+      in: cookie
+      name: __Host-valkyris-viewer
+      description: Secure HttpOnly SameSite=Strict cookie; requires X-Valkyris-Viewer 1 for all cookie-authenticated API calls. Read-only except WHEP negotiation and logout.
     bearerAuth: {type: http, scheme: bearer}
   parameters:
     id: {name: id, in: path, required: true, schema: {type: string, format: uuid}}
@@ -528,9 +552,14 @@ components:
       required: [initialized]
       properties:
         initialized: {type: boolean}
+    LocationReportResult:
+      type: object
+      properties:
+        transitions: {type: integer, description: Confirmed area changes emitted by this reading}
+        pendingConfirmations: {type: integer, description: Pending changes requiring further fresh readings}
     LoginRequest:
       type: object
-      required: [password, deviceName]
+      required: [password]
       properties:
         password: {type: string, format: password}
         deviceName: {type: string}

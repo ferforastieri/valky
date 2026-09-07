@@ -46,28 +46,15 @@ class RulesViewModel @Inject constructor(
         submit(onComplete) { repository.updateRule(id, rule) }
     }
 
-    fun delete(id: String, onComplete: (Boolean) -> Unit = {}) {
-        if (!actionGate.tryAcquire()) return
-        _saving.value = true
-        viewModelScope.launch {
-            try {
-                val result = runCatching { repository.deleteRule(id) }
-                if (result.isSuccess) runCatching { repository.refreshRules() }
-                onComplete(result.isSuccess)
-            } finally {
-                _saving.value = false
-                actionGate.release()
-            }
-        }
-    }
+    fun delete(id: String, onComplete: (Boolean) -> Unit = {}) =
+        submit(onComplete) { repository.deleteRule(id) }
 
-    private fun submit(onComplete: (Boolean) -> Unit, action: suspend () -> Rule) {
+    private fun submit(onComplete: (Boolean) -> Unit, action: suspend () -> Unit) {
         if (!actionGate.tryAcquire()) return
         _saving.value = true
         viewModelScope.launch {
             try {
                 val result = runCatching { action() }
-                if (result.isSuccess) runCatching { repository.refreshRules() }
                 onComplete(result.isSuccess)
             } finally {
                 _saving.value = false

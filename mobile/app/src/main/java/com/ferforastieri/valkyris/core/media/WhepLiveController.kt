@@ -12,7 +12,6 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.suspendCancellableCoroutine
-import kotlinx.coroutines.withTimeout
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
 import okhttp3.Request
@@ -79,7 +78,7 @@ class WhepLiveController(
         renderer = surface
         surface.init(egl.eglBaseContext, object : org.webrtc.RendererCommon.RendererEvents {
             override fun onFirstFrameRendered() {
-                main.post(onFirstFrame)
+                main.post { if (!closed) onFirstFrame() }
             }
             override fun onFrameResolutionChanged(videoWidth: Int, videoHeight: Int, rotation: Int) = Unit
         })
@@ -101,10 +100,10 @@ class WhepLiveController(
                 peer = connection
                 val offer = connection.createOfferAwait()
                 connection.setLocalAwait(offer)
-                // Waiting for ICE gathering includes the STUN candidate in the
-                // SDP, avoiding a separate trickle-ICE request for this reader.
-                withTimeout(8_000) { iceGathered.await() }
-                val answer = postOffer(requireNotNull(connection.localDescription).description)
+                // STUN can still be gathering while usable LAN candidates exist.
+                // Bound gathering, not the lifetime of an otherwise valid offer.
+                val localSdp = awaitUsableIceOffer(iceGathered) { connection.localDescription?.description }
+                val answer = postOffer(localSdp)
                 connection.setRemoteAwait(SessionDescription(SessionDescription.Type.ANSWER, answer))
             } catch (error: Throwable) {
                 if (!closed) notifyFailure(error.message?.takeIf { it.isNotBlank() } ?: "WebRTC connection failed")
@@ -183,7 +182,7 @@ class WhepLiveController(
     }
 
     private fun notifyFailure(message: String) {
-        main.post { onFailure(message) }
+        main.post { if (!closed) onFailure(message) }
     }
 
     private suspend fun postOffer(sdp: String): String {

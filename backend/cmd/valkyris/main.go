@@ -71,7 +71,7 @@ func main() {
 		MaxStorageGB: cfg.RetentionBytes / (1024 * 1024 * 1024),
 	})
 	hub := api.NewHub()
-	application := &app.Service{Rules: rulesService, Events: eventService, Cameras: cameraRepo, Media: mediaManager, Notify: notifyService, Hub: hub, DataDir: cfg.DataDir, Logger: logger, Preferences: preferencesService}
+	application := &app.Service{Rules: rulesService, Events: eventService, Media: mediaManager, Notify: notifyService, Hub: hub, DataDir: cfg.DataDir, Logger: logger, Preferences: preferencesService}
 	apiServer := api.NewServer(authManager, cameraRepo, onvif, mediaManager, rulesService, eventService, notifyService, hub, logger)
 	apiServer.SetViewerDirectory(cfg.ViewerDir)
 	apiServer.SetSubmitter(application)

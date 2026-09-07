@@ -20,10 +20,6 @@ type CameraLister interface {
 	Get(context.Context, string) (camera.Camera, camera.Credentials, error)
 }
 
-type DetectionSubmitter interface {
-	Submit(context.Context, rules.Detection) (any, error)
-}
-
 type Monitor struct {
 	Cameras CameraLister
 	Rules   interface {

@@ -378,5 +378,3 @@ func writeUnauthorized(w http.ResponseWriter) {
 	w.WriteHeader(http.StatusUnauthorized)
 	_ = json.NewEncoder(w).Encode(map[string]any{"success": false, "message": "authentication required", "error": "authentication required"})
 }
-
-func IsNotFound(err error) bool { return err == sql.ErrNoRows }

@@ -145,23 +145,6 @@ func (c *ONVIFClient) PTZ(ctx context.Context, cam Camera, cred Credentials, com
 	return err
 }
 
-func (c *ONVIFClient) SnapshotURI(ctx context.Context, cam Camera, cred Credentials) (string, error) {
-	endpoint := cam.Services.Media
-	if endpoint == "" {
-		endpoint = fmt.Sprintf("http://%s:%d/onvif/Media", cam.Host, cam.Port)
-	}
-	payload := fmt.Sprintf(`<trt:GetSnapshotUri><trt:ProfileToken>%s</trt:ProfileToken></trt:GetSnapshotUri>`, escape(cam.ProfileToken))
-	body, err := c.call(ctx, endpoint, cred.Username, cred.Password, "http://www.onvif.org/ver10/media/wsdl/GetSnapshotUri", payload)
-	if err != nil {
-		return "", err
-	}
-	uri := elementText(body, "Uri")
-	if uri == "" {
-		return "", fmt.Errorf("camera did not return a snapshot URI")
-	}
-	return uri, nil
-}
-
 // MonitorEvents maintains a renewable ONVIF PullPoint subscription. Returning
 // errors are retried with bounded backoff so a camera reboot does not require
 // restarting Valkyris.

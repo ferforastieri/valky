@@ -69,20 +69,18 @@ class CamerasViewModel @Inject constructor(
         refresh()
         connectRealtime()
         viewModelScope.launch {
-            var cycles = 0
             while (isActive) {
-                delay(if (_state.value.cameras.isEmpty()) EMPTY_STATUS_REFRESH_MS else STATUS_REFRESH_MS)
+                delay(STATUS_REFRESH_MS)
                 runCatching { repository.refreshCameras() }
-                cycles++
-                if (cycles % SNAPSHOT_REFRESH_CYCLES == 0) refreshSnapshots()
+                refreshSnapshots()
             }
         }
     }
 
     private fun connectRealtime() {
-        realtime = api.realtime({ refreshStatuses() }) {
+        realtime = api.realtime({ refreshStatuses() }, {
             if (active) viewModelScope.launch { delay(5_000); if (active) connectRealtime() }
-        }
+        }, eventPrefix = "camera.")
     }
 
     private fun refreshStatuses() {
@@ -96,14 +94,8 @@ class CamerasViewModel @Inject constructor(
         viewModelScope.launch {
             _state.update { it.copy(loading = true, error = null) }
             runCatching { repository.refreshCameras() }
-                .onSuccess { cameras ->
-                    _state.update { state ->
-                        state.copy(
-                            cameras = cameras,
-                            snapshots = state.snapshots.filterKeys { id -> cameras.any { it.id == id } },
-                            loading = false,
-                        )
-                    }
+                .onSuccess {
+                    _state.update { it.copy(loading = false) }
                     refreshSnapshots()
                 }
                 .onFailure { error -> _state.update { it.copy(loading = false, error = error.message) } }
@@ -154,7 +146,7 @@ class CamerasViewModel @Inject constructor(
         viewModelScope.launch {
             try {
                 runCatching { repository.updateCamera(id, input) }
-                    .onSuccess { refresh() }
+                    .onSuccess { refreshSnapshots() }
                     .onFailure { error -> _state.update { it.copy(error = error.message) } }
             } finally {
                 _state.update { it.copy(updating = it.updating - id) }
@@ -178,9 +170,7 @@ class CamerasViewModel @Inject constructor(
     }
 
     private companion object {
-        const val STATUS_REFRESH_MS = 2_000L
-        const val EMPTY_STATUS_REFRESH_MS = 15_000L
-        const val SNAPSHOT_REFRESH_CYCLES = 8
+        const val STATUS_REFRESH_MS = 15_000L
     }
 
     override fun onCleared() {
@@ -209,7 +199,7 @@ class CameraLiveViewModel @Inject constructor(
     private var realtime: okhttp3.WebSocket? = null
 
     init {
-        realtime = api.realtime({ refresh() })
+        realtime = api.realtime({ refresh() }, eventPrefix = "camera.")
         viewModelScope.launch {
             while (isActive) {
                 runCatching { api.cameras().firstOrNull { it.id == id } }.onSuccess { _camera.value = it }

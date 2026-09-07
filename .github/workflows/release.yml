@@ -15,9 +15,9 @@ permissions:
 env:
   IMAGE: ghcr.io/ferforastieri/valkyris
   UPDATER_IMAGE: ghcr.io/ferforastieri/valkyris-updater
-  RELEASE_SERIES: '1.0'
-  # Run 13 published v1.0.5. This keeps the next automatic release at v1.0.6.
-  RELEASE_PATCH_OFFSET: 8
+  RELEASE_SERIES: '2.0'
+  # Run 56 starts 2.0.0; subsequent successful CI runs increment the patch.
+  RELEASE_PATCH_OFFSET: 56
 
 jobs:
   prepare:
@@ -36,7 +36,7 @@ jobs:
           HEAD_SHA: ${{ github.event.workflow_run.head_sha }}
         run: |
           patch=$((GITHUB_RUN_NUMBER - RELEASE_PATCH_OFFSET))
-          test "$patch" -gt 0
+          test "$patch" -ge 0
           {
             echo "version=v${RELEASE_SERIES}.${patch}"
             echo "apk_version=${RELEASE_SERIES}.${patch}"

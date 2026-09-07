@@ -35,10 +35,12 @@ func TestConfigureCameraUsesMediaMTXPathPlaceholder(t *testing.T) {
 			t.Fatal(err)
 		}
 		switch r.URL.Path {
-		case "/v3/config/global/patch":
-			if r.Method != http.MethodPatch || payload["rtsp"] != true || payload["playback"] != true {
-				t.Fatalf("invalid global transport configuration: %v", payload)
+		case "/v3/config/paths/patch/camera-abc", "/v3/config/paths/patch/camera-abc-source":
+			if r.Method != http.MethodPatch {
+				t.Fatalf("expected patch, got %s", r.Method)
 			}
+			w.WriteHeader(http.StatusNotFound)
+			return
 		case "/v3/config/paths/add/camera-abc":
 			if r.Method != http.MethodPost {
 				t.Fatalf("unexpected method for output path: %s", r.Method)
@@ -73,8 +75,8 @@ func TestConfigureCameraUsesMediaMTXPathPlaceholder(t *testing.T) {
 	if err := manager.ConfigureCamera(context.Background(), "abc", cameraSource); err != nil {
 		t.Fatal(err)
 	}
-	if requests != 3 {
-		t.Fatalf("expected global transport, output and source paths, got %d requests", requests)
+	if requests != 4 {
+		t.Fatalf("expected patch/create for output and source paths, got %d requests", requests)
 	}
 }
 
@@ -166,5 +168,40 @@ func TestPreviewSharesCaptureAndSurvivesCancelledReader(t *testing.T) {
 	calls, err := os.ReadFile(dir + "/calls")
 	if err != nil || strings.Count(string(calls), "capture") != 1 {
 		t.Fatalf("duplicate captures: %q %v", calls, err)
+	}
+}
+
+func TestConfigureExistingCameraUpdatesWithoutCreateOrGlobalRoundtrip(t *testing.T) {
+	var requests []string
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		requests = append(requests, r.Method+" "+r.URL.Path)
+		if r.Method != http.MethodPatch || !strings.HasPrefix(r.URL.Path, "/v3/config/paths/patch/") {
+			t.Errorf("unexpected request: %s %s", r.Method, r.URL.Path)
+		}
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer server.Close()
+	m := New(server.URL, "rtsp://media", "http://webrtc", "http://playback", t.TempDir())
+	if err := m.ConfigureCamera(context.Background(), "abc", "rtsp://camera/stream"); err != nil {
+		t.Fatal(err)
+	}
+	if len(requests) != 2 {
+		t.Fatalf("requests: %v", requests)
+	}
+}
+
+func TestConfigureInvalidPathDoesNotAttemptCreate(t *testing.T) {
+	requests := 0
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		requests++
+		w.WriteHeader(http.StatusBadRequest)
+	}))
+	defer server.Close()
+	m := New(server.URL, "rtsp://media", "http://webrtc", "http://playback", t.TempDir())
+	if err := m.ConfigureCamera(context.Background(), "abc", "rtsp://camera/stream"); err == nil {
+		t.Fatal("expected validation error")
+	}
+	if requests != 1 {
+		t.Fatalf("unexpected retry count: %d", requests)
 	}
 }

@@ -15,22 +15,22 @@ const text = pt ? {
   eyebrow: 'GUIA OPERACIONAL · API V1',
   intro: 'Tudo o que você precisa para instalar o servidor, preparar uma câmera, conectar o Android e integrar a API — sem expor RTSP ou a câmera à internet.',
   onThisPage: 'Nesta página',
-  toc: [['start','Começar'],['architecture','Arquitetura'],['camera','Preparar a câmera'],['android','Android'],['configuration','Configuração'],['api','API HTTP'],['updates','Atualizações'],['security','Segurança'],['diagnostics','Diagnóstico']],
+  toc: [['start','Começar'],['architecture','Arquitetura'],['camera','Preparar a câmera'],['android','Android'],['viewer','Painel web'],['family','Localização e regras'],['configuration','Configuração'],['api','API HTTP'],['updates','Atualizações'],['security','Segurança'],['diagnostics','Diagnóstico']],
   requirements: ['Linux em amd64 ou arm64', 'Docker Engine com Docker Compose v2', 'Android 8.0 (SDK 26) ou mais recente', 'Câmera ONVIF Profile S com RTSP', 'Servidor, celular e câmera acessíveis por LAN ou VPN'],
-  methods: 'Bearer obrigatório, exceto onde indicado como público.',
+  methods: 'Bearer no Android e integrações; o painel usa cookie HttpOnly e X-Valkyris-Viewer: 1. Rotas públicas dispensam sessão.',
 } : {
   title: 'Valkyris documentation',
   description: 'Installation, ONVIF camera setup, security, operations and complete Valkyris HTTP API reference.',
   eyebrow: 'OPERATIONS GUIDE · API V1',
   intro: 'Everything needed to install the server, prepare a camera, connect Android and integrate the API — without exposing RTSP or the camera to the internet.',
   onThisPage: 'On this page',
-  toc: [['start','Get started'],['architecture','Architecture'],['camera','Prepare a camera'],['android','Android'],['configuration','Configuration'],['api','HTTP API'],['updates','Updates'],['security','Security'],['diagnostics','Diagnostics']],
+  toc: [['start','Get started'],['architecture','Architecture'],['camera','Prepare a camera'],['android','Android'],['viewer','Web dashboard'],['family','Location and rules'],['configuration','Configuration'],['api','HTTP API'],['updates','Updates'],['security','Security'],['diagnostics','Diagnostics']],
   requirements: ['Linux on amd64 or arm64', 'Docker Engine with Docker Compose v2', 'Android 8.0 (SDK 26) or later', 'ONVIF Profile S camera with RTSP', 'Server, phone and camera reachable over LAN or VPN'],
-  methods: 'Bearer token required except routes marked public.',
+  methods: 'Android and integrations use bearer tokens; the dashboard uses an HttpOnly cookie and X-Valkyris-Viewer: 1. Public routes require no session.',
 };
 
 const endpoints = pt ? [
-  ['GET','/health','Público','Saúde do servidor e versão em execução.'],
+  ['GET','/health','Público','Saúde do servidor.'],
   ['GET','/openapi.yaml','Público','Contrato OpenAPI 3.1 servido pelo backend.'],
   ['GET','/api/v1/auth/status','Público','Informa se o primeiro administrador já existe.'],
   ['POST','/api/v1/admin/bootstrap','Público','Cria a senha da casa e o primeiro administrador, uma única vez.'],
@@ -40,7 +40,6 @@ const endpoints = pt ? [
   ['GET · POST','/api/v1/cameras','Autenticado','Lista câmeras ou inicia o cadastro assíncrono.'],
   ['PUT · DELETE','/api/v1/cameras/{id}','Autenticado','Edita ou remove uma câmera; uma mudança de conexão reinicia sua configuração.'],
   ['GET','/api/v1/camera-operations/{id}','Autenticado','Acompanha a descoberta ONVIF e a configuração de mídia.'],
-  ['DELETE','/api/v1/cameras/{id}','Autenticado','Remove câmera, stream e dados associados.'],
   ['POST','/api/v1/cameras/{id}/ptz','Autenticado','Move, para ou aplica zoom quando suportado.'],
   ['GET','/api/v1/cameras/{id}/snapshot','Autenticado','Retorna um frame JPEG do stream local atual.'],
   ['GET','/api/v1/cameras/{id}/recording','Autenticado','Baixa os últimos 10 segundos do buffer em MP4.'],
@@ -51,7 +50,11 @@ const endpoints = pt ? [
   ['GET','/api/v1/users','Autenticado','Lista os perfis da família vinculados aos dispositivos pareados.'],
   ['GET','/api/v1/users/{id}/history','Autenticado','Retorna o histórico de localização de um usuário.'],
   ['POST','/api/v1/me/location','Autenticado','Registra a localização do usuário vinculado ao dispositivo atual.'],
-  ['GET · POST · PUT · DELETE','/api/v1/places','Autenticado / Admin ao alterar','Lista áreas ou cria, edita e remove áreas de alerta.'],
+  ['GET · POST','/api/v1/places','Autenticado / Admin ao alterar','Lista áreas ou cria uma área de alerta.'],
+  ['PUT · DELETE','/api/v1/places/{id}','Admin','Edita ou remove uma área.'],
+  ['GET · PUT','/api/v1/me','Autenticado','Consulta ou atualiza o perfil do próprio dispositivo.'],
+  ['POST','/api/v1/me/password','Admin','Troca a senha da casa e revoga as sessões web.'],
+  ['GET · DELETE','/api/v1/viewer-session','Sessão web','Restaura ou revoga a sessão do painel.'],
   ['GET','/api/v1/events','Autenticado','Lista eventos recentes.'],
   ['GET','/api/v1/events/{id}','Autenticado','Retorna metadados de um evento.'],
   ['POST','/api/v1/events/{id}/acknowledge','Autenticado','Reconhece o evento e interrompe o alarme.'],
@@ -65,7 +68,7 @@ const endpoints = pt ? [
   ['GET · POST','/api/v1/system/update','Admin ao atualizar','Consulta uma release ou inicia atualização do backend.'],
   ['GET','/api/v1/realtime','Autenticado','WebSocket para mudanças de câmeras e eventos.'],
 ] : [
-  ['GET','/health','Public','Server health and running version.'],
+  ['GET','/health','Public','Server health.'],
   ['GET','/openapi.yaml','Public','OpenAPI 3.1 contract served by the backend.'],
   ['GET','/api/v1/auth/status','Public','Reports whether the first administrator exists.'],
   ['POST','/api/v1/admin/bootstrap','Public','Creates the home password and first administrator once.'],
@@ -75,7 +78,6 @@ const endpoints = pt ? [
   ['GET · POST','/api/v1/cameras','Authenticated','Lists cameras or starts asynchronous setup.'],
   ['PUT · DELETE','/api/v1/cameras/{id}','Authenticated','Edits or deletes a camera; connection changes restart its setup.'],
   ['GET','/api/v1/camera-operations/{id}','Authenticated','Tracks ONVIF discovery and media setup.'],
-  ['DELETE','/api/v1/cameras/{id}','Authenticated','Removes a camera, stream and related data.'],
   ['POST','/api/v1/cameras/{id}/ptz','Authenticated','Moves, stops or zooms when supported.'],
   ['GET','/api/v1/cameras/{id}/snapshot','Authenticated','Returns a JPEG frame from the current local stream.'],
   ['GET','/api/v1/cameras/{id}/recording','Authenticated','Downloads the latest 10 seconds from the rolling buffer as MP4.'],
@@ -86,7 +88,11 @@ const endpoints = pt ? [
   ['GET','/api/v1/users','Authenticated','Lists family profiles linked to paired devices.'],
   ['GET','/api/v1/users/{id}/history','Authenticated','Returns a user location history.'],
   ['POST','/api/v1/me/location','Authenticated','Records the location of the user linked to the current device.'],
-  ['GET · POST · PUT · DELETE','/api/v1/places','Authenticated / Admin to change','Lists areas or creates, edits and removes alert areas.'],
+  ['GET · POST','/api/v1/places','Authenticated / Admin to change','Lists areas or creates an alert area.'],
+  ['PUT · DELETE','/api/v1/places/{id}','Admin','Edits or removes an area.'],
+  ['GET · PUT','/api/v1/me','Authenticated','Reads or updates this device owner profile.'],
+  ['POST','/api/v1/me/password','Admin','Changes the home password and revokes browser sessions.'],
+  ['GET · DELETE','/api/v1/viewer-session','Browser session','Restores or revokes the dashboard session.'],
   ['GET','/api/v1/events','Authenticated','Lists recent events.'],
   ['GET','/api/v1/events/{id}','Authenticated','Returns event metadata.'],
   ['POST','/api/v1/events/{id}/acknowledge','Authenticated','Acknowledges the event and stops its alarm.'],
@@ -139,7 +145,7 @@ const endpoints = pt ? [
             <article><strong>Go + SQLite</strong><small>{pt ? 'regras · eventos' : 'rules · events'}</small></article><i>→</i>
             <article><strong>Android</strong><small>Compose · push</small></article>
           </div>
-          <p>{pt ? 'O backend é o limite de segurança. O app nunca recebe a senha da câmera, e o MediaMTX não publica portas no host. Credenciais ficam cifradas com AES-256-GCM; tokens são persistidos somente como hash.' : 'The backend is the security boundary. The app never receives camera passwords, and MediaMTX publishes no host ports. Credentials use AES-256-GCM encryption; tokens are stored only as hashes.'}</p>
+          <p>{pt ? 'O backend é o limite de segurança. O app nunca recebe a senha da câmera. As portas de controle e RTSP do MediaMTX são internas; somente a mídia WebRTC usa a porta 8189 UDP/TCP no host. Credenciais ficam cifradas com AES-256-GCM; tokens são persistidos somente como hash.' : 'The backend is the security boundary. The app never receives camera passwords. MediaMTX control and RTSP ports remain internal; only WebRTC media uses host port 8189 UDP/TCP. Credentials use AES-256-GCM encryption; tokens are stored only as hashes.'}</p>
         </section>
 
         <section id="camera">
@@ -169,10 +175,30 @@ const endpoints = pt ? [
           <p>{pt ? 'A API aceita a mesma configuração para integrações administrativas em PUT /api/v1/settings/push, usando serviceAccountBase64. A conta nunca é retornada pela API.' : 'The API accepts the same setup for administrative integrations at PUT /api/v1/settings/push with serviceAccountBase64. The account is never returned by the API.'}</p>
         </section>
 
+
+        <section id="viewer">
+          <div class="docs-heading"><Network size={22}/><div><h2>{pt ? 'Painel web no seu servidor' : 'Web dashboard on your server'}</h2></div></div>
+          <p>{pt ? 'Abra /app/ na URL HTTPS da instalação e use a senha da casa. O painel consulta câmeras ao vivo, eventos, família, percursos e informações do servidor. Regras ficam dentro da câmera e áreas em Família. Edição, PTZ, marcar como lido e atualizações continuam no aplicativo.' : 'Open /app/ at your installation HTTPS URL and use the home password. The dashboard displays live cameras, events, family, routes and server information. Rules live inside camera details and areas under Family. Editing, PTZ, marking events as read and updates remain in the app.'}</p>
+          <p>{pt ? 'A sessão usa cookie Secure, HttpOnly e SameSite=Strict, válido por 30 dias e renovado durante o uso. Sair ou trocar a senha revoga a sessão. O painel vem na imagem Docker e não exige Node nem deploy na Vercel. Dados são consultados a cada 15 segundos com a aba visível.' : 'Sessions use a Secure, HttpOnly, SameSite=Strict cookie, valid for 30 days and renewed during use. Logout or password changes revoke sessions. The dashboard ships in the Docker image and requires neither Node nor Vercel deployment. Data refreshes every 15 seconds while the tab is visible.'}</p>
+          <h3>WebRTC · Cloudflare Tunnel</h3>
+          <p>{pt ? 'Android e painel usam os mesmos endpoints WHEP. O túnel leva HTTPS e a negociação, mas áudio e vídeo precisam alcançar o MediaMTX por ICE. Libere 8189 UDP/TCP na rede privada e configure VALKYRIS_WEBRTC_HOSTS com endereços LAN/VPN alcançáveis. O domínio do túnel não é endereço de mídia. STUN pode auxiliar conexão direta; NAT restritivo exige VPN, rota pública de mídia ou TURN configurado.' : 'Android and the dashboard use the same WHEP endpoints. The tunnel carries HTTPS and signaling, but audio and video must reach MediaMTX through ICE. Allow 8189 UDP/TCP on the private network and set VALKYRIS_WEBRTC_HOSTS to reachable LAN/VPN addresses. The tunnel hostname is not a media address. STUN can assist direct connections; restrictive NAT requires VPN, a public media route or configured TURN.'}</p>
+          <p>{pt ? 'O player não substitui WebRTC por imagem ou HLS. A espera ICE de oito segundos não encerra a conexão Android quando já existem candidatos utilizáveis. Um HTTP 201 na negociação não comprova reprodução: verifique frames recebidos.' : 'The player does not replace WebRTC with a snapshot or HLS. An eight-second ICE wait does not abort Android negotiation when usable candidates already exist. HTTP 201 during signaling does not prove playback: verify received frames.'}</p>
+        </section>
+
+        <section id="family">
+          <div class="docs-heading"><Smartphone size={22}/><div><h2>{pt ? 'Localização, eventos e movimento' : 'Location, events and motion'}</h2></div></div>
+          <p>{pt ? 'O Android integra fontes de localização com Fused Location Provider. Uma entrada ou saída exige três leituras por pelo menos dois minutos, além da margem de precisão. Leitura inconclusiva ou retorno cancela a confirmação. O servidor pede amostras enquanto há confirmação pendente, sem preencher o histórico com pontos estacionários.' : 'Android combines location sources through Fused Location Provider. Entering or leaving requires three readings spanning at least two minutes, beyond the accuracy margin. An uncertain reading or return cancels confirmation. The server requests samples while confirmation is pending without filling history with stationary points.'}</p>
+          <p>{pt ? 'Alertas mostram pessoa e área, e não são enviados ao próprio usuário que se deslocou. O histórico tem pontos numerados, horário e precisão; os mapas aproximam pessoas próximas. A precisão é estimada, e falta de rede ou sinal pode adiar alertas. Instale o APK atualizado em cada celular.' : 'Alerts name the person and area and are not sent to the moving user. History shows numbered points, time and accuracy; maps zoom in on nearby people. Accuracy is estimated, and missing signal or connectivity may delay alerts. Install the current APK on every phone.'}</p>
+          <p>{pt ? 'Nas regras da câmera, movimento persistente permite selecionar uma região da imagem, duração, sensibilidade e dias/horários, inclusive 22:00–06:00. Mantenha a câmera fixa e redesenhe a região após mover PTZ. A análise detecta movimento na região, não identifica o bebê, postura, respiração ou perigo médico; não substitui supervisão.' : 'Camera rules support persistent motion in an image region, duration, sensitivity and days/time windows, including 22:00–06:00. Keep the camera fixed and redraw the region after PTZ movement. Analysis detects regional motion, not baby identity, posture, breathing or medical danger; it does not replace supervision.'}</p>
+          <p>{pt ? 'Eventos são separados em localização, áudio e câmera. Detalhes mostram pessoa/área e posição quando disponíveis; clipes indicam se estão processando, prontos ou indisponíveis.' : 'Events are grouped into location, audio and camera categories. Details show person/area and position when available; clips report processing, ready or unavailable states.'}</p>
+        </section>
+
         <section id="configuration">
           <div class="docs-heading"><ServerCog size={22}/><div><span>05</span><h2>{pt ? 'Configuração' : 'Configuration'}</h2></div></div>
           <div class="config-table" role="table">
             {[
+              ['VALKYRIS_WEBRTC_HOSTS','IP LAN/VPN',pt?'Endereços de mídia anunciados, separados por vírgula.':'Advertised media addresses, comma separated.'],
+              ['VALKYRIS_WEB_DIR','/opt/valkyris/web',pt?'Build estático do painel no backend.':'Static dashboard build served by the backend.'],
               ['VALKYRIS_LISTEN',':8443',pt?'Endereço interno do serviço HTTPS.':'Internal HTTPS listen address.'],
               ['VALKYRIS_DATA_DIR','/data',pt?'Volume persistente.':'Persistent data volume.'],
               ['VALKYRIS_DATABASE','/data/valkyris.db','SQLite.'],
@@ -203,10 +229,15 @@ const endpoints = pt ? [
           <div class="docs-heading"><Download size={22}/><div><span>07</span><h2>{pt ? 'Atualizações' : 'Updates'}</h2></div></div>
           <p>{pt ? 'Quando uma release estável mais nova existir, o app cria um evento de atualização. Um administrador pode atualizar o container do backend pelo botão; depois, o APK assinado é baixado do GitHub e o Android solicita confirmação para instalar.' : 'When a newer stable release exists, the app creates an update event. An administrator can update the backend container from the action; the signed APK is then downloaded from GitHub and Android requests installation confirmation.'}</p>
           <p>{pt ? 'SQLite, clipes e snapshots permanecem no volume valkyris-data. O atualizador aceita somente tags de release validadas e não é exposto em uma porta do host.' : 'SQLite, clips and snapshots remain in the valkyris-data volume. The updater accepts only validated release tags and exposes no host port.'}</p>
+
+          <p>{pt ? 'Na série 2.x, a API permanece /api/v1 e a migração preserva dados. O atualizador interno troca apenas o backend; execute o instalador novamente no host para atualizar também Compose, MediaMTX e o updater. O APK precisa ser instalado em cada celular com confirmação do Android. A consulta de releases tem cache de até 15 minutos.' : 'In the 2.x series the API remains /api/v1 and migration preserves data. The internal updater replaces only the backend; rerun the installer on the host to also update Compose, MediaMTX and the updater. Install the APK on each phone with Android confirmation. Release checks are cached for up to 15 minutes.'}</p>
         </section>
 
         <section id="security">
           <div class="docs-heading"><ShieldCheck size={22}/><div><span>08</span><h2>{pt ? 'Segurança e backup' : 'Security and backup'}</h2></div></div>
+
+          <p>{pt ? 'A API limita por minuto: 3000 requisições globais e 1200 por endereço; autenticação tem 30 globais e 10 por endereço; snapshots/gravações têm 60 por sessão/endereço, e abertura WHEP tem 12. Respostas 429 incluem Retry-After. O backend não confia em X-Forwarded-For ou CF-Connecting-IP do cliente; usuários de um proxy compartilham o orçamento. Os contadores são locais ao processo.' : 'Per-minute API limits: 3000 global and 1200 per address; authentication has 30 global and 10 per address; snapshots/recordings have 60 per session/address, and WHEP creation has 12. A 429 response includes Retry-After. The backend does not trust client X-Forwarded-For or CF-Connecting-IP headers; proxy users share its budget. Counters are process-local.'}</p>
+          <p>{pt ? 'Para backup, use a API de backup SQLite ou pare a stack antes de copiar o volume. Preserve banco, WAL quando aplicável, chave mestra, certificados, mídia, .env, Compose e mediamtx.yml. Copiar apenas o .db em execução pode gerar backup incompleto.' : 'For backups, use the SQLite backup API or stop the stack before copying the volume. Preserve the database, WAL when applicable, master key, certificates, media, .env, Compose and mediamtx.yml. Copying only a running .db can produce an incomplete backup.'}</p>
           <ul>
             <li>{pt ? 'Não encaminhe 554, 2020, 8888 ou 9997 no roteador.' : 'Do not forward ports 554, 2020, 8888 or 9997 on the router.'}</li>
             <li>{pt ? 'Use TLS confiável por proxy reverso ou instale a CA privada no celular.' : 'Use trusted TLS through a reverse proxy or install the private CA on the phone.'}</li>

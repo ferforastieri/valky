@@ -59,9 +59,6 @@ func (m *Manager) ConfigureCamera(ctx context.Context, id, rtspURI string) error
 	if !mediaPathID.MatchString(id) {
 		return fmt.Errorf("invalid camera ID for media path")
 	}
-	if err := m.ensureInternalRTSP(ctx); err != nil {
-		return fmt.Errorf("configure internal media transport: %w", err)
-	}
 	outputPath := "camera-" + id
 	sourcePath := outputPath + "-source"
 
@@ -95,39 +92,18 @@ func (m *Manager) ConfigureCamera(ctx context.Context, id, rtspURI string) error
 	return nil
 }
 
-func (m *Manager) ensureInternalRTSP(ctx context.Context) error {
-	payload, err := json.Marshal(map[string]any{
-		"rtsp":            true,
-		"rtspAddress":     ":8554",
-		"rtspTransports":  []string{"tcp"},
-		"playback":        true,
-		"playbackAddress": ":9996",
-	})
-	if err != nil {
-		return err
-	}
-	resp, body, err := m.configurePath(ctx, http.MethodPatch, m.api+"/v3/config/global/patch", payload)
-	if err != nil {
-		return err
-	}
-	if resp.StatusCode/100 != 2 {
-		return mediaMTXResponseError(resp.Status, body, "")
-	}
-	return nil
-}
-
 func (m *Manager) upsertPath(ctx context.Context, name string, settings map[string]any, secret string) error {
 	payload, err := json.Marshal(settings)
 	if err != nil {
 		return fmt.Errorf("encode media path configuration: %w", err)
 	}
-	endpoint := m.api + "/v3/config/paths/add/" + url.PathEscape(name)
-	resp, body, err := m.configurePath(ctx, http.MethodPost, endpoint, payload)
+	endpoint := m.api + "/v3/config/paths/patch/" + url.PathEscape(name)
+	resp, body, err := m.configurePath(ctx, http.MethodPatch, endpoint, payload)
 	if err != nil {
 		return err
 	}
-	if resp.StatusCode == http.StatusConflict {
-		resp, body, err = m.configurePath(ctx, http.MethodPatch, strings.Replace(endpoint, "/add/", "/patch/", 1), payload)
+	if resp.StatusCode == http.StatusNotFound {
+		resp, body, err = m.configurePath(ctx, http.MethodPost, strings.Replace(endpoint, "/patch/", "/add/", 1), payload)
 		if err != nil {
 			return err
 		}

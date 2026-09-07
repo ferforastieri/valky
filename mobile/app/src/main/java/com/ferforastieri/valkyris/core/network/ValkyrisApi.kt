@@ -235,7 +235,6 @@ class ValkyrisApi(
 
     suspend fun updateRetention(settings: RetentionSettings): RetentionSettings = put("/settings/retention", settings, announceBackend = true)
 
-    suspend fun people(): List<TrackedPerson> = get("/people")
     suspend fun users(): List<TrackedPerson> = get("/users")
     suspend fun me(): TrackedPerson = get("/me")
     suspend fun updateMe(user: TrackedPerson): TrackedPerson = put("/me", user, announceBackend = true)
@@ -245,17 +244,6 @@ class ValkyrisApi(
         announceBackend = true,
     )
     suspend fun updateUser(id: String, user: TrackedPerson): TrackedPerson = put("/users/$id", user, announceBackend = true)
-    suspend fun createPerson(person: TrackedPerson): TrackedPerson = post("/people", person, announceBackend = true)
-    suspend fun updatePerson(id: String, person: TrackedPerson): TrackedPerson = put("/people/$id", person, announceBackend = true)
-    suspend fun deletePerson(id: String) {
-        val current = requireNotNull(session())
-        executeUnit(current.fingerprint, announceBackend = true) {
-            it.delete(base() + "/people/$id") {
-                bearerAuth(current.token)
-                header(HttpHeaders.AcceptLanguage, Locale.getDefault().toLanguageTag())
-            }
-        }
-    }
     suspend fun places(): List<TrackedPlace> = get("/places")
     suspend fun createPlace(place: TrackedPlace): TrackedPlace = post(
         "/places",
@@ -369,7 +357,6 @@ class ValkyrisApi(
     fun recordingUrl(cameraId: String) = base() + "/cameras/$cameraId/recording"
     fun whepUrl(cameraId: String) = base() + "/cameras/$cameraId/live/webrtc/whep"
     fun clipUrl(eventId: String) = base() + "/events/$eventId/clip"
-    fun eventSnapshotUrl(eventId: String) = base() + "/events/$eventId/snapshot"
     fun token() = requireNotNull(session()).token
 
     suspend fun downloadCameraSnapshot(cameraId: String): ByteArray = downloadMedia(snapshotUrl(cameraId))
@@ -395,7 +382,7 @@ class ValkyrisApi(
         }
     }
 
-    fun realtime(onMessage: () -> Unit, onDisconnect: () -> Unit = {}): WebSocket {
+    fun realtime(onMessage: () -> Unit, onDisconnect: () -> Unit = {}, eventPrefix: String = ""): WebSocket {
         val current = requireNotNull(session())
         val wsUrl = current.baseUrl.replaceFirst("https://", "wss://").replaceFirst("http://", "ws://")
             .trimEnd('/') + "/api/v1/realtime"
@@ -405,7 +392,10 @@ class ValkyrisApi(
             .header("Accept-Language", Locale.getDefault().toLanguageTag())
             .build()
         return pinnedClient(current.fingerprint).newWebSocket(request, object : WebSocketListener() {
-            override fun onMessage(webSocket: WebSocket, text: String) = onMessage()
+            override fun onMessage(webSocket: WebSocket, text: String) {
+                val type = runCatching { org.json.JSONObject(text).optString("type") }.getOrDefault("")
+                if (type.startsWith(eventPrefix)) onMessage()
+            }
             override fun onFailure(webSocket: WebSocket, t: Throwable, response: Response?) {
                 onDisconnect()
             }

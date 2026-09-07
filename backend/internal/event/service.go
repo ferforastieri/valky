@@ -51,10 +51,6 @@ func (s *Service) Create(ctx context.Context, e Event) (Event, error) {
 	_, err := s.store.DB.ExecContext(ctx, `INSERT INTO events(id,camera_id,rule_id,source,subject_id,type,confidence,occurred_at,snapshot_path,clip_path,clip_status,clip_error,metadata_json,created_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?)`, e.ID, nullable(e.CameraID), rule, e.Source, e.SubjectID, e.Type, e.Confidence, e.OccurredAt.Format(time.RFC3339Nano), nullable(e.SnapshotPath), nullable(e.ClipPath), e.ClipStatus, nullable(e.ClipError), string(meta), e.CreatedAt.Format(time.RFC3339Nano))
 	return e, err
 }
-func (s *Service) SetMedia(ctx context.Context, id, snapshot, clip string) error {
-	_, err := s.store.DB.ExecContext(ctx, `UPDATE events SET snapshot_path=?,clip_path=?,clip_status=CASE WHEN ?='' THEN clip_status ELSE 'ready' END,clip_error=NULL WHERE id=?`, nullable(snapshot), nullable(clip), clip, id)
-	return err
-}
 func (s *Service) SetSnapshot(ctx context.Context, id, snapshot string) error {
 	_, err := s.store.DB.ExecContext(ctx, `UPDATE events SET snapshot_path=? WHERE id=?`, nullable(snapshot), id)
 	return err

@@ -29,6 +29,7 @@ Valkyris transforma um servidor doméstico em uma central privada de monitoramen
 - Eventos com snapshot, reconhecimento, notificação e clipe com pré/pós-evento.
 - Credenciais de câmera cifradas com AES-256-GCM e tokens persistidos somente como hash.
 - Atualização do backend pelo app e download do APK assinado diretamente da release no GitHub.
+- Painel web em /app/, servido pelo próprio backend, para consultar câmeras, eventos, família e configurações.
 - Interface em PT-BR e inglês, temas claro/escuro e suporte a LAN ou VPN.
 
 ## Como funciona
@@ -37,15 +38,15 @@ Valkyris transforma um servidor doméstico em uma central privada de monitoramen
 Câmera ONVIF / RTSP
          │
          ▼
-  MediaMTX interno ─── WebRTC direto ─── Android
+  MediaMTX interno ─── WebRTC direto ─── Android / painel web
          │
          ├── ONVIF: capabilities, eventos e PTZ
-         ├── FFmpeg: snapshots, G.711 → AAC, detecção e buffer
+         ├── FFmpeg: snapshots, G.711 → Opus, detecção e buffer
          ▼
  Detectores locais → Regras → Evento + mídia → FCM → alerta nativo Android
 ```
 
-O backend Go é o limite de segurança: o app nunca recebe a senha da câmera e o MediaMTX não publica portas no host. SQLite, certificados, segredos, snapshots e clipes vivem no volume persistente `valkyris-data`.
+O backend Go é o limite de segurança: o app nunca recebe a senha da câmera e as APIs internas do MediaMTX não são expostas. Apenas a porta de mídia WebRTC 8189 UDP/TCP é publicada. SQLite, certificados, segredos, snapshots e clipes vivem no volume persistente `valkyris-data`.
 
 ## Tecnologias
 
@@ -53,8 +54,8 @@ O backend Go é o limite de segurança: o app nunca recebe a senha da câmera e 
 | --- | --- |
 | Backend | Go 1.26, SQLite, ONVIF, FFmpeg, sherpa-onnx, WebSocket |
 | Mídia | MediaMTX, RTSP, WebRTC/WHEP, MP4 |
-| Android | Kotlin, Jetpack Compose, Material 3, Hilt, Room, DataStore, Ktor/OkHttp, Media3, Coil, Firebase Cloud Messaging |
-| Web | Astro, TypeScript, CSS, Lucide, geração estática para Vercel |
+| Android | Kotlin, Jetpack Compose, Material 3, Hilt, DataStore, Ktor/OkHttp, Media3, Coil, Firebase Cloud Messaging |
+| Web | Astro, TypeScript, CSS, Lucide, landing estática e painel de consulta incluído na imagem Docker |
 | Distribuição | Docker Compose, GHCR multiarch (`amd64`/`arm64`), GitHub Actions, APK assinado |
 
 ## Requisitos
@@ -85,7 +86,9 @@ Depois:
 3. No primeiro acesso, crie a senha da casa; esse dispositivo se torna administrador.
 4. Cadastre a câmera com nome, ícone, IP, usuário e senha. Para Tapo, o RTSP principal é montado automaticamente.
 
-Para acessar de fora de casa, use uma VPN como Tailscale ou WireGuard. Um proxy reverso como Caddy pode fornecer um certificado TLS reconhecido pelo Android para um domínio privado.
+Para acessar de fora de casa, use uma VPN como Tailscale ou WireGuard, ou publique o HTTPS por proxy/túnel. O Cloudflare Tunnel transporta a API e a negociação WHEP, mas não a mídia WebRTC: o cliente precisa alcançar a porta 8189 UDP/TCP por LAN, VPN ou outra rota ICE configurada. O instalador preserva VALKYRIS_WEBRTC_HOSTS com o endereço do servidor; não use o domínio do túnel como endereço de mídia. Veja [conectividade WebRTC](docs/webrtc-connectivity.md).
+
+Abra https://SEU_SERVIDOR/app/ e entre com a senha da casa para consultar o painel. Regras ficam nos detalhes da câmera; áreas e percursos ficam em Família. O painel não permite PTZ, edição, marcar eventos como lidos ou atualizar o servidor.
 
 ## Rodar para desenvolvimento
 
@@ -141,7 +144,7 @@ O APK de desenvolvimento será criado em `mobile/app/build/outputs/apk/debug/`.
 ```text
 backend/   API Go, domínio, ONVIF, mídia, detectores, regras e persistência
 mobile/    aplicativo Android nativo em Kotlin e Jetpack Compose
-web/       landing page e documentação estática em Astro
+web/       landing/documentação Astro; viewer/ contém o painel servido em /app/
 updater/   sidecar isolado para atualizações autorizadas pelo administrador
 docs/      decisões de arquitetura e notas operacionais do repositório
 ```
@@ -230,11 +233,56 @@ Em pushes e pull requests, o GitHub Actions executa formatação, análise está
 
 Não é necessário criar tags nem executar comandos de release manualmente: basta fazer commit e push para `main`.
 
+## Família, eventos e segurança da consulta
+
+A localização Android usa Fused Location Provider. O servidor combina margem de
+precisão com três observações por pelo menos dois minutos antes de avisar entrada
+ou saída; leituras inconclusivas cancelam a confirmação. O celular envia amostras
+adicionais enquanto necessário, mas o histórico descarta pontos estacionários.
+Alertas incluem pessoa e área, sem notificar o próprio usuário que se deslocou.
+O percurso tem pontos numerados e detalhes de horário/precisão. Veja
+[localização](docs/location-tracking.md).
+
+Regras de movimento podem limitar região da imagem, duração, sensibilidade e
+horário, inclusive períodos que atravessam a meia-noite. Isso detecta movimento
+na região, não identifica o bebê nem diagnostica perigo, postura ou respiração.
+Veja [movimento em regiões](docs/motion-regions.md).
+
+A sessão web usa cookie Secure, HttpOnly e SameSite=Strict, com 30 dias de validade
+renovada durante o uso. Logout e troca de senha revogam a sessão; o JavaScript
+não recebe a credencial. Os limites por minuto são 3000 globais / 1200 por endereço,
+30 globais / 10 por endereço para autenticação, 60 para snapshots/gravações e
+12 aberturas WHEP por sessão/endereço. Respostas 429 incluem Retry-After. Cabeçalhos
+encaminhados não são usados como identidade: usuários de um proxy compartilham
+seu orçamento. Veja [painel e segurança](docs/web-viewer.md).
+
+## Operação e release 2.x
+
+A release 2.0.0 mantém a API /api/v1 e migra o SQLite automaticamente, preservando
+usuários, câmeras, regras e mídia. Atualize o servidor e instale também o APK novo
+para receber os ajustes de localização e WebRTC. Android pede confirmação para
+instalar o APK; o servidor não instala aplicativos silenciosamente.
+
+A CI bem-sucedida em main inicia a release: a execução 56 publica 2.0.0, e as
+seguintes incrementam o patch. O versionCode Android continua crescente.
+O updater interno troca apenas o backend; para atualizar Compose, MediaMTX e o
+próprio updater, execute novamente o instalador oficial no servidor.
+
+Faça backup consistente do SQLite e preserve junto o volume valkyris-data
+(incluindo secrets/master.key, certificados e mídia), .env, compose.yaml
+e mediamtx.yml. Não copie apenas o arquivo .db de uma instância ativa sem
+considerar o WAL: use backup SQLite ou pare a stack durante a cópia.
+Depois de atualizar, confira docker compose ps, /health e reprodução real.
+Remova imagens antigas sem uso somente após validar; não remova volumes de dados
+para fazer uma atualização.
+
 ## Compatibilidade e limites
 
 Valkyris apresenta apenas recursos anunciados por ONVIF/RTSP. Ausências degradam a interface sem impedir o restante da câmera. Recursos proprietários da Tapo que não fazem parte do Profile S — como áudio bidirecional, holofote, sirene, privacidade e patrulha — não são controlados pelo projeto.
 
 Não há gravação contínua, nuvem central, cadastro público nem promessa de entrega absoluta de alarmes quando faltam energia, rede ou permissões do Android.
+
+Veja também o [registro da revisão 2.0](docs/review-2.0.md).
 
 ## Licença
 

@@ -33,9 +33,7 @@ func (h *Hub) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		conn.Close(websocket.StatusNormalClosure, "")
 	}()
 	for {
-		ctx, cancel := context.WithTimeout(r.Context(), 60*time.Second)
-		_, _, err = conn.Read(ctx)
-		cancel()
+		_, _, err = conn.Read(r.Context())
 		if err != nil {
 			return
 		}
