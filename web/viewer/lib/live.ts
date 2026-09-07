@@ -26,12 +26,18 @@ export function live(
   };
   pc.addTransceiver("video", { direction: "recvonly" });
   pc.addTransceiver("audio", { direction: "recvonly" });
+  const stream = new MediaStream();
   pc.ontrack = (event) => {
-    video.srcObject = event.streams[0] || new MediaStream([event.track]);
+    stream.addTrack(event.track);
+    video.srcObject = stream;
     void video.play().catch(() => {});
+  };
+  const onPlaying = () => {
+    if (closed) return;
     onStatus("Ao vivo · áudio inicialmente silenciado");
     clearTimeout(timer);
   };
+  video.addEventListener("playing", onPlaying);
   pc.onconnectionstatechange = () => {
     if (pc.connectionState === "failed")
       onStatus(
@@ -54,7 +60,7 @@ export function live(
           resolve();
           return;
         }
-        const t = setTimeout(resolve, 4000);
+        const t = setTimeout(resolve, 8000);
         pc.onicegatheringstatechange = () => {
           if (pc.iceGatheringState === "complete") {
             clearTimeout(t);
@@ -111,6 +117,7 @@ export function live(
     closed = true;
     controller.abort();
     clearTimeout(timer);
+    video.removeEventListener("playing", onPlaying);
     pc.close();
     video.srcObject = null;
     removeSession();

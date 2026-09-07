@@ -94,6 +94,10 @@ else
     printf 'VALKYRIS_UPDATER_TOKEN=%s\n' "$(generate_secret)" >> "$ENV_FILE"
   fi
 fi
+# Preserve explicitly configured public/LAN candidates across upgrades.
+if ! grep -Eq '^VALKYRIS_WEBRTC_HOSTS=.+$' "$ENV_FILE"; then
+  printf '\nVALKYRIS_WEBRTC_HOSTS=%s\n' "$LAN_ADDRESS" >> "$ENV_FILE"
+fi
 chmod 600 "$ENV_FILE"
 
 printf 'Valkyris: iniciando os serviços em %s...\n' "$INSTALL_ROOT"

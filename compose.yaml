@@ -68,6 +68,11 @@ services:
     image: bluenviron/mediamtx:1.15.4-ffmpeg
     restart: unless-stopped
     command: ["/etc/mediamtx.yml"]
+    environment:
+      MTX_WEBRTCADDITIONALHOSTS: ${VALKYRIS_WEBRTC_HOSTS:-}
+    ports:
+      - "8189:8189/udp"
+      - "8189:8189/tcp"
     volumes:
       - type: bind
         source: ./mediamtx.yml
