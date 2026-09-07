@@ -40,8 +40,9 @@ export function familyMap(
         circle.getBounds().getSouthEast(),
       );
     });
+  const peopleBounds: L.LatLngExpression[] = [];
   people.forEach((p) => {
-    if (p.lastLatitude == null || p.lastLongitude == null) return;
+    if (p.lastLatitude == null || p.lastLongitude == null || !Number.isFinite(p.lastLatitude) || !Number.isFinite(p.lastLongitude)) return;
     const marker = text(p.name.slice(0, 1).toUpperCase());
     marker.className = "map-marker";
     marker.style.width = "32px";
@@ -51,7 +52,7 @@ export function familyMap(
     })
       .addTo(map)
       .bindPopup(text(`${p.name} · ${date(p.lastLocatedAt)}`));
-    bounds.push([p.lastLatitude, p.lastLongitude]);
+    peopleBounds.push([p.lastLatitude, p.lastLongitude]);
   });
   if (history.length) {
     history = [...history].sort(
@@ -81,10 +82,12 @@ export function familyMap(
     });
     bounds.push(...points);
   }
-  if (bounds.length)
-    map.fitBounds(L.latLngBounds(bounds), {
+  // Family framing follows people, even when saved areas are far away.
+  const visibleBounds = history.length ? bounds : peopleBounds.length ? peopleBounds : bounds;
+  if (visibleBounds.length)
+    map.fitBounds(L.latLngBounds(visibleBounds), {
       padding: [35, 35],
-      maxZoom: 16,
+      maxZoom: peopleBounds.length && !history.length ? 18 : 16,
       animate: false,
     });
   let disposed = false;

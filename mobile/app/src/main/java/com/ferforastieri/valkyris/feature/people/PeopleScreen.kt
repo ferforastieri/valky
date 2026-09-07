@@ -3,6 +3,9 @@ package com.ferforastieri.valkyris.feature.people
 import android.graphics.Color as AndroidColor
 import android.view.MotionEvent
 import androidx.core.content.ContextCompat
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -194,14 +197,25 @@ private fun FamilyMap(users: List<TrackedPerson>, places: List<TrackedPlace>, on
                 setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_BOTTOM)
             })
         }
-        if (map.tag != "initial-location-center") {
-            users.firstOrNull { it.lastLatitude != null && it.lastLongitude != null }?.let {
-                map.controller.setCenter(GeoPoint(it.lastLatitude!!, it.lastLongitude!!))
-                map.tag = "initial-location-center"
+        val located = users.filter { it.lastLatitude?.isFinite() == true && it.lastLongitude?.isFinite() == true }
+        val participantIds = located.map { it.id }.sorted()
+        if (located.isNotEmpty() && map.tag != participantIds) {
+            map.tag = participantIds
+            val coordinates = located.map { GeoPoint(it.lastLatitude!!, it.lastLongitude!!) }
+            map.post {
+                if (map.tag == participantIds) {
+                    if (coordinates.distinctBy { it.latitude to it.longitude }.size == 1) {
+                        map.controller.setZoom(18.0)
+                        map.controller.setCenter(coordinates.first())
+                    } else {
+                        val padding = (40 * map.resources.displayMetrics.density).toInt()
+                        map.zoomToBoundingBox(BoundingBox.fromGeoPoints(coordinates), false, padding, 18.0, null)
+                    }
+                }
             }
         }
         map.invalidate()
-    }, modifier = modifier.background(MaterialTheme.colorScheme.surfaceVariant))
+    }, onRelease = { it.onDetach() }, modifier = modifier.clip(RoundedCornerShape(16.dp)).background(MaterialTheme.colorScheme.surfaceVariant))
 }
 
 @Composable
@@ -383,57 +397,78 @@ private fun AreasSheet(
 }
 
 @Composable
-private fun HistorySheet(user: TrackedPerson, history: List<PersonLocation>, onDismiss: () -> Unit) = ValkyrisBottomSheet(title = "Por onde ${user.name} passou", onDismiss = onDismiss) {
+internal fun HistorySheet(user: TrackedPerson, history: List<PersonLocation>, onDismiss: () -> Unit) = ValkyrisBottomSheet(title = "Por onde ${user.name} passou", onDismiss = onDismiss, swipeToDismissEnabled = false) {
     if (history.isEmpty()) Text("Ainda não há localização registrada.", color = MaterialTheme.colorScheme.onSurfaceVariant)
     else {
         val points = remember(history) { history.sortedBy { it.occurredAt } }
-        Text("${points.size} pontos · toque em um ponto para consultar o horário", color = MaterialTheme.colorScheme.onSurfaceVariant)
-        AndroidView(
-            factory = { context ->
-                Configuration.getInstance().userAgentValue = context.packageName
-                MapView(context).apply {
-                    setTileSource(TileSourceFactory.MAPNIK)
-                    setMultiTouchControls(true)
-                    setOnTouchListener { view, event ->
-                        view.parent?.requestDisallowInterceptTouchEvent(event.actionMasked != MotionEvent.ACTION_UP && event.actionMasked != MotionEvent.ACTION_CANCEL)
-                        false
-                    }
+        var selected by remember(points) { mutableIntStateOf(points.lastIndex) }
+        val point = points[selected]
+        val screenHeight = LocalConfiguration.current.screenHeightDp.dp
+        Column(
+            Modifier.fillMaxWidth().heightIn(max = screenHeight * 0.72f).verticalScroll(rememberScrollState()),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            Card(Modifier.fillMaxWidth(), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerHigh)) {
+                Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                    Text("Ponto ${selected + 1} de ${points.size}", style = MaterialTheme.typography.titleMedium)
+                    Text(formatHistoryTime(point.occurredAt), style = MaterialTheme.typography.bodyMedium)
+                    Text("Precisão estimada: ${point.accuracy.toInt()} m", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
-            },
-            update = { map ->
-                if (map.tag != points) {
-                    map.tag = points
-                    map.overlays.clear()
-                    val coordinates = points.map { GeoPoint(it.latitude, it.longitude) }
-                    map.overlays.add(Polyline(map).apply { setPoints(coordinates); outlinePaint.color = AndroidColor.rgb(87, 156, 78); outlinePaint.strokeWidth = 6f })
-                    points.forEachIndexed { index, location ->
-                        map.overlays.add(Marker(map).apply {
-                            position = coordinates[index]
-                            title = "Ponto ${index + 1}"
-                            snippet = "${formatHistoryTime(location.occurredAt)} · precisão ${location.accuracy.toInt()} m"
-                            icon = android.graphics.drawable.BitmapDrawable(map.resources, android.graphics.Bitmap.createBitmap(72, 72, android.graphics.Bitmap.Config.ARGB_8888).also { bitmap ->
-                                val canvas = android.graphics.Canvas(bitmap)
-                                val paint = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG)
-                                paint.color = AndroidColor.rgb(87, 156, 78)
-                                canvas.drawCircle(36f, 36f, 32f, paint)
-                                paint.color = AndroidColor.WHITE; paint.textSize = 28f; paint.textAlign = android.graphics.Paint.Align.CENTER
-                                canvas.drawText("${index + 1}", 36f, 36f - (paint.ascent() + paint.descent()) / 2, paint)
-                            })
-                            setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_CENTER)
-                        })
-                    }
-                    map.post {
-                        if (map.tag == points) {
-                            if (coordinates.size == 1) { map.controller.setZoom(17.0); map.controller.setCenter(coordinates.first()) }
-                            else map.zoomToBoundingBox(BoundingBox.fromGeoPoints(coordinates), false, 60, 17.0, null)
+            }
+            AndroidView(
+                factory = { context ->
+                    Configuration.getInstance().userAgentValue = context.packageName
+                    MapView(context).apply {
+                        setTileSource(TileSourceFactory.MAPNIK)
+                        setMultiTouchControls(true)
+                        setOnTouchListener { view, event ->
+                            view.parent?.requestDisallowInterceptTouchEvent(event.actionMasked != MotionEvent.ACTION_UP && event.actionMasked != MotionEvent.ACTION_CANCEL)
+                            false
                         }
                     }
-                    map.invalidate()
+                },
+                update = { map ->
+                    if (map.tag != points) {
+                        map.tag = points
+                        map.overlays.clear()
+                        val coordinates = points.map { GeoPoint(it.latitude, it.longitude) }
+                        map.overlays.add(Polyline(map).apply { setPoints(coordinates); outlinePaint.color = AndroidColor.rgb(87, 156, 78); outlinePaint.strokeWidth = 6f })
+                        points.forEachIndexed { index, location ->
+                            map.overlays.add(Marker(map).apply {
+                                position = coordinates[index]
+                                setOnMarkerClickListener { _, _ -> selected = index; true }
+                                title = "Ponto ${index + 1}"
+                                snippet = "${formatHistoryTime(location.occurredAt)} · precisão ${location.accuracy.toInt()} m"
+                                icon = android.graphics.drawable.BitmapDrawable(map.resources, android.graphics.Bitmap.createBitmap(72, 72, android.graphics.Bitmap.Config.ARGB_8888).also { bitmap ->
+                                    val canvas = android.graphics.Canvas(bitmap)
+                                    val paint = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG)
+                                    paint.color = AndroidColor.rgb(87, 156, 78)
+                                    canvas.drawCircle(36f, 36f, 32f, paint)
+                                    paint.color = AndroidColor.WHITE; paint.textSize = 28f; paint.textAlign = android.graphics.Paint.Align.CENTER
+                                    canvas.drawText("${index + 1}", 36f, 36f - (paint.ascent() + paint.descent()) / 2, paint)
+                                })
+                                setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_CENTER)
+                            })
+                        }
+                        map.post {
+                            if (map.tag == points) {
+                                if (coordinates.size == 1) { map.controller.setZoom(17.0); map.controller.setCenter(coordinates.first()) }
+                                else map.zoomToBoundingBox(BoundingBox.fromGeoPoints(coordinates), false, 60, 17.0, null)
+                            }
+                        }
+                        map.invalidate()
+                    }
+                },
+                onRelease = { it.onDetach() },
+                modifier = Modifier.fillMaxWidth().height((screenHeight * 0.36f).coerceIn(160.dp, 320.dp)).clip(RoundedCornerShape(16.dp)),
+            )
+            Text("Toque em um ponto no mapa ou na sequência abaixo.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                points.forEachIndexed { index, _ ->
+                    FilterChip(selected = selected == index, onClick = { selected = index }, label = { Text("${index + 1}") })
                 }
-            },
-            onRelease = { it.onDetach() },
-            modifier = Modifier.fillMaxWidth().height(420.dp),
-        )
+            }
+        }
     }
 }
 

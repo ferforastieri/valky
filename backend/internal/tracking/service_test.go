@@ -16,6 +16,8 @@ func TestReportKeepsHistoryAndCreatesTransitions(t *testing.T) {
 	}
 	t.Cleanup(func() { _ = db.Close() })
 	service := New(db)
+	clock := time.Now().UTC()
+	service.now = func() time.Time { return clock }
 	person, err := service.CreatePerson(context.Background(), Person{Name: "Fernando"}, "device-1")
 	if err != nil {
 		t.Fatal(err)
@@ -27,12 +29,19 @@ func TestReportKeepsHistoryAndCreatesTransitions(t *testing.T) {
 	if err != nil || len(transitions) != 0 {
 		t.Fatalf("initial location transitions=%d err=%v", len(transitions), err)
 	}
-	transitions, err = service.Report(context.Background(), person.ID, "device-1", Location{Latitude: -23.01, Longitude: -46.01, Accuracy: 8})
-	if err != nil || len(transitions) != 1 || transitions[0].Entered {
-		t.Fatalf("exit transitions=%+v err=%v", transitions, err)
+	for i := 0; i < 3; i++ {
+		clock = clock.Add(time.Minute)
+		transitions, err = service.Report(context.Background(), person.ID, "device-1", Location{Latitude: -23.01, Longitude: -46.01, Accuracy: 8})
+		want := 0
+		if i == 2 {
+			want = 1
+		}
+		if err != nil || len(transitions) != want || (want == 1 && transitions[0].Entered) {
+			t.Fatalf("exit sample %d: transitions=%+v err=%v", i, transitions, err)
+		}
 	}
 	history, err := service.History(context.Background(), person.ID, 10)
-	if err != nil || len(history) != 2 {
+	if err != nil || len(history) != 3 {
 		t.Fatalf("history=%d err=%v", len(history), err)
 	}
 }
@@ -107,7 +116,7 @@ func TestHistorySkipsStationaryHeartbeatsButUpdatesCurrentPosition(t *testing.T)
 	}
 }
 
-func TestHistoryPreservesShortAreaCrossings(t *testing.T) {
+func TestHistoryPreservesConfirmedSmallAreaCrossings(t *testing.T) {
 	db, err := store.Open(filepath.Join(t.TempDir(), "crossing.db"))
 	if err != nil {
 		t.Fatal(err)
@@ -123,13 +132,14 @@ func TestHistoryPreservesShortAreaCrossings(t *testing.T) {
 		t.Fatal(err)
 	}
 	now := time.Now().UTC()
-	for i, lat := range []float64{0, 0.00045} {
-		transitions, err := s.Report(ctx, p.ID, "d", Location{Latitude: lat, Longitude: 0, Accuracy: 5, OccurredAt: now.Add(time.Duration(i-2) * time.Second)})
+	for i, lat := range []float64{0, 0.00045, 0.00045, 0.00045} {
+		s.now = func() time.Time { return now.Add(time.Duration(i) * time.Minute) }
+		transitions, err := s.Report(ctx, p.ID, "d", Location{Latitude: lat, Longitude: 0, Accuracy: 5})
 		if err != nil {
 			t.Fatal(err)
 		}
-		if i == 1 && len(transitions) != 1 {
-			t.Fatal("short exit lost")
+		if i == 3 && len(transitions) != 1 {
+			t.Fatal("confirmed exit lost")
 		}
 	}
 	history, err := s.History(ctx, p.ID, 100)

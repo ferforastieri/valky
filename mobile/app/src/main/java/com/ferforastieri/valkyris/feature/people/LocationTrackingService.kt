@@ -12,9 +12,14 @@ import android.content.pm.PackageManager
 import android.location.Address
 import android.location.Geocoder
 import android.location.Location
-import android.location.LocationListener
-import android.location.LocationManager
 import android.os.IBinder
+import com.google.android.gms.location.FusedLocationProviderClient
+import com.google.android.gms.location.LocationServices
+import com.google.android.gms.location.LocationRequest
+import com.google.android.gms.location.LocationCallback
+import com.google.android.gms.location.LocationResult
+import com.google.android.gms.location.Priority
+import android.util.Log
 import android.os.Looper
 import androidx.core.app.NotificationCompat
 import androidx.core.content.ContextCompat
@@ -34,17 +39,20 @@ import java.util.Locale
 import javax.inject.Inject
 
 @AndroidEntryPoint
-class LocationTrackingService : Service(), LocationListener {
+class LocationTrackingService : Service() {
     @Inject lateinit var api: ValkyrisApi
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
-    private lateinit var locationManager: LocationManager
+    private lateinit var locationClient: FusedLocationProviderClient
+    private val locationCallback = object : LocationCallback() {
+        override fun onLocationResult(result: LocationResult) { result.locations.sortedBy { it.time }.forEach(::report) }
+    }
     private lateinit var preferences: SharedPreferences
     private val reportingMutex = Mutex()
     private var updatesRegistered = false
 
     override fun onCreate() {
         super.onCreate()
-        locationManager = getSystemService(LocationManager::class.java)
+        locationClient = LocationServices.getFusedLocationProviderClient(this)
         preferences = getSharedPreferences(PREFERENCES, Context.MODE_PRIVATE)
         createChannel()
     }
@@ -55,27 +63,26 @@ class LocationTrackingService : Service(), LocationListener {
         preferences.edit().putBoolean(TRACKING_ENABLED, true).apply()
         startForeground(NOTIFICATION_ID, notification())
         if (updatesRegistered) return START_STICKY
-        runCatching {
-            locationManager.removeUpdates(this)
-            listOf(LocationManager.GPS_PROVIDER, LocationManager.NETWORK_PROVIDER).forEach { provider ->
-                if (locationManager.isProviderEnabled(provider)) {
-                    // Receive a reasonably fresh fix, but report it only when the
-                    // persisted heartbeat/movement policy below allows it.
-                    locationManager.requestLocationUpdates(provider, CHECK_INTERVAL_MS, MOVEMENT_DISTANCE_METERS, this, Looper.getMainLooper())
-                    locationManager.getLastKnownLocation(provider)?.let(::report)
-                }
+        val request = LocationRequest.Builder(Priority.PRIORITY_HIGH_ACCURACY, CHECK_INTERVAL_MS)
+            .setMinUpdateIntervalMillis(CHECK_INTERVAL_MS)
+            .setMinUpdateDistanceMeters(0f)
+            .setMaxUpdateAgeMillis(0L)
+            .setWaitForAccurateLocation(true)
+            .build()
+        updatesRegistered = true
+        locationClient.requestLocationUpdates(request, locationCallback, Looper.getMainLooper())
+            .addOnFailureListener {
+                updatesRegistered = false
+                Log.w("ValkyrisLocation", "Location updates unavailable: ${it.javaClass.simpleName}")
             }
-            updatesRegistered = true
-        }
         return START_STICKY
     }
 
-    override fun onLocationChanged(location: Location) = report(location)
     private fun report(location: Location) {
         scope.launch {
             reportingMutex.withLock {
                 if (!shouldReport(location)) return@withLock
-                val completed = runCatching {
+                val result = runCatching {
                     api.reportMyLocation(PersonLocation(
                         latitude = location.latitude,
                         longitude = location.longitude,
@@ -83,8 +90,8 @@ class LocationTrackingService : Service(), LocationListener {
                         address = resolveAddress(location),
                         occurredAt = Instant.ofEpochMilli(location.time).toString(),
                     ))
-                }.isSuccess
-                if (completed) persistReportedLocation(location)
+                }.getOrNull()
+                if (result != null) persistReportedLocation(location, result.pendingConfirmations > 0)
             }
         }
     }
@@ -96,7 +103,12 @@ class LocationTrackingService : Service(), LocationListener {
         if (location.time <= preferences.getLong(LAST_FIX_AT, 0L)) return false
         val lastSentAt = preferences.getLong(LAST_SENT_AT, 0L)
         if (lastSentAt == 0L || now - lastSentAt >= REPORT_INTERVAL_MS) return true
-        if (now - lastSentAt < 60_000) return false
+        if (now - lastSentAt < 55_000) return false
+        if (now < preferences.getLong(CONFIRM_UNTIL, 0L)) return true
+        return hasMoved(location)
+    }
+
+    private fun hasMoved(location: Location): Boolean {
         if (!preferences.contains(LAST_SENT_LATITUDE) || !preferences.contains(LAST_SENT_LONGITUDE)) return true
         val lastLocation = Location("last-reported").apply {
             latitude = Double.fromBits(preferences.getLong(LAST_SENT_LATITUDE, 0L))
@@ -106,8 +118,12 @@ class LocationTrackingService : Service(), LocationListener {
         return lastLocation.distanceTo(location) >= maxOf(MOVEMENT_DISTANCE_METERS, uncertainty)
     }
 
-    private fun persistReportedLocation(location: Location) {
+    private fun persistReportedLocation(location: Location, confirmationPending: Boolean) {
+        val now = System.currentTimeMillis()
+        // Fresh follow-ups confirm geofences; history still deduplicates stationary fixes.
+        val until = preferences.getLong(CONFIRM_UNTIL, 0L)
         preferences.edit()
+            .putLong(CONFIRM_UNTIL, if (confirmationPending || now >= until || hasMoved(location)) now + 4 * 60_000L else until)
             .putLong(LAST_SENT_AT, System.currentTimeMillis())
             .putLong(LAST_FIX_AT, location.time)
             .putFloat(LAST_ACCURACY, location.accuracy)
@@ -138,7 +154,7 @@ class LocationTrackingService : Service(), LocationListener {
         }.take(320)
     }
 
-    override fun onDestroy() { scope.cancel(); runCatching { locationManager.removeUpdates(this) }; super.onDestroy() }
+    override fun onDestroy() { scope.cancel(); runCatching { locationClient.removeLocationUpdates(locationCallback) }; super.onDestroy() }
     override fun onBind(intent: Intent?): IBinder? = null
     private fun hasLocationPermission() = ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED
     private fun createChannel() {
@@ -167,6 +183,7 @@ class LocationTrackingService : Service(), LocationListener {
         private const val TRACKING_ENABLED = "tracking_enabled"
         private const val PREFERENCES = "location_tracking"
         private const val LAST_SENT_AT = "last_sent_at"
+        private const val CONFIRM_UNTIL = "confirm_until"
         private const val LAST_FIX_AT = "last_fix_at"
         private const val LAST_ACCURACY = "last_accuracy"
         private const val LAST_SENT_LATITUDE = "last_sent_latitude"

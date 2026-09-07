@@ -967,9 +967,17 @@ dialog::backdrop {
     font-size: 9px;
     border-radius: 0;
   }
+  .sidebar nav a > span,
+  .sidebar-actions button > span {
+    display: none;
+  }
+  .sidebar nav a,
+  .sidebar-actions button {
+    min-height: 48px;
+  }
   .sidebar nav a svg {
-    width: 18px;
-    height: 18px;
+    width: 22px;
+    height: 22px;
   }
   .nav-count {
     display: none;

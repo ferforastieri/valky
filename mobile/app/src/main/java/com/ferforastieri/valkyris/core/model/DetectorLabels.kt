@@ -22,3 +22,13 @@ fun detectorLabelRes(type: String): Int = when (type.trim().lowercase()) {
     "dog_bark" -> R.string.detector_dog_bark
     else -> R.string.detector_other
 }
+
+internal fun locationEventTitle(type: String, personName: String?, placeName: String?): String? {
+    val person = personName?.trim()?.takeIf { it.isNotEmpty() && it != "null" } ?: "Pessoa"
+    val place = placeName?.trim()?.takeIf { it.isNotEmpty() && it != "null" } ?: "uma área"
+    return when (type) {
+        "place_entered" -> "$person chegou em $place"
+        "place_exited" -> "$person saiu de $place"
+        else -> null
+    }
+}

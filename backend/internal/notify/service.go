@@ -193,7 +193,7 @@ func (s *Service) deliverBatch(ctx context.Context) {
 	for _, i := range items {
 		var metadata map[string]any
 		_ = json.Unmarshal([]byte(i.metadata), &metadata)
-		s.deliver(ctx, i.id, i.attempts, i.endpoint, i.secret, map[string]any{"eventId": i.eventID, "cameraId": i.cameraID, "type": i.eventType, "confidence": i.confidence, "occurredAt": i.occurred, "alarm": metadata["alarm"], "target": notificationTarget(i.eventType)})
+		s.deliver(ctx, i.id, i.attempts, i.endpoint, i.secret, map[string]any{"eventId": i.eventID, "cameraId": i.cameraID, "type": i.eventType, "confidence": i.confidence, "occurredAt": i.occurred, "alarm": metadata["alarm"], "target": notificationTarget(i.eventType), "personName": metadata["personName"], "placeName": metadata["placeName"]})
 	}
 }
 

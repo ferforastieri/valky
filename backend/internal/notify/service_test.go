@@ -102,6 +102,37 @@ func TestEncryptedPushRetriesAndThenDelivers(t *testing.T) {
 	if err != nil || !strings.Contains(string(plain), "baby_cry") || !strings.Contains(string(plain), `"target":"event"`) || strings.Contains(string(plain), "fcm-device-token") {
 		t.Fatalf("unexpected decrypted payload %q: %v", plain, err)
 	}
+	arrival, err := events.Create(context.Background(), event.Event{Source: "tracking", Type: "place_entered", Confidence: 1, Metadata: map[string]any{"personName": "Miriam", "placeName": "Casa"}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err = service.Enqueue(context.Background(), arrival); err != nil {
+		t.Fatal(err)
+	}
+	service.deliverBatch(context.Background())
+	body := bodies[len(bodies)-1]
+	if strings.Contains(string(body), "Miriam") || strings.Contains(string(body), "Casa") {
+		t.Fatal("location names leaked outside ciphertext")
+	}
+	if err = json.Unmarshal(body, &wrapper); err != nil {
+		t.Fatal(err)
+	}
+	sealed, err = base64.RawURLEncoding.DecodeString(wrapper.Message.Data["ciphertext"])
+	if err != nil {
+		t.Fatal(err)
+	}
+	plain, err = openTestPayload(secret, sealed)
+	var payload map[string]any
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err = json.Unmarshal(plain, &payload); err != nil {
+		t.Fatal(err)
+	}
+	if payload["personName"] != "Miriam" || payload["placeName"] != "Casa" || payload["type"] != "place_entered" {
+		t.Fatalf("missing location context: %v", payload)
+	}
+
 }
 
 func TestRegisterRequiresFirebaseCredentials(t *testing.T) {

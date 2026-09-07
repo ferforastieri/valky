@@ -41,7 +41,7 @@ class AlarmNotifier @Inject constructor(@param:ApplicationContext private val co
         )
     }
 
-    fun show(eventId: String, cameraId: String, type: String, confidence: Double, alarm: Boolean, opensCamera: Boolean) {
+    fun show(eventId: String, cameraId: String, type: String, confidence: Double, alarm: Boolean, opensCamera: Boolean, personName: String = "", placeName: String = "") {
         createChannels()
         if (Build.VERSION.SDK_INT >= 33 && ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) return
         val eventIntent = PendingIntent.getActivity(
@@ -67,7 +67,7 @@ class AlarmNotifier @Inject constructor(@param:ApplicationContext private val co
         val canUseFullScreen = !alarm || Build.VERSION.SDK_INT < 34 || manager.canUseFullScreenIntent()
         val notification = NotificationCompat.Builder(context, if (alarm) ALARMS else EVENTS)
             .setSmallIcon(R.drawable.ic_notification)
-            .setContentTitle(context.getString(detectorLabelRes(type)))
+            .setContentTitle(com.ferforastieri.valkyris.core.model.locationEventTitle(type, personName, placeName) ?: context.getString(detectorLabelRes(type)))
             .setContentText(context.getString(if (alarm) R.string.notification_alarm_body else R.string.notification_event_body))
             .setContentIntent(open)
             .setOngoing(true)

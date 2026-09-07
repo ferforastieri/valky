@@ -44,4 +44,13 @@ class AlertNotificationTest {
         notifier.cancel("cry")
         assertFalse(manager.activeNotifications.any { it.id == "cry".hashCode() })
     }
+
+    @Test fun areaNotificationNamesThePersonAndPlace() {
+        val app = RuntimeEnvironment.getApplication()
+        shadowOf(app).grantPermissions(Manifest.permission.POST_NOTIFICATIONS)
+        AlarmNotifier(app).show("arrival", "", "place_entered", 1.0, false, false, "Miriam", "Casa")
+        val notification = app.getSystemService(NotificationManager::class.java).activeNotifications.single { it.id == "arrival".hashCode() }.notification
+        assertEquals("Miriam chegou em Casa", notification.extras.getString(Notification.EXTRA_TITLE))
+        assertEquals(AlarmNotifier.EVENTS, notification.channelId)
+    }
 }

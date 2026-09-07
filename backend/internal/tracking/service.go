@@ -54,9 +54,12 @@ type Transition struct {
 	At      time.Time
 }
 
-type Service struct{ store *store.Store }
+type Service struct {
+	store *store.Store
+	now   func() time.Time
+}
 
-func New(s *store.Store) *Service { return &Service{store: s} }
+func New(s *store.Store) *Service { return &Service{store: s, now: time.Now} }
 
 // User is a family profile. It deliberately has no device credential in its
 // public representation: a device belongs to a user, not the other way round.
@@ -127,7 +130,7 @@ func (s *Service) UpdateUser(ctx context.Context, id string, in User) (User, err
 	if avatarData != "" && !validAvatarData(avatarData) {
 		return User{}, fmt.Errorf("profile photo is invalid")
 	}
-	now := time.Now().UTC().Format(time.RFC3339Nano)
+	now := s.now().UTC().Format(time.RFC3339Nano)
 	result, err := s.store.DB.ExecContext(ctx, `UPDATE users SET name=?,color=?,avatar_data=?,updated_at=? WHERE id=?`, name, color, avatarData, now, id)
 	if err != nil {
 		return User{}, err
@@ -185,7 +188,7 @@ func (s *Service) ReportMyLocation(ctx context.Context, deviceID string, locatio
 	if len([]rune(location.Address)) > 320 {
 		return nil, fmt.Errorf("location address is invalid")
 	}
-	now := time.Now().UTC()
+	now := s.now().UTC()
 	if location.OccurredAt.IsZero() {
 		location.OccurredAt = now
 	}
@@ -223,27 +226,16 @@ func (s *Service) ReportMyLocation(ctx context.Context, deviceID string, locatio
 			rows.Close()
 			return nil, scanErr
 		}
-		inside, certain := confidentMembership(location.Latitude, location.Longitude, location.Accuracy, place)
-		if !certain {
-			continue
-		}
-		var previous int
-		lookupErr := tx.QueryRowContext(ctx, `SELECT inside FROM user_place_memberships WHERE user_id=? AND place_id=?`, user.ID, place.ID).Scan(&previous)
-		if lookupErr == sql.ErrNoRows {
-			if _, scanErr = tx.ExecContext(ctx, `INSERT INTO user_place_memberships(user_id,place_id,inside,updated_at) VALUES(?,?,?,?)`, user.ID, place.ID, boolInt(inside), now.Format(time.RFC3339Nano)); scanErr != nil {
-				rows.Close()
-				return nil, scanErr
-			}
-		} else if lookupErr != nil {
+
+		inside, changed, membershipErr := updateMembership(ctx, tx, "user", user.ID, "user_place_memberships", "user_id", place, location.Latitude, location.Longitude, location.Accuracy, location.OccurredAt)
+		if membershipErr != nil {
 			rows.Close()
-			return nil, lookupErr
-		} else if (previous == 1) != inside {
-			if _, scanErr = tx.ExecContext(ctx, `UPDATE user_place_memberships SET inside=?,updated_at=? WHERE user_id=? AND place_id=?`, boolInt(inside), now.Format(time.RFC3339Nano), user.ID, place.ID); scanErr != nil {
-				rows.Close()
-				return nil, scanErr
-			}
+			return nil, membershipErr
+		}
+		if changed {
 			transitions = append(transitions, UserTransition{User: user, Place: place, Entered: inside, At: location.OccurredAt})
 		}
+
 	}
 	if err = rows.Err(); err != nil {
 		rows.Close()
@@ -307,7 +299,7 @@ func (s *Service) UpdatePerson(ctx context.Context, id string, p Person) (Person
 	if p.Color == "" {
 		p.Color = "#5B5BD6"
 	}
-	now := time.Now().UTC()
+	now := s.now().UTC()
 	result, err := s.store.DB.ExecContext(ctx, `UPDATE people SET name=?,color=?,enabled=?,updated_at=? WHERE id=?`, p.Name, p.Color, boolInt(p.Enabled), now.Format(time.RFC3339Nano), id)
 	if err != nil {
 		return Person{}, err
@@ -368,7 +360,7 @@ func (s *Service) UpdatePlace(ctx context.Context, id string, p Place) (Place, e
 	if !validCoordinate(p.Latitude, p.Longitude) || p.RadiusMeters < 20 || p.RadiusMeters > 5000 {
 		return Place{}, fmt.Errorf("place coordinates or radius are invalid")
 	}
-	now := time.Now().UTC()
+	now := s.now().UTC()
 	result, err := s.store.DB.ExecContext(ctx, `UPDATE places SET name=?,latitude=?,longitude=?,radius_meters=?,enabled=?,updated_at=? WHERE id=?`, p.Name, p.Latitude, p.Longitude, p.RadiusMeters, boolInt(p.Enabled), now.Format(time.RFC3339Nano), id)
 	if err != nil {
 		return Place{}, err
@@ -429,7 +421,7 @@ func (s *Service) Report(ctx context.Context, personID, reporter string, locatio
 	if person.DeviceID != "" && person.DeviceID != reporter {
 		return nil, fmt.Errorf("this device is not linked to the selected person")
 	}
-	now := time.Now().UTC()
+	now := s.now().UTC()
 	if location.OccurredAt.IsZero() {
 		location.OccurredAt = now
 	}
@@ -469,29 +461,16 @@ func (s *Service) Report(ctx context.Context, personID, reporter string, locatio
 			rows.Close()
 			return nil, scanErr
 		}
-		inside, certain := confidentMembership(location.Latitude, location.Longitude, location.Accuracy, place)
-		if !certain {
-			continue
-		}
-		var previous int
-		lookupErr := tx.QueryRowContext(ctx, `SELECT inside FROM place_memberships WHERE person_id=? AND place_id=?`, personID, place.ID).Scan(&previous)
-		if lookupErr == sql.ErrNoRows {
-			_, scanErr = tx.ExecContext(ctx, `INSERT INTO place_memberships(person_id,place_id,inside,updated_at)VALUES(?,?,?,?)`, personID, place.ID, boolInt(inside), now.Format(time.RFC3339Nano))
-			if scanErr != nil {
-				rows.Close()
-				return nil, scanErr
-			}
-		} else if lookupErr != nil {
+
+		inside, changed, membershipErr := updateMembership(ctx, tx, "person", personID, "place_memberships", "person_id", place, location.Latitude, location.Longitude, location.Accuracy, location.OccurredAt)
+		if membershipErr != nil {
 			rows.Close()
-			return nil, lookupErr
-		} else if (previous == 1) != inside {
-			_, scanErr = tx.ExecContext(ctx, `UPDATE place_memberships SET inside=?,updated_at=? WHERE person_id=? AND place_id=?`, boolInt(inside), now.Format(time.RFC3339Nano), personID, place.ID)
-			if scanErr != nil {
-				rows.Close()
-				return nil, scanErr
-			}
+			return nil, membershipErr
+		}
+		if changed {
 			transitions = append(transitions, Transition{Person: person, Place: place, Entered: inside, At: location.OccurredAt})
 		}
+
 	}
 	if err = rows.Err(); err != nil {
 		rows.Close()
@@ -636,4 +615,64 @@ func retainHistoryPoint(ctx context.Context, tx *sql.Tx, table, owner, id string
 	}
 	threshold := math.Max(100, previousAccuracy+accuracy)
 	return distanceMeters(previousLat, previousLon, lat, lon) >= threshold, nil
+}
+
+// Require three independent observations spanning two minutes. Uncertain fixes
+// cancel confirmation. Persist candidates so restarts cannot bypass the dwell.
+func updateMembership(ctx context.Context, tx *sql.Tx, kind, owner, table, column string, place Place, lat, lon, accuracy float64, at time.Time) (bool, bool, error) {
+	inside, certain := confidentMembership(lat, lon, accuracy, place)
+	clear := func() error {
+		_, err := tx.ExecContext(ctx, `DELETE FROM geofence_candidates WHERE owner_kind=? AND owner_id=? AND place_id=?`, kind, owner, place.ID)
+		return err
+	}
+	if !certain {
+		return false, false, clear()
+	}
+	var previous int
+	err := tx.QueryRowContext(ctx, "SELECT inside FROM "+table+" WHERE "+column+"=? AND place_id=?", owner, place.ID).Scan(&previous)
+	stamp := at.UTC().Format(time.RFC3339Nano)
+	if err == sql.ErrNoRows {
+		_, err = tx.ExecContext(ctx, "INSERT INTO "+table+"("+column+",place_id,inside,updated_at) VALUES(?,?,?,?)", owner, place.ID, boolInt(inside), stamp)
+		return inside, false, err
+	}
+	if err != nil {
+		return inside, false, err
+	}
+	if (previous == 1) == inside {
+		return inside, false, clear()
+	}
+	var target, samples int
+	var since, last, version string
+	err = tx.QueryRowContext(ctx, `SELECT inside,since_at,last_at,samples,place_version FROM geofence_candidates WHERE owner_kind=? AND owner_id=? AND place_id=?`, kind, owner, place.ID).Scan(&target, &since, &last, &samples, &version)
+	if err != nil && err != sql.ErrNoRows {
+		return inside, false, err
+	}
+	sinceAt, _ := time.Parse(time.RFC3339Nano, since)
+	lastAt, _ := time.Parse(time.RFC3339Nano, last)
+	currentVersion := place.UpdatedAt.Format(time.RFC3339Nano)
+	if err == sql.ErrNoRows || target != boolInt(inside) || version != currentVersion || at.Sub(lastAt) > 3*time.Minute {
+		sinceAt, samples = at, 1
+	} else {
+		if at.Sub(lastAt) < 20*time.Second {
+			return inside, false, nil
+		}
+		samples++
+	}
+	if samples >= 3 && at.Sub(sinceAt) >= 2*time.Minute {
+		_, err = tx.ExecContext(ctx, "UPDATE "+table+" SET inside=?,updated_at=? WHERE "+column+"=? AND place_id=?", boolInt(inside), stamp, owner, place.ID)
+		if err != nil {
+			return inside, false, err
+		}
+		return inside, true, clear()
+	}
+	_, err = tx.ExecContext(ctx, `INSERT INTO geofence_candidates(owner_kind,owner_id,place_id,inside,since_at,last_at,samples,place_version) VALUES(?,?,?,?,?,?,?,?) ON CONFLICT(owner_kind,owner_id,place_id) DO UPDATE SET inside=excluded.inside,since_at=excluded.since_at,last_at=excluded.last_at,samples=excluded.samples,place_version=excluded.place_version`, kind, owner, place.ID, boolInt(inside), sinceAt.UTC().Format(time.RFC3339Nano), stamp, samples, currentVersion)
+	return inside, false, err
+}
+
+// PendingConfirmations lets the phone keep reporting while a boundary change
+// is being confirmed, including slow crossings near the end of a sampling burst.
+func (s *Service) PendingConfirmations(ctx context.Context, deviceID string) (int, error) {
+	var count int
+	err := s.store.DB.QueryRowContext(ctx, `SELECT COUNT(*) FROM geofence_candidates c JOIN devices d ON d.user_id=c.owner_id JOIN places p ON p.id=c.place_id WHERE c.owner_kind='user' AND d.id=? AND d.enabled=1 AND p.enabled=1 AND c.last_at>=?`, deviceID, s.now().UTC().Add(-3*time.Minute).Format(time.RFC3339Nano)).Scan(&count)
+	return count, err
 }

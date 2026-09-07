@@ -126,10 +126,11 @@ private fun formatTime(value: String) = runCatching {
 }.getOrDefault(value)
 
 @Composable internal fun eventTitle(event: ValkyrisEvent): String {
-    if (event.source != "tracking") return stringResource(com.ferforastieri.valkyris.core.model.detectorLabelRes(event.type))
-    val person = event.metadata["personName"]?.jsonPrimitive?.contentOrNull ?: "Pessoa"
-    val place = event.metadata["placeName"]?.jsonPrimitive?.contentOrNull ?: "uma área"
-    return when (event.type) { "place_entered" -> "$person entrou em $place"; "place_exited" -> "$person saiu de $place"; else -> "Localização de $person" }
+    return com.ferforastieri.valkyris.core.model.locationEventTitle(
+        event.type,
+        event.metadata["personName"]?.jsonPrimitive?.contentOrNull,
+        event.metadata["placeName"]?.jsonPrimitive?.contentOrNull,
+    ) ?: stringResource(com.ferforastieri.valkyris.core.model.detectorLabelRes(event.type))
 }
 
 internal fun eventCategoryRes(event: ValkyrisEvent): Int = when {

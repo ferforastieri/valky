@@ -186,3 +186,11 @@ CREATE TABLE IF NOT EXISTS viewer_sessions (
  expires_at TEXT NOT NULL,
  created_at TEXT NOT NULL
 );
+
+CREATE TABLE IF NOT EXISTS geofence_candidates (
+ owner_kind TEXT NOT NULL, owner_id TEXT NOT NULL,
+ place_id TEXT NOT NULL REFERENCES places(id) ON DELETE CASCADE,
+ inside INTEGER NOT NULL, since_at TEXT NOT NULL, last_at TEXT NOT NULL,
+ samples INTEGER NOT NULL, place_version TEXT NOT NULL,
+ PRIMARY KEY(owner_kind,owner_id,place_id)
+);

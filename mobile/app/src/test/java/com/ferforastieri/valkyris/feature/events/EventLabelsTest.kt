@@ -22,4 +22,10 @@ class EventLabelsTest {
         }
         assertEquals(R.string.event_category_camera, eventCategoryRes(event("motion")))
     }
+
+    @org.junit.Test fun locationTitlesIncludePersonAndPlace() {
+        org.junit.Assert.assertEquals("Miriam chegou em Casa", com.ferforastieri.valkyris.core.model.locationEventTitle("place_entered", "Miriam", "Casa"))
+        org.junit.Assert.assertEquals("Fernando saiu de Trabalho", com.ferforastieri.valkyris.core.model.locationEventTitle("place_exited", "Fernando", "Trabalho"))
+        org.junit.Assert.assertNull(com.ferforastieri.valkyris.core.model.locationEventTitle("baby_cry", "", ""))
+    }
 }

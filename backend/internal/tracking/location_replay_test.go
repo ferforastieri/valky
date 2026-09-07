@@ -50,12 +50,20 @@ func TestRejectRepeatedAndOutOfOrderLocations(t *testing.T) {
 	if err != nil || !latest.LastLocatedAt.Equal(outside.OccurredAt) {
 		t.Fatalf("latest regressed: %+v %v", latest, err)
 	}
-	// A genuinely distant, accurate observation still creates an exit.
-	far := UserLocation{Latitude: .01, Accuracy: 8, OccurredAt: at.Add(40 * time.Second)}
-	transitions, err := s.ReportMyLocation(context.Background(), "d", far)
-	if err != nil || len(transitions) != 1 || transitions[0].Entered {
-		t.Fatalf("real exit lost: %+v %v", transitions, err)
+	// A distant observation must persist before it creates an exit.
+	for i := 0; i < 3; i++ {
+		clock := at.Add(time.Duration(40+i*60) * time.Second)
+		s.now = func() time.Time { return clock }
+		transitions, err := s.ReportMyLocation(context.Background(), "d", UserLocation{Latitude: .01, Accuracy: 8, OccurredAt: clock})
+		want := 0
+		if i == 2 {
+			want = 1
+		}
+		if err != nil || len(transitions) != want || (want == 1 && transitions[0].Entered) {
+			t.Fatalf("sample %d: %+v %v", i, transitions, err)
+		}
 	}
+
 }
 func TestStaleAndConcurrentLocations(t *testing.T) {
 	s, db := locationFixture(t)

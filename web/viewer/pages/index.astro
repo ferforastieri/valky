@@ -35,10 +35,10 @@ const links = [
   </section>
   <div id="application" class="app-shell" hidden>
     <aside class="sidebar"><a href="#overview" class="brand"><img src="/app/valkyris-mark.svg" alt="" /><span>Valkyris<small>PAINEL DA CASA</small></span></a>
-      <nav aria-label="Navegação principal">{links.map(([id,label,Icon]) => <a href={`#${id}`} data-page={id}><Icon size={20}/><span>{label}</span><span class="nav-count" id={`count-${id}`}></span></a>)}</nav>
+      <nav aria-label="Navegação principal">{links.map(([id,label,Icon]) => <a href={`#${id}`} data-page={id} aria-label={label} title={label}><Icon size={20}/><span>{label}</span><span class="nav-count" id={`count-${id}`}></span></a>)}</nav>
       <div class="sidebar-actions">
         <button id="theme" class="quiet" aria-label="Alternar tema" title="Alternar tema"><SunMoon size={19}/><span>Tema</span></button>
-        <button id="logout" class="quiet"><LogOut size={19}/><span>Sair</span></button>
+        <button id="logout" class="quiet" aria-label="Sair" title="Sair"><LogOut size={19}/><span>Sair</span></button>
       </div>
       <div class="sidebar-foot"><span class="badge"><ShieldCheck size={14}/> Apenas consulta</span><small>Monitoramento no seu servidor</small></div>
     </aside>

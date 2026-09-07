@@ -744,7 +744,11 @@ func (s *Server) reportMyLocation(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 	}
-	writeSuccess(w, http.StatusOK, "Location recorded successfully", map[string]int{"transitions": len(transitions)})
+	pending, pendingErr := s.tracking.PendingConfirmations(r.Context(), auth.DeviceID(r.Context()))
+	if pendingErr != nil {
+		s.logger.Error("read geofence confirmations", "error", pendingErr)
+	}
+	writeSuccess(w, http.StatusOK, "Location recorded successfully", map[string]int{"transitions": len(transitions), "pendingConfirmations": pending})
 }
 func (s *Server) createPerson(w http.ResponseWriter, r *http.Request) {
 	if s.trackingUnavailable(w) {

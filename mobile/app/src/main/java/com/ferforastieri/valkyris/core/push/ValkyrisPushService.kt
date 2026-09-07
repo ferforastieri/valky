@@ -28,6 +28,8 @@ class ValkyrisPushService : FirebaseMessagingService() {
         runCatching {
             val payload = JSONObject(String(open(ciphertext, secrets.getOrCreate())))
             notifier.show(
+                personName = payload.optString("personName", ""),
+                placeName = payload.optString("placeName", ""),
                 eventId = payload.getString("eventId"),
                 cameraId = payload.optString("cameraId"),
                 type = payload.optString("type", "event"),

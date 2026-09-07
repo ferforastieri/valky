@@ -75,7 +75,7 @@ const eventSource = (event: Event) =>
     ? "Localização da família"
     : cameraName(event.cameraId);
 const head = (name: string) =>
-  `<div class="page-head"><div><span class="eyebrow">SUA CASA / ${e(name === "overview" ? "AGORA" : messages[name][0].toUpperCase())}</span><h1>${e(messages[name][0])}</h1><p>${e(messages[name][1])}</p></div><span class="badge">${new Intl.DateTimeFormat("pt-BR", { day: "2-digit", month: "short" }).format(new Date())}</span></div>`;
+  `<div class="page-head"><div><span class="eyebrow">SUA CASA / ${e(name === "overview" ? "AGORA" : messages[name][0].toUpperCase())}</span><h1>${e(messages[name][0])}</h1><p>${e(messages[name][1])}</p></div></div>`;
 const activity = (list: Event[]) =>
   list.length
     ? `<div class="panel">${list.map((ev) => `<button class="activity-row" data-event="${e(ev.id)}"><span class="tile-icon">${icon(ev.source === "tracking" ? "map" : "bell")}</span><span class="activity-main"><strong>${e(eventName(ev))}</strong><small>${e(eventSource(ev))}</small></span><time datetime="${e(ev.occurredAt)}">${clock(ev.occurredAt)}</time>${icon("arrow")}</button>`).join("")}</div>`
