@@ -375,7 +375,7 @@ async function cameraDetails(id: string) {
   if (!c) return;
   openDetails(c.name, "CÂMERA");
   $("#detail-body").innerHTML =
-    `<div class="media-stage"><video id="live-video" autoplay muted controls playsinline hidden></video><img id="camera-image" alt="Imagem da câmera" hidden/><span id="camera-loading">Carregando imagem…</span></div><p id="live-status" class="notice" role="status">Conectando…</p><div class="media-actions"><button id="show-image">Consultar imagem</button><button id="restart-live">Reconectar vídeo</button></div>${dl(
+    `<div class="media-stage"><video id="live-video" autoplay muted controls playsinline></video></div><p id="live-status" class="notice" role="status">Conectando…</p><div class="media-actions"><button id="show-image">Consultar imagem</button><button id="restart-live">Reconectar vídeo</button></div>${dl(
       [
         [
           "Estado",
@@ -394,79 +394,29 @@ async function cameraDetails(id: string) {
         )
         .join("") || '<p class="muted">Nenhuma regra cadastrada.</p>'
     }`;
-  const video = $<HTMLVideoElement>("#live-video");
-  const image = $<HTMLImageElement>("#camera-image");
-  const status = $("#live-status");
-  const loading = $("#camera-loading");
-  const controller = new AbortController();
   let stop: () => void = () => {};
-  let closed = false;
-  let playing = false;
-  let imageURL = "";
-  let imageTimer: ReturnType<typeof setTimeout>;
-  const updateImage = async () => {
-    if (closed) return;
-    if (!playing && !document.hidden) {
-      try {
-        const blob = await api.blob(
-          `/cameras/${key(id)}/snapshot`,
-          controller.signal,
-        );
-        if (closed) return;
-        const next = URL.createObjectURL(blob);
-        image.src = next;
-        image.hidden = playing;
-        loading.hidden = true;
-        if (imageURL) URL.revokeObjectURL(imageURL);
-        imageURL = next;
-      } catch {
-        if (!closed && !imageURL)
-          loading.textContent = "Imagem indisponível. Tentando novamente…";
-      }
-    }
-    if (!closed) imageTimer = setTimeout(updateImage, 5000);
-  };
   const connect = () => {
     stop();
-    playing = false;
-    video.hidden = true;
-    image.hidden = !imageURL;
     try {
-      stop = live(
-        api,
-        id,
-        video,
-        (text) => {
-          if (!closed) status.textContent = text;
-        },
-        (ready) => {
-          if (closed) return;
-          playing = ready;
-          video.hidden = !ready;
-          image.hidden = ready || !imageURL;
-        },
-      );
+      stop = live(api, id, $<HTMLVideoElement>("#live-video"), (text) => {
+        const status = $("#live-status");
+        if (status) status.textContent = text;
+      });
     } catch {
-      status.textContent =
-        "Exibindo imagens atualizadas a cada 5 segundos. Vídeo indisponível neste navegador.";
+      $("#live-status").textContent =
+        "WebRTC não está disponível neste navegador.";
     }
   };
-  void updateImage();
   connect();
-  modalCleanups.push(() => {
-    closed = true;
-    controller.abort();
-    clearTimeout(imageTimer);
-    stop();
-    if (imageURL) URL.revokeObjectURL(imageURL);
-  });
+  modalCleanups.push(() => stop());
   $("#restart-live").onclick = connect;
   $("#show-image").onclick = () => {
     stop();
-    playing = false;
-    video.hidden = true;
-    image.hidden = !imageURL;
-    status.textContent = "Imagens atualizadas a cada 5 segundos · sem áudio.";
+    $("#detail-body .media-stage").innerHTML =
+      `<img data-snapshot="${e(id)}" alt="Imagem de ${e(c.name)}" hidden/>`;
+    $<HTMLButtonElement>("#restart-live").disabled = true;
+    $("#live-status").textContent = "Imagem pontual da câmera.";
+    void snapshots($("#detail-body"), modalController.signal, modalCleanups);
   };
 }
 async function eventDetails(id: string) {

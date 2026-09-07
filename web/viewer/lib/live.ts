@@ -5,7 +5,6 @@ export function live(
   cameraId: string,
   video: HTMLVideoElement,
   onStatus: (value: string) => void,
-  onPlayback: (ready: boolean) => void = () => {},
 ): () => void {
   const controller = new AbortController();
   const token = api.token;
@@ -27,35 +26,25 @@ export function live(
   };
   pc.addTransceiver("video", { direction: "recvonly" });
   pc.addTransceiver("audio", { direction: "recvonly" });
-  const stream = new MediaStream();
   pc.ontrack = (event) => {
-    stream.addTrack(event.track);
-    video.srcObject = stream;
+    video.srcObject = event.streams[0] || new MediaStream([event.track]);
     void video.play().catch(() => {});
-  };
-  const started = () => {
-    if (closed) return;
-    clearTimeout(timer);
-    onPlayback(true);
     onStatus("Ao vivo · áudio inicialmente silenciado");
-  };
-  video.addEventListener("playing", started);
-  const unavailable = () => {
-    if (closed) return;
     clearTimeout(timer);
-    onPlayback(false);
-    onStatus(
-      "Vídeo sem conexão. Exibindo imagens atualizadas a cada 5 segundos · sem áudio.",
-    );
   };
   pc.onconnectionstatechange = () => {
-    if (
-      pc.connectionState === "failed" ||
-      pc.connectionState === "disconnected"
-    )
-      unavailable();
+    if (pc.connectionState === "failed")
+      onStatus(
+        "Sem conexão de vídeo. Confira a rede ou consulte a imagem da câmera.",
+      );
   };
-  timer = setTimeout(unavailable, 18000);
+  timer = setTimeout(
+    () =>
+      onStatus(
+        "O vídeo não conectou. WebRTC precisa alcançar o servidor de mídia; você pode consultar a imagem abaixo.",
+      ),
+    18000,
+  );
   void (async () => {
     try {
       onStatus("Conectando ao vídeo ao vivo…");
@@ -112,14 +101,16 @@ export function live(
         sdp: await response.text(),
       });
     } catch (error) {
-      if (!closed) unavailable();
+      if (!closed)
+        onStatus(
+          error instanceof Error ? error.message : "Vídeo indisponível.",
+        );
     }
   })();
   return () => {
     closed = true;
     controller.abort();
     clearTimeout(timer);
-    video.removeEventListener("playing", started);
     pc.close();
     video.srcObject = null;
     removeSession();
