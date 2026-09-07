@@ -146,3 +146,47 @@ func openTestPayload(secret string, sealed []byte) ([]byte, error) {
 	}
 	return aead.Open(nil, sealed[:aead.NonceSize()], sealed[aead.NonceSize():], nil)
 }
+
+func TestTrackingNotificationExcludesAllSubjectDevices(t *testing.T) {
+	db, err := store.Open(t.TempDir() + "/notify.db")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db.Close()
+	stamp := time.Now().UTC().Format(time.RFC3339Nano)
+	for _, u := range []string{"miriam", "fernando"} {
+		if _, err = db.DB.Exec(`INSERT INTO users(id,name,created_at,updated_at) VALUES(?,?,?,?)`, u, u, stamp, stamp); err != nil {
+			t.Fatal(err)
+		}
+	}
+	for _, d := range []struct{ id, user string }{{"m1", "miriam"}, {"m2", "miriam"}, {"f1", "fernando"}} {
+		if _, err = db.DB.Exec(`INSERT INTO devices(id,user_id,name,token_hash,push_endpoint_enc,created_at) VALUES(?,?,?, ?,x'01',?)`, d.id, d.user, d.id, []byte(d.id), stamp); err != nil {
+			t.Fatal(err)
+		}
+	}
+	service := NewService(db, nil, "")
+	e, err := event.NewService(db).Create(context.Background(), event.Event{Source: "tracking", SubjectID: "miriam", Type: "place_entered", Confidence: 1})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err = service.Enqueue(context.Background(), e); err != nil {
+		t.Fatal(err)
+	}
+	var count int
+	var recipient string
+	if err = db.DB.QueryRow(`SELECT count(*),min(device_id) FROM push_deliveries WHERE event_id=?`, e.ID).Scan(&count, &recipient); err != nil || count != 1 || recipient != "f1" {
+		t.Fatalf("count=%d recipient=%s err=%v", count, recipient, err)
+	}
+	// A queued self-delivery from an old version is filtered before decryption/send.
+	if _, err = db.DB.Exec(`INSERT INTO push_deliveries(id,event_id,device_id,next_attempt_at,created_at) VALUES('old',?,'m1',?,?)`, e.ID, stamp, stamp); err != nil {
+		t.Fatal(err)
+	}
+	// Keep the legitimate delivery out of the batch, so no external sends occur.
+	if _, err = db.DB.Exec(`UPDATE push_deliveries SET delivered_at=? WHERE device_id='f1'`, stamp); err != nil {
+		t.Fatal(err)
+	}
+	service.deliverBatch(context.Background())
+	if err = db.DB.QueryRow(`SELECT attempts FROM push_deliveries WHERE id='old'`).Scan(&count); err != nil || count != 0 {
+		t.Fatalf("self delivery attempted: %d %v", count, err)
+	}
+}

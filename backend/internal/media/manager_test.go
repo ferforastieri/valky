@@ -141,3 +141,30 @@ func TestRemoveCameraDeletesSourceBeforeOutput(t *testing.T) {
 		t.Fatalf("unexpected deletion order: %v", paths)
 	}
 }
+
+func TestPreviewSharesCaptureAndSurvivesCancelledReader(t *testing.T) {
+	dir := t.TempDir()
+	// A fake FFmpeg makes cancellation, in-flight sharing and retry deterministic.
+	script := "#!/bin/sh\nprintf 'capture\\n' >> '" + dir + "/calls'\nsleep 0.2\nprintf 'jpeg-test-frame'\n"
+	if err := os.WriteFile(dir+"/ffmpeg", []byte(script), 0700); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("PATH", dir+":"+os.Getenv("PATH"))
+	m := New("http://media", "rtsp://media", "http://media", "http://media", dir)
+	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Millisecond)
+	defer cancel()
+	if _, err := m.PreviewFrame(ctx, "camera"); err == nil {
+		t.Fatal("cancelled reader succeeded")
+	}
+	frame, err := m.PreviewFrame(context.Background(), "camera")
+	if err != nil || string(frame) != "jpeg-test-frame" {
+		t.Fatalf("frame=%q err=%v", frame, err)
+	}
+	if _, err = m.PreviewFrame(context.Background(), "camera"); err != nil {
+		t.Fatal(err)
+	}
+	calls, err := os.ReadFile(dir + "/calls")
+	if err != nil || strings.Count(string(calls), "capture") != 1 {
+		t.Fatalf("duplicate captures: %q %v", calls, err)
+	}
+}

@@ -453,7 +453,7 @@ func (s *Server) snapshot(w http.ResponseWriter, r *http.Request) {
 	// Prefer the already-open local stream. It avoids a fresh HTTP authentication
 	// round trip to the camera on every list refresh and retains the main stream
 	// resolution selected during the ONVIF probe.
-	streamContext, cancelStream := context.WithTimeout(r.Context(), 3*time.Second)
+	streamContext, cancelStream := context.WithTimeout(r.Context(), 10*time.Second)
 	frame, streamErr := s.media.PreviewFrame(streamContext, cam.ID)
 	cancelStream()
 	if streamErr != nil {

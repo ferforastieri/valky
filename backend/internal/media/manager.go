@@ -22,26 +22,34 @@ type cachedFrame struct {
 	captured time.Time
 }
 
+type previewFlight struct {
+	done chan struct{}
+	data []byte
+	err  error
+}
+
 type Manager struct {
-	api        string
-	rtsp       string
-	webrtc     string
-	playback   string
-	recordings string
-	http       *http.Client
-	previewMu  sync.Mutex
-	previews   map[string]cachedFrame
+	api            string
+	rtsp           string
+	webrtc         string
+	playback       string
+	recordings     string
+	http           *http.Client
+	previewMu      sync.Mutex
+	previews       map[string]cachedFrame
+	previewFlights map[string]*previewFlight
 }
 
 func New(api, rtsp, webrtc, playback, recordings string) *Manager {
 	return &Manager{
-		api:        strings.TrimRight(api, "/"),
-		rtsp:       strings.TrimRight(rtsp, "/"),
-		webrtc:     strings.TrimRight(webrtc, "/"),
-		playback:   strings.TrimRight(playback, "/"),
-		recordings: recordings,
-		http:       &http.Client{Timeout: 30 * time.Second},
-		previews:   make(map[string]cachedFrame),
+		api:            strings.TrimRight(api, "/"),
+		rtsp:           strings.TrimRight(rtsp, "/"),
+		webrtc:         strings.TrimRight(webrtc, "/"),
+		playback:       strings.TrimRight(playback, "/"),
+		recordings:     recordings,
+		http:           &http.Client{Timeout: 30 * time.Second},
+		previews:       make(map[string]cachedFrame),
+		previewFlights: make(map[string]*previewFlight),
 	}
 }
 
@@ -215,10 +223,13 @@ func (m *Manager) MonitoringFrame(ctx context.Context, cameraID string) ([]byte,
 	frameContext, cancel := context.WithTimeout(ctx, 8*time.Second)
 	defer cancel()
 	input := m.RTSPURL(cameraID)
-	cmd := exec.CommandContext(frameContext, "ffmpeg", "-hide_banner", "-loglevel", "error", "-i", input, "-frames:v", "1", "-f", "image2pipe", "-c:v", "mjpeg", "-q:v", "2", "pipe:1")
+	cmd := exec.CommandContext(frameContext, "ffmpeg", "-hide_banner", "-loglevel", "error", "-rtsp_transport", "tcp", "-analyzeduration", "1000000", "-probesize", "1000000", "-i", input, "-frames:v", "1", "-an", "-f", "image2pipe", "-c:v", "mjpeg", "-q:v", "2", "pipe:1")
 	frame, err := cmd.Output()
 	if err != nil {
 		return nil, fmt.Errorf("capture monitoring frame: %w", err)
+	}
+	if len(frame) == 0 {
+		return nil, fmt.Errorf("camera returned an empty frame")
 	}
 	return frame, nil
 }
@@ -234,16 +245,33 @@ func (m *Manager) PreviewFrame(ctx context.Context, cameraID string) ([]byte, er
 		m.previewMu.Unlock()
 		return frame, nil
 	}
-	m.previewMu.Unlock()
-
-	frame, err := m.MonitoringFrame(ctx, cameraID)
-	if err != nil {
-		return nil, err
+	flight := m.previewFlights[cameraID]
+	if flight == nil {
+		flight = &previewFlight{done: make(chan struct{})}
+		m.previewFlights[cameraID] = flight
+		// One capture per camera, shared by lists and the region editor. A cancelled
+		// screen cannot cancel another screen's pending frame.
+		go func() {
+			captureContext, cancel := context.WithTimeout(context.WithoutCancel(ctx), 8*time.Second)
+			defer cancel()
+			frame, err := m.MonitoringFrame(captureContext, cameraID)
+			m.previewMu.Lock()
+			defer m.previewMu.Unlock()
+			flight.data, flight.err = frame, err
+			if err == nil {
+				m.previews[cameraID] = cachedFrame{data: append([]byte(nil), frame...), captured: time.Now()}
+			}
+			delete(m.previewFlights, cameraID)
+			close(flight.done)
+		}()
 	}
-	m.previewMu.Lock()
-	m.previews[cameraID] = cachedFrame{data: append([]byte(nil), frame...), captured: time.Now()}
 	m.previewMu.Unlock()
-	return frame, nil
+	select {
+	case <-ctx.Done():
+		return nil, ctx.Err()
+	case <-flight.done:
+		return append([]byte(nil), flight.data...), flight.err
+	}
 }
 
 // MaterializeClip joins the rolling fMP4 fragments intersecting the event window.

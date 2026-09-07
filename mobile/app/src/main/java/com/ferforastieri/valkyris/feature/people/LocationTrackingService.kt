@@ -26,6 +26,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.cancel
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import java.time.Instant
@@ -39,6 +40,7 @@ class LocationTrackingService : Service(), LocationListener {
     private lateinit var locationManager: LocationManager
     private lateinit var preferences: SharedPreferences
     private val reportingMutex = Mutex()
+    private var updatesRegistered = false
 
     override fun onCreate() {
         super.onCreate()
@@ -52,6 +54,7 @@ class LocationTrackingService : Service(), LocationListener {
         if (!hasLocationPermission()) { stopSelf(); return START_NOT_STICKY }
         preferences.edit().putBoolean(TRACKING_ENABLED, true).apply()
         startForeground(NOTIFICATION_ID, notification())
+        if (updatesRegistered) return START_STICKY
         runCatching {
             locationManager.removeUpdates(this)
             listOf(LocationManager.GPS_PROVIDER, LocationManager.NETWORK_PROVIDER).forEach { provider ->
@@ -62,6 +65,7 @@ class LocationTrackingService : Service(), LocationListener {
                     locationManager.getLastKnownLocation(provider)?.let(::report)
                 }
             }
+            updatesRegistered = true
         }
         return START_STICKY
     }
@@ -86,19 +90,27 @@ class LocationTrackingService : Service(), LocationListener {
     }
 
     private fun shouldReport(location: Location): Boolean {
+        val now = System.currentTimeMillis()
+        if (!location.hasAccuracy() || !location.accuracy.isFinite() || location.accuracy <= 0 || location.accuracy > 200) return false
+        if (location.time < now - 2 * 60_000 || location.time > now + 30_000) return false
+        if (location.time <= preferences.getLong(LAST_FIX_AT, 0L)) return false
         val lastSentAt = preferences.getLong(LAST_SENT_AT, 0L)
-        if (lastSentAt == 0L || System.currentTimeMillis() - lastSentAt >= REPORT_INTERVAL_MS) return true
+        if (lastSentAt == 0L || now - lastSentAt >= REPORT_INTERVAL_MS) return true
+        if (now - lastSentAt < 30_000) return false
         if (!preferences.contains(LAST_SENT_LATITUDE) || !preferences.contains(LAST_SENT_LONGITUDE)) return true
         val lastLocation = Location("last-reported").apply {
             latitude = Double.fromBits(preferences.getLong(LAST_SENT_LATITUDE, 0L))
             longitude = Double.fromBits(preferences.getLong(LAST_SENT_LONGITUDE, 0L))
         }
-        return lastLocation.distanceTo(location) >= MOVEMENT_DISTANCE_METERS
+        val uncertainty = location.accuracy + preferences.getFloat(LAST_ACCURACY, 0f)
+        return lastLocation.distanceTo(location) >= maxOf(MOVEMENT_DISTANCE_METERS, uncertainty)
     }
 
     private fun persistReportedLocation(location: Location) {
         preferences.edit()
             .putLong(LAST_SENT_AT, System.currentTimeMillis())
+            .putLong(LAST_FIX_AT, location.time)
+            .putFloat(LAST_ACCURACY, location.accuracy)
             .putLong(LAST_SENT_LATITUDE, location.latitude.toBits())
             .putLong(LAST_SENT_LONGITUDE, location.longitude.toBits())
             .apply()
@@ -126,7 +138,7 @@ class LocationTrackingService : Service(), LocationListener {
         }.take(320)
     }
 
-    override fun onDestroy() { runCatching { locationManager.removeUpdates(this) }; super.onDestroy() }
+    override fun onDestroy() { scope.cancel(); runCatching { locationManager.removeUpdates(this) }; super.onDestroy() }
     override fun onBind(intent: Intent?): IBinder? = null
     private fun hasLocationPermission() = ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED
     private fun createChannel() {
@@ -157,6 +169,8 @@ class LocationTrackingService : Service(), LocationListener {
         private const val TRACKING_ENABLED = "tracking_enabled"
         private const val PREFERENCES = "location_tracking"
         private const val LAST_SENT_AT = "last_sent_at"
+        private const val LAST_FIX_AT = "last_fix_at"
+        private const val LAST_ACCURACY = "last_accuracy"
         private const val LAST_SENT_LATITUDE = "last_sent_latitude"
         private const val LAST_SENT_LONGITUDE = "last_sent_longitude"
         private const val REPORT_INTERVAL_MS = 5 * 60 * 1000L

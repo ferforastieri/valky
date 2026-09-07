@@ -121,7 +121,13 @@ func (s *Service) Register(ctx context.Context, deviceID string, r Registration)
 	return err
 }
 func (s *Service) Enqueue(ctx context.Context, e event.Event) error {
-	rows, err := s.store.DB.QueryContext(ctx, `SELECT id FROM devices WHERE enabled=1 AND push_endpoint_enc IS NOT NULL`)
+	query := `SELECT id FROM devices WHERE enabled=1 AND push_endpoint_enc IS NOT NULL`
+	var args []any
+	if e.Source == "tracking" && e.SubjectID != "" {
+		query += ` AND COALESCE(user_id,'')<>? AND id NOT IN (SELECT device_id FROM people WHERE id=? AND device_id IS NOT NULL)`
+		args = []any{e.SubjectID, e.SubjectID}
+	}
+	rows, err := s.store.DB.QueryContext(ctx, query, args...)
 	if err != nil {
 		return err
 	}
@@ -164,7 +170,7 @@ func (s *Service) Run(ctx context.Context) {
 	}
 }
 func (s *Service) deliverBatch(ctx context.Context) {
-	rows, err := s.store.DB.QueryContext(ctx, `SELECT p.id,p.attempts,d.push_endpoint_enc,d.push_secret_enc,e.id,COALESCE(e.camera_id,''),e.type,e.confidence,e.occurred_at,e.metadata_json FROM push_deliveries p JOIN devices d ON d.id=p.device_id JOIN events e ON e.id=p.event_id WHERE p.delivered_at IS NULL AND p.next_attempt_at<=? AND p.attempts<10 ORDER BY p.created_at LIMIT 20`, time.Now().UTC().Format(time.RFC3339Nano))
+	rows, err := s.store.DB.QueryContext(ctx, `SELECT p.id,p.attempts,d.push_endpoint_enc,d.push_secret_enc,e.id,COALESCE(e.camera_id,''),e.type,e.confidence,e.occurred_at,e.metadata_json FROM push_deliveries p JOIN devices d ON d.id=p.device_id JOIN events e ON e.id=p.event_id WHERE d.enabled=1 AND NOT (e.source='tracking' AND e.subject_id<>'' AND (COALESCE(d.user_id,'')=e.subject_id OR EXISTS (SELECT 1 FROM people own WHERE own.id=e.subject_id AND own.device_id=d.id))) AND p.delivered_at IS NULL AND p.next_attempt_at<=? AND p.attempts<10 ORDER BY p.created_at LIMIT 20`, time.Now().UTC().Format(time.RFC3339Nano))
 	if err != nil {
 		return
 	}

@@ -178,7 +178,7 @@ func (s *Service) ReportMyLocation(ctx context.Context, deviceID string, locatio
 	if !user.Enabled {
 		return nil, fmt.Errorf("user tracking is disabled")
 	}
-	if !validCoordinate(location.Latitude, location.Longitude) || location.Accuracy < 0 || location.Accuracy > 10000 {
+	if !validCoordinate(location.Latitude, location.Longitude) || math.IsNaN(location.Accuracy) || math.IsInf(location.Accuracy, 0) || location.Accuracy < 0 || location.Accuracy > 10000 {
 		return nil, fmt.Errorf("location is invalid")
 	}
 	location.Address = strings.TrimSpace(location.Address)
@@ -192,11 +192,22 @@ func (s *Service) ReportMyLocation(ctx context.Context, deviceID string, locatio
 	if location.OccurredAt.Before(now.Add(-24*time.Hour)) || location.OccurredAt.After(now.Add(5*time.Minute)) {
 		return nil, fmt.Errorf("location timestamp is invalid")
 	}
+	// A stale provider cache is not a new location observation.
+	if location.OccurredAt.Before(now.Add(-2*time.Minute)) || location.OccurredAt.After(now.Add(30*time.Second)) {
+		return nil, nil
+	}
 	tx, err := s.store.DB.BeginTx(ctx, nil)
 	if err != nil {
 		return nil, err
 	}
 	defer tx.Rollback()
+	var previousAt sql.NullString
+	if err = tx.QueryRowContext(ctx, `SELECT last_located_at FROM users WHERE id=?`, user.ID).Scan(&previousAt); err != nil {
+		return nil, err
+	}
+	if previous := store.NullTime(previousAt); previous != nil && !location.OccurredAt.After(*previous) {
+		return nil, nil
+	}
 	location.ID, location.UserID = uuid.NewString(), user.ID
 	if _, err = tx.ExecContext(ctx, `INSERT INTO user_locations(id,user_id,latitude,longitude,accuracy,address,occurred_at,created_at) VALUES(?,?,?,?,?,?,?,?)`, location.ID, location.UserID, location.Latitude, location.Longitude, location.Accuracy, location.Address, location.OccurredAt.Format(time.RFC3339Nano), now.Format(time.RFC3339Nano)); err != nil {
 		return nil, err
@@ -215,7 +226,10 @@ func (s *Service) ReportMyLocation(ctx context.Context, deviceID string, locatio
 			rows.Close()
 			return nil, scanErr
 		}
-		inside := distanceMeters(location.Latitude, location.Longitude, place.Latitude, place.Longitude) <= place.RadiusMeters
+		inside, certain := confidentMembership(location.Latitude, location.Longitude, location.Accuracy, place)
+		if !certain {
+			continue
+		}
 		var previous int
 		lookupErr := tx.QueryRowContext(ctx, `SELECT inside FROM user_place_memberships WHERE user_id=? AND place_id=?`, user.ID, place.ID).Scan(&previous)
 		if lookupErr == sql.ErrNoRows {
@@ -395,7 +409,7 @@ func (s *Service) History(ctx context.Context, personID string, limit int) ([]Lo
 }
 
 func (s *Service) Report(ctx context.Context, personID, reporter string, location Location) ([]Transition, error) {
-	if !validCoordinate(location.Latitude, location.Longitude) || location.Accuracy < 0 || location.Accuracy > 10000 {
+	if !validCoordinate(location.Latitude, location.Longitude) || math.IsNaN(location.Accuracy) || math.IsInf(location.Accuracy, 0) || location.Accuracy < 0 || location.Accuracy > 10000 {
 		return nil, fmt.Errorf("location is invalid")
 	}
 	person, err := s.GetPerson(ctx, personID)
@@ -415,11 +429,22 @@ func (s *Service) Report(ctx context.Context, personID, reporter string, locatio
 	if location.OccurredAt.Before(now.Add(-24*time.Hour)) || location.OccurredAt.After(now.Add(5*time.Minute)) {
 		return nil, fmt.Errorf("location timestamp is invalid")
 	}
+	// A stale provider cache is not a new location observation.
+	if location.OccurredAt.Before(now.Add(-2*time.Minute)) || location.OccurredAt.After(now.Add(30*time.Second)) {
+		return nil, nil
+	}
 	tx, err := s.store.DB.BeginTx(ctx, nil)
 	if err != nil {
 		return nil, err
 	}
 	defer tx.Rollback()
+	var previousAt sql.NullString
+	if err = tx.QueryRowContext(ctx, `SELECT last_located_at FROM people WHERE id=?`, personID).Scan(&previousAt); err != nil {
+		return nil, err
+	}
+	if previous := store.NullTime(previousAt); previous != nil && !location.OccurredAt.After(*previous) {
+		return nil, nil
+	}
 	location.ID = uuid.NewString()
 	location.PersonID = personID
 	_, err = tx.ExecContext(ctx, `INSERT INTO person_locations(id,person_id,latitude,longitude,accuracy,occurred_at,created_at)VALUES(?,?,?,?,?,?,?)`, location.ID, personID, location.Latitude, location.Longitude, location.Accuracy, location.OccurredAt.Format(time.RFC3339Nano), now.Format(time.RFC3339Nano))
@@ -441,7 +466,10 @@ func (s *Service) Report(ctx context.Context, personID, reporter string, locatio
 			rows.Close()
 			return nil, scanErr
 		}
-		inside := distanceMeters(location.Latitude, location.Longitude, place.Latitude, place.Longitude) <= place.RadiusMeters
+		inside, certain := confidentMembership(location.Latitude, location.Longitude, location.Accuracy, place)
+		if !certain {
+			continue
+		}
 		var previous int
 		lookupErr := tx.QueryRowContext(ctx, `SELECT inside FROM place_memberships WHERE person_id=? AND place_id=?`, personID, place.ID).Scan(&previous)
 		if lookupErr == sql.ErrNoRows {
@@ -562,4 +590,21 @@ func distanceMeters(aLat, aLon, bLat, bLon float64) float64 {
 	dLon := (bLon - aLon) * math.Pi / 180
 	a := math.Sin(dLat/2)*math.Sin(dLat/2) + math.Cos(aLat*math.Pi/180)*math.Cos(bLat*math.Pi/180)*math.Sin(dLon/2)*math.Sin(dLon/2)
 	return earth * 2 * math.Atan2(math.Sqrt(a), math.Sqrt(1-a))
+}
+
+// Only change membership when the accuracy circle is fully on one side of the
+// boundary. A minimum margin prevents GPS jitter from alternating enter/exit.
+func confidentMembership(latitude, longitude, accuracy float64, place Place) (inside, certain bool) {
+	if accuracy <= 0 || accuracy > 200 || math.IsNaN(accuracy) || math.IsInf(accuracy, 0) {
+		return false, false
+	}
+	distance := distanceMeters(latitude, longitude, place.Latitude, place.Longitude)
+	margin := math.Max(accuracy, 15)
+	if distance+margin < place.RadiusMeters {
+		return true, true
+	}
+	if distance-margin > place.RadiusMeters {
+		return false, true
+	}
+	return false, false
 }
