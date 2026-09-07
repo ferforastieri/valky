@@ -3,10 +3,10 @@ import '@fontsource-variable/bricolage-grotesque';
 import '@fontsource-variable/manrope';
 import '@fontsource/ibm-plex-mono/400.css';
 import '../viewer.css';
-import { LayoutDashboard, Camera, Bell, MapPin, Scan, SlidersHorizontal, Server, SunMoon, LogOut, RefreshCw, ShieldCheck, ArrowRight, X } from '@lucide/astro';
+import { LayoutDashboard, Camera, Bell, MapPin, Server, SunMoon, LogOut, ShieldCheck, ArrowRight, X } from '@lucide/astro';
 const links = [
   ['overview','Visão geral',LayoutDashboard],['cameras','Câmeras',Camera],['events','Eventos',Bell],
-  ['family','Família',MapPin],['places','Áreas',Scan],['rules','Regras',SlidersHorizontal],['system','Sistema',Server],
+  ['family','Família',MapPin],['system','Sistema',Server],
 ] as const;
 ---
 <!doctype html>
@@ -36,13 +36,13 @@ const links = [
   <div id="application" class="app-shell" hidden>
     <aside class="sidebar"><a href="#overview" class="brand"><img src="/app/valkyris-mark.svg" alt="" /><span>Valkyris<small>PAINEL DA CASA</small></span></a>
       <nav aria-label="Navegação principal">{links.map(([id,label,Icon]) => <a href={`#${id}`} data-page={id}><Icon size={20}/><span>{label}</span><span class="nav-count" id={`count-${id}`}></span></a>)}</nav>
+      <div class="sidebar-actions">
+        <button id="theme" class="quiet" aria-label="Alternar tema" title="Alternar tema"><SunMoon size={19}/><span>Tema</span></button>
+        <button id="logout" class="quiet"><LogOut size={19}/><span>Sair</span></button>
+      </div>
       <div class="sidebar-foot"><span class="badge"><ShieldCheck size={14}/> Apenas consulta</span><small>Monitoramento no seu servidor</small></div>
     </aside>
-    <div class="workspace"><header class="topbar"><div class="connection"><span class="status-dot"></span><span id="connection-text">Conectando ao servidor</span></div><div class="toolbar">
-      <button id="refresh" class="icon-button" aria-label="Atualizar dados" title="Atualizar dados"><RefreshCw size={18}/></button>
-      <button id="theme" class="icon-button" aria-label="Alternar tema" title="Alternar tema"><SunMoon size={19}/></button>
-      <span class="toolbar-divider"></span><button id="logout" class="quiet"><LogOut size={17}/><span>Sair</span></button>
-    </div></header>
+    <div class="workspace">
     <p id="global-error" class="banner error" role="alert" hidden></p>
     <main id="main" tabindex="-1"><div class="loading"><span class="spinner"></span>Carregando sua casa…</div></main>
     <footer class="page-footer">Valkyris <span>·</span> Consulta protegida <span>·</span> <span id="last-sync">Aguardando sincronização</span></footer>

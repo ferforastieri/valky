@@ -59,8 +59,6 @@ const messages: Record<string, [string, string]> = {
   ],
   events: ["Eventos", "Consulte os últimos 200 registros e suas mídias."],
   family: ["Família", "Últimas posições recebidas dos aparelhos da casa."],
-  places: ["Áreas", "Locais acompanhados no mapa da família."],
-  rules: ["Regras", "Critérios e ações configurados no aplicativo."],
   system: [
     "Sistema",
     "Informações desta instalação e preferências de consulta.",
@@ -164,25 +162,11 @@ function render() {
   else if (page === "family")
     content =
       people.length || places.length
-        ? `<div class="family-layout"><div id="family-map" class="map" aria-label="Mapa da família"></div><div class="family-members">${members(people) || empty("Nenhum aparelho", "Vincule os aparelhos pelo aplicativo.")}</div></div>`
+        ? `<div class="family-layout"><div id="family-map" class="map" aria-label="Mapa da família"></div><div class="family-context"><section><div class="section-title"><h2>Família</h2></div><div class="family-members">${members(people) || empty("Nenhum aparelho", "Vincule os aparelhos pelo aplicativo.")}</div></section><section><div class="section-title"><h2>Áreas</h2></div><div class="area-list">${places.map((p) => `<button class="member-card" data-place="${e(p.id)}"><span class="tile-icon">${icon("map")}</span><span><strong>${e(p.name)}</strong><small>Raio de ${e(p.radiusMeters)} m · ${p.enabled ? "Ativa" : "Desativada"}</small></span><span class="arrow">${icon("arrow")}</span></button>`).join("") || empty("Nenhuma área cadastrada", "Configure os locais pelo aplicativo.")}</div></section></div></div>`
         : empty(
             "O mapa está aguardando a família",
             "Nenhum aparelho ou área foi cadastrado.",
           );
-  else if (page === "places")
-    content = places.length
-      ? `<div class="family-layout"><div id="family-map" class="map" aria-label="Mapa de áreas"></div><div>${places.map((p) => `<article class="panel panel-pad" style="margin-bottom:12px"><span class="tile-icon">${icon("map")}</span><h3 style="margin-top:14px">${e(p.name)}</h3><p class="muted">Raio de ${e(p.radiusMeters)} metros</p><span class="pill">${p.enabled ? "Área ativa" : "Área desativada"}</span></article>`).join("")}</div></div>`
-      : empty(
-          "Nenhuma área cadastrada",
-          "Configure os locais pelo aplicativo.",
-        );
-  else if (page === "rules")
-    content = rules.length
-      ? `<div class="rule-grid">${rules.map((r) => `<button class="rule-card" data-rule="${e(r.id)}"><span class="tile-icon">${icon("rule")}</span><h3>${e(r.name)}</h3><div class="rule-details"><span>${e(cameraName(r.cameraId))} · ${r.detectorTypes.map((d) => e(labels[d] || d)).join(", ")}</span><span>${e(schedule(r))}</span><span>${r.motion ? `Região selecionada · movimento por ${r.motion.minDurationSeconds} s` : "Detecção padrão da câmera"}</span></div><div class="rule-actions">${actionPills(r)}</div></button>`).join("")}</div>`
-      : empty(
-          "Nenhuma regra cadastrada",
-          "As regras criadas no aplicativo aparecerão aqui.",
-        );
   else if (page === "system")
     content = `<div id="system-content" class="loading"><span class="spinner"></span>Consultando instalação…</div>`;
   main.innerHTML = head(page) + content;
@@ -505,6 +489,25 @@ async function personDetails(id: string) {
         error instanceof Error ? error.message : "Histórico indisponível.";
   }
 }
+async function placeDetails(id: string) {
+  const place = places.find((p) => p.id === id);
+  if (!place) return;
+  const version = openDetails(place.name, "ÁREA DA FAMÍLIA");
+  $("#detail-body").innerHTML = `${dl([
+    ["Raio", `${place.radiusMeters} m`],
+    ["Estado", place.enabled ? "Ativa" : "Desativada"],
+  ])}<div id="place-map" class="map" style="height:300px;margin-top:20px" aria-label="Localização da área"></div>`;
+  try {
+    const { familyMap } = await import("./lib/map");
+    if (version === dialogVersion)
+      modalCleanups.push(
+        familyMap($("#place-map"), [], [{ ...place, enabled: true }]),
+      );
+  } catch {
+    if (version === dialogVersion)
+      $("#place-map").textContent = "Não foi possível carregar o mapa.";
+  }
+}
 async function ruleDetails(id: string) {
   const r = rules.find((r) => r.id === id);
   if (!r) return;
@@ -530,7 +533,6 @@ async function ruleDetails(id: string) {
 async function refresh(force = false) {
   if (refreshing || !api.token || document.hidden) return;
   refreshing = true;
-  $<HTMLButtonElement>("#refresh").disabled = true;
   const token = api.token;
   const response = await Promise.allSettled([
     api.get<Camera[]>("/cameras", alive.signal),
@@ -559,12 +561,9 @@ async function refresh(force = false) {
     hasLoaded = true;
     render();
   }
-  $("#connection-text").textContent = failures.length
-    ? "Conexão parcial · tentando novamente"
-    : "Conectado ao seu servidor";
   $("#global-error").hidden = !failures.length;
   $("#global-error").textContent = failures.length
-    ? "Alguns dados não puderam ser atualizados. Você pode tentar novamente pelo botão de atualizar."
+    ? "Alguns dados não puderam ser atualizados. Tentaremos novamente automaticamente."
     : "";
   if (!failures.length)
     $("#last-sync").textContent =
@@ -573,7 +572,6 @@ async function refresh(force = false) {
   $("#count-events").textContent = String(
     events.filter((ev) => !ev.acknowledgedAt).length || "",
   );
-  $<HTMLButtonElement>("#refresh").disabled = false;
   refreshing = false;
 }
 function enter() {
@@ -582,9 +580,7 @@ function enter() {
   $("#login").hidden = true;
   $("#application").hidden = false;
   hasLoaded = false;
-  page = messages[window.location.hash.slice(1)]
-    ? window.location.hash.slice(1)
-    : "overview";
+  page = selectedPage();
   void refresh(true);
 }
 function leave(message = "") {
@@ -628,7 +624,6 @@ $("#logout").onclick = () => {
   void api.logout();
   leave();
 };
-$("#refresh").onclick = () => void refresh(true);
 $("#detail-close").onclick = () => dialog.close();
 dialog.addEventListener("close", closeDetails);
 dialog.addEventListener("click", (event) => {
@@ -646,22 +641,26 @@ dialog.addEventListener("click", (event) => {
 window.addEventListener("viewer-expired", () =>
   leave("Sua sessão expirou. Entre novamente."),
 );
+function selectedPage() {
+  const hash = window.location.hash.slice(1);
+  if (hash === "places") return "family";
+  if (hash === "rules") return "cameras";
+  return messages[hash] ? hash : "overview";
+}
 window.addEventListener("hashchange", () => {
-  const next = window.location.hash.slice(1);
-  if (messages[next]) {
-    page = next;
-    if (api.token && hasLoaded) render();
-  }
+  page = selectedPage();
+  if (api.token && hasLoaded) render();
 });
 document.addEventListener("click", (event) => {
   const el = (event.target as Element).closest<HTMLElement>(
-    "[data-camera],[data-event],[data-person],[data-rule]",
+    "[data-camera],[data-event],[data-person],[data-rule],[data-place]",
   );
   if (!el) return;
   if (el.dataset.camera) void cameraDetails(el.dataset.camera);
   if (el.dataset.event) void eventDetails(el.dataset.event);
   if (el.dataset.person) void personDetails(el.dataset.person);
   if (el.dataset.rule) void ruleDetails(el.dataset.rule);
+  if (el.dataset.place) void placeDetails(el.dataset.place);
 });
 try {
   document.documentElement.dataset.theme =

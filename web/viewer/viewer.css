@@ -311,8 +311,36 @@ select:focus {
   font: 10px var(--mono);
 }
 .sidebar-foot {
-  margin-top: auto;
+  margin-top: 0;
   padding: 20px 7px 0;
+}
+.sidebar-actions {
+  margin-top: auto;
+  padding-top: 24px;
+  display: grid;
+  gap: 5px;
+}
+.sidebar-actions button {
+  justify-content: flex-start;
+  padding: 12px 14px;
+  gap: 13px;
+  border-radius: 11px;
+  width: 100%;
+}
+.sidebar-actions button:hover {
+  background: var(--soft);
+}
+.family-context {
+  display: grid;
+  align-content: start;
+  gap: 24px;
+}
+.family-context .section-title {
+  margin-top: 0;
+}
+.area-list {
+  display: grid;
+  gap: 10px;
 }
 .sidebar-foot small {
   display: block;
@@ -321,38 +349,6 @@ select:focus {
 }
 .workspace {
   min-width: 0;
-}
-.topbar {
-  height: 78px;
-  padding: 0 38px;
-  border-bottom: 1px solid var(--line);
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-}
-.connection {
-  display: flex;
-  gap: 9px;
-  align-items: center;
-  font-size: 11px;
-  color: var(--muted);
-}
-.status-dot {
-  width: 6px;
-  height: 6px;
-  border-radius: 50%;
-  background: var(--signal);
-}
-.toolbar {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-}
-.toolbar-divider {
-  width: 1px;
-  height: 22px;
-  background: var(--line);
-  margin: 0 8px;
 }
 main {
   padding: 38px;
@@ -891,9 +887,6 @@ dialog::backdrop {
   main {
     padding: 28px;
   }
-  .topbar {
-    padding: 0 28px;
-  }
   .camera-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
@@ -934,6 +927,7 @@ dialog::backdrop {
     border-top: 1px solid var(--line);
     padding: 0;
     overflow-x: auto;
+    flex-direction: row;
   }
   .sidebar > .brand,
   .sidebar-foot {
@@ -942,15 +936,34 @@ dialog::backdrop {
   .sidebar nav {
     display: flex;
     justify-content: space-around;
-    min-width: 370px;
+    min-width: 0;
+    flex: 5;
     height: 100%;
     gap: 0;
   }
   .sidebar nav a {
+    flex: 1;
+    min-width: 0;
     flex-direction: column;
     justify-content: center;
     gap: 4px;
     padding: 8px 9px;
+    font-size: 9px;
+    border-radius: 0;
+  }
+  .sidebar-actions {
+    display: flex;
+    flex: 2;
+    margin: 0;
+    padding: 0;
+    gap: 0;
+  }
+  .sidebar-actions button {
+    flex: 1;
+    flex-direction: column;
+    justify-content: center;
+    gap: 4px;
+    padding: 8px 4px;
     font-size: 9px;
     border-radius: 0;
   }
@@ -960,19 +973,6 @@ dialog::backdrop {
   }
   .nav-count {
     display: none;
-  }
-  .topbar {
-    height: 65px;
-    padding: 0 18px;
-  }
-  .connection {
-    font-size: 10px;
-  }
-  .toolbar {
-    gap: 0;
-  }
-  .toolbar-divider {
-    margin: 0 4px;
   }
   .quiet {
     font-size: 11px;
