@@ -72,6 +72,9 @@ func (m *Manager) ChangeAdminPassword(ctx context.Context, currentPassword, newP
 		return err
 	}
 	_, err = m.store.DB.ExecContext(ctx, `UPDATE settings SET value=?,updated_at=? WHERE key='admin_password_hash'`, string(hash), time.Now().UTC().Format(time.RFC3339Nano))
+	if err == nil {
+		_, err = m.store.DB.ExecContext(ctx, `DELETE FROM viewer_sessions`)
+	}
 	return err
 }
 
@@ -295,25 +298,56 @@ func (m *Manager) authenticate(ctx context.Context, token string) (string, bool,
 func (m *Manager) Middleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		header := r.Header.Get("Authorization")
-		if !strings.HasPrefix(header, "Bearer ") {
-			writeUnauthorized(w)
-			return
-		}
-		id, admin, err := m.authenticate(r.Context(), strings.TrimPrefix(header, "Bearer "))
-		if err != nil {
-			id, err = m.authenticateViewer(r.Context(), strings.TrimPrefix(header, "Bearer "))
-			if err != nil {
+		token := strings.TrimPrefix(header, "Bearer ")
+		cookieAuth := header == ""
+		var id string
+		var admin bool
+		var err error
+		if cookieAuth {
+			cookie, cookieErr := r.Cookie(ViewerCookie)
+			if cookieErr != nil {
 				writeUnauthorized(w)
 				return
 			}
-			admin = false
-			if !viewerRequestAllowed(r) {
-				w.Header().Set("Content-Type", "application/json")
-				w.WriteHeader(http.StatusForbidden)
-				_ = json.NewEncoder(w).Encode(map[string]any{"success": false, "message": "Esta sessão permite apenas consulta."})
+			token = cookie.Value
+			id, err = m.authenticateViewer(r.Context(), token)
+		} else {
+			if !strings.HasPrefix(header, "Bearer ") {
+				writeUnauthorized(w)
 				return
 			}
+			id, admin, err = m.authenticate(r.Context(), token)
 		}
+		viewer := cookieAuth
+		if err != nil && !cookieAuth {
+			id, err = m.authenticateViewer(r.Context(), token)
+			viewer = err == nil
+			admin = false
+		}
+		if err != nil {
+			writeUnauthorized(w)
+			return
+		}
+		if viewer {
+			if !viewerRequestAllowed(r) || (cookieAuth && !ViewerRequestSafe(r)) {
+				w.Header().Set("Content-Type", "application/json")
+				w.WriteHeader(http.StatusForbidden)
+				json.NewEncoder(w).Encode(map[string]any{"success": false, "message": "Acesso de consulta inválido ou operação não permitida."})
+				return
+			}
+			if cookieAuth && !(r.Method == "DELETE" && r.URL.Path == "/viewer-session") {
+				now := time.Now().UTC()
+				result, updateErr := m.store.DB.ExecContext(r.Context(), `UPDATE viewer_sessions SET expires_at=? WHERE id=? AND expires_at<?`, now.Add(30*24*time.Hour).Format(time.RFC3339Nano), id, now.Add(29*24*time.Hour).Format(time.RFC3339Nano))
+				if updateErr != nil {
+					http.Error(w, "Session renewal failed", 500)
+					return
+				}
+				if changed, _ := result.RowsAffected(); changed > 0 {
+					SetViewerCookie(w, token)
+				}
+			}
+		}
+		w.Header().Set("Cache-Control", "no-store")
 		ctx := context.WithValue(r.Context(), deviceKey, id)
 		ctx = context.WithValue(ctx, adminKey, admin)
 		next.ServeHTTP(w, r.WithContext(ctx))

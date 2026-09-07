@@ -44,6 +44,8 @@ import org.osmdroid.views.MapView
 import org.osmdroid.views.overlay.MapEventsOverlay
 import org.osmdroid.views.overlay.Marker
 import org.osmdroid.views.overlay.Polygon
+import org.osmdroid.views.overlay.Polyline
+import org.osmdroid.util.BoundingBox
 
 @Composable
 fun PeopleScreen(vm: PeopleViewModel = hiltViewModel()) {
@@ -53,6 +55,7 @@ fun PeopleScreen(vm: PeopleViewModel = hiltViewModel()) {
     val history by vm.history.collectAsStateWithLifecycle()
     val busy by vm.busy.collectAsStateWithLifecycle()
     var placeEditor by remember { mutableStateOf<TrackedPlace?>(null) }
+    var selectedMapUser by remember { mutableStateOf<TrackedPerson?>(null) }
     var historyUser by remember { mutableStateOf<TrackedPerson?>(null) }
     var areaPickerOpen by remember { mutableStateOf(false) }
     var areasOpen by remember { mutableStateOf(false) }
@@ -76,6 +79,7 @@ fun PeopleScreen(vm: PeopleViewModel = hiltViewModel()) {
         ) {
             FamilyMap(
                 users = users,
+                onUserClick = { selectedMapUser = it },
                 places = places,
                 modifier = Modifier.fillMaxSize().clip(MaterialTheme.shapes.extraLarge),
             )
@@ -149,11 +153,23 @@ fun PeopleScreen(vm: PeopleViewModel = hiltViewModel()) {
             },
         )
     }
+    selectedMapUser?.let { user ->
+        ValkyrisBottomSheet(title = user.name, onDismiss = { selectedMapUser = null }) {
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(14.dp)) {
+                ProfileAvatar(contentDescription = user.name, avatarData = user.avatarData, modifier = Modifier.size(52.dp))
+                Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                    Text(user.lastLocatedAt?.let { "Atualizado ${formatTime(it)}" } ?: "Sem localização recebida", style = MaterialTheme.typography.bodyMedium)
+                    user.lastAccuracy?.let { Text("Precisão aproximada de ${it.toInt()} m", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant) }
+                }
+            }
+            Button(onClick = { selectedMapUser = null; historyUser = user; vm.history(user) }, modifier = Modifier.fillMaxWidth()) { Text("Ver percurso") }
+        }
+    }
     historyUser?.let { user -> HistorySheet(user, history) { historyUser = null } }
 }
 
 @Composable
-private fun FamilyMap(users: List<TrackedPerson>, places: List<TrackedPlace>, modifier: Modifier = Modifier) {
+private fun FamilyMap(users: List<TrackedPerson>, places: List<TrackedPlace>, onUserClick: (TrackedPerson) -> Unit, modifier: Modifier = Modifier) {
     AndroidView(factory = { context ->
         Configuration.getInstance().userAgentValue = context.packageName
         MapView(context).apply {
@@ -171,6 +187,7 @@ private fun FamilyMap(users: List<TrackedPerson>, places: List<TrackedPlace>, mo
         users.forEach { user ->
             val lat = user.lastLatitude ?: return@forEach; val lon = user.lastLongitude ?: return@forEach
             map.overlays.add(Marker(map).apply {
+                setOnMarkerClickListener { _, _ -> onUserClick(user); true }
                 position = GeoPoint(lat, lon); title = user.name; snippet = user.lastLocatedAt?.let { "Atualizado ${formatTime(it)}" } ?: "Sem atualização"
                 icon = profileMarkerDrawable(map.context, user.avatarData)
                     ?: ContextCompat.getDrawable(map.context, R.drawable.valkyris_map_marker)
@@ -368,14 +385,55 @@ private fun AreasSheet(
 @Composable
 private fun HistorySheet(user: TrackedPerson, history: List<PersonLocation>, onDismiss: () -> Unit) = ValkyrisBottomSheet(title = "Por onde ${user.name} passou", onDismiss = onDismiss) {
     if (history.isEmpty()) Text("Ainda não há localização registrada.", color = MaterialTheme.colorScheme.onSurfaceVariant)
-    else Column(Modifier.fillMaxWidth().heightIn(max = 460.dp).verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-        history.forEach { location ->
-            ListItem(
-                headlineContent = { Text(location.address.ifBlank { "Endereço indisponível" }) },
-                supportingContent = { Text(formatHistoryTime(location.occurredAt)) },
-                leadingContent = { Icon(Lucide.MapPin, null) },
-            )
-        }
+    else {
+        val points = remember(history) { history.sortedBy { it.occurredAt } }
+        Text("${points.size} pontos · toque em um ponto para consultar o horário", color = MaterialTheme.colorScheme.onSurfaceVariant)
+        AndroidView(
+            factory = { context ->
+                Configuration.getInstance().userAgentValue = context.packageName
+                MapView(context).apply {
+                    setTileSource(TileSourceFactory.MAPNIK)
+                    setMultiTouchControls(true)
+                    setOnTouchListener { view, event ->
+                        view.parent?.requestDisallowInterceptTouchEvent(event.actionMasked != MotionEvent.ACTION_UP && event.actionMasked != MotionEvent.ACTION_CANCEL)
+                        false
+                    }
+                }
+            },
+            update = { map ->
+                if (map.tag != points) {
+                    map.tag = points
+                    map.overlays.clear()
+                    val coordinates = points.map { GeoPoint(it.latitude, it.longitude) }
+                    map.overlays.add(Polyline(map).apply { setPoints(coordinates); outlinePaint.color = AndroidColor.rgb(87, 156, 78); outlinePaint.strokeWidth = 6f })
+                    points.forEachIndexed { index, location ->
+                        map.overlays.add(Marker(map).apply {
+                            position = coordinates[index]
+                            title = "Ponto ${index + 1}"
+                            snippet = "${formatHistoryTime(location.occurredAt)} · precisão ${location.accuracy.toInt()} m"
+                            icon = android.graphics.drawable.BitmapDrawable(map.resources, android.graphics.Bitmap.createBitmap(72, 72, android.graphics.Bitmap.Config.ARGB_8888).also { bitmap ->
+                                val canvas = android.graphics.Canvas(bitmap)
+                                val paint = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG)
+                                paint.color = AndroidColor.rgb(87, 156, 78)
+                                canvas.drawCircle(36f, 36f, 32f, paint)
+                                paint.color = AndroidColor.WHITE; paint.textSize = 28f; paint.textAlign = android.graphics.Paint.Align.CENTER
+                                canvas.drawText("${index + 1}", 36f, 36f - (paint.ascent() + paint.descent()) / 2, paint)
+                            })
+                            setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_CENTER)
+                        })
+                    }
+                    map.post {
+                        if (map.tag == points) {
+                            if (coordinates.size == 1) { map.controller.setZoom(17.0); map.controller.setCenter(coordinates.first()) }
+                            else map.zoomToBoundingBox(BoundingBox.fromGeoPoints(coordinates), false, 60, 17.0, null)
+                        }
+                    }
+                    map.invalidate()
+                }
+            },
+            onRelease = { it.onDetach() },
+            modifier = Modifier.fillMaxWidth().height(420.dp),
+        )
     }
 }
 

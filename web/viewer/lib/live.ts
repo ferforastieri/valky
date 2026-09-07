@@ -7,7 +7,6 @@ export function live(
   onStatus: (value: string) => void,
 ): () => void {
   const controller = new AbortController();
-  const token = api.token;
   const pc = new RTCPeerConnection({
     iceServers: [{ urls: "stun:stun.l.google.com:19302" }],
   });
@@ -18,7 +17,7 @@ export function live(
     if (session) {
       void fetch(session, {
         method: "DELETE",
-        headers: { Authorization: `Bearer ${token}` },
+        headers: { "X-Valkyris-Viewer": "1" },
         keepalive: true,
       }).catch(() => {});
       session = "";
@@ -74,7 +73,7 @@ export function live(
         {
           method: "POST",
           headers: {
-            Authorization: `Bearer ${token}`,
+            "X-Valkyris-Viewer": "1",
             "Content-Type": "application/sdp",
           },
           body: pc.localDescription?.sdp,

@@ -113,20 +113,28 @@ export class API {
   token = "";
   constructor() {
     try {
-      this.token = sessionStorage.getItem(sessionKey) || "";
+      sessionStorage.removeItem("valkyris-viewer-session");
     } catch {}
   }
   clear() {
     this.token = "";
-    try {
-      sessionStorage.removeItem(sessionKey);
-    } catch {}
+  }
+  async restore() {
+    const response = await fetch("/api/v1/viewer-session", {
+      credentials: "same-origin",
+      headers: { "X-Valkyris-Viewer": "1" },
+      cache: "no-store",
+      signal: AbortSignal.timeout(15000),
+    });
+    if (response.ok) this.token = "cookie-session";
+    return response.ok;
   }
   async login(password: string) {
     const response = await fetch("/api/v1/login", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
+        "X-Valkyris-Viewer": "1",
         "Accept-Language": "pt-BR",
       },
       body: JSON.stringify({
@@ -144,17 +152,14 @@ export class API {
       throw new Error(
         "Atualize o servidor para habilitar o painel de consulta.",
       );
-    this.token = body.data.token;
-    try {
-      sessionStorage.setItem(sessionKey, this.token);
-    } catch {}
+    this.token = "cookie-session";
   }
   async response(path: string, signal?: AbortSignal): Promise<Response> {
     if (!path.startsWith("/") || path.startsWith("//"))
       throw new Error("Caminho inválido.");
     const response = await fetch("/api/v1" + path, {
       headers: {
-        Authorization: `Bearer ${this.token}`,
+        "X-Valkyris-Viewer": "1",
         "Accept-Language": "pt-BR",
       },
       cache: "no-store",
@@ -187,12 +192,11 @@ export class API {
     return (await this.response(path, signal)).blob();
   }
   async logout() {
-    const token = this.token;
     this.clear();
     try {
       await fetch("/api/v1/viewer-session", {
         method: "DELETE",
-        headers: { Authorization: `Bearer ${token}` },
+        headers: { "X-Valkyris-Viewer": "1" },
         signal: AbortSignal.timeout(5000),
       });
     } catch {}

@@ -60,7 +60,7 @@ class LocationTrackingService : Service(), LocationListener {
             listOf(LocationManager.GPS_PROVIDER, LocationManager.NETWORK_PROVIDER).forEach { provider ->
                 if (locationManager.isProviderEnabled(provider)) {
                     // Receive a reasonably fresh fix, but report it only when the
-                    // persisted five-minute/movement policy below allows it.
+                    // persisted heartbeat/movement policy below allows it.
                     locationManager.requestLocationUpdates(provider, CHECK_INTERVAL_MS, MOVEMENT_DISTANCE_METERS, this, Looper.getMainLooper())
                     locationManager.getLastKnownLocation(provider)?.let(::report)
                 }
@@ -96,7 +96,7 @@ class LocationTrackingService : Service(), LocationListener {
         if (location.time <= preferences.getLong(LAST_FIX_AT, 0L)) return false
         val lastSentAt = preferences.getLong(LAST_SENT_AT, 0L)
         if (lastSentAt == 0L || now - lastSentAt >= REPORT_INTERVAL_MS) return true
-        if (now - lastSentAt < 30_000) return false
+        if (now - lastSentAt < 60_000) return false
         if (!preferences.contains(LAST_SENT_LATITUDE) || !preferences.contains(LAST_SENT_LONGITUDE)) return true
         val lastLocation = Location("last-reported").apply {
             latitude = Double.fromBits(preferences.getLong(LAST_SENT_LATITUDE, 0L))
@@ -156,9 +156,7 @@ class LocationTrackingService : Service(), LocationListener {
         .setSmallIcon(R.drawable.ic_notification)
         .setColorized(false)
         .setCategory(NotificationCompat.CATEGORY_SERVICE)
-        .setContentTitle("Valkyris · localização ativa")
-        .setContentText("Este telefone aparece no mapa da família.")
-        .setStyle(NotificationCompat.BigTextStyle().bigText("O Valkyris atualiza sua posição em segundo plano para manter o mapa da família atual."))
+        .setContentTitle(getString(R.string.location_notification_title))
         .setOngoing(true)
         .setOnlyAlertOnce(true)
         .build()
@@ -173,9 +171,9 @@ class LocationTrackingService : Service(), LocationListener {
         private const val LAST_ACCURACY = "last_accuracy"
         private const val LAST_SENT_LATITUDE = "last_sent_latitude"
         private const val LAST_SENT_LONGITUDE = "last_sent_longitude"
-        private const val REPORT_INTERVAL_MS = 5 * 60 * 1000L
+        private const val REPORT_INTERVAL_MS = 15 * 60 * 1000L
         private const val CHECK_INTERVAL_MS = 60 * 1000L
-        private const val MOVEMENT_DISTANCE_METERS = 50f
+        private const val MOVEMENT_DISTANCE_METERS = 100f
         fun start(context: Context) = ContextCompat.startForegroundService(context, Intent(context, LocationTrackingService::class.java))
     }
 }

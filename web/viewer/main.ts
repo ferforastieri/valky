@@ -331,7 +331,7 @@ async function renderSystem(version: number) {
           retention ? `${retention.maxStorageGB} GB` : "Indisponível",
         ],
         ["Permissão desta sessão", "Apenas consulta"],
-        ["Validade da sessão", "12 horas"],
+        ["Validade da sessão", "30 dias, renovados durante o uso"],
       ],
     )}<p class="notice" style="margin-top:20px">Gerencie câmeras, regras, áreas e atualizações pelo aplicativo.</p></section>`;
 }
@@ -477,11 +477,11 @@ async function personDetails(id: string) {
         "Precisão informada",
         p.lastAccuracy ? `${Math.round(p.lastAccuracy)} m` : "Sem registro",
       ],
-    ])}${history.length ? '<div id="history-map" class="map" style="height:300px;margin-top:20px"></div>' : ""}<ol class="history-list">${history.map((l) => `<li><time>${date(l.occurredAt)}</time>${e(l.address || "Endereço indisponível")}<small> · precisão ${Math.round(l.accuracy)} m</small></li>`).join("")}</ol>${history.length ? "" : empty("Sem histórico", "Nenhuma localização recebida para este aparelho.")}`;
+    ])}${history.length ? '<div id="history-map" class="map" style="height:440px;margin-top:20px" aria-label="Percurso cronológico de localização"></div>' : ""}${history.length ? "" : empty("Sem histórico", "Nenhuma localização recebida para este aparelho.")}`;
     if (history.length) {
       const { familyMap } = await import("./lib/map");
       if (version === dialogVersion)
-        modalCleanups.push(familyMap($("#history-map"), [p], places, history));
+        modalCleanups.push(familyMap($("#history-map"), [], [], history));
     }
   } catch (error) {
     if (version === dialogVersion)
@@ -688,4 +688,9 @@ window.addEventListener("pagehide", () => {
   closeDetails();
   alive.abort();
 });
-if (api.token) enter();
+void api
+  .restore()
+  .then((ok) => {
+    if (ok) enter();
+  })
+  .catch(() => {});

@@ -83,3 +83,63 @@ func TestViewerLoginIsIsolatedAndReadOnly(t *testing.T) {
 		t.Fatal("expired viewer accepted")
 	}
 }
+
+func TestViewerCookieRenewalCSRFAndLogout(t *testing.T) {
+	db, err := store.Open(t.TempDir() + "/cookies.db")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db.Close()
+	m := NewManager(db, time.Minute)
+	ctx := context.Background()
+	v, err := m.issueViewer(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, err = db.DB.Exec(`UPDATE viewer_sessions SET expires_at=? WHERE id=?`, time.Now().Add(time.Hour).Format(time.RFC3339Nano), v.DeviceID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	h := m.Middleware(http.HandlerFunc(m.ViewerSession))
+	request := func(header, site string) *httptest.ResponseRecorder {
+		r := httptest.NewRequest("GET", "/viewer-session", nil)
+		r.AddCookie(&http.Cookie{Name: ViewerCookie, Value: v.Token})
+		r.Header.Set("X-Valkyris-Viewer", header)
+		r.Header.Set("Sec-Fetch-Site", site)
+		w := httptest.NewRecorder()
+		h.ServeHTTP(w, r)
+		return w
+	}
+	if w := request("", ""); w.Code != 403 {
+		t.Fatal("missing CSRF header accepted")
+	}
+	if w := request("1", "cross-site"); w.Code != 403 {
+		t.Fatal("cross-site accepted")
+	}
+	w := request("1", "same-origin")
+	if w.Code != 200 {
+		t.Fatal(w.Code)
+	}
+	cookies := w.Result().Cookies()
+	if len(cookies) != 1 {
+		t.Fatal("not renewed")
+	}
+	c := cookies[0]
+	if !c.HttpOnly || !c.Secure || c.SameSite != http.SameSiteStrictMode || c.Path != "/" || c.MaxAge != 30*24*60*60 {
+		t.Fatalf("insecure cookie: %+v", c)
+	}
+	if len(request("1", "same-origin").Result().Cookies()) != 0 {
+		t.Fatal("renewed on every poll")
+	}
+	r := httptest.NewRequest("DELETE", "/viewer-session", nil)
+	r.AddCookie(c)
+	r.Header.Set("X-Valkyris-Viewer", "1")
+	w = httptest.NewRecorder()
+	m.Middleware(http.HandlerFunc(m.EndViewerSession)).ServeHTTP(w, r)
+	if w.Code != 204 || w.Result().Cookies()[0].MaxAge != -1 {
+		t.Fatal("logout did not clear cookie")
+	}
+	if w := request("1", "same-origin"); w.Code != 401 {
+		t.Fatal("revoked token accepted")
+	}
+}

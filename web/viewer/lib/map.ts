@@ -54,19 +54,31 @@ export function familyMap(
     bounds.push([p.lastLatitude, p.lastLongitude]);
   });
   if (history.length) {
+    history = [...history].sort(
+      (a, b) => Date.parse(a.occurredAt) - Date.parse(b.occurredAt),
+    );
     const points = history.map(
       (p) => [p.latitude, p.longitude] as L.LatLngTuple,
     );
     L.polyline(points, { color: "#579c4e", weight: 3 }).addTo(map);
-    history.forEach((p) =>
-      L.circleMarker([p.latitude, p.longitude], { radius: 4, color: "#579c4e" })
+    history.forEach((p, index) => {
+      const label = text(String(index + 1));
+      label.className = "map-marker";
+      L.marker([p.latitude, p.longitude], {
+        icon: L.divIcon({
+          html: label,
+          className: "history-point",
+          iconSize: [28, 28],
+        }),
+        title: `Ponto ${index + 1} · ${date(p.occurredAt)}`,
+      })
         .addTo(map)
         .bindPopup(
           text(
-            `${date(p.occurredAt)} · ${p.address || "Endereço indisponível"}`,
+            `Ponto ${index + 1} · ${date(p.occurredAt)} · precisão ${Math.round(p.accuracy)} m`,
           ),
-        ),
-    );
+        );
+    });
     bounds.push(...points);
   }
   if (bounds.length)

@@ -1,6 +1,8 @@
 package com.ferforastieri.valkyris.feature.events
 
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -24,6 +26,7 @@ import com.composables.icons.lucide.Check
 import com.composables.icons.lucide.Eye
 import com.composables.icons.lucide.ListFilter
 import com.composables.icons.lucide.Lucide
+import com.composables.icons.lucide.MapPin
 import com.composables.icons.lucide.Mic
 import com.composables.icons.lucide.Video
 import com.ferforastieri.valkyris.R
@@ -49,8 +52,9 @@ fun EventsContent(
     onAcknowledgeAll: () -> Unit = {},
 ) {
     var unreadOnly by rememberSaveable { mutableStateOf(false) }
+    var category by rememberSaveable { mutableStateOf<Int?>(null) }
     val hasUnread = events.any { it.acknowledgedAt == null }
-    val visibleEvents = if (unreadOnly) events.filter { it.acknowledgedAt == null } else events
+    val visibleEvents = events.filter { (!unreadOnly || it.acknowledgedAt == null) && (category == null || eventCategoryRes(it) == category) }
     Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
         Column(Modifier.fillMaxSize().padding(horizontal = 18.dp)) {
             Spacer(Modifier.height(10.dp))
@@ -61,6 +65,12 @@ fun EventsContent(
                 }
                 Spacer(Modifier.weight(1f))
                 IconButton(onClick = onAcknowledgeAll, enabled = hasUnread) { Icon(Lucide.Check, contentDescription = stringResource(R.string.mark_all_read)) }
+            }
+            Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                FilterChip(selected = category == null, onClick = { category = null }, label = { Text("Todos os tipos") })
+                listOf(R.string.event_category_location, R.string.event_category_audio, R.string.event_category_camera).forEach { item ->
+                    FilterChip(selected = category == item, onClick = { category = item }, label = { Text(stringResource(item)) })
+                }
             }
             Spacer(Modifier.height(8.dp))
             if (visibleEvents.isEmpty()) {
@@ -94,7 +104,7 @@ private fun EventCard(event: ValkyrisEvent, onOpen: () -> Unit, onCamera: () -> 
             Column(Modifier.weight(1f)) {
                 Text(eventTitle(event), fontWeight = FontWeight.SemiBold)
                 Text(formatTime(event.occurredAt), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                if (event.source != "tracking") Text((event.confidence * 100).toInt().toString() + "% confidence", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text(stringResource(eventCategoryRes(event)), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
             Row(horizontalArrangement = Arrangement.spacedBy(2.dp), verticalAlignment = Alignment.CenterVertically) {
                 if (event.cameraId.isNotBlank()) IconButton(onCamera) { Icon(Lucide.Video, stringResource(R.string.open_camera)) }
@@ -105,7 +115,7 @@ private fun EventCard(event: ValkyrisEvent, onOpen: () -> Unit, onCamera: () -> 
 }
 
 private fun eventIcon(type: String) = when {
-    type.startsWith("place_") -> Lucide.Bell
+    type.startsWith("place_") -> Lucide.MapPin
     type.contains("mov", ignoreCase = true) || type.contains("motion", ignoreCase = true) -> Lucide.Video
     type.contains("camp", ignoreCase = true) || type.contains("door", ignoreCase = true) -> Lucide.Bell
     else -> Lucide.Mic
@@ -115,9 +125,15 @@ private fun formatTime(value: String) = runCatching {
     DateTimeFormatter.ofPattern("dd MMM · HH:mm").withZone(ZoneId.systemDefault()).format(Instant.parse(value))
 }.getOrDefault(value)
 
-@Composable private fun eventTitle(event: ValkyrisEvent): String {
+@Composable internal fun eventTitle(event: ValkyrisEvent): String {
     if (event.source != "tracking") return stringResource(com.ferforastieri.valkyris.core.model.detectorLabelRes(event.type))
     val person = event.metadata["personName"]?.jsonPrimitive?.contentOrNull ?: "Pessoa"
     val place = event.metadata["placeName"]?.jsonPrimitive?.contentOrNull ?: "uma área"
-    return if (event.type == "place_entered") "$person entrou em $place" else "$person saiu de $place"
+    return when (event.type) { "place_entered" -> "$person entrou em $place"; "place_exited" -> "$person saiu de $place"; else -> "Localização de $person" }
+}
+
+internal fun eventCategoryRes(event: ValkyrisEvent): Int = when {
+    event.source == "tracking" || event.type.startsWith("place_") -> R.string.event_category_location
+    event.type in setOf("baby_cry", "crying", "scream", "glass_break", "smoke_alarm", "fire_alarm", "siren", "doorbell", "knock", "dog_bark") -> R.string.event_category_audio
+    else -> R.string.event_category_camera
 }

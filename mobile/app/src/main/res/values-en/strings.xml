@@ -35,7 +35,7 @@
     <string name="no_cameras">No cameras added</string>
     <string name="no_events">Everything is quiet</string>
     <string name="no_events_body">Detected alerts will appear in this timeline.</string>
-    <string name="acknowledge">I am safe</string>
+    <string name="acknowledge">Mark as read</string>
     <string name="silence">Silence</string>
     <string name="alarm_title">Attention needed</string>
     <string name="notification_channel_events">Home alerts</string>
@@ -120,7 +120,7 @@
     <string name="detector_doorbell">Doorbell</string>
     <string name="detector_knock">Knock</string>
     <string name="detector_dog_bark">Dog bark</string>
-    <string name="detector_other">Configured detector</string>
+    <string name="detector_other">Monitoring event</string>
     <string name="no_rules">No rules yet</string>
     <string name="rule_name">Rule name</string>
     <string name="detector">Detector</string>
@@ -228,4 +228,14 @@
     <string name="notice_rule_deleted">Rule removed.</string>
     <string name="people">People</string>
     <string name="profile">Profile</string>
+    <string name="event_place_entered">Area arrival</string>
+    <string name="event_place_exited">Area departure</string>
+    <string name="event_confidence">Detection confidence: %1$d%%</string>
+    <string name="location_notification_title">Location active</string>
+    <string name="location_notification_text">Sharing with family</string>
+    <string name="event_category_location">Location</string>
+    <string name="event_category_audio">Sound detected</string>
+    <string name="event_category_camera">Camera</string>
+    <string name="event_read">Read</string>
+    <string name="event_unread">Unread</string>
 </resources>

@@ -534,7 +534,7 @@ components:
       properties:
         password: {type: string, format: password}
         deviceName: {type: string}
-        readOnly: {type: boolean, default: false, description: "Issue a 12-hour read-only browser session without creating a family device."}
+        readOnly: {type: boolean, default: false, description: "Issue a renewable 30-day HttpOnly cookie session; requires X-Valkyris-Viewer: 1; no token is returned in JSON."}
         locale: {type: string, default: pt-BR}
     PairRequest:
       type: object

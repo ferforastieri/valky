@@ -209,9 +209,6 @@ func (s *Service) ReportMyLocation(ctx context.Context, deviceID string, locatio
 		return nil, nil
 	}
 	location.ID, location.UserID = uuid.NewString(), user.ID
-	if _, err = tx.ExecContext(ctx, `INSERT INTO user_locations(id,user_id,latitude,longitude,accuracy,address,occurred_at,created_at) VALUES(?,?,?,?,?,?,?,?)`, location.ID, location.UserID, location.Latitude, location.Longitude, location.Accuracy, location.Address, location.OccurredAt.Format(time.RFC3339Nano), now.Format(time.RFC3339Nano)); err != nil {
-		return nil, err
-	}
 	if _, err = tx.ExecContext(ctx, `UPDATE users SET last_latitude=?,last_longitude=?,last_accuracy=?,last_located_at=?,updated_at=? WHERE id=?`, location.Latitude, location.Longitude, location.Accuracy, location.OccurredAt.Format(time.RFC3339Nano), now.Format(time.RFC3339Nano), user.ID); err != nil {
 		return nil, err
 	}
@@ -253,6 +250,16 @@ func (s *Service) ReportMyLocation(ctx context.Context, deviceID string, locatio
 		return nil, err
 	}
 	rows.Close()
+	keep, err := retainHistoryPoint(ctx, tx, "user_locations", "user_id", user.ID, location.Latitude, location.Longitude, location.Accuracy)
+	if err != nil {
+		return nil, err
+	}
+	if keep || len(transitions) > 0 {
+		if _, err = tx.ExecContext(ctx, `INSERT INTO user_locations(id,user_id,latitude,longitude,accuracy,address,occurred_at,created_at) VALUES(?,?,?,?,?,?,?,?)`, location.ID, location.UserID, location.Latitude, location.Longitude, location.Accuracy, location.Address, location.OccurredAt.Format(time.RFC3339Nano), now.Format(time.RFC3339Nano)); err != nil {
+			return nil, err
+		}
+	}
+
 	if err = tx.Commit(); err != nil {
 		return nil, err
 	}
@@ -447,10 +454,6 @@ func (s *Service) Report(ctx context.Context, personID, reporter string, locatio
 	}
 	location.ID = uuid.NewString()
 	location.PersonID = personID
-	_, err = tx.ExecContext(ctx, `INSERT INTO person_locations(id,person_id,latitude,longitude,accuracy,occurred_at,created_at)VALUES(?,?,?,?,?,?,?)`, location.ID, personID, location.Latitude, location.Longitude, location.Accuracy, location.OccurredAt.Format(time.RFC3339Nano), now.Format(time.RFC3339Nano))
-	if err != nil {
-		return nil, err
-	}
 	_, err = tx.ExecContext(ctx, `UPDATE people SET last_latitude=?,last_longitude=?,last_accuracy=?,last_located_at=?,updated_at=? WHERE id=?`, location.Latitude, location.Longitude, location.Accuracy, location.OccurredAt.Format(time.RFC3339Nano), now.Format(time.RFC3339Nano), personID)
 	if err != nil {
 		return nil, err
@@ -495,6 +498,17 @@ func (s *Service) Report(ctx context.Context, personID, reporter string, locatio
 		return nil, err
 	}
 	rows.Close()
+	keep, err := retainHistoryPoint(ctx, tx, "person_locations", "person_id", personID, location.Latitude, location.Longitude, location.Accuracy)
+	if err != nil {
+		return nil, err
+	}
+	if keep || len(transitions) > 0 {
+		_, err = tx.ExecContext(ctx, `INSERT INTO person_locations(id,person_id,latitude,longitude,accuracy,occurred_at,created_at)VALUES(?,?,?,?,?,?,?)`, location.ID, personID, location.Latitude, location.Longitude, location.Accuracy, location.OccurredAt.Format(time.RFC3339Nano), now.Format(time.RFC3339Nano))
+		if err != nil {
+			return nil, err
+		}
+	}
+
 	if err = tx.Commit(); err != nil {
 		return nil, err
 	}
@@ -607,4 +621,19 @@ func confidentMembership(latitude, longitude, accuracy float64, place Place) (in
 		return false, true
 	}
 	return false, false
+}
+
+// Compare against the last retained point, not the latest heartbeat: a slow
+// journey must eventually accumulate enough distance to appear in history.
+func retainHistoryPoint(ctx context.Context, tx *sql.Tx, table, owner, id string, lat, lon, accuracy float64) (bool, error) {
+	var previousLat, previousLon, previousAccuracy float64
+	err := tx.QueryRowContext(ctx, "SELECT latitude,longitude,accuracy FROM "+table+" WHERE "+owner+"=? ORDER BY occurred_at DESC LIMIT 1", id).Scan(&previousLat, &previousLon, &previousAccuracy)
+	if err == sql.ErrNoRows {
+		return true, nil
+	}
+	if err != nil {
+		return false, err
+	}
+	threshold := math.Max(100, previousAccuracy+accuracy)
+	return distanceMeters(previousLat, previousLon, lat, lon) >= threshold, nil
 }

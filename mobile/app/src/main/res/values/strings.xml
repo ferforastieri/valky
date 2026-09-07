@@ -33,7 +33,7 @@
     <string name="no_cameras">Nenhuma câmera adicionada</string>
     <string name="no_events">Tudo tranquilo por aqui</string>
     <string name="no_events_body">Os alertas detectados aparecerão nesta linha do tempo.</string>
-    <string name="acknowledge">Estou seguro</string>
+    <string name="acknowledge">Marcar como lido</string>
     <string name="silence">Silenciar</string>
     <string name="alarm_title">Atenção necessária</string>
     <string name="notification_channel_events">Alertas da casa</string>
@@ -120,7 +120,7 @@
     <string name="detector_doorbell">Campainha</string>
     <string name="detector_knock">Batida</string>
     <string name="detector_dog_bark">Latido</string>
-    <string name="detector_other">Detector configurado</string>
+    <string name="detector_other">Evento de monitoramento</string>
     <string name="no_rules">Nenhuma regra ainda</string>
     <string name="rule_name">Nome da regra</string>
     <string name="detector">Detector</string>
@@ -228,4 +228,14 @@
     <string name="notice_rule_deleted">Regra removida.</string>
     <string name="people">Pessoas</string>
     <string name="profile">Perfil</string>
+    <string name="event_place_entered">Entrada na área</string>
+    <string name="event_place_exited">Saída da área</string>
+    <string name="event_confidence">Confiança da detecção: %1$d%%</string>
+    <string name="location_notification_title">Localização ativa</string>
+    <string name="location_notification_text">Compartilhando com a família</string>
+    <string name="event_category_location">Localização</string>
+    <string name="event_category_audio">Som detectado</string>
+    <string name="event_category_camera">Câmera</string>
+    <string name="event_read">Lido</string>
+    <string name="event_unread">Não lido</string>
 </resources>

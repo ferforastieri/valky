@@ -82,7 +82,7 @@ class AlarmNotifier @Inject constructor(@param:ApplicationContext private val co
                 if (cameraId.isNotBlank() && !opensCamera) addAction(0, context.getString(R.string.open_camera), cameraIntent)
                 if (opensCamera) addAction(0, context.getString(R.string.view_event), eventIntent)
             }
-            .addAction(0, context.getString(R.string.acknowledge), alarmIntent)
+            .apply { if (alarm) addAction(0, context.getString(R.string.view_event), alarmIntent) else if (!opensCamera) addAction(0, context.getString(R.string.view_event), eventIntent) }
             .apply { if (alarm && canUseFullScreen) setFullScreenIntent(alarmIntent, true) }
             .build()
         NotificationManagerCompat.from(context).notify(eventId.hashCode(), notification)

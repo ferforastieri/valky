@@ -4,7 +4,9 @@ import androidx.annotation.StringRes
 import com.ferforastieri.valkyris.R
 
 @StringRes
-fun detectorLabelRes(type: String): Int = when (type) {
+fun detectorLabelRes(type: String): Int = when (type.trim().lowercase()) {
+    "place_entered" -> R.string.event_place_entered
+    "place_exited" -> R.string.event_place_exited
     "motion" -> R.string.detector_motion
     "person" -> R.string.detector_person
     "tamper" -> R.string.detector_tamper

@@ -119,6 +119,7 @@ func (s *Server) Handler() http.Handler {
 		http.Redirect(w, r, "/app/", http.StatusTemporaryRedirect)
 	})
 	protected := http.NewServeMux()
+	protected.HandleFunc("GET /viewer-session", s.auth.ViewerSession)
 	protected.HandleFunc("DELETE /viewer-session", s.auth.EndViewerSession)
 	protected.Handle("POST /pairing-sessions", s.auth.RequireAdmin(http.HandlerFunc(s.pairingSession)))
 	protected.HandleFunc("GET /cameras", s.listCameras)
@@ -172,7 +173,7 @@ func (s *Server) Handler() http.Handler {
 	protected.Handle("POST /system/update", s.auth.RequireAdmin(http.HandlerFunc(s.startSystemUpdate)))
 	protected.Handle("/realtime", s.hub)
 	mux.Handle("/api/v1/", http.StripPrefix("/api/v1", s.auth.Middleware(protected)))
-	return requestLog(s.logger, securityHeaders(localizedResponses(outcomeHeaders(mux))))
+	return requestLog(s.logger, securityHeaders(newRequestLimits().wrap(localizedResponses(outcomeHeaders(mux)))))
 }
 func (s *Server) health(w http.ResponseWriter, r *http.Request) {
 	writeSuccess(w, http.StatusOK, "Valkyris is healthy", map[string]any{"status": "ok", "service": "valkyris", "time": time.Now().UTC()})
@@ -216,11 +217,20 @@ func (s *Server) login(w http.ResponseWriter, r *http.Request) {
 	if !decode(w, r, &in) {
 		return
 	}
+	if in.ReadOnly && !auth.ViewerRequestSafe(r) {
+		writeError(w, 403, fmt.Errorf("invalid browser request"))
+		return
+	}
 	out, err := s.auth.LoginAdmin(r.Context(), in)
 	if err != nil {
 		writeError(w, http.StatusUnauthorized, err)
 		return
 	}
+	if in.ReadOnly {
+		auth.SetViewerCookie(w, out.Token)
+		out.Token = ""
+	}
+	w.Header().Set("Cache-Control", "no-store")
 	writeSuccess(w, http.StatusCreated, "Login completed successfully", out)
 }
 func (s *Server) pair(w http.ResponseWriter, r *http.Request) {
