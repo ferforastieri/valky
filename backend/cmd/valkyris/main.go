@@ -73,6 +73,7 @@ func main() {
 	hub := api.NewHub()
 	application := &app.Service{Rules: rulesService, Events: eventService, Cameras: cameraRepo, Media: mediaManager, Notify: notifyService, Hub: hub, DataDir: cfg.DataDir, Logger: logger, Preferences: preferencesService}
 	apiServer := api.NewServer(authManager, cameraRepo, onvif, mediaManager, rulesService, eventService, notifyService, hub, logger)
+	apiServer.SetViewerDirectory(cfg.ViewerDir)
 	apiServer.SetSubmitter(application)
 	apiServer.SetUpdates(updates.New(version, cfg.ReleaseAPI, cfg.UpdaterURL, cfg.UpdaterToken))
 	apiServer.SetPreferences(preferencesService)

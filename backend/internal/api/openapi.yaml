@@ -26,6 +26,12 @@ paths:
       responses:
         '201': {description: Administrator created, content: {application/json: {schema: {$ref: '#/components/schemas/APIResponse'}}}}
         '409': {description: Administrator already configured}
+  /viewer-session:
+    delete:
+      summary: Revoke the current read-only browser session
+      responses:
+        '204': {description: Session revoked}
+        '401': {description: Invalid or expired session}
   /login:
     post:
       security: []
@@ -528,6 +534,7 @@ components:
       properties:
         password: {type: string, format: password}
         deviceName: {type: string}
+        readOnly: {type: boolean, default: false, description: "Issue a 12-hour read-only browser session without creating a family device."}
         locale: {type: string, default: pt-BR}
     PairRequest:
       type: object
@@ -542,6 +549,7 @@ components:
         deviceId: {type: string, format: uuid}
         token: {type: string}
         admin: {type: boolean}
+        readOnly: {type: boolean, default: false}
     MediaAsset:
       type: object
       properties:

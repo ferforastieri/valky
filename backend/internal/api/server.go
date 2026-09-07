@@ -39,6 +39,7 @@ type DetectionSubmitter interface {
 	Submit(context.Context, rules.Detection) ([]event.Event, error)
 }
 type Server struct {
+	viewerDir    string
 	auth         *auth.Manager
 	cameras      *camera.Repository
 	onvif        *camera.ONVIFClient
@@ -113,7 +114,12 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("POST /api/v1/admin/bootstrap", s.bootstrapAdmin)
 	mux.HandleFunc("POST /api/v1/login", s.login)
 	mux.HandleFunc("POST /api/v1/pair", s.pair)
+	mux.Handle("GET /app/", s.viewerHandler())
+	mux.HandleFunc("GET /app", func(w http.ResponseWriter, r *http.Request) {
+		http.Redirect(w, r, "/app/", http.StatusTemporaryRedirect)
+	})
 	protected := http.NewServeMux()
+	protected.HandleFunc("DELETE /viewer-session", s.auth.EndViewerSession)
 	protected.Handle("POST /pairing-sessions", s.auth.RequireAdmin(http.HandlerFunc(s.pairingSession)))
 	protected.HandleFunc("GET /cameras", s.listCameras)
 	protected.HandleFunc("POST /cameras", s.createCamera)

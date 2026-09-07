@@ -35,6 +35,7 @@ type PairingSession struct {
 }
 
 type LoginRequest struct {
+	ReadOnly   bool   `json:"readOnly,omitempty"`
 	Password   string `json:"password"`
 	DeviceName string `json:"deviceName"`
 	UserName   string `json:"userName"`
@@ -49,6 +50,7 @@ type PairRequest struct {
 }
 
 type PairResponse struct {
+	ReadOnly bool   `json:"readOnly,omitempty"`
 	DeviceID string `json:"deviceId"`
 	Token    string `json:"token"`
 	Admin    bool   `json:"admin"`
@@ -126,6 +128,9 @@ func (m *Manager) LoginAdmin(ctx context.Context, req LoginRequest) (PairRespons
 	if req.Password == "" || req.DeviceName == "" || err != nil ||
 		bcrypt.CompareHashAndPassword([]byte(encoded), []byte(req.Password)) != nil {
 		return PairResponse{}, fmt.Errorf("invalid credentials")
+	}
+	if req.ReadOnly {
+		return m.issueViewer(ctx)
 	}
 	// A phone can lose its local session during an app reinstall. Reuse the
 	// matching administrator device/profile and rotate its token instead of
@@ -296,8 +301,18 @@ func (m *Manager) Middleware(next http.Handler) http.Handler {
 		}
 		id, admin, err := m.authenticate(r.Context(), strings.TrimPrefix(header, "Bearer "))
 		if err != nil {
-			writeUnauthorized(w)
-			return
+			id, err = m.authenticateViewer(r.Context(), strings.TrimPrefix(header, "Bearer "))
+			if err != nil {
+				writeUnauthorized(w)
+				return
+			}
+			admin = false
+			if !viewerRequestAllowed(r) {
+				w.Header().Set("Content-Type", "application/json")
+				w.WriteHeader(http.StatusForbidden)
+				_ = json.NewEncoder(w).Encode(map[string]any{"success": false, "message": "Esta sessão permite apenas consulta."})
+				return
+			}
 		}
 		ctx := context.WithValue(r.Context(), deviceKey, id)
 		ctx = context.WithValue(ctx, adminKey, admin)

@@ -1,0 +1,55 @@
+---
+import '@fontsource-variable/bricolage-grotesque';
+import '@fontsource-variable/manrope';
+import '@fontsource/ibm-plex-mono/400.css';
+import '../viewer.css';
+import { LayoutDashboard, Camera, Bell, MapPin, Scan, SlidersHorizontal, Server, SunMoon, LogOut, RefreshCw, ShieldCheck, ArrowRight, X } from '@lucide/astro';
+const links = [
+  ['overview','Visão geral',LayoutDashboard],['cameras','Câmeras',Camera],['events','Eventos',Bell],
+  ['family','Família',MapPin],['places','Áreas',Scan],['rules','Regras',SlidersHorizontal],['system','Sistema',Server],
+] as const;
+---
+<!doctype html>
+<html lang="pt-BR" data-theme="auto">
+<head>
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="robots" content="noindex, nofollow" /><meta name="color-scheme" content="light dark" />
+  <meta name="referrer" content="strict-origin-when-cross-origin" />
+  <title>Valkyris · Consulta</title><link rel="icon" href="/app/valkyris-mark.svg" type="image/svg+xml" />
+</head>
+<body>
+  <a class="skip-link" href="#main">Pular para o conteúdo</a>
+  <section id="login" class="login-shell">
+    <div class="login-story"><a class="brand" href="/app/"><img src="/app/valkyris-mark.svg" alt="" /><span>Valkyris</span></a>
+      <div><span class="eyebrow">PERTO, MESMO À DISTÂNCIA</span><h1>Um olhar<br />sobre a sua casa.</h1><p>Câmeras, acontecimentos e a família.<br />Tudo reunido, no seu próprio servidor.</p></div>
+      <div class="login-note"><ShieldCheck size={19} /><span>Seus dados continuam em casa.</span></div>
+    </div>
+    <div class="login-panel"><form id="login-form" class="login-card">
+      <span class="badge"><ShieldCheck size={14} /> Apenas consulta</span>
+      <h2>Bem-vindo de volta.</h2><p class="muted">Entre com a senha da casa para acompanhar o Valkyris.</p>
+      <label for="password">Senha da casa</label><input id="password" name="password" type="password" autocomplete="current-password" required />
+      <p id="login-error" class="error" role="alert" hidden></p>
+      <button class="primary" type="submit" id="login-submit">Acessar painel <ArrowRight size={18}/></button>
+      <p class="login-foot">As configurações são gerenciadas pelo aplicativo. A sessão de consulta expira em 12 horas.</p>
+    </form></div>
+  </section>
+  <div id="application" class="app-shell" hidden>
+    <aside class="sidebar"><a href="#overview" class="brand"><img src="/app/valkyris-mark.svg" alt="" /><span>Valkyris<small>PAINEL DA CASA</small></span></a>
+      <nav aria-label="Navegação principal">{links.map(([id,label,Icon]) => <a href={`#${id}`} data-page={id}><Icon size={20}/><span>{label}</span><span class="nav-count" id={`count-${id}`}></span></a>)}</nav>
+      <div class="sidebar-foot"><span class="badge"><ShieldCheck size={14}/> Apenas consulta</span><small>Monitoramento no seu servidor</small></div>
+    </aside>
+    <div class="workspace"><header class="topbar"><div class="connection"><span class="status-dot"></span><span id="connection-text">Conectando ao servidor</span></div><div class="toolbar">
+      <button id="refresh" class="icon-button" aria-label="Atualizar dados" title="Atualizar dados"><RefreshCw size={18}/></button>
+      <button id="theme" class="icon-button" aria-label="Alternar tema" title="Alternar tema"><SunMoon size={19}/></button>
+      <span class="toolbar-divider"></span><button id="logout" class="quiet"><LogOut size={17}/><span>Sair</span></button>
+    </div></header>
+    <p id="global-error" class="banner error" role="alert" hidden></p>
+    <main id="main" tabindex="-1"><div class="loading"><span class="spinner"></span>Carregando sua casa…</div></main>
+    <footer class="page-footer">Valkyris <span>·</span> Consulta protegida <span>·</span> <span id="last-sync">Aguardando sincronização</span></footer>
+    </div>
+  </div>
+  <dialog id="detail"><div class="dialog-head"><div><span class="eyebrow" id="detail-kicker">DETALHES</span><h2 id="detail-title"></h2></div><button class="icon-button" id="detail-close" aria-label="Fechar detalhes"><X size={22}/></button></div><div id="detail-body"></div></dialog>
+  <noscript><p class="banner">Ative o JavaScript para consultar o Valkyris.</p></noscript>
+  <script>import '../main';</script>
+</body>
+</html>

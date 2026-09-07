@@ -1,3 +1,11 @@
+FROM node:22-bookworm-slim AS viewer
+WORKDIR /src/web
+RUN npm install -g pnpm@10.15.0
+COPY web/package.json web/pnpm-lock.yaml ./
+RUN pnpm install --frozen-lockfile
+COPY web/ ./
+RUN pnpm build:viewer
+
 FROM golang:1.26.5-bookworm AS build
 WORKDIR /src/backend
 COPY backend/go.mod backend/go.sum* ./
@@ -16,6 +24,7 @@ RUN install -d -o valkyris -g valkyris -m 0700 /data
 COPY --from=build /out/valkyris /usr/local/bin/valkyris
 COPY --from=build /out/lib /usr/local/lib
 COPY --from=build /out/models /opt/valkyris/models
+COPY --from=viewer /src/web/dist-viewer /opt/valkyris/web
 ENV LD_LIBRARY_PATH=/usr/local/lib
 ENV VALKYRIS_MODELS_DIR=/opt/valkyris/models
 ENV VALKYRIS_DATA_DIR=/data

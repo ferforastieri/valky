@@ -178,3 +178,11 @@ CREATE TABLE IF NOT EXISTS push_deliveries (
   last_error TEXT,
   created_at TEXT NOT NULL
 );
+
+-- Browser sessions never create family profiles or register for push/location.
+CREATE TABLE IF NOT EXISTS viewer_sessions (
+ id TEXT PRIMARY KEY,
+ token_hash BLOB NOT NULL UNIQUE,
+ expires_at TEXT NOT NULL,
+ created_at TEXT NOT NULL
+);

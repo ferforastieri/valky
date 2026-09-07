@@ -56,7 +56,7 @@ jobs:
               updater/*)
                 backend=true; container=true ;;
               web/*)
-                web=true ;;
+                web=true; container=true ;;
               mobile/*)
                 android=true ;;
               compose.yaml|mediamtx.yml|install.sh|.dockerignore)
@@ -168,6 +168,8 @@ jobs:
           docker run -d --rm --name valkyris-ci -p 127.0.0.1:18443:8443 valkyris:ci
           for attempt in $(seq 1 20); do
             if curl -kfsS https://127.0.0.1:18443/health | grep -q '"status":"ok"'; then
+              curl -kfsS https://127.0.0.1:18443/app/ -o /tmp/valkyris-viewer.html
+              grep -q 'Valkyris · Consulta' /tmp/valkyris-viewer.html
               docker stop valkyris-ci
               exit 0
             fi

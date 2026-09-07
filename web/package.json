@@ -9,7 +9,8 @@
     "dev": "pnpm sync-assets && astro dev",
     "build": "pnpm sync-assets && astro check && astro build",
     "preview": "astro preview",
-    "test": "pnpm build && node --test tests/*.test.mjs"
+    "test": "pnpm build && pnpm build:viewer && node --test tests/*.test.mjs",
+    "build:viewer": "astro check --root . && astro build --config astro.viewer.config.mjs"
   },
   "dependencies": {
     "@astrojs/check": "^0.9.4",
@@ -19,6 +20,10 @@
     "@fontsource/ibm-plex-mono": "^5.2.8",
     "@lucide/astro": "^0.556.0",
     "astro": "^5.13.5",
-    "typescript": "^5.9.2"
+    "typescript": "^5.9.2",
+    "leaflet": "1.9.4"
+  },
+  "devDependencies": {
+    "@types/leaflet": "1.9.20"
   }
 }

@@ -4,7 +4,11 @@
 data
 mobile
 updater
-web
+web/node_modules
+web/dist
+web/dist-viewer
+web/.astro
+web/.vercel
 docs
 **/*_test.go
 *.md
