@@ -238,4 +238,13 @@
     <string name="event_category_camera">Câmera</string>
     <string name="event_read">Lido</string>
     <string name="event_unread">Não lido</string>
+    <string name="activity_chart_title">Atividade registrada</string>
+    <string name="activity_chart_error">Não foi possível atualizar a atividade.</string>
+    <string name="activity_chart_count">%1$d eventos · intervalos de %2$d h</string>
+    <string name="activity_bar_description">De %1$s a %2$s: %3$d eventos</string>
+    <string name="activity_chart_hint">Toque em uma barra para ver os eventos.</string>
+    <string name="activity_interval_count">%1$d eventos neste intervalo</string>
+    <string name="activity_retry">Tentar novamente</string>
+    <string name="activity_more">Carregar mais</string>
+    <string name="activity_empty">Nenhum evento neste intervalo.</string>
 </resources>

@@ -269,6 +269,8 @@ class ValkyrisApi(
     suspend fun userHistory(id: String): List<PersonLocation> = get("/users/$id/history?limit=200")
     suspend fun reportMyLocation(location: PersonLocation): com.ferforastieri.valkyris.core.model.LocationReportResult = post("/me/location", location)
 
+    suspend fun activity(hours: Int): List<ActivityBucket> = get("/events/activity?hours=$hours")
+    suspend fun intervalEvents(bucket: ActivityBucket, offset: Int): List<ValkyrisEvent> = get("/events/interval?from=${Uri.encode(bucket.start)}&to=${Uri.encode(bucket.end)}&offset=$offset")
     suspend fun events(): List<ValkyrisEvent> = get("/events?limit=100")
     suspend fun event(id: String): ValkyrisEvent = get("/events/$id")
     suspend fun rules(): List<Rule> = get("/rules")

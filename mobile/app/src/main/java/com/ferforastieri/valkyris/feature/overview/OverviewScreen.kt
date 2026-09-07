@@ -101,7 +101,7 @@ fun OverviewScreen(
     OverviewContent(state.cameras, people.count { it.enabled }, events, onCamera = { id ->
         val camera = state.cameras.firstOrNull { it.id == id }
         if (camera?.setupStatus == "failed") failedCameraId = id else onCamera(id)
-    }, onEvent = onEvent, onCameras = onCameras, onPeople = onPeople, onEvents = onEvents)
+    }, onEvent = onEvent, onCameras = onCameras, onPeople = onPeople, onEvents = onEvents, activityChart = { OverviewActivityChart(onEvent = onEvent) })
     failedCamera?.let { CameraFailureSheet(it, onDismiss = { failedCameraId = null }) }
 }
 
@@ -115,6 +115,7 @@ fun OverviewContent(
     onCameras: () -> Unit = {},
     onPeople: () -> Unit = {},
     onEvents: () -> Unit = {},
+    activityChart: @Composable () -> Unit = {},
 ) {
     val pending = events.count { it.acknowledgedAt == null }
     LazyColumn(
@@ -129,6 +130,7 @@ fun OverviewContent(
                 MetricCard(Lucide.Bell, pending.toString(), stringResource(R.string.pending_alerts), Modifier.weight(1f), onClick = onEvents, alarm = pending > 0)
             }
         }
+        item { activityChart() }
         if (cameras.isNotEmpty()) {
             item { SectionLabel(stringResource(R.string.cameras)) }
             items(cameras.take(2), key = { "camera-${it.id}" }) { camera ->

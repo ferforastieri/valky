@@ -15,3 +15,9 @@ O login de consulta e as requisições autenticadas por cookie exigem X-Valkyris
 Limites em memória por minuto: API 3000 globais e 1200 por endereço de conexão; login/bootstrap/pareamento 30 globais e 10 por endereço, compartilhados entre os três endpoints; imagens/gravações 60 por sessão e endereço; abertura WHEP 12 por sessão e endereço. Respostas 429 incluem Retry-After. O backend não confia em X-Forwarded-For nem CF-Connecting-IP enviados pelo cliente: acessos via Caddy compartilham o orçamento do proxy. Os contadores reiniciam com o processo e não substituem proteção volumétrica na borda.
 
 A navegação mobile usa um dock flutuante de ícones com rótulos acessíveis; desktop mostra a logo e navegação lateral. O mapa enquadra as pessoas, sem afastar o zoom por áreas salvas distantes. Não há rodapé de sincronização nem data decorativa no cabeçalho.
+
+### Gráfico de atividade
+
+A home do painel e do Android mostram o gráfico abaixo dos cards, com períodos de 12, 24, 36 ou 48 horas. As 12 barras representam intervalos de 1, 2, 3 ou 4 horas. `GET /events/activity?hours=12` agrega os eventos que não são de localização diretamente no banco, sem o limite da lista recente. O mesmo filtro é aplicado no backend antes da paginação dos detalhes; os clientes não filtram os registros. O horário de referência vem do servidor; os clientes exibem os limites no fuso local e atualizam a atividade a cada 15 segundos enquanto a tela está visível.
+
+No Android, tocar em uma barra abre o sheet do intervalo, inclusive quando vazio. Os registros são consultados em páginas de 100 por `GET /events/interval?from=...&to=...&offset=0`, com início inclusivo e fim exclusivo. Cada registro abre o detalhe do evento.

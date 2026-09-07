@@ -158,6 +158,8 @@ func (s *Server) Handler() http.Handler {
 	protected.HandleFunc("PUT /places/{id}", s.updatePlace)
 	protected.HandleFunc("DELETE /places/{id}", s.deletePlace)
 	protected.HandleFunc("GET /events", s.listEvents)
+	protected.HandleFunc("GET /events/activity", s.eventActivity)
+	protected.HandleFunc("GET /events/interval", s.eventInterval)
 	protected.HandleFunc("POST /events/acknowledge-all", s.ackAllEvents)
 	protected.HandleFunc("GET /events/{id}", s.getEvent)
 	protected.HandleFunc("POST /events/{id}/acknowledge", s.ackEvent)

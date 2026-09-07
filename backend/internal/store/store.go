@@ -106,6 +106,10 @@ func Open(path string) (*Store, error) {
 		db.Close()
 		return nil, err
 	}
+	if _, err = db.ExecContext(ctx, `CREATE INDEX IF NOT EXISTS idx_events_epoch ON events(unixepoch(occurred_at))`); err != nil {
+		db.Close()
+		return nil, fmt.Errorf("index event activity: %w", err)
+	}
 	return &Store{DB: db}, nil
 }
 

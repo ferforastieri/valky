@@ -74,14 +74,31 @@ func (s *Service) List(ctx context.Context, cameraID string, limit int) ([]Event
 	if limit < 1 || limit > 200 {
 		limit = 50
 	}
-	q := `SELECT id,camera_id,rule_id,source,subject_id,type,confidence,occurred_at,snapshot_path,clip_path,clip_status,clip_error,metadata_json,acknowledged_at,acknowledged_by,created_at FROM events`
+	return s.list(ctx, cameraID, limit, 0, time.Time{}, time.Time{})
+}
+
+func (s *Service) ListInterval(ctx context.Context, from, to time.Time, offset int) ([]Event, error) {
+	return s.list(ctx, "", 100, offset, from, to)
+}
+
+func (s *Service) list(ctx context.Context, cameraID string, limit, offset int, from, to time.Time) ([]Event, error) {
+	q := `SELECT id,camera_id,rule_id,source,subject_id,type,confidence,occurred_at,snapshot_path,clip_path,clip_status,clip_error,metadata_json,acknowledged_at,acknowledged_by,created_at FROM events WHERE 1=1`
 	var args []any
 	if cameraID != "" {
-		q += " WHERE camera_id=?"
+		q += " AND camera_id=?"
 		args = append(args, cameraID)
 	}
-	q += " ORDER BY occurred_at DESC LIMIT ?"
-	args = append(args, limit)
+	if !from.IsZero() {
+		q += " AND " + activityEvents + " AND unixepoch(occurred_at)>=? AND unixepoch(occurred_at)<=? AND julianday(occurred_at)>=julianday(?) AND julianday(occurred_at)<julianday(?)"
+		args = append(args, from.Unix(), to.Unix(), from.Format(time.RFC3339Nano), to.Format(time.RFC3339Nano))
+	}
+	if from.IsZero() {
+		q += " ORDER BY occurred_at DESC,id DESC"
+	} else {
+		q += " ORDER BY julianday(occurred_at) DESC,id DESC"
+	}
+	q += " LIMIT ? OFFSET ?"
+	args = append(args, limit, offset)
 	rows, err := s.store.DB.QueryContext(ctx, q, args...)
 	if err != nil {
 		return nil, err

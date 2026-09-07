@@ -33,7 +33,25 @@ let events: Event[] = [];
 let people: Person[] = [];
 let places: Place[] = [];
 let rules: Rule[] = [];
+let chartHours = 12;
+let chartRequest = 0;
 let page = "overview";
+async function refreshChart() {
+  if (page !== "overview" || !api.token) return;
+  const request = ++chartRequest;
+  const target = document.getElementById("activity-chart");
+  if (!target) return;
+  try {
+    const buckets = await api.get<{ start: string; end: string; count: number }[]>(`/events/activity?hours=${chartHours}`, viewController.signal);
+    if (request !== chartRequest || !target.isConnected) return;
+    const max = Math.max(1, ...buckets.map(b => b.count));
+    const total = buckets.reduce((sum, b) => sum + b.count, 0);
+    target.innerHTML = `<span class="muted">${total} eventos · intervalos de ${chartHours / 12} h</span><div class="chart" role="img" aria-label="${e(buckets.map(b => `${date(b.start)} a ${date(b.end)}: ${b.count} eventos`).join('; '))}">${buckets.map(b => `<span style="height:${b.count ? Math.max(4, b.count / max * 100) : 0}%" title="${e(date(b.start))} – ${e(date(b.end))}: ${b.count} eventos"></span>`).join('')}</div><div class="chart-legend"><span>${e(date(buckets[0].start))}</span><span>${e(date(buckets[11].end))}</span></div>`;
+  } catch (error) {
+    if (request === chartRequest && target.isConnected && !viewController.signal.aborted)
+      target.innerHTML = '<p class="muted">Não foi possível carregar a atividade. Tentaremos novamente automaticamente.</p>';
+  }
+}
 let refreshing = false;
 let alive = new AbortController();
 let viewController = new AbortController();
@@ -137,16 +155,7 @@ function render() {
       ],
       ["Regras", rules.length, "Configuradas no aplicativo", "rule"],
     ];
-    const hours = Array.from(
-      { length: 12 },
-      (_, i) =>
-        events.filter((ev) => {
-          const ago = (Date.now() - Date.parse(ev.occurredAt)) / 3600000;
-          return ago >= 11 - i && ago < 12 - i;
-        }).length,
-    );
-    const max = Math.max(1, ...hours);
-    content = `<div class="stats">${stats.map(([label, value, hint, ico]) => `<div class="stat"><div class="stat-label">${label}${icon(String(ico), "stat-icon")}</div><div class="stat-value">${value}</div><small>${hint}</small></div>`).join("")}</div><div class="section-title"><h2>Um olhar em casa</h2><a class="text-link" href="#cameras">Todas as câmeras →</a></div>${cameraGrid(cameras.slice(0, 3))}<div class="dashboard-bottom"><section><div class="section-title"><h2>Aconteceu por aqui</h2><a class="text-link" href="#events">Ver eventos →</a></div>${activity(events.slice(0, 5))}</section><section><div class="section-title"><h2>Nas últimas 12 horas</h2></div><div class="panel panel-pad"><span class="muted">Atividade registrada</span><div class="chart" role="img" aria-label="Eventos nas últimas 12 horas: ${hours.join(", ")}">${hours.map((n) => `<span style="height:${Math.max(4, (n / max) * 100)}%" title="${n} eventos"></span>`).join("")}</div><div class="chart-legend"><span>12 HORAS ATRÁS</span><span>AGORA</span></div></div><div class="section-title"><h2>Família</h2><a class="text-link" href="#family">Abrir mapa →</a></div>${people.length ? members(people.slice(0, 3)) : empty("Aguardando a família", "Os aparelhos vinculados aparecerão aqui.")}</section></div>`;
+    content = `<div class="stats">${stats.map(([label, value, hint, ico]) => `<div class="stat"><div class="stat-label">${label}${icon(String(ico), "stat-icon")}</div><div class="stat-value">${value}</div><small>${hint}</small></div>`).join("")}</div><section class="activity-summary"><div class="section-title"><h2>Atividade registrada</h2><select id="activity-hours" aria-label="Período da atividade">${[12,24,36,48].map(h => `<option value="${h}" ${chartHours === h ? 'selected' : ''}>Últimas ${h} horas</option>`).join('')}</select></div><div id="activity-chart" class="panel panel-pad" aria-live="polite">Carregando atividade…</div></section><div class="section-title"><h2>Um olhar em casa</h2><a class="text-link" href="#cameras">Todas as câmeras →</a></div>${cameraGrid(cameras.slice(0, 3))}<div class="dashboard-bottom"><section><div class="section-title"><h2>Aconteceu por aqui</h2><a class="text-link" href="#events">Ver eventos →</a></div>${activity(events.slice(0, 5))}</section><section><div class="section-title"><h2>Família</h2><a class="text-link" href="#family">Abrir mapa →</a></div>${people.length ? members(people.slice(0, 3)) : empty("Aguardando a família", "Os aparelhos vinculados aparecerão aqui.")}</section></div>`;
   } else if (page === "cameras") content = cameraGrid(cameras);
   else if (page === "events")
     content = `<div class="filter-bar"><input id="event-search" aria-label="Buscar eventos" placeholder="Buscar acontecimento…" value="${e(search)}"/><select id="event-camera" aria-label="Filtrar câmera"><option value="">Todas as câmeras</option>${cameras.map((c) => `<option value="${e(c.id)}" ${eventCamera === c.id ? "selected" : ""}>${e(c.name)}</option>`).join("")}<option value="tracking" ${eventCamera === "tracking" ? "selected" : ""}>Localização</option></select><select id="event-type" aria-label="Filtrar tipo"><option value="">Todos os tipos</option>${Object.entries(
@@ -170,6 +179,14 @@ function render() {
   else if (page === "system")
     content = `<div id="system-content" class="loading"><span class="spinner"></span>Consultando instalação…</div>`;
   main.innerHTML = head(page) + content;
+  if (page === "overview") {
+    void refreshChart();
+    $("#activity-hours").addEventListener("change", event => {
+      chartHours = Number((event.target as HTMLSelectElement).value);
+      $("#activity-chart").textContent = "Carregando atividade…";
+      void refreshChart();
+    });
+  }
   if (page === "events") {
     renderEvents();
     $("#event-search").addEventListener("input", (ev) => {
@@ -552,6 +569,8 @@ async function refresh(force = false) {
     signature = next;
     hasLoaded = true;
     render();
+  } else {
+    void refreshChart();
   }
   $("#global-error").hidden = !failures.length;
   $("#global-error").textContent = failures.length

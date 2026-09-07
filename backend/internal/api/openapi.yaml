@@ -212,6 +212,34 @@ paths:
     get:
       summary: List recent events
       responses: {'200': {description: Events in APIResponse.data, content: {application/json: {schema: {$ref: '#/components/schemas/APIResponse'}}}}}
+  /events/activity:
+    get:
+      summary: Count all events in twelve equal time intervals
+      description: Excludes location events in the database before aggregation. Counts the complete window independently of recent-event list limits. Boundaries use server UTC time; start is inclusive and end exclusive.
+      parameters:
+        - {name: hours, in: query, required: true, schema: {type: integer, enum: [12, 24, 36, 48]}}
+      responses:
+        '200':
+          description: Twelve ActivityBucket objects in APIResponse.data, oldest first
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - {$ref: '#/components/schemas/APIResponse'}
+                  - properties:
+                      data: {type: array, items: {$ref: '#/components/schemas/ActivityBucket'}}
+        '400': {description: Invalid period}
+  /events/interval:
+    get:
+      summary: List interval events in pages of 100
+      description: Excludes location events in the database before pagination. Start inclusive, end exclusive, maximum 48 hours. Ordered by occurredAt descending then id descending. An empty or short page ends pagination.
+      parameters:
+        - {name: from, in: query, required: true, schema: {type: string, format: date-time}}
+        - {name: to, in: query, required: true, schema: {type: string, format: date-time}}
+        - {name: offset, in: query, schema: {type: integer, minimum: 0, default: 0}}
+      responses:
+        '200': {description: Event array in APIResponse.data, content: {application/json: {schema: {$ref: '#/components/schemas/APIResponse'}}}}
+        '400': {description: Invalid interval or offset}
   /events/acknowledge-all:
     post:
       summary: Acknowledge all unacknowledged events
@@ -493,6 +521,13 @@ components:
         record: {type: boolean}
         notify: {type: boolean}
         alarm: {type: boolean}
+    ActivityBucket:
+      type: object
+      required: [start, end, count]
+      properties:
+        start: {type: string, format: date-time}
+        end: {type: string, format: date-time}
+        count: {type: integer, minimum: 0}
     Event:
       type: object
       properties:

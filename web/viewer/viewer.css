@@ -279,7 +279,23 @@ select:focus {
   flex-direction: column;
 }
 .sidebar .brand {
-  padding: 0 7px 40px;
+  justify-content: center;
+  width: 100%;
+  padding: 0 0 30px;
+}
+.sidebar .brand img {
+  width: 88px;
+  height: 88px;
+}
+.activity-summary .section-title {
+  flex-wrap: wrap;
+  gap: 12px;
+}
+.activity-summary select {
+  width: auto;
+}
+.activity-summary .chart {
+  height: 120px;
 }
 .sidebar nav {
   display: grid;
@@ -843,7 +859,6 @@ dialog::backdrop {
 .chart span {
   flex: 1;
   background: var(--accent);
-  min-height: 3px;
   border-radius: 4px 4px 0 0;
   opacity: 0.65;
 }

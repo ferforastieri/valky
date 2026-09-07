@@ -36,3 +36,5 @@ import kotlinx.serialization.json.JsonElement
 @Serializable data class PersonLocation(val id:String="",val personId:String="",val latitude:Double,val longitude:Double,val accuracy:Double=0.0,val address:String="",val occurredAt:String="")
 
 @Serializable data class LocationReportResult(val transitions: Int = 0, val pendingConfirmations: Int = 0)
+
+@Serializable data class ActivityBucket(val start: String, val end: String, val count: Int)
