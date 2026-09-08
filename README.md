@@ -24,6 +24,7 @@ Valkyris transforma um servidor doméstico em uma central privada de monitoramen
 - Live WebRTC autenticado, com uma única conexão RTSP por câmera e conversão apenas do áudio G.711 para Opus.
 - Movimento PTZ por pressionar e segurar e zoom quando anunciado pela câmera.
 - Cadastro assíncrono: a câmera aparece imediatamente e o progresso ou erro fica persistido.
+- [Detecção sonora contínua](docs/audio-detection.md), com janelas sobrepostas, confirmação temporal de choro de bebê e diagnóstico de pontuações por 24 horas.
 - Regras para movimento e sons residenciais; a confiança mínima é aplicada internamente por detector, sem ajuste manual, e as regras ficam sempre ativas.
 - Mapa familiar com usuários vinculados aos dispositivos pareados, histórico de localização e alertas de entrada e saída de áreas.
 - Eventos com snapshot, reconhecimento, notificação e clipe com pré/pós-evento.

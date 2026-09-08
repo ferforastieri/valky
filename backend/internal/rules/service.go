@@ -23,11 +23,12 @@ type Service struct {
 	store         *store.Store
 	mu            sync.Mutex
 	pending       map[string]int
+	audioPending  map[string]audioConfirmation
 	motionPending map[string]motionWindow
 }
 
 func NewService(s *store.Store) *Service {
-	return &Service{store: s, pending: map[string]int{}, motionPending: map[string]motionWindow{}}
+	return &Service{store: s, pending: map[string]int{}, audioPending: map[string]audioConfirmation{}, motionPending: map[string]motionWindow{}}
 }
 
 func (s *Service) Create(ctx context.Context, r Rule) (Rule, error) {
@@ -196,7 +197,7 @@ func (s *Service) Delete(ctx context.Context, id string) error {
 }
 
 func (s *Service) Match(ctx context.Context, d Detection) ([]Rule, error) {
-	if d.Motion == nil && !reliableDetection(d) {
+	if d.Motion == nil && d.Audio == nil && !reliableDetection(d) {
 		return nil, nil
 	}
 	s.mu.Lock()
@@ -215,18 +216,29 @@ func (s *Service) Match(ctx context.Context, d Detection) ([]Rule, error) {
 		}
 		if !r.Enabled || !contains(r.DetectorTypes, d.Type) || !activeAt(r.Schedule, d.OccurredAt) {
 			delete(s.motionPending, r.ID)
+			delete(s.audioPending, r.ID+":"+d.Type)
+			continue
+		}
+		if d.Audio != nil && !d.Audio.Start.Before(d.Audio.End) {
 			continue
 		}
 		if r.LastTriggeredAt != nil && d.OccurredAt.Sub(*r.LastTriggeredAt) < time.Duration(r.CooldownSeconds)*time.Second {
 			delete(s.motionPending, r.ID)
+			delete(s.audioPending, r.ID+":"+d.Type)
 			continue
 		}
 		if r.Motion != nil && !s.persistentMotion(r, d) {
 			continue
 		}
 		key := r.ID + ":" + d.Type
-		s.pending[key]++
-		if r.Motion == nil && s.pending[key] < r.Confirmations {
+		if d.Audio != nil {
+			if !s.confirmAudio(key, r, d) {
+				continue
+			}
+		} else {
+			s.pending[key]++
+		}
+		if d.Audio == nil && r.Motion == nil && s.pending[key] < r.Confirmations {
 			continue
 		}
 		s.pending[key] = 0
@@ -250,17 +262,7 @@ func reliableDetection(d Detection) bool {
 	if source == "onvif" {
 		return d.Confidence >= .5
 	}
-	minimum := .70
-	switch d.Type {
-	case "motion", "person", "tamper":
-		minimum = .20
-	case "baby_cry", "crying", "scream":
-		minimum = .78
-	case "glass_break", "smoke_alarm", "fire_alarm", "siren":
-		minimum = .85
-	case "doorbell", "knock", "dog_bark":
-		minimum = .72
-	}
+	minimum := AudioThreshold(d.Type)
 	return d.Confidence >= minimum
 }
 

@@ -99,7 +99,7 @@ func main() {
 	} else {
 		logger.Warn("audio classifier disabled", "reason", "model files not installed")
 	}
-	monitor := &detector.Monitor{Rules: rulesService, Cameras: cameraRepo, Media: mediaManager, ONVIF: onvif, Classifier: classifier, DataDir: cfg.DataDir, Logger: logger, Submit: func(ctx context.Context, detection rules.Detection) error {
+	monitor := &detector.Monitor{AudioAudit: &detector.AudioAudit{Store: db}, Rules: rulesService, Cameras: cameraRepo, Media: mediaManager, ONVIF: onvif, Classifier: classifier, DataDir: cfg.DataDir, Logger: logger, Submit: func(ctx context.Context, detection rules.Detection) error {
 		_, err := application.Submit(ctx, detection)
 		return err
 	}}

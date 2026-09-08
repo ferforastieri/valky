@@ -43,6 +43,9 @@ func (s *Service) Submit(ctx context.Context, d rules.Detection) ([]event.Event,
 	if err != nil {
 		return nil, err
 	}
+	if d.Audio != nil && d.Audio.TemporalAccepted {
+		s.Logger.Info("audio rule evaluation", "camera", d.CameraID, "type", d.Type, "score", d.Confidence, "matchedRules", len(matched), "windowEnd", d.Audio.End)
+	}
 	created := make([]event.Event, 0, len(matched))
 	for _, rule := range matched {
 		if d.Metadata == nil {

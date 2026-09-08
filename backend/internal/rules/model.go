@@ -48,7 +48,15 @@ type Rule struct {
 	CreatedAt       time.Time       `json:"createdAt"`
 	UpdatedAt       time.Time       `json:"updatedAt"`
 }
+type AudioSample struct {
+	Start            time.Time
+	End              time.Time
+	Session          string
+	TemporalAccepted bool
+}
+
 type Detection struct {
+	Audio      *AudioSample  `json:"-"`
 	Motion     *MotionSample `json:"-"`
 	CameraID   string
 	Type       string

@@ -2,11 +2,7 @@ package detector
 
 import (
 	"context"
-	"fmt"
 	"log/slog"
-	"os"
-	"os/exec"
-	"path/filepath"
 	"sync"
 	"time"
 
@@ -21,8 +17,9 @@ type CameraLister interface {
 }
 
 type Monitor struct {
-	Cameras CameraLister
-	Rules   interface {
+	AudioAudit *AudioAudit
+	Cameras    CameraLister
+	Rules      interface {
 		List(context.Context, string) ([]rules.Rule, error)
 	}
 	Media      *media.Manager
@@ -98,39 +95,6 @@ func (m *Monitor) monitorCamera(ctx context.Context, cam camera.Camera) {
 	m.ONVIF.MonitorEvents(ctx, detailed, credentials, func(kind string, confidence float64) {
 		m.submit(ctx, rules.Detection{CameraID: cam.ID, Type: kind, Confidence: confidence, OccurredAt: time.Now().UTC(), Metadata: map[string]any{"source": "onvif"}})
 	})
-}
-
-func (m *Monitor) monitorAudio(ctx context.Context, cameraID string) {
-	dir := filepath.Join(m.DataDir, "detector", cameraID)
-	if err := os.MkdirAll(dir, 0o700); err != nil {
-		m.Logger.Warn("prepare detector directory", "camera", cameraID, "error", err)
-		return
-	}
-	window := filepath.Join(dir, "audio.wav")
-	for ctx.Err() == nil {
-		captureCtx, cancel := context.WithTimeout(ctx, 18*time.Second)
-		err := captureAudio(captureCtx, m.Media.RTSPURL(cameraID), window)
-		cancel()
-		if err == nil {
-			results, classifyErr := m.Classifier.Classify(ctx, window)
-			if classifyErr == nil {
-				for _, result := range uniqueResults(results) {
-					// The rule service applies the detector-specific reliability
-					// threshold. Do not feed it noise from the classifier.
-					if result.Confidence >= 0.70 {
-						m.submit(ctx, rules.Detection{CameraID: cameraID, Type: result.Type, Confidence: result.Confidence, OccurredAt: time.Now().UTC(), Metadata: map[string]any{"source": "sherpa-onnx"}})
-					}
-				}
-			} else if ctx.Err() == nil {
-				m.Logger.Warn("classify audio", "camera", cameraID, "error", classifyErr)
-			}
-		} else if ctx.Err() == nil {
-			m.Logger.Warn("capture detector audio", "camera", cameraID, "error", err)
-		}
-		if !wait(ctx, 2*time.Second) {
-			return
-		}
-	}
 }
 
 func (m *Monitor) monitorVisual(ctx context.Context, cameraID string, fallback bool) {
@@ -215,14 +179,6 @@ func (m *Monitor) stopAll() {
 	for _, cancel := range m.running {
 		cancel()
 	}
-}
-
-func captureAudio(ctx context.Context, input, output string) error {
-	cmd := exec.CommandContext(ctx, "ffmpeg", "-hide_banner", "-loglevel", "error", "-i", input, "-t", "10", "-vn", "-ac", "1", "-ar", "16000", "-c:a", "pcm_s16le", "-y", output)
-	if output, err := cmd.CombinedOutput(); err != nil {
-		return fmt.Errorf("ffmpeg audio window: %w: %s", err, output)
-	}
-	return nil
 }
 
 func wait(ctx context.Context, duration time.Duration) bool {

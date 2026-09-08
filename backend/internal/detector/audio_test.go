@@ -2,13 +2,6 @@ package detector
 
 import "testing"
 
-func TestParseSherpaOutput(t *testing.T) {
-	got := ParseOutput(`0: AudioEvent(name="Baby cry, infant cry", index=23, prob=0.912273)`)
-	if len(got) != 1 || got[0].Type != "baby_cry" || got[0].Confidence < .91 {
-		t.Fatalf("unexpected: %#v", got)
-	}
-}
-
 func TestResidentialAudioCatalogMappings(t *testing.T) {
 	cases := map[string]string{
 		"Baby cry, infant cry":        "baby_cry",
@@ -24,21 +17,16 @@ func TestResidentialAudioCatalogMappings(t *testing.T) {
 		"Bark":                        "dog_bark",
 	}
 	for label, want := range cases {
-		output := `AudioEvent(name="` + label + `", index=1, prob=0.81)`
-		got := ParseOutput(output)
-		if len(got) != 1 || got[0].Type != want {
-			t.Errorf("%q: got %#v, want %q", label, got, want)
+		if got := AudioLabels[label]; got != want {
+			t.Errorf("%q: got %q, want %q", label, got, want)
 		}
-	}
-	if got := ParseOutput(`AudioEvent(name="Speech", index=2, prob=0.99)`); len(got) != 0 {
-		t.Fatalf("unlisted negative class generated an event: %#v", got)
 	}
 }
 
 func TestGenericSoundsDoNotBecomeSpecificAlarms(t *testing.T) {
 	for _, label := range []string{"Dog", "Glass", "Speech", "Whimper (dog)"} {
-		if got := ParseOutput(`AudioEvent(name="` + label + `", index=1, prob=0.99)`); len(got) != 0 {
-			t.Errorf("generic sound %q produced %#v", label, got)
+		if got, ok := AudioLabels[label]; ok {
+			t.Errorf("generic sound %q produced %q", label, got)
 		}
 	}
 }

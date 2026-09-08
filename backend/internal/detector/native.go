@@ -24,7 +24,7 @@ func NewNativeClassifier(model, labels string) (*NativeClassifier, error) {
 			Provider:   "cpu",
 		},
 		Labels: labels,
-		TopK:   10,
+		TopK:   527,
 	}
 	tagger := sherpa.NewAudioTagging(config)
 	if tagger == nil {
@@ -42,23 +42,25 @@ func (c *NativeClassifier) Close() {
 	}
 }
 
-func (c *NativeClassifier) Classify(ctx context.Context, wav string) ([]Result, error) {
+func (c *NativeClassifier) Classify(ctx context.Context, samples []float32) ([]Result, error) {
 	if err := ctx.Err(); err != nil {
 		return nil, err
 	}
-	wave := sherpa.ReadWave(wav)
-	if wave == nil || len(wave.Samples) == 0 {
-		return nil, fmt.Errorf("read audio window")
+	if len(samples) == 0 {
+		return nil, fmt.Errorf("empty audio window")
 	}
 	c.mu.Lock()
 	defer c.mu.Unlock()
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
 	if c.tagger == nil {
 		return nil, fmt.Errorf("audio classifier is closed")
 	}
 	stream := sherpa.NewAudioTaggingStream(c.tagger)
 	defer sherpa.DeleteOfflineStream(stream)
-	stream.AcceptWaveform(wave.SampleRate, wave.Samples)
-	events := c.tagger.Compute(stream, 10)
+	stream.AcceptWaveform(audioSampleRate, samples)
+	events := c.tagger.Compute(stream, 527)
 	results := make([]Result, 0, len(events))
 	for _, candidate := range events {
 		kind, ok := AudioLabels[candidate.Name]

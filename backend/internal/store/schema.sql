@@ -200,3 +200,19 @@ CREATE TABLE IF NOT EXISTS location_address_cache (
  address TEXT NOT NULL,
  retry_after INTEGER NOT NULL
 );
+
+CREATE TABLE IF NOT EXISTS audio_decisions (
+ id INTEGER PRIMARY KEY,
+ camera_id TEXT NOT NULL REFERENCES cameras(id) ON DELETE CASCADE,
+ window_start TEXT NOT NULL,
+ window_end TEXT NOT NULL,
+ session_id TEXT NOT NULL,
+ scores_json TEXT NOT NULL,
+ rms REAL NOT NULL,
+ inference_ms INTEGER NOT NULL,
+ accepted INTEGER NOT NULL,
+ reason TEXT NOT NULL,
+ created_at INTEGER NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_audio_decisions_created ON audio_decisions(created_at);
+CREATE INDEX IF NOT EXISTS idx_audio_decisions_camera ON audio_decisions(camera_id,id DESC);
