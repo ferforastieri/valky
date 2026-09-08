@@ -20,10 +20,12 @@
     "@fontsource/ibm-plex-mono": "^5.2.8",
     "@lucide/astro": "^0.556.0",
     "astro": "^5.13.5",
-    "typescript": "^5.9.2",
-    "leaflet": "1.9.4"
+    "leaflet": "1.9.4",
+    "qrcode": "1.5.4",
+    "typescript": "^5.9.2"
   },
   "devDependencies": {
-    "@types/leaflet": "1.9.20"
+    "@types/leaflet": "1.9.20",
+    "@types/qrcode": "1.5.6"
   }
 }

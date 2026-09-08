@@ -73,12 +73,15 @@ fun OverviewActivityChart(onEvent: (String) -> Unit, vm: ActivityViewModel = hil
 fun ActivityChart(hours: Int, buckets: List<ActivityBucket>?, failed: Boolean = false, onHours: (Int) -> Unit = {}, onBucket: (ActivityBucket) -> Unit = {}) {
     Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)) {
         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            Text(stringResource(R.string.activity_chart_title), style = MaterialTheme.typography.titleMedium)
-            Row(Modifier.fillMaxWidth().selectableGroup(), verticalAlignment = Alignment.CenterVertically) {
-                listOf(12, 24, 36, 48).forEachIndexed { index, value ->
-                    if (index > 0) Text("·", color = MaterialTheme.colorScheme.outline)
-                    Box(Modifier.weight(1f).heightIn(min = 48.dp).selectable(selected = hours == value, role = Role.RadioButton, onClick = { onHours(value) }), contentAlignment = Alignment.Center) {
-                        Text("${value}h", style = MaterialTheme.typography.bodyMedium, fontWeight = if (hours == value) FontWeight.Bold else FontWeight.Normal, color = if (hours == value) MaterialTheme.colorScheme.secondary else MaterialTheme.colorScheme.onSurfaceVariant)
+            var periodExpanded by remember { mutableStateOf(false) }
+            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                Text(stringResource(R.string.activity_chart_title), modifier = Modifier.weight(1f), style = MaterialTheme.typography.titleMedium)
+                Box {
+                    TextButton(onClick = { periodExpanded = true }) { Text("${hours}h ▾") }
+                    DropdownMenu(expanded = periodExpanded, onDismissRequest = { periodExpanded = false }) {
+                        listOf(12, 24, 36, 48).forEach { value ->
+                            DropdownMenuItem(text = { Text("Últimas $value horas") }, onClick = { periodExpanded = false; onHours(value) }, trailingIcon = { if (hours == value) Text("✓") })
+                        }
                     }
                 }
             }

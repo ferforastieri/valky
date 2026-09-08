@@ -1,3 +1,4 @@
+import { styleSelects } from "./lib/select";
 import { API, labels, escape as e, date, clock, key } from "./lib/api";
 import type {
   ManagedUser,
@@ -210,6 +211,7 @@ function render() {
     input?.focus({ preventScroll: true });
     input?.setSelectionRange(focused.start, focused.end);
   }
+  viewCleanups.push(styleSelects(main));
   void snapshots(main, viewController.signal, viewCleanups);
   if ($("#family-map"))
     void import("./lib/map")
@@ -544,8 +546,12 @@ async function ruleDetails(id: string) {
   ])}<div class="rule-actions">${actionPills(r)}</div>${r.motion ? `<div class="section-title"><h2>Região monitorada</h2></div><div class="media-stage"><img data-snapshot="${e(r.cameraId)}" alt="Região configurada na câmera" hidden/><span class="region" style="left:${r.motion.region.x * 100}%;top:${r.motion.region.y * 100}%;width:${r.motion.region.width * 100}%;height:${r.motion.region.height * 100}%"></span></div><p class="notice">A região corresponde ao enquadramento configurado. Movimento na região não identifica postura nem risco médico.</p>` : ""}`;
   if(api.admin) {
  const selected=r.actions.recipientUserIds;
- $('#detail-body').insertAdjacentHTML('beforeend',`<form id="recipients"><h3>Quem recebe alertas e notificações</h3><label><input type="checkbox" name="all" ${selected==null?'checked':''}> Toda a família</label>${people.map(p=>`<label style="display:block"><input type="checkbox" name="recipient" value="${e(p.id)}" ${selected?.includes(p.id)?'checked':''}> ${e(p.name)}</label>`).join('')}<p class="muted">Sem pessoas selecionadas, ninguém recebe notificações desta regra.</p><button type="submit">Salvar destinatários</button><p role="status"></p></form>`);
- const form=$<HTMLFormElement>('#recipients');form.onsubmit=async ev=>{ev.preventDefault();const data=new FormData(form);const ids=data.has('all')?null:data.getAll('recipient').map(String);const button=form.querySelector('button')!;button.disabled=true;try{await api.mutate(`/rules/${key(id)}/recipients`,'PUT',{recipientUserIds:ids});r.actions.recipientUserIds=ids;form.querySelector('[role=status]')!.textContent='Destinatários salvos.';}catch(err){form.querySelector('[role=status]')!.textContent=(err as Error).message;}finally{button.disabled=false;}};
+ $('#detail-body').insertAdjacentHTML('beforeend',`<form id="recipients" class="editor-section"><h3>Quem recebe alertas e notificações</h3><label><input type="checkbox" name="all" ${selected==null?'checked':''}> Toda a família</label>${people.map(p=>`<label class="setting-row"><input class="project-switch" type="checkbox" role="switch" name="recipient" value="${e(p.id)}" ${selected?.includes(p.id)?'checked':''}> ${e(p.name)}</label>`).join('')}<p class="muted">Sem pessoas selecionadas, ninguém recebe notificações desta regra.</p><button type="submit" class="primary">Salvar destinatários</button><p role="status"></p></form>`);
+ const form=$<HTMLFormElement>('#recipients');
+ const all = form.querySelector<HTMLInputElement>('[name=all]')!;
+ const syncRecipients = () => form.querySelectorAll<HTMLInputElement>('[name=recipient]').forEach(input => { input.disabled = all.checked; });
+ all.onchange = syncRecipients; syncRecipients();
+ form.onsubmit=async ev=>{ev.preventDefault();const data=new FormData(form);const ids=data.has('all')?null:data.getAll('recipient').map(String);const button=form.querySelector('button')!;button.disabled=true;try{await api.mutate(`/rules/${key(id)}/recipients`,'PUT',{recipientUserIds:ids});r.actions.recipientUserIds=ids;form.querySelector('[role=status]')!.textContent='Destinatários salvos.';}catch(err){form.querySelector('[role=status]')!.textContent=(err as Error).message;}finally{button.disabled=false;}};
  }
   void snapshots($("#detail-body"), modalController.signal, modalCleanups);
 }
@@ -714,16 +720,56 @@ void api
   .catch(() => {});
 
 async function renderUsers() {
- const target=document.getElementById('user-admin');if(!target)return;
- try{
- const users=await api.get<ManagedUser[]>('/admin/users');if(!target.isConnected)return;
- target.innerHTML='<h2>Gerenciar usuários</h2><button type="button" id="invite-user">Convidar usuário</button><p id="invite-result" role="status"></p>'+users.map(u=>`<form data-managed="${e(u.id)}" class="panel-pad"><label>Nome <input name="name" value="${e(u.name)}" required maxlength="100"></label><label><input name="enabled" type="checkbox" ${u.enabled?'checked':''}> Ativo</label><label><input name="admin" type="checkbox" ${u.admin?'checked':''}> Administrador</label><small>${u.devices} dispositivos</small><button type="submit">Salvar</button><button type="button" data-remove>Remover</button><p role="status"></p></form>`).join('');
- target.querySelector<HTMLButtonElement>('#invite-user')!.onclick=async()=>{const button=target.querySelector<HTMLButtonElement>('#invite-user')!;button.disabled=true;try{const invite=await api.mutate<{code:string;expiresAt:string}>('/pairing-sessions','POST');target.querySelector('#invite-result')!.textContent=`Convite: ${invite.code} · válido até ${date(invite.expiresAt)}. Use este código no Android.`;}catch(err){target.querySelector('#invite-result')!.textContent=(err as Error).message;}finally{button.disabled=false;}};
- target.querySelectorAll<HTMLFormElement>('form').forEach(form=>{
- const id=form.dataset.managed!;
- const run=async(remove:boolean)=>{const status=form.querySelector('[role=status]')!;form.querySelectorAll('button').forEach(b=>b.disabled=true);try{const data=new FormData(form);await api.mutate(`/admin/users/${key(id)}`,remove?'DELETE':'PUT',remove?undefined:{name:data.get('name'),enabled:data.has('enabled'),admin:data.has('admin')});if(remove)form.remove();else status.textContent='Usuário atualizado.';}catch(err){status.textContent=(err as Error).message;}finally{form.querySelectorAll('button').forEach(b=>b.disabled=false);}};
- form.onsubmit=ev=>{ev.preventDefault();void run(false)};
- form.querySelector<HTMLButtonElement>('[data-remove]')!.onclick=()=>{if(window.confirm('Remover este usuário e revogar o acesso dos seus dispositivos?'))void run(true)};
- });
- }catch(err){target.textContent=(err as Error).message;}
+  const target = document.getElementById('user-admin');
+  if (!target) return;
+  try {
+    const users = await api.get<ManagedUser[]>('/admin/users');
+    if (!target.isConnected) return;
+    target.innerHTML = `<div class="section-title"><div><span class="eyebrow">PESSOAS E ACESSO</span><h2>Gerenciar usuários</h2><p class="muted">Escolha uma pessoa para editar seu perfil e suas permissões.</p></div><button class="primary" id="invite-user">${icon('users')} Convidar usuário</button></div><div class="managed-users">${users.map(user => `<button class="activity-row managed-user" data-user="${e(user.id)}"><span class="avatar">${e(user.name.slice(0,1).toUpperCase())}</span><span class="activity-main"><strong>${e(user.name)}</strong><small>${user.admin ? 'Administrador' : 'Membro'} · ${user.devices} dispositivo(s)</small></span><span class="access-badge ${user.enabled ? 'active' : ''}">${user.enabled ? 'Ativo' : 'Desativado'}</span>${icon('arrow')}</button>`).join('')}</div>`;
+    target.querySelector<HTMLButtonElement>('#invite-user')!.onclick = () => void inviteUser();
+    target.querySelectorAll<HTMLButtonElement>('[data-user]').forEach(button => {
+      button.onclick = () => { const user = users.find(item => item.id === button.dataset.user); if (user) editUser(user); };
+    });
+  } catch (error) { target.textContent = (error as Error).message; }
+}
+
+function editUser(user: ManagedUser) {
+  openDetails(user.name, 'GERENCIAR PESSOA');
+  const body = $('#detail-body');
+  body.innerHTML = `<form id="user-editor" class="editor-form"><div class="editor-context"><span class="avatar">${e(user.name.slice(0,1).toUpperCase())}</span><div><strong>${e(user.name)}</strong><small>${user.devices} dispositivo(s) vinculado(s)</small></div></div><section class="editor-section"><h3>Perfil</h3><label class="field-label" for="user-name">Nome da pessoa</label><input id="user-name" name="name" value="${e(user.name)}" required maxlength="100" autocomplete="off"></section><section class="editor-section"><h3>Permissões</h3><label class="field-label" for="user-role">Papel no sistema</label><select id="user-role" name="admin"><option value="false" ${!user.admin ? 'selected' : ''}>Membro</option><option value="true" ${user.admin ? 'selected' : ''}>Administrador</option></select><p class="muted">Administradores podem gerenciar pessoas e configurações do sistema.</p><label class="setting-row"><span><strong>Acesso ao sistema</strong><small>Desativar bloqueia os dispositivos desta pessoa.</small></span><input class="project-switch" type="checkbox" role="switch" name="enabled" ${user.enabled ? 'checked' : ''}></label></section><p role="status" class="error" id="user-result"></p><div class="editor-footer"><button type="button" class="danger quiet" id="remove-user">Remover pessoa</button><button type="submit" class="primary">Salvar alterações</button></div><div id="remove-confirm" class="notice" hidden><p>Remover ${e(user.name)} e revogar o acesso dos seus dispositivos?</p><button type="button" class="danger" id="confirm-remove">Confirmar remoção</button><button type="button" class="quiet" id="cancel-remove">Cancelar</button></div></form>`;
+  modalCleanups.push(styleSelects(body));
+  const form = $<HTMLFormElement>('#user-editor');
+  const run = async (remove: boolean) => {
+    const buttons = Array.from(form.querySelectorAll('button')); buttons.forEach(button => button.disabled = true);
+    try {
+      const data = new FormData(form);
+      await api.mutate(`/admin/users/${key(user.id)}`, remove ? 'DELETE' : 'PUT', remove ? undefined : { name: String(data.get('name')).trim(), enabled: data.has('enabled'), admin: data.get('admin') === 'true' });
+      if (form.isConnected) dialog.close();
+      await renderUsers();
+    } catch (error) { if (form.isConnected) $('#user-result').textContent = (error as Error).message; }
+    finally { buttons.forEach(button => button.disabled = false); }
+  };
+  form.onsubmit = event => { event.preventDefault(); void run(false); };
+  $('#remove-user').onclick = () => { $('#remove-confirm').hidden = false; $('#confirm-remove').focus(); };
+  $('#cancel-remove').onclick = () => { $('#remove-confirm').hidden = true; $('#remove-user').focus(); };
+  $('#confirm-remove').onclick = () => void run(true);
+}
+
+async function inviteUser() {
+  openDetails('Convidar usuário', 'ADICIONAR À FAMÍLIA');
+  const version = dialogVersion;
+  $('#detail-body').innerHTML = '<div class="loading"><span class="spinner"></span>Gerando convite…</div>';
+  try {
+    const invite = await api.mutate<{code: string; expiresAt: string}>('/pairing-sessions', 'POST');
+    const QRCode = (await import('qrcode')).default;
+    if (version !== dialogVersion || !dialog.open) return;
+    const uri = `valkyris://pair?url=${encodeURIComponent(window.location.origin)}&code=${encodeURIComponent(invite.code)}`;
+    $('#detail-body').innerHTML = `<div class="invitation"><p>Abra o Valkyris no Android e escaneie este QR Code para vincular o aparelho.</p><div class="qr-surface"><canvas id="invitation-qr" role="img" aria-label="QR Code de convite para o Valkyris"></canvas></div><span class="eyebrow">CÓDIGO DO CONVITE</span><strong class="invitation-code">${e(invite.code)}</strong><p class="muted">Uso único · válido até ${e(date(invite.expiresAt))}</p><button type="button" class="primary" id="copy-invitation">Copiar link do convite</button><p role="status" id="invitation-status"></p></div>`;
+    await QRCode.toCanvas($<HTMLCanvasElement>('#invitation-qr'), uri, { width: 280, margin: 4, errorCorrectionLevel: 'M', color: { dark: '#000000', light: '#ffffff' } });
+    if (version !== dialogVersion || !dialog.open) return;
+    const status = $('#invitation-status');
+    $('#copy-invitation').onclick = async () => { try { await navigator.clipboard.writeText(uri); status.textContent = 'Link copiado.'; } catch { status.textContent = 'Não foi possível copiar. Use o QR Code ou o código acima.'; } };
+    const timer = window.setTimeout(() => { if (version === dialogVersion && dialog.open) $('#detail-body').innerHTML = '<p class="notice">Este convite expirou. Feche e gere um novo convite.</p>'; }, Math.max(0, Date.parse(invite.expiresAt) - Date.now()));
+    modalCleanups.push(() => clearTimeout(timer));
+  } catch (error) { if (version === dialogVersion && dialog.open) $('#detail-body').textContent = (error as Error).message; }
 }

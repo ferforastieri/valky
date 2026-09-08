@@ -1122,11 +1122,40 @@ dialog::backdrop {
 .location-timeline strong { font-size: 14px; font-weight: 550; overflow-wrap: anywhere; }
 .location-timeline small { color: var(--muted); }
 
+
 #user-admin { margin-top: 24px; }
-#user-admin form { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; border-bottom: 1px solid var(--line); }
-#user-admin form > label:first-child { flex: 1 1 220px; }
-#user-admin label, #recipients label { display: flex; align-items: center; gap: 8px; }
-#user-admin input[type="text"], #user-admin input[name="name"] { width: 100%; min-width: 0; }
-#user-admin input[type="checkbox"], #recipients input[type="checkbox"] { width: auto; accent-color: var(--accent); }
-#user-admin [role="status"], #recipients [role="status"] { flex-basis: 100%; }
+.managed-users { display: grid; gap: 8px; }
+.managed-user { width: 100%; border: 1px solid var(--line); border-radius: 18px; background: var(--surface); text-align: left; }
+.access-badge { padding: 5px 9px; border-radius: 999px; font-size: 11px; background: var(--soft); color: var(--muted); }
+.access-badge.active { color: var(--signal); }
+.editor-form { display: grid; gap: 22px; }
+.editor-context { display: flex; align-items: center; gap: 14px; padding: 18px; border-radius: 20px; background: var(--soft); }
+.editor-context small, .setting-row small { display: block; color: var(--muted); margin-top: 4px; }
+.editor-section { display: grid; gap: 10px; }
+.editor-section h3 { margin: 0; }
+.field-label { font-size: 12px; font-weight: 600; }
+.setting-row { display: flex; align-items: center; justify-content: space-between; gap: 18px; padding-top: 12px; }
+.project-switch { appearance: none; flex-shrink: 0; width: 42px; height: 25px; padding: 3px; border-radius: 99px; background: var(--line); cursor: pointer; }
+.project-switch::before { content: ''; display: block; width: 17px; height: 17px; border-radius: 50%; background: var(--surface); transition: transform .15s; }
+.project-switch:checked { background: var(--signal); }
+.project-switch:checked::before { transform: translateX(16px); }
+.editor-footer { display: flex; justify-content: space-between; gap: 12px; flex-wrap: wrap; padding-top: 16px; border-top: 1px solid var(--line); }
+.danger { color: var(--alarm); }
+.project-select { position: relative; min-width: 0; }
+.select-trigger { display: flex; align-items: center; justify-content: space-between; gap: 18px; width: 100%; padding: 12px 15px; border: 1px solid var(--line); border-radius: 14px; color: var(--ink); background: var(--surface); text-align: left; font: inherit; cursor: pointer; }
+.select-trigger[aria-expanded="true"] { border-color: var(--signal); }
+.select-options { position: absolute; z-index: 30; top: calc(100% + 7px); left: 0; min-width: 100%; max-height: 260px; overflow: auto; padding: 6px; border: 1px solid var(--line); border-radius: 16px; background: var(--surface); box-shadow: var(--shadow); }
+.select-options button { display: block; width: 100%; padding: 11px 12px; border: 0; border-radius: 10px; background: transparent; color: var(--ink); text-align: left; white-space: nowrap; font: inherit; cursor: pointer; }
+.select-options button:hover, .select-options button:focus-visible, .select-options [aria-selected="true"] { background: var(--soft); color: var(--signal); }
+.invitation { display: grid; justify-items: center; gap: 14px; text-align: center; }
+.qr-surface { background: white; padding: 8px; border-radius: 20px; max-width: 100%; }
+.qr-surface canvas { display: block; max-width: 100%; height: auto !important; }
+.invitation-code { font: 600 26px var(--mono); letter-spacing: .15em; }
 #recipients { display: grid; gap: 12px; margin-top: 24px; }
+#recipients label { display: flex; align-items: center; gap: 8px; }
+#recipients input[type="checkbox"]:not(.project-switch) { width: auto; accent-color: var(--signal); }
+@media(max-width: 600px) { #user-admin .section-title { align-items: stretch; flex-direction: column; } .managed-user { gap: 10px; } .access-badge { font-size: 10px; } }
+
+.filter-bar .project-select { flex: 1; }
+.select-trigger:focus-visible, .project-switch:focus-visible { outline: 2px solid var(--signal); outline-offset: 3px; }
+.setting-row:has(input:disabled) { opacity: .55; }

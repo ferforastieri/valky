@@ -25,7 +25,8 @@ class ActivityChartTest {
         var hours = 12
         compose.setContent { ValkyrisTheme { ActivityChart(12, listOf(bucket), onHours = { hours = it }, onBucket = { selected = it }) } }
         for (period in listOf(12,24,36,48)) {
-            compose.onNodeWithText("${period}h").performClick()
+            compose.onNodeWithText("12h ▾").performClick()
+            compose.onNodeWithText("Últimas $period horas").performClick()
             assertEquals(period, hours)
         }
         compose.onNodeWithContentDescription("0 eventos", substring = true).performClick()

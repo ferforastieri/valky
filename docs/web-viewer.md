@@ -31,3 +31,11 @@ O telefone envia latitude, longitude, precisão e horário, usando um DTO sem en
 A resolução de endereço roda fora da requisição de localização: nomes de áreas cadastradas têm prioridade, depois [Photon](https://github.com/komoot/photon). Um único worker limita consultas a uma a cada 10 segundos, com cache persistente por coordenada arredondada e espera de uma hora após falha. `VALKYRIS_GEOCODER_URL` pode apontar para uma instância Photon própria. O provedor recebe somente coordenadas, sem identidade ou credenciais. Se estiver indisponível, a localização continua funcionando e a interface mostra as coordenadas até o endereço estar disponível. Dados geográficos: © OpenStreetMap.
 
 No mapa Android, tocar no avatar mostra um indicador ancorado acima dele, com nome e horário. Tocar novamente ou no mapa fecha o indicador; o histórico continua acessível na lista da família.
+
+### Administração e convites
+
+Em Sistema, administradores encontram a lista de usuários, com papel, estado de acesso e quantidade de dispositivos. Selecionar uma pessoa abre o editor de perfil e permissões; a remoção exige confirmação. A autorização continua sendo validada pelo backend em cada operação.
+
+Convidar usuário cria uma sessão de pareamento e apresenta um QR Code gerado localmente no navegador, sem enviar o convite a serviços externos. O conteúdo segue o Android: `valkyris://pair?url=<origem do painel>&code=<código>`. Use o endereço HTTPS do servidor acessível pelo aparelho. O convite é de uso único e sua validade vem do backend; também é possível copiar o link.
+
+Os seletores do painel usam controles estilizados com suporte a teclado. Nas regras, selecionar toda a família desabilita as escolhas individuais; desmarcar permite escolher os destinatários. Nenhuma pessoa selecionada significa que ninguém recebe os alertas da regra. No Android, o período do gráfico fica em um dropdown na mesma linha de Atividade registrada.

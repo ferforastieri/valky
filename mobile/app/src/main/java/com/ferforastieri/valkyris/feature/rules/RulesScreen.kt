@@ -205,6 +205,14 @@ fun RuleEditorDialog(cameras: List<Camera>, detectors: List<DetectorKind>, exist
         },
     ) {
         Column(Modifier.fillMaxWidth().heightIn(max = 520.dp).imePadding().verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            Surface(color = MaterialTheme.colorScheme.secondaryContainer, shape = MaterialTheme.shapes.large, modifier = Modifier.fillMaxWidth()) {
+                Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                    Text(if (existing == null) "Nova regra" else "Editando regra", style = MaterialTheme.typography.labelMedium)
+                    Text(name.ifBlank { "Defina o que acompanhar" }, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+                    Text(cameras.firstOrNull { it.id == (fixedCameraID ?: camera?.id) }?.name.orEmpty(), style = MaterialTheme.typography.bodyMedium)
+                }
+            }
+            RuleSectionTitle("O que monitorar", "Escolha a câmera e o acontecimento que deve acionar esta regra.")
             if (fixedCameraID == null) ExposedDropdownMenuBox(cameraExpanded, { cameraExpanded = it }) {
                 OutlinedTextField(camera?.name.orEmpty(), {}, readOnly = true, label = { Text(stringResource(R.string.cameras)) }, trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(cameraExpanded) }, modifier = Modifier.menuAnchor(MenuAnchorType.PrimaryNotEditable).fillMaxWidth())
                 ExposedDropdownMenu(cameraExpanded, { cameraExpanded = false }) { cameras.forEach { item -> DropdownMenuItem({ Text(item.name) }, { camera = item; cameraExpanded = false }) } }
@@ -214,7 +222,7 @@ fun RuleEditorDialog(cameras: List<Camera>, detectors: List<DetectorKind>, exist
                 OutlinedTextField(detector?.let { stringResource(detectorLabelRes(it.id)) }.orEmpty(), {}, readOnly = true, label = { Text(stringResource(R.string.detector)) }, trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(detectorExpanded) }, modifier = Modifier.menuAnchor(MenuAnchorType.PrimaryNotEditable).fillMaxWidth())
                 ExposedDropdownMenu(detectorExpanded, { detectorExpanded = false }) { detectors.forEach { item -> DropdownMenuItem({ Text(stringResource(detectorLabelRes(item.id))) }, { detector = item; detectorExpanded = false }) } }
             }
-            Text("Destinatários dos alertas", style = MaterialTheme.typography.titleSmall)
+            RuleSectionTitle("Quem recebe", "Estas pessoas receberão as notificações e os alarmes desta regra.")
             RuleActionRow(recipients == null, { recipients = if (it) null else emptyList() }, "Toda a família")
             if (recipients != null) {
                 people.forEach { person ->
@@ -222,6 +230,7 @@ fun RuleEditorDialog(cameras: List<Camera>, detectors: List<DetectorKind>, exist
                 }
                 if (recipients.orEmpty().isEmpty()) Text("Ninguém receberá notificações desta regra.", style = MaterialTheme.typography.bodySmall)
             }
+            RuleSectionTitle("Quando monitorar", "Monitore o dia todo ou escolha dias e horários.")
             RuleActionRow(scheduled, { scheduled = it }, "Limitar por horário")
             if (scheduled) {
                 Text("Dias de início do período", style = MaterialTheme.typography.labelLarge)
@@ -239,6 +248,7 @@ fun RuleEditorDialog(cameras: List<Camera>, detectors: List<DetectorKind>, exist
                 if (!validSchedule) Text("Selecione dias, horários distintos e um fuso válido (ex.: America/Sao_Paulo).", color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
             }
             if (detector?.id == "motion") {
+                RuleSectionTitle("Onde detectar movimento", "Delimite a parte da imagem que deseja acompanhar.")
                 RuleActionRow(regionEnabled, { regionEnabled = it }, "Movimento persistente em uma região")
                 if (regionEnabled) {
                     MotionRegionEditor(fixedCameraID ?: camera?.id.orEmpty(), region, { region = it }, preview)
@@ -248,6 +258,7 @@ fun RuleEditorDialog(cameras: List<Camera>, detectors: List<DetectorKind>, exist
                     Text("Valores menores detectam movimentos mais sutis. O alerta indica movimento na região, não identifica o bebê nem avalia risco, respiração ou postura.", style = MaterialTheme.typography.bodySmall)
                 }
             }
+            RuleSectionTitle("O que acontece", "Defina a gravação, a notificação e o alarme sonoro.")
             OutlinedTextField(cooldown, { cooldown = it.filter(Char::isDigit) }, label = { Text("Intervalo entre alertas (segundos)") }, supportingText = { Text("De 10 a 3.600 s") }, isError = cooldown.toIntOrNull() !in 10..3600, singleLine = true, modifier = Modifier.fillMaxWidth())
             RuleActionRow(record, { record = it }, stringResource(R.string.record_media))
             RuleActionRow(notify, { notify = it }, stringResource(R.string.send_notification))
@@ -262,5 +273,14 @@ private fun RuleActionRow(checked: Boolean, onChecked: (Boolean) -> Unit, label:
         Switch(checked = checked, onCheckedChange = onChecked)
         Spacer(Modifier.width(8.dp))
         Text(label)
+    }
+}
+
+@Composable
+private fun RuleSectionTitle(title: String, description: String) {
+    Column(Modifier.fillMaxWidth().padding(top = 12.dp, bottom = 4.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+        HorizontalDivider(Modifier.padding(bottom = 10.dp), color = MaterialTheme.colorScheme.outlineVariant)
+        Text(title, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
+        Text(description, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
     }
 }

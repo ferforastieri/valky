@@ -194,7 +194,7 @@ private fun ConnectedValkyrisApp(main: MainViewModel) {
     }
 }
 
-private fun NavHostController.openTopLevel(route: String) {
+internal fun NavHostController.openTopLevel(route: String) {
     if (route == "cameras" && currentDestination?.route == "camera/{id}") {
         if (popBackStack("cameras", inclusive = false)) return
     }
@@ -205,8 +205,9 @@ private fun NavHostController.openTopLevel(route: String) {
         return
     }
     navigate(route) {
-        popUpTo(graph.findStartDestination().id) { saveState = true }
+        // Restore only the requested destination, never its former notification overlay.
+        popUpTo(graph.findStartDestination().id)
         launchSingleTop = true
-        restoreState = true
+        restoreState = false
     }
 }
