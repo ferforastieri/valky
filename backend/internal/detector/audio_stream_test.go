@@ -8,7 +8,9 @@ import (
 	"io"
 	"math"
 	"os"
+	"os/exec"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 )
@@ -151,5 +153,19 @@ func TestNativeAudioReference(t *testing.T) {
 				t.Fatal("reference baby cry missed")
 			}
 		})
+	}
+}
+
+// Validate the actual command against the installed FFmpeg RTSP demuxer.
+// Port 1 is intentionally closed: parsing must reach connection establishment.
+func TestAudioFFmpegRTSPOptions(t *testing.T) {
+	if _, err := exec.LookPath("ffmpeg"); err != nil {
+		t.Skip("FFmpeg is not installed")
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	output, err := audioCommand(ctx, "rtsp://127.0.0.1:1/compatibility-test").CombinedOutput()
+	if err == nil || !strings.Contains(string(output), "Connection refused") {
+		t.Fatalf("FFmpeg did not reach RTSP connection: %v %s", err, output)
 	}
 }

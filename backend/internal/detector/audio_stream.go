@@ -73,10 +73,14 @@ func readAudioWindows(ctx context.Context, input io.Reader, start time.Time, ses
 	}
 }
 
-func captureAudioStream(ctx context.Context, input string, queue chan audioWindow) error {
+func audioCommand(ctx context.Context, input string) *exec.Cmd {
 	// Keep the RTSP session open. TCP avoids silent holes caused by UDP loss;
-	// rw_timeout bounds an unresponsive camera without imposing a stream lifetime.
-	cmd := exec.CommandContext(ctx, "ffmpeg", "-nostdin", "-hide_banner", "-loglevel", "error", "-rtsp_transport", "tcp", "-rw_timeout", "15000000", "-i", input, "-map", "0:a:0", "-vn", "-ac", "1", "-ar", "16000", "-c:a", "pcm_f32le", "-f", "f32le", "pipe:1")
+	// timeout bounds an unresponsive camera without imposing a stream lifetime.
+	return exec.CommandContext(ctx, "ffmpeg", "-nostdin", "-hide_banner", "-loglevel", "error", "-rtsp_transport", "tcp", "-timeout", "15000000", "-i", input, "-map", "0:a:0", "-vn", "-ac", "1", "-ar", "16000", "-c:a", "pcm_f32le", "-f", "f32le", "pipe:1")
+}
+
+func captureAudioStream(ctx context.Context, input string, queue chan audioWindow) error {
+	cmd := audioCommand(ctx, input)
 	output, err := cmd.StdoutPipe()
 	if err != nil {
 		return fmt.Errorf("open audio pipe: %w", err)
