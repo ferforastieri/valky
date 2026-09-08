@@ -426,15 +426,23 @@ private fun ReadyCameraContent(camera: Camera, vm: CameraLiveViewModel) {
 
 @Composable
 private fun LivePlayer(controller: WhepLiveController, modifier: Modifier) {
-    AndroidView(
-        factory = { context -> SurfaceViewRenderer(context).apply {
-            layoutParams = ViewGroup.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT)
-            controller.bind(this)
-        } },
-        update = { controller.bind(it) },
-        onRelease = { controller.unbind(it) },
-        modifier = modifier,
-    )
+    val aspectRatio by controller.videoAspectRatio.collectAsStateWithLifecycle()
+    BoxWithConstraints(modifier, contentAlignment = Alignment.Center) {
+        val videoModifier = if (maxWidth / maxHeight > aspectRatio) {
+            Modifier.height(maxHeight).width(maxHeight * aspectRatio)
+        } else {
+            Modifier.width(maxWidth).height(maxWidth / aspectRatio)
+        }
+        AndroidView(
+            factory = { context -> SurfaceViewRenderer(context).apply {
+                layoutParams = ViewGroup.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT)
+                controller.bind(this)
+            } },
+            update = { controller.bind(it) },
+            onRelease = { controller.unbind(it) },
+            modifier = videoModifier,
+        )
+    }
 }
 
 @Composable
@@ -464,8 +472,9 @@ private fun FullscreenLivePlayer(controller: WhepLiveController,preview:android.
         activity?.requestedOrientation=ActivityInfo.SCREEN_ORIENTATION_FULL_SENSOR
         onDispose{if(previous!=null)activity.requestedOrientation=previous}
     }
-    var scale by remember { mutableFloatStateOf(1f) }
-    var offset by remember { mutableStateOf(Offset.Zero) }
+    val configuration = androidx.compose.ui.platform.LocalConfiguration.current
+    var scale by remember(configuration.screenWidthDp, configuration.screenHeightDp) { mutableFloatStateOf(1f) }
+    var offset by remember(configuration.screenWidthDp, configuration.screenHeightDp) { mutableStateOf(Offset.Zero) }
     Dialog(onDismissRequest = onDismiss, properties = DialogProperties(usePlatformDefaultWidth = false, decorFitsSystemWindows = false)) {
         Box(Modifier.fillMaxSize().background(Color.Black)) {
             Box(
@@ -484,7 +493,7 @@ private fun FullscreenLivePlayer(controller: WhepLiveController,preview:android.
                 },
             ) {
                 LivePlayer(controller, Modifier.fillMaxSize())
-                if(!rendered)preview?.let{Image(it.asImageBitmap(),null,Modifier.fillMaxSize(),contentScale=ContentScale.Crop)}
+                if(!rendered)preview?.let{Image(it.asImageBitmap(),null,Modifier.fillMaxSize(),contentScale=ContentScale.Fit)}
                 if(!rendered&&preview==null)CircularProgressIndicator(Modifier.align(Alignment.Center).size(30.dp),strokeWidth=2.dp,color=Color.White)
             }
             Text(

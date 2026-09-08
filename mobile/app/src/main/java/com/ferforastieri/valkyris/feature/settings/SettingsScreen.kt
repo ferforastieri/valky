@@ -110,6 +110,7 @@ fun SettingsScreen(main: MainViewModel, viewModel: SettingsViewModel = hiltViewM
         dndAllowed = dndAllowed,
         language = language,
         theme = theme,
+        locationAllowed = locationAllowed,
         retention = retention.value,
         onInvite = { showInvitation = true },
         onPermissions = { showPermissions = true },
@@ -196,6 +197,7 @@ fun SettingsContent(
     dndAllowed: Boolean,
     language: String,
     theme: String,
+    locationAllowed: Boolean = false,
     retention: RetentionSettings = RetentionSettings(),
     version: String = BuildConfig.VERSION_NAME,
     onInvite: () -> Unit = {},
@@ -212,7 +214,8 @@ fun SettingsContent(
             .padding(18.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-        val readyCount = listOf(notificationsAllowed, fullScreenAllowed, dndAllowed).count { it }
+        val permissions = listOf(notificationsAllowed, fullScreenAllowed, dndAllowed, locationAllowed)
+        val readyCount = permissions.count { it }
         if (admin) {
             SettingsCard(
                 Lucide.UserPlus,
@@ -223,7 +226,7 @@ fun SettingsContent(
         SettingsCard(
             Lucide.ShieldCheck,
             stringResource(R.string.permissions),
-            stringResource(R.string.permissions_summary, readyCount),
+            stringResource(R.string.permissions_summary, readyCount, permissions.size),
         ) { onPermissions() }
         SettingsCard(Lucide.Languages, stringResource(R.string.language), languageLabel(language), onClick = onLanguage)
         SettingsCard(Lucide.Moon, stringResource(R.string.theme), themeLabel(theme), onClick = onTheme)

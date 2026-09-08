@@ -49,7 +49,7 @@
     <string name="firebase_service_account">Firebase service account</string>
     <string name="upload_firebase_account">Upload Firebase account</string>
     <string name="permissions">Permissions</string>
-    <string name="permissions_summary">%1$d of 3 permissions active</string>
+    <string name="permissions_summary">%1$d of %2$d permissions active</string>
     <string name="language">Language</string>
     <string name="choose_language">Choose language</string>
     <string name="portuguese_brazil">Portuguese (Brazil)</string>

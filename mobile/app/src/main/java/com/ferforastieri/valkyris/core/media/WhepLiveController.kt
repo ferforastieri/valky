@@ -54,6 +54,8 @@ class WhepLiveController(
     private var video: VideoTrack? = null
     private var audio: AudioTrack? = null
     private var renderer: SurfaceViewRenderer? = null
+    private val _videoAspectRatio = kotlinx.coroutines.flow.MutableStateFlow(16f / 9f)
+    val videoAspectRatio: kotlinx.coroutines.flow.StateFlow<Float> = _videoAspectRatio
     private var job: Job? = null
     private var closed = false
     private var muted = false
@@ -80,9 +82,14 @@ class WhepLiveController(
             override fun onFirstFrameRendered() {
                 main.post { if (!closed) onFirstFrame() }
             }
-            override fun onFrameResolutionChanged(videoWidth: Int, videoHeight: Int, rotation: Int) = Unit
+            override fun onFrameResolutionChanged(videoWidth: Int, videoHeight: Int, rotation: Int) {
+                if (videoWidth > 0 && videoHeight > 0) {
+                    _videoAspectRatio.value = if (rotation % 180 == 0) videoWidth.toFloat() / videoHeight else videoHeight.toFloat() / videoWidth
+                }
+            }
         })
-        surface.setEnableHardwareScaler(true)
+        surface.setScalingType(org.webrtc.RendererCommon.ScalingType.SCALE_ASPECT_FIT)
+        surface.setEnableHardwareScaler(false)
         video?.addSink(surface)
     }
 
