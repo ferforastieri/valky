@@ -1,5 +1,7 @@
 package com.ferforastieri.valkyris.core.design
 
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
@@ -44,6 +46,7 @@ fun ValkyrisBottomSheet(
     onDismiss: () -> Unit,
     dismissEnabled: Boolean = true,
     swipeToDismissEnabled: Boolean = true,
+    scrollContent: Boolean = true,
     actions: (@Composable FlowRowScope.() -> Unit)? = null,
     content: @Composable ColumnScope.() -> Unit,
 ) {
@@ -77,7 +80,7 @@ fun ValkyrisBottomSheet(
                 )
             }
         }
-        Column(Modifier.fillMaxWidth().padding(horizontal = 20.dp), content = content)
+        Column(Modifier.weight(1f, fill = false).fillMaxWidth().then(if (scrollContent) Modifier.verticalScroll(rememberScrollState()) else Modifier).padding(horizontal = 20.dp), content = content)
         if (actions != null) {
             FlowRow(
                 modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 16.dp),

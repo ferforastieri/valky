@@ -76,7 +76,7 @@ func TestBrowserAdminCannotBeForged(t *testing.T) {
 	defer db.Close()
 	m := NewManager(db, time.Minute)
 	for _, admin := range []bool{false, true} {
-		session, err := m.issueBrowser(context.Background(), admin)
+		session, err := testBrowser(t, m, admin)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -100,4 +100,17 @@ func TestBrowserAdminCannotBeForged(t *testing.T) {
 			}
 		}
 	}
+}
+
+func testBrowser(t *testing.T, m *Manager, admin bool) (PairResponse, error) {
+	t.Helper()
+	device, err := m.insertDevice(context.Background(), "browser fixture", "Browser user", "pt-BR", admin)
+	if err != nil {
+		return PairResponse{}, err
+	}
+	var id string
+	if err = m.store.DB.QueryRow(`SELECT user_id FROM devices WHERE id=?`, device.DeviceID).Scan(&id); err != nil {
+		return PairResponse{}, err
+	}
+	return m.issueBrowserForUser(context.Background(), id, admin)
 }

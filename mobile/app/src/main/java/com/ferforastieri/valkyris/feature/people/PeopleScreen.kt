@@ -248,6 +248,7 @@ private fun AreaEditorSheet(
     val validRadius = radiusMeters != null && radiusMeters in 20.0..5000.0
 
     ValkyrisBottomSheet(
+        scrollContent = false,
         title = if (initial == null) "Cadastrar área" else "Editar área",
         onDismiss = onDismiss,
         dismissEnabled = !busy,
@@ -412,7 +413,7 @@ private fun AreasSheet(
 }
 
 @Composable
-internal fun HistorySheet(user: TrackedPerson, history: List<PersonLocation>, loading: Boolean = false, failed: Boolean = false, more: Boolean = false, onMore: () -> Unit = {}, onDismiss: () -> Unit) = ValkyrisBottomSheet(title = "Por onde ${user.name} passou", onDismiss = onDismiss) {
+internal fun HistorySheet(user: TrackedPerson, history: List<PersonLocation>, loading: Boolean = false, failed: Boolean = false, more: Boolean = false, onMore: () -> Unit = {}, onDismiss: () -> Unit) = ValkyrisBottomSheet(scrollContent = false, title = "Por onde ${user.name} passou", onDismiss = onDismiss) {
     LazyColumn(Modifier.fillMaxWidth().heightIn(max = LocalConfiguration.current.screenHeightDp.dp * .65f), contentPadding = PaddingValues(bottom = 16.dp)) {
         items(history, key = { it.id }) { point ->
             Row(Modifier.fillMaxWidth().height(IntrinsicSize.Min)) {

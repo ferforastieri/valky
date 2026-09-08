@@ -137,11 +137,11 @@ func (s *Server) Handler() http.Handler {
 	protected.HandleFunc("PATCH /cameras/{id}/live/webrtc/whep/{session}", s.liveWebRTC)
 	protected.HandleFunc("DELETE /cameras/{id}/live/webrtc/whep/{session}", s.liveWebRTC)
 	protected.HandleFunc("GET /detectors", s.detectors)
-	protected.HandleFunc("GET /rules", s.listRules)
-	protected.Handle("PUT /rules/{id}/recipients", s.auth.RequireAdmin(http.HandlerFunc(s.ruleRecipients)))
-	protected.HandleFunc("POST /rules", s.createRule)
-	protected.HandleFunc("PUT /rules/{id}", s.updateRule)
-	protected.HandleFunc("DELETE /rules/{id}", s.deleteRule)
+	protected.Handle("GET /rules", s.auth.RequireRules(false, http.HandlerFunc(s.listRules)))
+	protected.Handle("PUT /rules/{id}/recipients", s.auth.RequireRules(true, http.HandlerFunc(s.ruleRecipients)))
+	protected.Handle("POST /rules", s.auth.RequireRules(true, http.HandlerFunc(s.createRule)))
+	protected.Handle("PUT /rules/{id}", s.auth.RequireRules(true, http.HandlerFunc(s.updateRule)))
+	protected.Handle("DELETE /rules/{id}", s.auth.RequireRules(true, http.HandlerFunc(s.deleteRule)))
 	protected.HandleFunc("GET /people", s.listPeople)
 	protected.Handle("POST /people", s.auth.RequireAdmin(http.HandlerFunc(s.createPerson)))
 	protected.Handle("PUT /people/{id}", s.auth.RequireAdmin(http.HandlerFunc(s.updatePerson)))
@@ -153,7 +153,8 @@ func (s *Server) Handler() http.Handler {
 	protected.HandleFunc("GET /users/{id}/history", s.userHistory)
 	protected.HandleFunc("GET /me", s.currentUser)
 	protected.HandleFunc("PUT /me", s.updateCurrentUser)
-	protected.Handle("POST /me/password", s.auth.RequireAdmin(http.HandlerFunc(s.changeCurrentPassword)))
+	protected.HandleFunc("POST /me/password", s.changeCurrentPassword)
+	protected.HandleFunc("POST /me/credentials", s.changeCurrentPassword)
 	protected.HandleFunc("POST /me/location", s.reportMyLocation)
 	protected.HandleFunc("GET /places", s.listPlaces)
 	// Areas belong to the shared family map. Any authenticated family phone can
@@ -227,7 +228,7 @@ func (s *Server) login(w http.ResponseWriter, r *http.Request) {
 		writeError(w, 403, fmt.Errorf("invalid browser request"))
 		return
 	}
-	out, err := s.auth.LoginAdmin(r.Context(), in)
+	out, err := s.auth.Login(r.Context(), in)
 	if err != nil {
 		writeError(w, http.StatusUnauthorized, err)
 		return
@@ -691,15 +692,15 @@ func (s *Server) updateCurrentUser(w http.ResponseWriter, r *http.Request) {
 	respondWithMessage(w, out, err, "Family user updated successfully")
 }
 func (s *Server) changeCurrentPassword(w http.ResponseWriter, r *http.Request) {
-	var in changePasswordInput
+	var in auth.CredentialsRequest
 	if !decode(w, r, &in) {
 		return
 	}
-	if err := s.auth.ChangeAdminPassword(r.Context(), in.CurrentPassword, in.NewPassword); err != nil {
+	if err := s.auth.SaveCredentials(r.Context(), in); err != nil {
 		writeError(w, http.StatusBadRequest, err)
 		return
 	}
-	writeSuccess(w, http.StatusOK, "Home password changed successfully", map[string]bool{"changed": true})
+	writeSuccess(w, http.StatusOK, "Account credentials updated successfully", map[string]bool{"changed": true})
 }
 func (s *Server) updateUser(w http.ResponseWriter, r *http.Request) {
 	if s.trackingUnavailable(w) {

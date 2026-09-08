@@ -61,7 +61,7 @@ func (l *requestLimits) wrap(next http.Handler) http.Handler {
 		// origin budget; authenticated media also has a per-session budget.
 		allowed := l.allow("all", 3000, now) && l.allow("ip:"+ip, 1200, now)
 		path := r.URL.Path
-		if r.Method == "POST" && (path == "/api/v1/login" || path == "/api/v1/pair" || path == "/api/v1/admin/bootstrap") {
+		if r.Method == "POST" && (path == "/api/v1/login" || path == "/api/v1/pair" || path == "/api/v1/admin/bootstrap" || path == "/api/v1/me/credentials" || path == "/api/v1/me/password") {
 			r.Body = http.MaxBytesReader(w, r.Body, 8192)
 			allowed = allowed && l.allow("auth-global", 30, now) && l.allow("auth:"+ip, 10, now)
 		}

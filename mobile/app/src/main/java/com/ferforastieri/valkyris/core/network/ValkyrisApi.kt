@@ -36,6 +36,11 @@ data class ApiNotice(val message: String, val success: Boolean)
 class ValkyrisApi(
     private val session: () -> Session?,
 ) {
+    private val _permissionsLoaded = kotlinx.coroutines.flow.MutableStateFlow(false)
+    val permissionsLoaded: kotlinx.coroutines.flow.StateFlow<Boolean> = _permissionsLoaded
+    private val _permissions = kotlinx.coroutines.flow.MutableStateFlow(SessionPermissions())
+    val permissions: kotlinx.coroutines.flow.StateFlow<SessionPermissions> = _permissions
+    fun clearPermissions() { _permissions.value = SessionPermissions(); _permissionsLoaded.value = false }
     private val json = Json { ignoreUnknownKeys = true; explicitNulls = false; coerceInputValues = true }
     private val _notices = MutableSharedFlow<ApiNotice>(extraBufferCapacity = 32)
     val notices = _notices.asSharedFlow()
@@ -162,13 +167,13 @@ class ValkyrisApi(
         }
     }
 
-    suspend fun authStatus(baseUrl: String): AuthStatus = execute("") {
+    suspend fun authStatus(baseUrl: String, fingerprint: String = ""): AuthStatus = execute(fingerprint) {
         it.get(baseUrl.trimEnd('/') + "/api/v1/auth/status") {
             header(HttpHeaders.AcceptLanguage, Locale.getDefault().toLanguageTag())
         }
     }
 
-    suspend fun login(baseUrl: String, request: LoginRequest, bootstrap: Boolean = false): PairResponse = execute("") {
+    suspend fun login(baseUrl: String, request: LoginRequest, bootstrap: Boolean = false, fingerprint: String = ""): PairResponse = execute(fingerprint) {
         it.post(baseUrl.trimEnd('/') + if (bootstrap) "/api/v1/admin/bootstrap" else "/api/v1/login") {
             header(HttpHeaders.AcceptLanguage, Locale.getDefault().toLanguageTag())
             contentType(ContentType.Application.Json)
@@ -235,7 +240,8 @@ class ValkyrisApi(
 
     suspend fun updateRetention(settings: RetentionSettings): RetentionSettings = put("/settings/retention", settings, announceBackend = true)
 
-    suspend fun sessionPermissions(): SessionPermissions = get("/viewer-session")
+    suspend fun sessionPermissions(): SessionPermissions = get<SessionPermissions>("/viewer-session").also { _permissions.value = it; _permissionsLoaded.value = true }
+    suspend fun saveCredentials(username: String, password: String, currentPassword: String = ""): Map<String, Boolean> = post("/me/credentials", mapOf("username" to username, "newPassword" to password, "currentPassword" to currentPassword))
     suspend fun managedUsers(): List<ManagedUser> = get("/admin/users")
     suspend fun manageUser(user: ManagedUser): ManagedUser = put("/admin/users/${user.id}", user, announceBackend = true)
     suspend fun removeUser(id: String) {

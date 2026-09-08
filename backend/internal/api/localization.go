@@ -86,6 +86,14 @@ func localizedMessage(message string, success bool, language string) string {
 		return message
 	}
 	translations := map[string]string{
+		"use 3 to 40 letters, digits, dots, underscores or hyphens for username": "Use de 3 a 40 letras sem acento, números, ponto, hífen ou sublinhado no usuário.",
+		"password must contain at least 12 characters and at most 72 bytes":      "Use pelo menos 12 caracteres na senha. Se ela for muito longa, reduza o tamanho.",
+		"username unavailable": "Este usuário já está em uso.",
+		"username unavailable; sign in if you already have an account": "Este usuário já está em uso. Se a conta é sua, entre com seu usuário e senha.",
+		"current password is invalid":                                  "A senha atual está incorreta.",
+		"Account credentials updated successfully":                     "Credenciais da conta atualizadas com sucesso.",
+		"keep at least one active administrator":                       "Mantenha pelo menos um administrador ativo.",
+
 		"Valkyris is healthy":                     "Valkyris está saudável",
 		"Place created successfully":              "Área criada com sucesso",
 		"Place updated successfully":              "Área atualizada com sucesso",

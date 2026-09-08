@@ -12,10 +12,7 @@ import (
 	"time"
 )
 
-func (m *Manager) issueViewer(ctx context.Context) (PairResponse, error) {
-	return m.issueBrowser(ctx, false)
-}
-func (m *Manager) issueBrowser(ctx context.Context, admin bool) (PairResponse, error) {
+func (m *Manager) issueBrowserForUser(ctx context.Context, userID string, admin bool) (PairResponse, error) {
 	token, err := appcrypto.RandomToken(32)
 	if err != nil {
 		return PairResponse{}, err
@@ -26,12 +23,12 @@ func (m *Manager) issueBrowser(ctx context.Context, admin bool) (PairResponse, e
 		return PairResponse{}, err
 	}
 	id := uuid.NewString()
-	_, err = m.store.DB.ExecContext(ctx, `INSERT INTO viewer_sessions(id,token_hash,expires_at,created_at,is_admin) VALUES(?,?,?,?,?)`, id, appcrypto.Hash(token), now.Add(30*24*time.Hour).Format(time.RFC3339Nano), now.Format(time.RFC3339Nano), admin)
+	_, err = m.store.DB.ExecContext(ctx, `INSERT INTO viewer_sessions(id,token_hash,expires_at,created_at,user_id) VALUES(?,?,?,?,?)`, id, appcrypto.Hash(token), now.Add(30*24*time.Hour).Format(time.RFC3339Nano), now.Format(time.RFC3339Nano), userID)
 	return PairResponse{DeviceID: id, Token: token, ReadOnly: !admin, Admin: admin}, err
 }
 func (m *Manager) authenticateViewer(ctx context.Context, token string) (string, error) {
 	var id, expiry string
-	err := m.store.DB.QueryRowContext(ctx, `SELECT id,expires_at FROM viewer_sessions WHERE token_hash=?`, appcrypto.Hash(token)).Scan(&id, &expiry)
+	err := m.store.DB.QueryRowContext(ctx, `SELECT v.id,v.expires_at FROM viewer_sessions v JOIN users u ON u.id=v.user_id WHERE v.token_hash=? AND u.enabled=1`, appcrypto.Hash(token)).Scan(&id, &expiry)
 	if err != nil {
 		return "", err
 	}
@@ -81,7 +78,12 @@ func ViewerRequestSafe(r *http.Request) bool {
 func (m *Manager) ViewerSession(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	w.Header().Set("Cache-Control", "no-store")
-	json.NewEncoder(w).Encode(map[string]any{"success": true, "data": map[string]bool{"readOnly": !IsAdmin(r.Context()), "admin": IsAdmin(r.Context())}})
+	permissions, err := m.Permissions(r.Context())
+	if err != nil {
+		writeUnauthorized(w)
+		return
+	}
+	json.NewEncoder(w).Encode(map[string]any{"success": true, "data": permissions})
 }
 
 func (m *Manager) EndViewerSession(w http.ResponseWriter, r *http.Request) {
@@ -106,4 +108,14 @@ func browserAdminRequestAllowed(r *http.Request) bool {
 		return r.Method == "PUT"
 	}
 	return r.URL.Path == "/pairing-sessions" && r.Method == "POST"
+}
+
+// Mutations that are available to personal browser accounts still pass the
+// endpoint's authorization middleware and same-origin cookie checks.
+func browserAccountRequestAllowed(r *http.Request) bool {
+	if r.URL.Path == "/me/credentials" || r.URL.Path == "/me/password" {
+		return r.Method == "POST"
+	}
+	parts := strings.Split(strings.Trim(r.URL.Path, "/"), "/")
+	return len(parts) == 3 && parts[0] == "rules" && parts[1] != "" && parts[2] == "recipients" && r.Method == "PUT"
 }

@@ -53,7 +53,7 @@ fun ValkyrisTopBar(
                 modifier = Modifier.weight(1f),
                 style = MaterialTheme.typography.titleLarge,
                 fontWeight = FontWeight.SemiBold,
-                maxLines = 1,
+                maxLines = 3,
                 overflow = TextOverflow.Ellipsis,
             )
             Surface(
@@ -63,10 +63,10 @@ fun ValkyrisTopBar(
                 shadowElevation = 3.dp,
             ) {
                 Box {
-                    IconButton(onClick = onNotifications, modifier = Modifier.size(40.dp)) {
+                    IconButton(onClick = onNotifications, modifier = Modifier.size(48.dp)) {
                         Icon(
                             Lucide.Bell,
-                            contentDescription = null,
+                            contentDescription = "Notificações",
                             modifier = Modifier.size(20.dp),
                             tint = if (notificationsSelected) MaterialTheme.colorScheme.onSecondary else MaterialTheme.colorScheme.onSurface,
                         )

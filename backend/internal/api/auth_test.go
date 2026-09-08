@@ -30,7 +30,7 @@ func TestFirstUserCreatesAdministratorAndInvites(t *testing.T) {
 		t.Fatalf("unexpected initial status: %d %s", status.Code, status.Body.String())
 	}
 
-	credentials := auth.LoginRequest{Password: "a secure home password", DeviceName: "Pixel", Locale: "pt-BR"}
+	credentials := auth.LoginRequest{Username: "admin", Password: "a secure home password", DeviceName: "Pixel", Locale: "pt-BR"}
 	created := performJSON(t, handler, http.MethodPost, "/api/v1/admin/bootstrap", "", credentials)
 	if created.Code != http.StatusCreated {
 		t.Fatalf("bootstrap returned %d: %s", created.Code, created.Body.String())

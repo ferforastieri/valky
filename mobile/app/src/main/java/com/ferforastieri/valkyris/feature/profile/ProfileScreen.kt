@@ -58,6 +58,7 @@ import kotlinx.coroutines.withContext
 @Composable
 fun ProfileScreen(admin: Boolean, vm: ProfileViewModel = hiltViewModel()) {
     val current by vm.profile.collectAsStateWithLifecycle()
+    val permissions by vm.permissions.collectAsStateWithLifecycle()
     val saving by vm.saving.collectAsStateWithLifecycle()
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
@@ -108,9 +109,10 @@ fun ProfileScreen(admin: Boolean, vm: ProfileViewModel = hiltViewModel()) {
                 modifier = Modifier.fillMaxWidth(),
             ) { Text("Salvar perfil") }
 
-            if (admin) {
-            Text("Senha da casa", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold, modifier = Modifier.padding(top = 12.dp))
-            Text("Essa é a senha usada para entrar nesta instalação.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            run {
+            Text("Usuário: ${permissions.username}", style = MaterialTheme.typography.bodyMedium)
+            Text("Senha da sua conta", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold, modifier = Modifier.padding(top = 12.dp))
+            Text("Use seu usuário e esta senha para entrar em outro aparelho.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             OutlinedTextField(currentPassword, { currentPassword = it }, label = { Text("Senha atual") }, singleLine = true, visualTransformation = PasswordVisualTransformation(), modifier = Modifier.fillMaxWidth())
             OutlinedTextField(newPassword, { newPassword = it }, label = { Text("Nova senha") }, singleLine = true, visualTransformation = PasswordVisualTransformation(), modifier = Modifier.fillMaxWidth())
             OutlinedTextField(confirmation, { confirmation = it }, label = { Text("Confirmar nova senha") }, isError = confirmation.isNotEmpty() && confirmation != newPassword, singleLine = true, visualTransformation = PasswordVisualTransformation(), modifier = Modifier.fillMaxWidth())
@@ -191,7 +193,7 @@ private fun ProfilePhotoEditorSheet(
             Spacer(Modifier.height(14.dp))
             Text("Zoom", modifier = Modifier.align(Alignment.Start), style = MaterialTheme.typography.labelLarge)
             Slider(value = zoom, onValueChange = { zoom = it }, valueRange = 1f..4f)
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+            com.ferforastieri.valkyris.core.design.AdaptiveRow(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                 OutlinedButton(onClick = { rotation = (rotation - 90f) % 360f }) { Text("Girar à esquerda") }
                 OutlinedButton(onClick = { rotation = (rotation + 90f) % 360f }) { Text("Girar à direita") }
             }

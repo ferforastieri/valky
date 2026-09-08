@@ -155,7 +155,7 @@ function render() {
         `${people.filter((p) => p.lastLocatedAt).length} com localização`,
         "users",
       ],
-      ["Regras", rules.length, "Configuradas no aplicativo", "rule"],
+      ...(api.viewRules ? [["Regras", rules.length, "Configuradas no aplicativo", "rule"]] : []),
     ];
     content = `<div class="stats">${stats.map(([label, value, hint, ico]) => `<div class="stat"><div class="stat-label">${label}${icon(String(ico), "stat-icon")}</div><div class="stat-value">${value}</div><small>${hint}</small></div>`).join("")}</div><section class="activity-summary"><div class="section-title"><h2>Atividade registrada</h2><select id="activity-hours" aria-label="Período da atividade">${[12,24,36,48].map(h => `<option value="${h}" ${chartHours === h ? 'selected' : ''}>Últimas ${h} horas</option>`).join('')}</select></div><div id="activity-chart" class="panel panel-pad" aria-live="polite">Carregando atividade…</div></section><div class="section-title"><h2>Um olhar em casa</h2><a class="text-link" href="#cameras">Todas as câmeras →</a></div>${cameraGrid(cameras.slice(0, 3))}<div class="dashboard-bottom"><section><div class="section-title"><h2>Aconteceu por aqui</h2><a class="text-link" href="#events">Ver eventos →</a></div>${activity(events.slice(0, 5))}</section><section><div class="section-title"><h2>Família</h2><a class="text-link" href="#family">Abrir mapa →</a></div>${people.length ? members(people.slice(0, 3)) : empty("Aguardando a família", "Os aparelhos vinculados aparecerão aqui.")}</section></div>`;
   } else if (page === "cameras") content = cameraGrid(cameras);
@@ -388,14 +388,14 @@ async function cameraDetails(id: string) {
         ],
         ["Endereço", `${c.host}:${c.port}`],
       ],
-    )}<div class="section-title"><h2>Regras desta câmera</h2></div>${
+    )}${api.viewRules ? '<div class="section-title"><h2>Regras desta câmera</h2></div>' : ''}${
       rules
         .filter((r) => r.cameraId === id)
         .map(
           (r) =>
             `<button class="activity-row" data-rule="${e(r.id)}"><span class="tile-icon">${icon("rule")}</span><span class="activity-main"><strong>${e(r.name)}</strong><small>${e(schedule(r))}</small></span>${icon("arrow")}</button>`,
         )
-        .join("") || '<p class="muted">Nenhuma regra cadastrada.</p>'
+        .join("") || (api.viewRules ? '<p class="muted">Nenhuma regra cadastrada.</p>' : '')
     }`;
   let stop: () => void = () => {};
   const connect = () => {
@@ -544,7 +544,7 @@ async function ruleDetails(id: string) {
         ] as [string, string][])
       : []),
   ])}<div class="rule-actions">${actionPills(r)}</div>${r.motion ? `<div class="section-title"><h2>Região monitorada</h2></div><div class="media-stage"><img data-snapshot="${e(r.cameraId)}" alt="Região configurada na câmera" hidden/><span class="region" style="left:${r.motion.region.x * 100}%;top:${r.motion.region.y * 100}%;width:${r.motion.region.width * 100}%;height:${r.motion.region.height * 100}%"></span></div><p class="notice">A região corresponde ao enquadramento configurado. Movimento na região não identifica postura nem risco médico.</p>` : ""}`;
-  if(api.admin) {
+  if(api.editRules) {
  const selected=r.actions.recipientUserIds;
  $('#detail-body').insertAdjacentHTML('beforeend',`<form id="recipients" class="editor-section"><h3>Quem recebe alertas e notificações</h3><label><input type="checkbox" name="all" ${selected==null?'checked':''}> Toda a família</label>${people.map(p=>`<label class="setting-row"><input class="project-switch" type="checkbox" role="switch" name="recipient" value="${e(p.id)}" ${selected?.includes(p.id)?'checked':''}> ${e(p.name)}</label>`).join('')}<p class="muted">Sem pessoas selecionadas, ninguém recebe notificações desta regra.</p><button type="submit" class="primary">Salvar destinatários</button><p role="status"></p></form>`);
  const form=$<HTMLFormElement>('#recipients');
@@ -559,14 +559,22 @@ async function refresh(force = false) {
   if (refreshing || !api.token || document.hidden) return;
   refreshing = true;
   const token = api.token;
+  const connection = alive;
+  try {
+    const permissions = await api.get<{admin:boolean;viewRules:boolean;editRules:boolean}>("/viewer-session", alive.signal);
+    if (token !== api.token || connection !== alive) { refreshing = false; return; }
+    if ((api.viewRules && !permissions.viewRules) || (api.editRules && !permissions.editRules) || (api.admin && !permissions.admin)) dialog.close();
+    api.setPermissions(permissions);
+    if (!api.viewRules) rules = [];
+  } catch { refreshing = false; return; }
   const response = await Promise.allSettled([
     api.get<Camera[]>("/cameras", alive.signal),
     api.get<Event[]>("/events?limit=200", alive.signal),
     api.get<Person[]>("/users", alive.signal),
     api.get<Place[]>("/places", alive.signal),
-    api.get<Rule[]>("/rules", alive.signal),
+    api.viewRules ? api.get<Rule[]>("/rules", alive.signal) : Promise.resolve([]),
   ]);
-  if (token !== api.token) {
+  if (token !== api.token || connection !== alive) {
     refreshing = false;
     return;
   }
@@ -580,7 +588,7 @@ async function refresh(force = false) {
     if (i === 3) places = value as Place[];
     if (i === 4) rules = value as Rule[];
   });
-  const next = JSON.stringify([cameras, events, people, places, rules]);
+  const next = JSON.stringify([cameras, events, people, places, rules, api.admin, api.viewRules, api.editRules]);
   if (next !== signature || !hasLoaded || force) {
     signature = next;
     hasLoaded = true;
@@ -633,7 +641,7 @@ $("#login-form").addEventListener("submit", async (event) => {
   button.disabled = true;
   $("#login-error").hidden = true;
   try {
-    await api.login($<HTMLInputElement>("#password").value);
+    await api.login($<HTMLInputElement>("#username").value, $<HTMLInputElement>("#password").value);
     $<HTMLInputElement>("#password").value = "";
     enter();
   } catch (error) {
@@ -644,9 +652,11 @@ $("#login-form").addEventListener("submit", async (event) => {
     button.disabled = false;
   }
 });
-$("#logout").onclick = () => {
-  void api.logout();
-  leave();
+$("#logout").onclick = async () => {
+  const button = $<HTMLButtonElement>("#logout"); button.disabled = true;
+  try { await api.logout(); leave(); }
+  catch (error) { $("#global-error").hidden = false; $("#global-error").textContent = (error as Error).message; }
+  finally { button.disabled = false; }
 };
 $("#detail-close").onclick = () => dialog.close();
 dialog.addEventListener("close", closeDetails);
@@ -736,14 +746,18 @@ async function renderUsers() {
 function editUser(user: ManagedUser) {
   openDetails(user.name, 'GERENCIAR PESSOA');
   const body = $('#detail-body');
-  body.innerHTML = `<form id="user-editor" class="editor-form"><div class="editor-context"><span class="avatar">${e(user.name.slice(0,1).toUpperCase())}</span><div><strong>${e(user.name)}</strong><small>${user.devices} dispositivo(s) vinculado(s)</small></div></div><section class="editor-section"><h3>Perfil</h3><label class="field-label" for="user-name">Nome da pessoa</label><input id="user-name" name="name" value="${e(user.name)}" required maxlength="100" autocomplete="off"></section><section class="editor-section"><h3>Permissões</h3><label class="field-label" for="user-role">Papel no sistema</label><select id="user-role" name="admin"><option value="false" ${!user.admin ? 'selected' : ''}>Membro</option><option value="true" ${user.admin ? 'selected' : ''}>Administrador</option></select><p class="muted">Administradores podem gerenciar pessoas e configurações do sistema.</p><label class="setting-row"><span><strong>Acesso ao sistema</strong><small>Desativar bloqueia os dispositivos desta pessoa.</small></span><input class="project-switch" type="checkbox" role="switch" name="enabled" ${user.enabled ? 'checked' : ''}></label></section><p role="status" class="error" id="user-result"></p><div class="editor-footer"><button type="button" class="danger quiet" id="remove-user">Remover pessoa</button><button type="submit" class="primary">Salvar alterações</button></div><div id="remove-confirm" class="notice" hidden><p>Remover ${e(user.name)} e revogar o acesso dos seus dispositivos?</p><button type="button" class="danger" id="confirm-remove">Confirmar remoção</button><button type="button" class="quiet" id="cancel-remove">Cancelar</button></div></form>`;
+  body.innerHTML = `<form id="user-editor" class="editor-form"><div class="editor-context"><span class="avatar">${e(user.name.slice(0,1).toUpperCase())}</span><div><strong>${e(user.name)}</strong><small>${user.devices} dispositivo(s) vinculado(s)</small></div></div><section class="editor-section"><h3>Perfil</h3><label class="field-label" for="user-name">Nome da pessoa</label><input id="user-name" name="name" value="${e(user.name)}" required maxlength="100" autocomplete="off"></section><section class="editor-section"><h3>Permissões</h3><label class="field-label" for="user-role">Papel no sistema</label><select id="user-role" name="admin"><option value="false" ${!user.admin ? 'selected' : ''}>Membro</option><option value="true" ${user.admin ? 'selected' : ''}>Administrador</option></select><p class="muted">Administradores podem gerenciar pessoas e configurações do sistema.</p><label class="setting-row"><span><strong>Visualizar regras</strong><small>Consultar as regras das câmeras.</small></span><input class="project-switch" type="checkbox" name="viewRules" ${user.viewRules?'checked':''}></label><label class="setting-row"><span><strong>Editar regras</strong><small>Alterar regras e seus destinatários.</small></span><input class="project-switch" type="checkbox" name="editRules" ${user.editRules?'checked':''}></label><label class="setting-row"><span><strong>Acesso ao sistema</strong><small>Desativar bloqueia os dispositivos desta pessoa.</small></span><input class="project-switch" type="checkbox" role="switch" name="enabled" ${user.enabled ? 'checked' : ''}></label></section><section class="editor-section"><h3>${user.credentialsConfigured ? 'Redefinir acesso' : 'Configurar acesso'}</h3><label for="account-username">Usuário</label><input id="account-username" name="username" value="${e(user.username)}" autocomplete="off"><label for="account-password">Nova senha (opcional)</label><input id="account-password" name="password" type="password" minlength="12" maxlength="72" autocomplete="new-password"><p class="muted">Preencha a senha para definir as credenciais. As sessões desta pessoa serão encerradas.</p></section><p role="status" class="error" id="user-result"></p><div class="editor-footer"><button type="button" class="danger quiet" id="remove-user">Remover pessoa</button><button type="submit" class="primary">Salvar alterações</button></div><div id="remove-confirm" class="notice" hidden><p>Remover ${e(user.name)} e revogar o acesso dos seus dispositivos?</p><button type="button" class="danger" id="confirm-remove">Confirmar remoção</button><button type="button" class="quiet" id="cancel-remove">Cancelar</button></div></form>`;
   modalCleanups.push(styleSelects(body));
   const form = $<HTMLFormElement>('#user-editor');
+  const view = form.querySelector<HTMLInputElement>('[name=viewRules]')!;
+  const edit = form.querySelector<HTMLInputElement>('[name=editRules]')!;
+  view.onchange = () => { if (!view.checked) edit.checked = false; };
+  edit.onchange = () => { if (edit.checked) view.checked = true; };
   const run = async (remove: boolean) => {
     const buttons = Array.from(form.querySelectorAll('button')); buttons.forEach(button => button.disabled = true);
     try {
       const data = new FormData(form);
-      await api.mutate(`/admin/users/${key(user.id)}`, remove ? 'DELETE' : 'PUT', remove ? undefined : { name: String(data.get('name')).trim(), enabled: data.has('enabled'), admin: data.get('admin') === 'true' });
+      await api.mutate(`/admin/users/${key(user.id)}`, remove ? 'DELETE' : 'PUT', remove ? undefined : { name: String(data.get('name')).trim(), enabled: data.has('enabled'), admin: data.get('admin') === 'true', viewRules: data.has('viewRules'), editRules: data.has('editRules'), username: String(data.get('username')).trim(), password: String(data.get('password')) });
       if (form.isConnected) dialog.close();
       await renderUsers();
     } catch (error) { if (form.isConnected) $('#user-result').textContent = (error as Error).message; }

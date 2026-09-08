@@ -77,11 +77,11 @@ func TestEveryProtectedRouteRejectsAnonymous(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	member, err := m.Pair(context.Background(), auth.PairRequest{Code: session.Code, DeviceName: "Member"})
+	member, err := m.Pair(context.Background(), auth.PairRequest{Username: "member", Password: "member password 123", Code: session.Code, DeviceName: "Member"})
 	if err != nil {
 		t.Fatal(err)
 	}
-	for _, route := range []string{"GET /admin/users", "PUT /admin/users/other", "DELETE /admin/users/other", "POST /pairing-sessions", "POST /detections", "POST /cameras", "PUT /cameras/other", "DELETE /cameras/other", "PUT /settings/push", "PUT /settings/retention", "POST /system/update", "PUT /rules/other/recipients"} {
+	for _, route := range []string{"GET /rules", "POST /rules", "PUT /rules/other", "DELETE /rules/other", "GET /admin/users", "PUT /admin/users/other", "DELETE /admin/users/other", "POST /pairing-sessions", "POST /detections", "POST /cameras", "PUT /cameras/other", "DELETE /cameras/other", "PUT /settings/push", "PUT /settings/retention", "POST /system/update", "PUT /rules/other/recipients"} {
 		parts := strings.SplitN(route, " ", 2)
 		req := httptest.NewRequest(parts[0], "/api/v1"+parts[1], strings.NewReader(`{"isAdmin":true}`))
 		req.Header.Set("Authorization", "Bearer "+member.Token)

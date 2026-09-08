@@ -57,7 +57,9 @@ class ValkyrisRepository @Inject constructor(
     }
 
     suspend fun refreshRules(): List<Rule> {
-        return api.rules().also { _rules.value = it }
+        val allowed = api.sessionPermissions().viewRules
+        if (!allowed) { _rules.value = emptyList(); return emptyList() }
+        return try { api.rules().also { _rules.value = it } } catch (error: Exception) { _rules.value = emptyList(); throw error }
     }
 
     suspend fun acknowledge(eventId: String) {

@@ -17,14 +17,17 @@ func TestViewerLoginIsIsolatedAndReadOnly(t *testing.T) {
 	defer db.Close()
 	m := NewManager(db, time.Minute)
 	ctx := context.Background()
-	mobile, err := m.BootstrapAdmin(ctx, LoginRequest{Password: "password", DeviceName: "Phone"})
+	mobile, err := m.BootstrapAdmin(ctx, LoginRequest{Username: "admin", Password: "password 12345", DeviceName: "Phone"})
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err = m.LoginAdmin(ctx, LoginRequest{Password: "wrong", DeviceName: "Browser", ReadOnly: true}); err == nil {
+	if _, err = db.DB.Exec(`UPDATE users SET is_admin=0`); err != nil {
+		t.Fatal(err)
+	}
+	if _, err = m.Login(ctx, LoginRequest{Username: "admin", Password: "wrong", DeviceName: "Browser", ReadOnly: true}); err == nil {
 		t.Fatal("wrong password accepted")
 	}
-	viewer, err := m.LoginAdmin(ctx, LoginRequest{Password: "password", DeviceName: "Browser", ReadOnly: true})
+	viewer, err := m.Login(ctx, LoginRequest{Username: "admin", Password: "password 12345", DeviceName: "Browser", ReadOnly: true})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -72,7 +75,7 @@ func TestViewerLoginIsIsolatedAndReadOnly(t *testing.T) {
 	if _, err = m.authenticateViewer(ctx, viewer.Token); err == nil {
 		t.Fatal("logged out token accepted")
 	}
-	viewer, err = m.issueViewer(ctx)
+	viewer, err = testBrowser(t, m, false)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -91,8 +94,7 @@ func TestViewerCookieRenewalCSRFAndLogout(t *testing.T) {
 	}
 	defer db.Close()
 	m := NewManager(db, time.Minute)
-	ctx := context.Background()
-	v, err := m.issueViewer(ctx)
+	v, err := testBrowser(t, m, false)
 	if err != nil {
 		t.Fatal(err)
 	}

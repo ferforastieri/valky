@@ -63,7 +63,7 @@ func TestWHEPProxyAuthenticatesAndRewritesSessionLocation(t *testing.T) {
 		t.Fatal(err)
 	}
 	manager := auth.NewManager(database, 10*time.Minute)
-	session, err := manager.BootstrapAdmin(context.Background(), auth.LoginRequest{Password: "home", DeviceName: "phone"})
+	session, err := manager.BootstrapAdmin(context.Background(), auth.LoginRequest{Username: "admin", Password: "home password 123", DeviceName: "phone"})
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -22,11 +22,11 @@ func TestPairingIsOneTimeAndTokenAuthenticates(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	paired, err := manager.Pair(context.Background(), PairRequest{Code: strings.ToLower(session.Code), DeviceName: "Pixel", Locale: "en"})
+	paired, err := manager.Pair(context.Background(), PairRequest{Username: "member", Password: "member password 123", Code: strings.ToLower(session.Code), DeviceName: "Pixel", Locale: "en"})
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err = manager.Pair(context.Background(), PairRequest{Code: session.Code, DeviceName: "Again"}); err == nil {
+	if _, err = manager.Pair(context.Background(), PairRequest{Username: "member", Password: "member password 123", Code: session.Code, DeviceName: "Again"}); err == nil {
 		t.Fatal("one-time pairing code was accepted twice")
 	}
 	if id, err := manager.Authenticate(context.Background(), paired.Token); err != nil || id != paired.DeviceID {
@@ -67,7 +67,7 @@ func TestExpiredPairingCodeIsRejected(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err = manager.Pair(context.Background(), PairRequest{Code: session.Code, DeviceName: "Phone"}); err == nil {
+	if _, err = manager.Pair(context.Background(), PairRequest{Username: "member", Password: "member password 123", Code: session.Code, DeviceName: "Phone"}); err == nil {
 		t.Fatal("expired pairing code was accepted")
 	}
 }
@@ -83,17 +83,17 @@ func TestAdministratorLoginAndAuthorization(t *testing.T) {
 	if err != nil || initialized {
 		t.Fatalf("fresh installation has unexpected admin state: initialized=%v err=%v", initialized, err)
 	}
-	logged, err := manager.BootstrapAdmin(context.Background(), LoginRequest{Password: "correct horse battery staple", DeviceName: "Pixel", Locale: "pt-BR"})
+	logged, err := manager.BootstrapAdmin(context.Background(), LoginRequest{Username: "admin", Password: "correct horse battery staple", DeviceName: "Pixel", Locale: "pt-BR"})
 	if err != nil || !logged.Admin {
 		t.Fatalf("administrator bootstrap failed: response=%+v err=%v", logged, err)
 	}
-	if _, err = manager.BootstrapAdmin(context.Background(), LoginRequest{Password: "another secure password", DeviceName: "Other"}); err == nil {
+	if _, err = manager.BootstrapAdmin(context.Background(), LoginRequest{Username: "admin", Password: "another secure password", DeviceName: "Other"}); err == nil {
 		t.Fatal("second administrator bootstrap was accepted")
 	}
-	if _, err = manager.LoginAdmin(context.Background(), LoginRequest{Password: "wrong", DeviceName: "Pixel"}); err == nil {
+	if _, err = manager.Login(context.Background(), LoginRequest{Username: "admin", Password: "wrong", DeviceName: "Pixel"}); err == nil {
 		t.Fatal("wrong administrator password was accepted")
 	}
-	second, err := manager.LoginAdmin(context.Background(), LoginRequest{Password: "correct horse battery staple", DeviceName: "Tablet", Locale: "pt-BR"})
+	second, err := manager.Login(context.Background(), LoginRequest{Username: "admin", Password: "correct horse battery staple", DeviceName: "Tablet", Locale: "pt-BR"})
 	if err != nil || !second.Admin {
 		t.Fatalf("administrator login failed: response=%+v err=%v", second, err)
 	}
@@ -113,18 +113,15 @@ func TestAdministratorLoginAndAuthorization(t *testing.T) {
 	}
 }
 
-func TestAdministratorPasswordOnlyRequiresAValue(t *testing.T) {
-	db, err := store.Open(t.TempDir() + "/short-password.db")
+func TestShortPasswordIsRejected(t *testing.T) {
+	db, err := store.Open(t.TempDir() + "/password.db")
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer db.Close()
-	manager := NewManager(db, time.Minute)
-	if _, err = manager.BootstrapAdmin(context.Background(), LoginRequest{Password: "x", DeviceName: "Pixel"}); err != nil {
-		t.Fatalf("non-empty password was rejected: %v", err)
-	}
-	if err = manager.ChangeAdminPassword(context.Background(), "x", "y"); err != nil {
-		t.Fatalf("non-empty replacement password was rejected: %v", err)
+	m := NewManager(db, time.Minute)
+	if _, err = m.BootstrapAdmin(context.Background(), LoginRequest{Username: "admin", Password: "x", DeviceName: "Phone"}); err == nil {
+		t.Fatal("short password accepted")
 	}
 }
 
@@ -135,11 +132,11 @@ func TestAdministratorLoginReconnectsSamePhoneAndProfile(t *testing.T) {
 	}
 	defer db.Close()
 	manager := NewManager(db, time.Minute)
-	first, err := manager.BootstrapAdmin(context.Background(), LoginRequest{Password: "correct horse battery staple", DeviceName: "Pixel", UserName: "Fernando"})
+	first, err := manager.BootstrapAdmin(context.Background(), LoginRequest{Username: "admin", Password: "correct horse battery staple", DeviceName: "Pixel", UserName: "Fernando"})
 	if err != nil {
 		t.Fatal(err)
 	}
-	second, err := manager.LoginAdmin(context.Background(), LoginRequest{Password: "correct horse battery staple", DeviceName: "Pixel", UserName: "Fernando"})
+	second, err := manager.Login(context.Background(), LoginRequest{Username: "admin", Password: "correct horse battery staple", DeviceName: "Pixel", UserName: "Fernando"})
 	if err != nil {
 		t.Fatal(err)
 	}

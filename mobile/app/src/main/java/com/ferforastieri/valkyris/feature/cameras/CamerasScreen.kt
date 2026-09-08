@@ -176,7 +176,7 @@ fun CameraFailureSheet(camera:Camera,onDismiss:()->Unit,onEdit:(()->Unit)?=null,
             Text(stringResource(R.string.camera_icon),style=MaterialTheme.typography.labelLarge)
             Column(verticalArrangement=Arrangement.spacedBy(8.dp)){
                 cameraIconOptions.chunked(4).forEach { row ->
-                    Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.spacedBy(8.dp)){
+                    com.ferforastieri.valkyris.core.design.AdaptiveRow(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.spacedBy(8.dp)){
                         row.forEach { option -> CameraIconChoice(option,icon==option.value,{icon=option.value},Modifier.weight(1f)) }
                         repeat(4-row.size){Spacer(Modifier.weight(1f))}
                     }
@@ -393,7 +393,7 @@ private fun ReadyCameraContent(camera: Camera, vm: CameraLiveViewModel) {
         if(camera.capabilities.audio) actions += CameraActionItem(if(muted)Lucide.VolumeX else Lucide.Volume2,if(muted)stringResource(R.string.unmute) else stringResource(R.string.mute),{muted=!muted})
         actions += CameraActionItem(Lucide.Aperture,stringResource(R.string.snapshot),{runMediaAction(MediaAction.Snapshot)},snapshotLoading)
         actions += CameraActionItem(Lucide.Video,stringResource(R.string.record_recent),{runMediaAction(MediaAction.Recording)},recordingLoading)
-        Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.spacedBy(8.dp)) {
+        com.ferforastieri.valkyris.core.design.AdaptiveRow(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.spacedBy(8.dp)) {
             actions.forEach { action -> CameraAction(action.icon,action.label,action.onClick,Modifier.weight(1f),action.loading) }
         }
         if(camera.capabilities.ptz) {
@@ -516,7 +516,7 @@ private tailrec fun Context.findActivity(): Activity? = when (this) {
     is ContextWrapper -> baseContext.findActivity()
     else -> null
 }
-@Composable private fun CameraAction(icon:ImageVector,label:String,onClick:()->Unit,modifier:Modifier=Modifier,loading:Boolean=false){Surface(onClick=onClick,enabled=!loading,modifier=modifier.height(66.dp),shape=RoundedCornerShape(17.dp),color=MaterialTheme.colorScheme.surface,border=androidx.compose.foundation.BorderStroke(1.dp,MaterialTheme.colorScheme.outlineVariant),shadowElevation=3.dp){Column(Modifier.fillMaxSize(),horizontalAlignment=Alignment.CenterHorizontally,verticalArrangement=Arrangement.Center){if(loading)CircularProgressIndicator(Modifier.size(20.dp),strokeWidth=2.dp)else Icon(icon,label,Modifier.size(20.dp),tint=MaterialTheme.colorScheme.secondary);Spacer(Modifier.height(5.dp));Text(label,style=MaterialTheme.typography.labelSmall,fontWeight=FontWeight.Medium,maxLines=1)}}}
+@Composable private fun CameraAction(icon:ImageVector,label:String,onClick:()->Unit,modifier:Modifier=Modifier,loading:Boolean=false){Surface(onClick=onClick,enabled=!loading,modifier=modifier.heightIn(min=66.dp),shape=RoundedCornerShape(17.dp),color=MaterialTheme.colorScheme.surface,border=androidx.compose.foundation.BorderStroke(1.dp,MaterialTheme.colorScheme.outlineVariant),shadowElevation=3.dp){Column(Modifier.fillMaxWidth().padding(12.dp),horizontalAlignment=Alignment.CenterHorizontally,verticalArrangement=Arrangement.Center){if(loading)CircularProgressIndicator(Modifier.size(20.dp),strokeWidth=2.dp)else Icon(icon,label,Modifier.size(20.dp),tint=MaterialTheme.colorScheme.secondary);Spacer(Modifier.height(5.dp));Text(label,style=MaterialTheme.typography.labelSmall,fontWeight=FontWeight.Medium)}}}
 private enum class MediaAction { Snapshot, Recording }
 private data class CameraActionItem(val icon:ImageVector,val label:String,val onClick:()->Unit,val loading:Boolean=false)
 @Composable private fun PTZPad(vm:CameraLiveViewModel){Surface(Modifier.size(190.dp),CircleShape,color=MaterialTheme.colorScheme.surfaceVariant,border=androidx.compose.foundation.BorderStroke(1.dp,MaterialTheme.colorScheme.outlineVariant),tonalElevation=1.dp){Box(Modifier.fillMaxSize().padding(10.dp)){Surface(Modifier.size(72.dp).align(Alignment.Center),CircleShape,color=MaterialTheme.colorScheme.surface,border=androidx.compose.foundation.BorderStroke(1.dp,MaterialTheme.colorScheme.outlineVariant)){Box(contentAlignment=Alignment.Center){Icon(Lucide.Video,null,tint=MaterialTheme.colorScheme.secondary)}};PTZButton(Lucide.ChevronUp,stringResource(R.string.move_up),{vm.move(0.0,.65)},{vm.stop()},Modifier.align(Alignment.TopCenter));PTZButton(Lucide.ChevronLeft,stringResource(R.string.move_left),{vm.move(-.65,0.0)},{vm.stop()},Modifier.align(Alignment.CenterStart));PTZButton(Lucide.ChevronRight,stringResource(R.string.move_right),{vm.move(.65,0.0)},{vm.stop()},Modifier.align(Alignment.CenterEnd));PTZButton(Lucide.ChevronDown,stringResource(R.string.move_down),{vm.move(0.0,-.65)},{vm.stop()},Modifier.align(Alignment.BottomCenter))}}}

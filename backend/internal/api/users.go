@@ -18,6 +18,7 @@ func (s *Server) adminUpdateUser(w http.ResponseWriter, r *http.Request) {
 		writeError(w, 400, err)
 		return
 	}
+	in.Password = ""
 	writeSuccess(w, 200, "User updated successfully", in)
 }
 func (s *Server) adminDeleteUser(w http.ResponseWriter, r *http.Request) {

@@ -56,7 +56,7 @@ func TestCameraCreationContinuesAsynchronously(t *testing.T) {
 		t.Fatal(err)
 	}
 	authManager := auth.NewManager(database, 10*time.Minute)
-	session, err := authManager.BootstrapAdmin(context.Background(), auth.LoginRequest{Password: "a secure home password", DeviceName: "test"})
+	session, err := authManager.BootstrapAdmin(context.Background(), auth.LoginRequest{Username: "admin", Password: "a secure home password", DeviceName: "test"})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -136,7 +136,7 @@ func TestCameraCreationPersistsProbeFailure(t *testing.T) {
 		t.Fatal(err)
 	}
 	authManager := auth.NewManager(database, 10*time.Minute)
-	session, err := authManager.BootstrapAdmin(context.Background(), auth.LoginRequest{Password: "a secure home password", DeviceName: "test"})
+	session, err := authManager.BootstrapAdmin(context.Background(), auth.LoginRequest{Username: "admin", Password: "a secure home password", DeviceName: "test"})
 	if err != nil {
 		t.Fatal(err)
 	}

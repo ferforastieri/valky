@@ -124,7 +124,7 @@ fun OverviewContent(
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         item {
-            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+            com.ferforastieri.valkyris.core.design.AdaptiveRow(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                 MetricCard(Lucide.Camera, cameras.size.toString(), stringResource(R.string.cameras), Modifier.weight(1f), onClick = onCameras, accent = true)
                 MetricCard(Lucide.UserRound, trackedPeople.toString(), stringResource(R.string.people), Modifier.weight(1f), onClick = onPeople)
                 MetricCard(Lucide.Bell, pending.toString(), stringResource(R.string.pending_alerts), Modifier.weight(1f), onClick = onEvents, alarm = pending > 0)
@@ -201,7 +201,7 @@ private fun MetricCard(icon: androidx.compose.ui.graphics.vector.ImageVector, va
             Icon(icon, null, Modifier.size(18.dp), tint = when { alarm -> MaterialTheme.colorScheme.error; accent -> MaterialTheme.colorScheme.secondary; else -> MaterialTheme.colorScheme.onSurfaceVariant })
             Spacer(Modifier.height(10.dp))
             Text(value, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold)
-            Text(label, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1)
+            Text(label, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
     }
 }

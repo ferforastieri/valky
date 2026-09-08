@@ -85,12 +85,12 @@ Depois:
 
 1. Instale o APK da [última release](https://github.com/ferforastieri/valkyris/releases/latest).
 2. Abra o app e informe a URL HTTPS pela qual o celular alcança o servidor.
-3. No primeiro acesso, crie a senha da casa; esse dispositivo se torna administrador.
+3. No primeiro acesso, crie a conta com usuário e senha; esse dispositivo se torna administrador.
 4. Cadastre a câmera com nome, ícone, IP, usuário e senha. Para Tapo, o RTSP principal é montado automaticamente.
 
 Para acessar de fora de casa, use uma VPN como Tailscale ou WireGuard, ou publique o HTTPS por proxy/túnel. O Cloudflare Tunnel transporta a API e a negociação WHEP, mas não a mídia WebRTC: o cliente precisa alcançar a porta 8189 UDP/TCP por LAN, VPN ou outra rota ICE configurada. O instalador preserva VALKYRIS_WEBRTC_HOSTS com o endereço do servidor; não use o domínio do túnel como endereço de mídia. Veja [conectividade WebRTC](docs/webrtc-connectivity.md).
 
-Abra https://SEU_SERVIDOR/app/ e entre com a senha da casa para consultar o painel. Regras ficam nos detalhes da câmera; áreas e percursos ficam em Família. O painel não permite PTZ, edição, marcar eventos como lidos ou atualizar o servidor.
+Abra https://SEU_SERVIDOR/app/ e entre com seu usuário e senha para consultar o painel. Regras ficam nos detalhes da câmera; áreas e percursos ficam em Família. O painel permite gestão de usuários e convites para administradores e edição de destinatários para quem tem permissão; PTZ, edição completa das regras, marcar eventos como lidos e atualizar o servidor continuam no Android.
 
 ## Rodar para desenvolvimento
 
@@ -291,3 +291,9 @@ Veja também o [registro da revisão 2.0](docs/review-2.0.md).
 ## Licença
 
 Distribuído sob a [licença MIT](LICENSE). © 2026 Fernando Forastieri.
+
+### Contas e acessibilidade
+
+Cada pessoa possui usuário e senha próprios. O QR Code é um convite de uso único para o primeiro cadastro; acessos seguintes reutilizam a conta, inclusive em outro aparelho. Administradores controlam quem visualiza e quem edita regras e podem redefinir credenciais. Consulte [a migração das contas existentes](docs/security-access.md#migração-de-instalações-existentes) antes de atualizar uma instalação que ainda usa senha compartilhada.
+
+O Android respeita a escala de fontes do sistema: cards e ações se reorganizam em telas estreitas ou com texto ampliado, e os sheets permitem rolagem sem esconder as ações. Há testes de interface com fonte em 200%.

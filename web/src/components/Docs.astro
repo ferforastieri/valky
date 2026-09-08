@@ -33,8 +33,8 @@ const endpoints = pt ? [
   ['GET','/health','Público','Saúde do servidor.'],
   ['GET','/openapi.yaml','Público','Contrato OpenAPI 3.1 servido pelo backend.'],
   ['GET','/api/v1/auth/status','Público','Informa se o primeiro administrador já existe.'],
-  ['POST','/api/v1/admin/bootstrap','Público','Cria a senha da casa e o primeiro administrador, uma única vez.'],
-  ['POST','/api/v1/login','Público','Troca a senha da casa por um token de dispositivo.'],
+  ['POST','/api/v1/admin/bootstrap','Público','Cria a conta com usuário e senha e o primeiro administrador, uma única vez.'],
+  ['POST','/api/v1/login','Público','Autentica uma conta pessoal sem recriar o perfil.'],
   ['POST','/api/v1/pair','Público','Consome um convite de uso único.'],
   ['POST','/api/v1/pairing-sessions','Admin','Cria um convite temporário para outro celular.'],
   ['GET · POST','/api/v1/cameras','Autenticado','Lista câmeras ou inicia o cadastro assíncrono.'],
@@ -53,7 +53,7 @@ const endpoints = pt ? [
   ['GET · POST','/api/v1/places','Autenticado / Admin ao alterar','Lista áreas ou cria uma área de alerta.'],
   ['PUT · DELETE','/api/v1/places/{id}','Admin','Edita ou remove uma área.'],
   ['GET · PUT','/api/v1/me','Autenticado','Consulta ou atualiza o perfil do próprio dispositivo.'],
-  ['POST','/api/v1/me/password','Admin','Troca a senha da casa e revoga as sessões web.'],
+  ['POST','/api/v1/me/password','Usuário','Altera a própria senha e revoga as outras sessões.'],
   ['GET · DELETE','/api/v1/viewer-session','Sessão web','Restaura ou revoga a sessão do painel.'],
   ['GET','/api/v1/events','Autenticado','Lista eventos recentes.'],
   ['GET','/api/v1/events/{id}','Autenticado','Retorna metadados de um evento.'],
@@ -71,8 +71,8 @@ const endpoints = pt ? [
   ['GET','/health','Public','Server health.'],
   ['GET','/openapi.yaml','Public','OpenAPI 3.1 contract served by the backend.'],
   ['GET','/api/v1/auth/status','Public','Reports whether the first administrator exists.'],
-  ['POST','/api/v1/admin/bootstrap','Public','Creates the home password and first administrator once.'],
-  ['POST','/api/v1/login','Public','Exchanges the home password for a device token.'],
+  ['POST','/api/v1/admin/bootstrap','Public','Creates the personal username and password and first administrator once.'],
+  ['POST','/api/v1/login','Public','Exchanges the personal username and password for a device token.'],
   ['POST','/api/v1/pair','Public','Consumes a single-use invitation.'],
   ['POST','/api/v1/pairing-sessions','Admin','Creates a temporary invitation for another phone.'],
   ['GET · POST','/api/v1/cameras','Authenticated','Lists cameras or starts asynchronous setup.'],
@@ -91,7 +91,7 @@ const endpoints = pt ? [
   ['GET · POST','/api/v1/places','Authenticated / Admin to change','Lists areas or creates an alert area.'],
   ['PUT · DELETE','/api/v1/places/{id}','Admin','Edits or removes an area.'],
   ['GET · PUT','/api/v1/me','Authenticated','Reads or updates this device owner profile.'],
-  ['POST','/api/v1/me/password','Admin','Changes the home password and revokes browser sessions.'],
+  ['POST','/api/v1/me/password','User','Changes the personal password and revokes other sessions.'],
   ['GET · DELETE','/api/v1/viewer-session','Browser session','Restores or revokes the dashboard session.'],
   ['GET','/api/v1/events','Authenticated','Lists recent events.'],
   ['GET','/api/v1/events/{id}','Authenticated','Returns event metadata.'],
@@ -161,7 +161,7 @@ const endpoints = pt ? [
 
         <section id="android">
           <div class="docs-heading"><Smartphone size={22}/><div><span>04</span><h2>Android</h2></div></div>
-          <p>{pt ? 'Instale o APK da release mais recente. No primeiro acesso, informe a URL HTTPS pela qual o celular alcança o servidor e crie a senha da casa. O primeiro dispositivo vira administrador.' : 'Install the APK from the latest release. On first access, enter the HTTPS URL through which the phone reaches the server and create the home password. The first device becomes administrator.'}</p>
+          <p>{pt ? 'Instale o APK da release mais recente. No primeiro acesso, informe a URL HTTPS pela qual o celular alcança o servidor e crie a conta com usuário e senha. O primeiro dispositivo vira administrador.' : 'Install the APK from the latest release. On first access, enter the HTTPS URL through which the phone reaches the server and create the personal username and password. The first device becomes administrator.'}</p>
           <div class="docs-actions"><a class="button dark" href="https://github.com/ferforastieri/valkyris/releases/latest"><Download size={17}/>{pt ? 'Baixar APK' : 'Download APK'}</a><a class="button quiet" href="https://github.com/ferforastieri/valkyris/releases"><ExternalLink size={17}/>{pt ? 'Todas as releases' : 'All releases'}</a></div>
           <h3>{pt ? 'Outros celulares' : 'Other phones'}</h3>
           <p>{pt ? 'Em Ajustes, o administrador cria um convite temporário e de uso único. O QR é montado dentro do app com a URL já conhecida; o backend não possui página pública de pareamento.' : 'In Settings, the administrator creates a temporary, single-use invitation. The QR is assembled inside the app using the known server URL; the backend has no public pairing page.'}</p>
@@ -178,7 +178,7 @@ const endpoints = pt ? [
 
         <section id="viewer">
           <div class="docs-heading"><Network size={22}/><div><h2>{pt ? 'Painel web no seu servidor' : 'Web dashboard on your server'}</h2></div></div>
-          <p>{pt ? 'Abra /app/ na URL HTTPS da instalação e use a senha da casa. O painel consulta câmeras ao vivo, eventos, família, percursos e informações do servidor. Regras ficam dentro da câmera e áreas em Família. Edição, PTZ, marcar como lido e atualizações continuam no aplicativo.' : 'Open /app/ at your installation HTTPS URL and use the home password. The dashboard displays live cameras, events, family, routes and server information. Rules live inside camera details and areas under Family. Editing, PTZ, marking events as read and updates remain in the app.'}</p>
+          <p>{pt ? 'Abra /app/ na URL HTTPS da instalação e use seu usuário e senha. O painel consulta câmeras ao vivo, eventos, família, percursos e informações do servidor. Regras ficam dentro da câmera e áreas em Família. Edição, PTZ, marcar como lido e atualizações continuam no aplicativo.' : 'Open /app/ at your installation HTTPS URL and use the personal username and password. The dashboard displays live cameras, events, family, routes and server information. Rules live inside camera details and areas under Family. Editing, PTZ, marking events as read and updates remain in the app.'}</p>
           <p>{pt ? 'A sessão usa cookie Secure, HttpOnly e SameSite=Strict, válido por 30 dias e renovado durante o uso. Sair ou trocar a senha revoga a sessão. O painel vem na imagem Docker e não exige Node nem deploy na Vercel. Dados são consultados a cada 15 segundos com a aba visível.' : 'Sessions use a Secure, HttpOnly, SameSite=Strict cookie, valid for 30 days and renewed during use. Logout or password changes revoke sessions. The dashboard ships in the Docker image and requires neither Node nor Vercel deployment. Data refreshes every 15 seconds while the tab is visible.'}</p>
           <h3>WebRTC · Cloudflare Tunnel</h3>
           <p>{pt ? 'Android e painel usam os mesmos endpoints WHEP. O túnel leva HTTPS e a negociação, mas áudio e vídeo precisam alcançar o MediaMTX por ICE. Libere 8189 UDP/TCP na rede privada e configure VALKYRIS_WEBRTC_HOSTS com endereços LAN/VPN alcançáveis. O domínio do túnel não é endereço de mídia. STUN pode auxiliar conexão direta; NAT restritivo exige VPN, rota pública de mídia ou TURN configurado.' : 'Android and the dashboard use the same WHEP endpoints. The tunnel carries HTTPS and signaling, but audio and video must reach MediaMTX through ICE. Allow 8189 UDP/TCP on the private network and set VALKYRIS_WEBRTC_HOSTS to reachable LAN/VPN addresses. The tunnel hostname is not a media address. STUN can assist direct connections; restrictive NAT requires VPN, a public media route or configured TURN.'}</p>

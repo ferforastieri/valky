@@ -16,9 +16,9 @@ import kotlinx.serialization.json.JsonElement
 @Serializable data class RuleUpsertRequest(val cameraId:String,val name:String,val detectorTypes:List<String>,val actions:RuleActionsRequest,val schedule:RuleSchedule=RuleSchedule(),val motion:MotionSettings?=null,val cooldownSeconds:Int=60,val confirmations:Int=1)
 @Serializable data class DetectorKind(val id:String,val label:String,val source:String)
 @Serializable data class AuthStatus(val initialized:Boolean)
-@Serializable data class LoginRequest(val password:String,val deviceName:String,val userName:String="",val locale:String)
+@Serializable data class LoginRequest(val password:String,val deviceName:String,val userName:String="",val locale:String,val username:String="")
 @Serializable data class ChangePasswordRequest(val currentPassword:String,val newPassword:String)
-@Serializable data class PairRequest(val code:String,val deviceName:String,val userName:String="",val locale:String)
+@Serializable data class PairRequest(val code:String,val deviceName:String,val userName:String="",val locale:String,val username:String="",val password:String="")
 @Serializable data class PairResponse(val deviceId:String,val token:String,val admin:Boolean=false)
 @Serializable data class PairingSession(val id:String,val code:String,val expiresAt:String)
 @Serializable data class PTZCommand(val action:String,val pan:Double=0.0,val tilt:Double=0.0,val zoom:Double=0.0)
@@ -41,6 +41,6 @@ import kotlinx.serialization.json.JsonElement
 
 @Serializable data class LocationReport(val latitude: Double, val longitude: Double, val accuracy: Double, val occurredAt: String)
 
-@Serializable data class ManagedUser(val id:String="",val name:String,val enabled:Boolean=true,val admin:Boolean=false,val devices:Int=0)
+@Serializable data class ManagedUser(val id:String="",val name:String,val enabled:Boolean=true,val admin:Boolean=false,val devices:Int=0,val username:String="",val credentialsConfigured:Boolean=false,val viewRules:Boolean=false,val editRules:Boolean=false,val password:String="")
 
-@Serializable data class SessionPermissions(val admin:Boolean=false,val readOnly:Boolean=false)
+@Serializable data class SessionPermissions(val admin:Boolean=false,val readOnly:Boolean=false,val viewRules:Boolean=false,val editRules:Boolean=false,val username:String="",val credentialsConfigured:Boolean=false)

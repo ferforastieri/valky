@@ -16,6 +16,7 @@ class ProfileViewModel @Inject constructor(
     private val repository: ValkyrisRepository,
     private val actionGate: MobileActionGate,
 ) : ViewModel() {
+    val permissions = repository.api.permissions
     val profile = repository.me
     private val _saving = MutableStateFlow(false)
     val saving = _saving.asStateFlow()

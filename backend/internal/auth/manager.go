@@ -35,6 +35,7 @@ type PairingSession struct {
 }
 
 type LoginRequest struct {
+	Username     string `json:"username"`
 	BrowserAdmin bool   `json:"browserAdmin,omitempty"`
 	ReadOnly     bool   `json:"readOnly,omitempty"`
 	Password     string `json:"password"`
@@ -44,6 +45,8 @@ type LoginRequest struct {
 }
 
 type PairRequest struct {
+	Username   string `json:"username"`
+	Password   string `json:"password"`
 	Code       string `json:"code"`
 	DeviceName string `json:"deviceName"`
 	UserName   string `json:"userName"`
@@ -57,35 +60,13 @@ type PairResponse struct {
 	Admin    bool   `json:"admin"`
 }
 
-func (m *Manager) ChangeAdminPassword(ctx context.Context, currentPassword, newPassword string) error {
-	if strings.TrimSpace(newPassword) == "" {
-		return fmt.Errorf("password is required")
-	}
-	var encoded string
-	if err := m.store.DB.QueryRowContext(ctx, `SELECT value FROM settings WHERE key='admin_password_hash'`).Scan(&encoded); err != nil {
-		return err
-	}
-	if bcrypt.CompareHashAndPassword([]byte(encoded), []byte(currentPassword)) != nil {
-		return fmt.Errorf("current password is invalid")
-	}
-	hash, err := bcrypt.GenerateFromPassword([]byte(newPassword), bcrypt.DefaultCost)
-	if err != nil {
-		return err
-	}
-	_, err = m.store.DB.ExecContext(ctx, `UPDATE settings SET value=?,updated_at=? WHERE key='admin_password_hash'`, string(hash), time.Now().UTC().Format(time.RFC3339Nano))
-	if err == nil {
-		_, err = m.store.DB.ExecContext(ctx, `DELETE FROM viewer_sessions`)
-	}
-	return err
-}
-
 func NewManager(s *store.Store, lifetime time.Duration) *Manager {
 	return &Manager{store: s, lifetime: lifetime}
 }
 
 func (m *Manager) AdminInitialized(ctx context.Context) (bool, error) {
 	var value string
-	err := m.store.DB.QueryRowContext(ctx, `SELECT value FROM settings WHERE key='admin_password_hash'`).Scan(&value)
+	err := m.store.DB.QueryRowContext(ctx, `SELECT value FROM settings WHERE key IN ('admin_initialized','admin_password_hash')`).Scan(&value)
 	if err == sql.ErrNoRows {
 		return false, nil
 	}
@@ -93,6 +74,9 @@ func (m *Manager) AdminInitialized(ctx context.Context) (bool, error) {
 }
 
 func (m *Manager) BootstrapAdmin(ctx context.Context, req LoginRequest) (PairResponse, error) {
+	if err := validateCredentials(req.Username, req.Password); err != nil {
+		return PairResponse{}, err
+	}
 	if strings.TrimSpace(req.Password) == "" {
 		return PairResponse{}, fmt.Errorf("password is required")
 	}
@@ -104,12 +88,19 @@ func (m *Manager) BootstrapAdmin(ctx context.Context, req LoginRequest) (PairRes
 		return PairResponse{}, err
 	}
 	defer tx.Rollback()
+	var initialized int
+	if err := tx.QueryRowContext(ctx, `SELECT count(*) FROM settings WHERE key IN ('admin_initialized','admin_password_hash')`).Scan(&initialized); err != nil {
+		return PairResponse{}, err
+	}
+	if initialized > 0 {
+		return PairResponse{}, fmt.Errorf("administrator is already configured")
+	}
 	now := time.Now().UTC().Format(time.RFC3339Nano)
 	passwordHash, err := bcrypt.GenerateFromPassword([]byte(req.Password), bcrypt.DefaultCost)
 	if err != nil {
 		return PairResponse{}, err
 	}
-	result, err := tx.ExecContext(ctx, `INSERT OR IGNORE INTO settings(key,value,updated_at) VALUES('admin_password_hash',?,?)`, string(passwordHash), now)
+	result, err := tx.ExecContext(ctx, `INSERT OR IGNORE INTO settings(key,value,updated_at) VALUES('admin_initialized',?,?)`, "true", now)
 	if err != nil {
 		return PairResponse{}, err
 	}
@@ -120,54 +111,30 @@ func (m *Manager) BootstrapAdmin(ctx context.Context, req LoginRequest) (PairRes
 	if err != nil {
 		return PairResponse{}, err
 	}
+	if _, err = tx.ExecContext(ctx, `UPDATE users SET username=?,password_hash=?,is_admin=1 WHERE id=(SELECT user_id FROM devices WHERE id=?)`, normalizeUsername(req.Username), string(passwordHash), response.DeviceID); err != nil {
+		return PairResponse{}, err
+	}
 	if err = tx.Commit(); err != nil {
 		return PairResponse{}, err
 	}
 	return response, nil
 }
 
-func (m *Manager) LoginAdmin(ctx context.Context, req LoginRequest) (PairResponse, error) {
-	var encoded string
-	err := m.store.DB.QueryRowContext(ctx, `SELECT value FROM settings WHERE key='admin_password_hash'`).Scan(&encoded)
-	if req.Password == "" || req.DeviceName == "" || err != nil ||
-		bcrypt.CompareHashAndPassword([]byte(encoded), []byte(req.Password)) != nil {
+func (m *Manager) Login(ctx context.Context, req LoginRequest) (PairResponse, error) {
+	var id, encoded string
+	var admin bool
+	err := m.store.DB.QueryRowContext(ctx, `SELECT id,password_hash,is_admin FROM users WHERE username=? AND enabled=1`, normalizeUsername(req.Username)).Scan(&id, &encoded, &admin)
+	if err != nil {
+		encoded = dummyPasswordHash
+	}
+	valid := bcrypt.CompareHashAndPassword([]byte(encoded), []byte(req.Password)) == nil
+	if err != nil || !valid || req.Username == "" || req.DeviceName == "" {
 		return PairResponse{}, fmt.Errorf("invalid credentials")
 	}
 	if req.ReadOnly || req.BrowserAdmin {
-		return m.issueBrowser(ctx, req.BrowserAdmin)
+		return m.issueBrowserForUser(ctx, id, admin)
 	}
-	// A phone can lose its local session during an app reinstall. Reuse the
-	// matching administrator device/profile and rotate its token instead of
-	// creating a second family member with the same phone and name.
-	return m.reconnectAdminDevice(ctx, req.DeviceName, req.UserName, req.Locale)
-}
-
-func (m *Manager) reconnectAdminDevice(ctx context.Context, name, userName, locale string) (PairResponse, error) {
-	if userName == "" {
-		userName = name
-	}
-	if locale == "" {
-		locale = "pt-BR"
-	}
-	var deviceID string
-	err := m.store.DB.QueryRowContext(ctx, `SELECT d.id FROM devices d JOIN users u ON u.id=d.user_id
-		WHERE d.enabled=1 AND d.is_admin=1 AND d.name=? AND u.name=?
-		ORDER BY d.last_seen_at DESC LIMIT 1`, name, userName).Scan(&deviceID)
-	if err == sql.ErrNoRows {
-		return m.insertDevice(ctx, name, userName, locale, true)
-	}
-	if err != nil {
-		return PairResponse{}, err
-	}
-	token, err := appcrypto.RandomToken(32)
-	if err != nil {
-		return PairResponse{}, err
-	}
-	_, err = m.store.DB.ExecContext(ctx, `UPDATE devices SET token_hash=?,locale=?,last_seen_at=? WHERE id=?`, appcrypto.Hash(token), locale, time.Now().UTC().Format(time.RFC3339Nano), deviceID)
-	if err != nil {
-		return PairResponse{}, err
-	}
-	return PairResponse{DeviceID: deviceID, Token: token, Admin: true}, nil
+	return m.accountDevice(ctx, id, req.DeviceName, req.Locale, admin)
 }
 
 func (m *Manager) CreatePairing(ctx context.Context) (PairingSession, error) {
@@ -183,6 +150,9 @@ func (m *Manager) CreatePairing(ctx context.Context) (PairingSession, error) {
 }
 
 func (m *Manager) Pair(ctx context.Context, req PairRequest) (PairResponse, error) {
+	if err := validateCredentials(req.Username, req.Password); err != nil {
+		return PairResponse{}, err
+	}
 	if req.Code == "" || req.DeviceName == "" {
 		return PairResponse{}, fmt.Errorf("code and deviceName are required")
 	}
@@ -218,6 +188,10 @@ func (m *Manager) Pair(ctx context.Context, req PairRequest) (PairResponse, erro
 		return PairResponse{}, fmt.Errorf("invalid or expired pairing code")
 	}
 
+	passwordHash, err := bcrypt.GenerateFromPassword([]byte(req.Password), bcrypt.DefaultCost)
+	if err != nil {
+		return PairResponse{}, err
+	}
 	now := time.Now().UTC().Format(time.RFC3339Nano)
 	tx, err := m.store.DB.BeginTx(ctx, nil)
 	if err != nil {
@@ -228,7 +202,10 @@ func (m *Manager) Pair(ctx context.Context, req PairRequest) (PairResponse, erro
 	if err != nil {
 		return PairResponse{}, err
 	}
-	result, err := tx.ExecContext(ctx, `UPDATE pairing_sessions SET used_at=? WHERE id=? AND used_at IS NULL`, now, sessionID)
+	if _, err = tx.ExecContext(ctx, `UPDATE users SET username=?,password_hash=? WHERE id=(SELECT user_id FROM devices WHERE id=?)`, normalizeUsername(req.Username), string(passwordHash), response.DeviceID); err != nil {
+		return PairResponse{}, fmt.Errorf("username unavailable; sign in if you already have an account")
+	}
+	result, err := tx.ExecContext(ctx, `UPDATE pairing_sessions SET used_at=? WHERE id=? AND used_at IS NULL AND julianday(expires_at)>julianday(?)`, now, sessionID, now)
 	if err != nil {
 		return PairResponse{}, err
 	}
@@ -267,7 +244,7 @@ func issueDevice(ctx context.Context, exec contextExecer, name, userName, locale
 	if admin {
 		adminValue = 1
 	}
-	if _, err = exec.ExecContext(ctx, `INSERT INTO users(id,name,color,enabled,created_at,updated_at) VALUES(?,?,?,1,?,?)`, userID, userName, "#5B5BD6", now, now); err != nil {
+	if _, err = exec.ExecContext(ctx, `INSERT INTO users(id,name,color,enabled,is_admin,created_at,updated_at) VALUES(?,?,?,1,?,?,?)`, userID, userName, "#5B5BD6", adminValue, now, now); err != nil {
 		return PairResponse{}, err
 	}
 	_, err = exec.ExecContext(ctx, `INSERT INTO devices(id,user_id,name,token_hash,is_admin,locale,created_at,last_seen_at) VALUES(?,?,?,?,?,?,?,?)`, deviceID, userID, name, appcrypto.Hash(token), adminValue, locale, now, now)
@@ -288,7 +265,7 @@ func (m *Manager) authenticate(ctx context.Context, token string) (string, bool,
 	}
 	var id string
 	var admin int
-	err := m.store.DB.QueryRowContext(ctx, `SELECT id,is_admin FROM devices WHERE token_hash=? AND enabled=1 AND (user_id IS NULL OR EXISTS(SELECT 1 FROM users WHERE users.id=devices.user_id AND users.enabled=1))`, appcrypto.Hash(token)).Scan(&id, &admin)
+	err := m.store.DB.QueryRowContext(ctx, `SELECT d.id,u.is_admin FROM devices d JOIN users u ON u.id=d.user_id WHERE d.token_hash=? AND d.enabled=1 AND u.enabled=1`, appcrypto.Hash(token)).Scan(&id, &admin)
 	if err != nil {
 		return "", false, err
 	}
@@ -330,11 +307,11 @@ func (m *Manager) Middleware(next http.Handler) http.Handler {
 			return
 		}
 		if viewer {
-			if err := m.store.DB.QueryRowContext(r.Context(), `SELECT is_admin FROM viewer_sessions WHERE id=?`, id).Scan(&admin); err != nil {
+			if err := m.store.DB.QueryRowContext(r.Context(), `SELECT u.is_admin FROM viewer_sessions v JOIN users u ON u.id=v.user_id WHERE v.id=? AND u.enabled=1`, id).Scan(&admin); err != nil {
 				writeUnauthorized(w)
 				return
 			}
-			if !(viewerRequestAllowed(r) || (admin && browserAdminRequestAllowed(r))) || (cookieAuth && !ViewerRequestSafe(r)) {
+			if !(viewerRequestAllowed(r) || browserAccountRequestAllowed(r) || (admin && browserAdminRequestAllowed(r))) || (cookieAuth && !ViewerRequestSafe(r)) {
 				w.Header().Set("Content-Type", "application/json")
 				w.WriteHeader(http.StatusForbidden)
 				json.NewEncoder(w).Encode(map[string]any{"success": false, "message": "Acesso de consulta inválido ou operação não permitida."})
@@ -355,6 +332,16 @@ func (m *Manager) Middleware(next http.Handler) http.Handler {
 		w.Header().Set("Cache-Control", "no-store")
 		ctx := context.WithValue(r.Context(), deviceKey, id)
 		ctx = context.WithValue(ctx, adminKey, admin)
+		var accountID string
+		table := "devices"
+		if viewer {
+			table = "viewer_sessions"
+		}
+		if err := m.store.DB.QueryRowContext(ctx, "SELECT user_id FROM "+table+" WHERE id=?", id).Scan(&accountID); err != nil {
+			writeUnauthorized(w)
+			return
+		}
+		ctx = context.WithValue(ctx, accountKey, accountID)
 		if r.URL.Path == "/realtime" {
 			connectionCtx, cancel := context.WithCancel(ctx)
 			defer cancel()

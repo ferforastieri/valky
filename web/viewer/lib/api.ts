@@ -109,9 +109,11 @@ export const clock = (value: string): string =>
       }).format(new Date(value))
     : "—";
 export const key = (value: string) => encodeURIComponent(value);
-export interface ManagedUser { id: string; name: string; enabled: boolean; admin: boolean; devices: number }
+export interface ManagedUser { id: string; name: string; enabled: boolean; admin: boolean; devices: number; username: string; credentialsConfigured: boolean; viewRules: boolean; editRules: boolean }
 export class API {
  admin = false;
+ viewRules = false;
+ editRules = false;
   token = "";
   constructor() {
     try {
@@ -120,7 +122,7 @@ export class API {
   }
   clear() {
     this.token = "";
- this.admin = false;
+ this.admin = false; this.viewRules = false; this.editRules = false;
   }
   async restore() {
     const response = await fetch("/api/v1/viewer-session", {
@@ -129,10 +131,11 @@ export class API {
       cache: "no-store",
       signal: AbortSignal.timeout(15000),
     });
-    if (response.ok) { this.token = "cookie-session"; this.admin = (await response.json()).data.admin === true; }
+    if (response.ok) { this.token = "cookie-session"; this.setPermissions((await response.json()).data); }
     return response.ok;
   }
-  async login(password: string) {
+  setPermissions(data: {admin?: boolean;viewRules?: boolean;editRules?: boolean}) { this.admin = data.admin === true; this.viewRules = data.viewRules === true; this.editRules = data.editRules === true; }
+  async login(username: string, password: string) {
     const response = await fetch("/api/v1/login", {
       method: "POST",
       headers: {
@@ -141,6 +144,7 @@ export class API {
         "Accept-Language": "pt-BR",
       },
       body: JSON.stringify({
+        username,
         password,
         deviceName: "Navegador de consulta",
         locale: "pt-BR",
@@ -157,6 +161,7 @@ export class API {
         "Atualize o servidor para habilitar o painel de consulta.",
       );
     this.token = "cookie-session";
+    this.setPermissions(await this.get("/viewer-session"));
   }
   async response(path: string, signal?: AbortSignal): Promise<Response> {
     if (!path.startsWith("/") || path.startsWith("//"))
@@ -197,17 +202,17 @@ export class API {
   }
   async mutate<T>(path: string, method: string, value?: unknown): Promise<T> {
  const response = await fetch('/api/v1' + path, {method, credentials:'same-origin', headers:{'Content-Type':'application/json','X-Valkyris-Viewer':'1'}, body:value===undefined?undefined:JSON.stringify(value), signal:AbortSignal.timeout(15000)});
+ if(response.status===401) { this.clear(); window.dispatchEvent(new CustomEvent("viewer-expired")); throw new Error("Sessão expirada. Entre novamente."); }
  if(response.status===204) return undefined as T;
  const body=await response.json();if(!response.ok||!body.success) throw new Error(body.message||'Não foi possível salvar.');return body.data;
  }
   async logout() {
+    const response = await fetch("/api/v1/viewer-session", {
+      method: "DELETE",
+      headers: { "X-Valkyris-Viewer": "1" },
+      signal: AbortSignal.timeout(15000),
+    });
+    if (!response.ok && response.status !== 401) throw new Error("Não foi possível encerrar a sessão. Tente novamente.");
     this.clear();
-    try {
-      await fetch("/api/v1/viewer-session", {
-        method: "DELETE",
-        headers: { "X-Valkyris-Viewer": "1" },
-        signal: AbortSignal.timeout(5000),
-      });
-    } catch {}
   }
 }

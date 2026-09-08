@@ -37,6 +37,7 @@ import com.composables.icons.lucide.Video
 
 @Composable
 fun CameraRulesSection(cameraId: String, vm: RulesViewModel = hiltViewModel()) {
+    val permissions by vm.permissions.collectAsStateWithLifecycle()
     val people by vm.people.collectAsStateWithLifecycle()
     val rules by vm.rules.collectAsStateWithLifecycle()
     val cameras by vm.cameras.collectAsStateWithLifecycle()
@@ -48,6 +49,7 @@ fun CameraRulesSection(cameraId: String, vm: RulesViewModel = hiltViewModel()) {
     val cameraRules = rules.filter { it.cameraId == cameraId }
     val cameraName = cameras.firstOrNull { it.id == cameraId }?.name.orEmpty()
 
+    if (!permissions.viewRules) return
     Card(
         modifier = Modifier.fillMaxWidth(),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
@@ -59,15 +61,15 @@ fun CameraRulesSection(cameraId: String, vm: RulesViewModel = hiltViewModel()) {
                     Text(stringResource(R.string.rules), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
                     Text(if (cameraRules.isEmpty()) stringResource(R.string.no_rules) else "${cameraRules.size} ativa(s)", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
-                TextButton(onClick = { creating = true }, enabled = detectors.isNotEmpty() && !saving) { Icon(Lucide.Plus, null, Modifier.size(17.dp)); Spacer(Modifier.width(4.dp)); Text(stringResource(R.string.add_rule)) }
+                if (permissions.editRules) TextButton(onClick = { creating = true }, enabled = detectors.isNotEmpty() && !saving) { Icon(Lucide.Plus, null, Modifier.size(17.dp)); Spacer(Modifier.width(4.dp)); Text(stringResource(R.string.add_rule)) }
             }
             if (cameraRules.isEmpty()) Text("Configure alertas para esta câmera.", color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodySmall)
-            cameraRules.forEach { RuleCard(it, onEdit = { editing = it }, onDelete = { deleting = it }) }
+            cameraRules.forEach { RuleCard(it, canEdit = permissions.editRules, onEdit = { editing = it }, onDelete = { deleting = it }) }
         }
     }
-    if (creating) RuleEditorDialog(cameras, detectors, fixedCameraID = cameraId, saving = saving, people = people, preview = vm::preview, onDismiss = { if (!saving) creating = false }) { vm.create(it) { success -> if (success) creating = false } }
-    editing?.let { existing -> RuleEditorDialog(cameras, detectors, existing, fixedCameraID = cameraId, saving = saving, people = people, preview = vm::preview, onDismiss = { if (!saving) editing = null }) { vm.update(existing.id, it) { success -> if (success) editing = null } } }
-    deleting?.let { rule -> DeleteRuleDialog(rule, saving, { deleting = null }) { vm.delete(rule.id) { if (it) deleting = null } } }
+    if (creating && permissions.editRules) RuleEditorDialog(cameras, detectors, fixedCameraID = cameraId, saving = saving, people = people, preview = vm::preview, onDismiss = { if (!saving) creating = false }) { vm.create(it) { success -> if (success) creating = false } }
+    editing?.takeIf { permissions.editRules }?.let { existing -> RuleEditorDialog(cameras, detectors, existing, fixedCameraID = cameraId, saving = saving, people = people, preview = vm::preview, onDismiss = { if (!saving) editing = null }) { vm.update(existing.id, it) { success -> if (success) editing = null } } }
+    deleting?.takeIf { permissions.editRules }?.let { rule -> DeleteRuleDialog(rule, saving, { deleting = null }) { vm.delete(rule.id) { if (it) deleting = null } } }
 }
 
 @Composable
@@ -110,7 +112,7 @@ fun RulesContent(
 }
 
 @Composable
-fun RuleCard(rule: Rule, onEdit: () -> Unit, onDelete: () -> Unit) {
+fun RuleCard(rule: Rule, onEdit: () -> Unit, onDelete: () -> Unit, canEdit: Boolean = true) {
     val critical = rule.detectorTypes.any { it in setOf("scream", "glass_break", "smoke_alarm", "fire_alarm", "siren", "tamper") }
     val motion = rule.detectorTypes.any { it == "motion" || it == "person" || it == "tamper" }
     val icon: ImageVector = when { critical -> Lucide.TriangleAlert; motion -> Lucide.Video; else -> Lucide.Mic }
@@ -127,10 +129,10 @@ fun RuleCard(rule: Rule, onEdit: () -> Unit, onDelete: () -> Unit) {
             }
             Spacer(Modifier.width(13.dp))
             Column(Modifier.weight(1f)) {
+                Text(rule.name, fontWeight = FontWeight.SemiBold)
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text(rule.name, Modifier.weight(1f), fontWeight = FontWeight.SemiBold)
-                    IconButton(onClick = onEdit) { Icon(Lucide.Pencil, stringResource(R.string.edit_rule)) }
-                    IconButton(onClick = onDelete) { Icon(Lucide.Trash2, stringResource(R.string.remove_rule), tint = MaterialTheme.colorScheme.error) }
+                    if (canEdit) IconButton(onClick = onEdit) { Icon(Lucide.Pencil, stringResource(R.string.edit_rule)) }
+                    if (canEdit) IconButton(onClick = onDelete) { Icon(Lucide.Trash2, stringResource(R.string.remove_rule), tint = MaterialTheme.colorScheme.error) }
                 }
                 if (rule.schedule.start.isNotBlank()) Text("${rule.schedule.start}–${rule.schedule.end} · ${rule.schedule.timezone}", style = MaterialTheme.typography.bodySmall)
                 rule.motion?.let { Text("Região selecionada · movimento por ${it.minDurationSeconds} s", style = MaterialTheme.typography.bodySmall) }
@@ -175,7 +177,7 @@ fun RuleEditorDialog(cameras: List<Camera>, detectors: List<DetectorKind>, exist
     var cameraExpanded by remember { mutableStateOf(false) }
     var detectorExpanded by remember { mutableStateOf(false) }
 
-    com.ferforastieri.valkyris.core.design.ValkyrisBottomSheet(
+    com.ferforastieri.valkyris.core.design.ValkyrisBottomSheet(scrollContent = false,
         title = stringResource(if (existing == null) R.string.add_rule else R.string.edit_rule),
         onDismiss = onDismiss,
         dismissEnabled = !saving,
@@ -239,7 +241,7 @@ fun RuleEditorDialog(cameras: List<Camera>, detectors: List<DetectorKind>, exist
                         FilterChip(selected = day in days, onClick = { days = if (day in days) days - day else days + day }, label = { Text(listOf("Dom","Seg","Ter","Qua","Qui","Sex","Sáb")[day]) })
                     }
                 }
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                com.ferforastieri.valkyris.core.design.AdaptiveRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     OutlinedTextField(start, { start = it }, label = { Text("Início · HH:mm") }, singleLine = true, modifier = Modifier.weight(1f))
                     OutlinedTextField(end, { end = it }, label = { Text("Fim · HH:mm") }, singleLine = true, modifier = Modifier.weight(1f))
                 }

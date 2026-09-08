@@ -46,6 +46,12 @@ func Open(path string) (*Store, error) {
 		// Devices paired by releases without roles were trusted setup devices.
 		{"devices", "is_admin", `ALTER TABLE devices ADD COLUMN is_admin INTEGER NOT NULL DEFAULT 0`, `UPDATE devices SET is_admin=1`},
 		{"devices", "user_id", `ALTER TABLE devices ADD COLUMN user_id TEXT REFERENCES users(id) ON DELETE SET NULL`, ""},
+		{"users", "username", `ALTER TABLE users ADD COLUMN username TEXT COLLATE NOCASE`, `CREATE UNIQUE INDEX idx_users_username ON users(username) WHERE username IS NOT NULL`},
+		{"users", "password_hash", `ALTER TABLE users ADD COLUMN password_hash TEXT NOT NULL DEFAULT ''`, ""},
+		{"users", "is_admin", `ALTER TABLE users ADD COLUMN is_admin INTEGER NOT NULL DEFAULT 0`, `UPDATE users SET is_admin=1 WHERE EXISTS(SELECT 1 FROM devices WHERE devices.user_id=users.id AND devices.is_admin=1)`},
+		{"users", "view_rules", `ALTER TABLE users ADD COLUMN view_rules INTEGER NOT NULL DEFAULT 0`, ""},
+		{"users", "edit_rules", `ALTER TABLE users ADD COLUMN edit_rules INTEGER NOT NULL DEFAULT 0`, ""},
+		{"viewer_sessions", "user_id", `ALTER TABLE viewer_sessions ADD COLUMN user_id TEXT REFERENCES users(id) ON DELETE CASCADE`, `DELETE FROM viewer_sessions`},
 		{"users", "avatar_data", `ALTER TABLE users ADD COLUMN avatar_data TEXT NOT NULL DEFAULT ''`, ""},
 		{"user_locations", "last_seen_at", `ALTER TABLE user_locations ADD COLUMN last_seen_at TEXT NOT NULL DEFAULT ''`, ""},
 		{"user_locations", "address", `ALTER TABLE user_locations ADD COLUMN address TEXT NOT NULL DEFAULT ''`, ""},
@@ -167,6 +173,10 @@ func migrateUsersFromDevices(ctx context.Context, db *sql.DB) error {
 		if _, err := db.ExecContext(ctx, `UPDATE devices SET user_id=? WHERE id=?`, userID, device.id); err != nil {
 			return fmt.Errorf("link device to user: %w", err)
 		}
+		if _, err := db.ExecContext(ctx, `UPDATE users SET is_admin=1 WHERE id=? AND EXISTS(SELECT 1 FROM devices WHERE user_id=? AND is_admin=1)`, userID, userID); err != nil {
+			return fmt.Errorf("migrate administrator account: %w", err)
+		}
+
 	}
 	return nil
 }

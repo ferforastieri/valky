@@ -68,7 +68,7 @@ paths:
   /admin/bootstrap:
     post:
       security: []
-      summary: Create the home password and first administrator device
+      summary: Create the first administrator account and device
       requestBody:
         required: true
         content:
@@ -79,13 +79,13 @@ paths:
         '409': {description: Administrator already configured}
   /viewer-session:
     get:
-      summary: Restore the current read-only browser session
+      summary: Read current account permissions and credential setup status
       security:
         - viewerCookie: []
       parameters:
         - {in: header, name: X-Valkyris-Viewer, required: true, schema: {type: string, const: '1'}}
       responses:
-        '200': {description: Active session with readOnly true; cookie renewed during use}
+        '200': {description: Account permissions (admin, viewRules, editRules), username and credentialsConfigured; browser cookie renewed during use}
         '401': {description: Invalid or expired session}
     delete:
       summary: Revoke the current read-only browser session
@@ -95,7 +95,7 @@ paths:
   /login:
     post:
       security: []
-      summary: Authenticate an administrator device with the home password
+      summary: Authenticate a personal account by username and password
       requestBody:
         required: true
         content:
@@ -107,7 +107,7 @@ paths:
   /pair:
     post:
       security: []
-      summary: Exchange a single-use pairing code for a device token
+      summary: Register a new account using a single-use invitation; existing accounts must use login
       requestBody:
         required: true
         content:
@@ -241,9 +241,18 @@ paths:
                   success: {type: boolean}
                   message: {type: string}
                   data: {$ref: '#/components/schemas/LocationReportResult'}
+  /me/credentials:
+    post:
+      summary: Set credentials for the authenticated legacy account or change existing credentials
+      description: Initial setup requires the existing device session. Subsequent changes require currentPassword. Preserves the user ID and history, and revokes other sessions.
+      requestBody: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/AccountCredentials'}}}}
+      responses:
+        '200': {description: Credentials saved}
+        '400': {description: Invalid password or username unavailable}
+        '401': {description: Authentication required}
   /me/password:
     post:
-      summary: Change the administrator home password
+      summary: Change the current account password and revoke its other sessions
       requestBody: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/ChangePassword'}}}}
       responses: {'200': {description: Password changed, content: {application/json: {schema: {$ref: '#/components/schemas/APIResponse'}}}}}
   /places:
@@ -662,19 +671,44 @@ components:
       properties:
         transitions: {type: integer, description: Confirmed area changes emitted by this reading}
         pendingConfirmations: {type: integer, description: Pending changes requiring further fresh readings}
+    AccountCredentials:
+      type: object
+      required: [newPassword]
+      properties:
+        username: {type: string, minLength: 3, maxLength: 40}
+        currentPassword: {type: string, format: password, writeOnly: true}
+        newPassword: {type: string, format: password, minLength: 12, writeOnly: true, description: At most 72 UTF-8 bytes}
+    ManagedUser:
+      type: object
+      properties:
+        id: {type: string}
+        name: {type: string}
+        enabled: {type: boolean}
+        admin: {type: boolean}
+        viewRules: {type: boolean, description: May read rules; administrators always have access}
+        editRules: {type: boolean, description: May create, edit, delete rules and change recipients; implies viewRules}
+        username: {type: string}
+        credentialsConfigured: {type: boolean, readOnly: true}
+        password: {type: string, format: password, writeOnly: true, description: Optional administrator credential reset; revokes all user sessions}
+        devices: {type: integer, readOnly: true}
     LoginRequest:
       type: object
-      required: [password]
+      required: [username, password, deviceName]
       properties:
-        browserAdmin: {type: boolean, description: Request an administrative HttpOnly browser session after password validation.}
+        username: {type: string, minLength: 3, maxLength: 40}
+        userName: {type: string, description: Display name used only during account creation}
+        browserAdmin: {type: boolean, description: Request an HttpOnly browser session. Permissions always come from the authenticated account.}
         password: {type: string, format: password}
         deviceName: {type: string}
         readOnly: {type: boolean, default: false, description: "Issue a renewable 30-day HttpOnly cookie session; requires X-Valkyris-Viewer: 1; no token is returned in JSON."}
         locale: {type: string, default: pt-BR}
     PairRequest:
       type: object
-      required: [code, deviceName]
+      required: [code, deviceName, username, password]
       properties:
+        username: {type: string, minLength: 3, maxLength: 40}
+        password: {type: string, format: password, minLength: 12, writeOnly: true, description: At most 72 UTF-8 bytes}
+        userName: {type: string, description: Display name}
         code: {type: string}
         deviceName: {type: string}
         locale: {type: string, default: pt-BR}

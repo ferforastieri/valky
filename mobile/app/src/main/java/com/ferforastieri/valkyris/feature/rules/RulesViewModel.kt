@@ -17,6 +17,7 @@ class RulesViewModel @Inject constructor(
     private val repository: ValkyrisRepository,
     private val actionGate: MobileActionGate,
 ) : ViewModel() {
+    val permissions = repository.api.permissions
     val people = repository.people
     val rules = repository.rules
     val cameras = repository.cameras

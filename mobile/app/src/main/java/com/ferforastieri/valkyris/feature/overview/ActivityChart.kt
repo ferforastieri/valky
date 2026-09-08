@@ -128,7 +128,7 @@ internal fun ActivitySheet(bucket: ActivityBucket, load: suspend (Int) -> List<V
         catch (_: Exception) { failed = true }
         finally { loading = false }
     }
-    ValkyrisBottomSheet(stringResource(R.string.activity_chart_title), onDismiss) {
+    ValkyrisBottomSheet(title = stringResource(R.string.activity_chart_title), onDismiss = onDismiss, scrollContent = false) {
         Text("${activityTime(bucket.start)} – ${activityTime(bucket.end)}", style = MaterialTheme.typography.bodyMedium)
         Text(stringResource(R.string.activity_interval_count, bucket.count), style = MaterialTheme.typography.titleMedium, modifier = Modifier.padding(vertical = 8.dp))
         LazyColumn(Modifier.fillMaxWidth().heightIn(max = (LocalConfiguration.current.screenHeightDp * .55f).dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
