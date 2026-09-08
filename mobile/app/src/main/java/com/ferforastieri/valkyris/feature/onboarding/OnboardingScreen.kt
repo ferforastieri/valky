@@ -10,6 +10,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.ferforastieri.valkyris.MainViewModel
@@ -34,9 +35,10 @@ fun OnboardingScreen(viewModel: MainViewModel) {
         result.contents?.let { viewModel.acceptPairingLink(Uri.parse(it)) }
     }
     AccountSurface {
-        ValkyrisMark(Modifier.size(72.dp).align(Alignment.CenterHorizontally))
-        Text(if (firstAccess) "Crie sua conta" else "Entre na sua conta", style = MaterialTheme.typography.headlineMedium)
-        Text(if (firstAccess) "O convite é usado apenas neste cadastro. Depois, entre com seu usuário e senha." else "Use a mesma conta para manter seu perfil e histórico, mesmo em outro aparelho.", style = MaterialTheme.typography.bodyMedium)
+        AccountHeading(
+            if (firstAccess) "Crie sua conta" else "Entre na sua conta",
+            if (firstAccess) "Cadastre seu usuário e senha para os próximos acessos." else "Acesse seu perfil com seu usuário e senha.",
+        )
         OutlinedTextField(url, { url = it; viewModel.resetAuthStatus() }, label = { Text("Endereço do servidor") }, placeholder = { Text("https://seu-dominio.exemplo") }, singleLine = true, enabled = !connecting && initialized == null && invitation == null, modifier = Modifier.fillMaxWidth())
         if (initialized != null) {
             if (firstAccess) OutlinedTextField(name, { name = it }, label = { Text("Seu nome") }, singleLine = true, enabled = !connecting, modifier = Modifier.fillMaxWidth())
@@ -77,9 +79,11 @@ fun CredentialsSetupScreen(viewModel: MainViewModel) {
     val error by viewModel.error.collectAsStateWithLifecycle()
     val loaded by viewModel.permissionsLoaded.collectAsStateWithLifecycle()
     AccountSurface {
-        Text(if (loaded) "Proteja sua conta" else "Verificando sua conta", style = MaterialTheme.typography.headlineMedium)
+        AccountHeading(
+            if (loaded) "Proteja sua conta" else "Verificando sua conta",
+            if (loaded) "Defina seu usuário e senha. Seu perfil e histórico serão mantidos." else "Aguarde enquanto verificamos seu acesso.",
+        )
         if (loaded) {
-            Text("Defina seu usuário e sua senha para os próximos acessos. Seu perfil e seu histórico serão mantidos.")
             UsernameField(username, { username = it }, !connecting)
             PasswordField(password, { password = it }, "Nova senha", !connecting)
             Text("Use uma frase com pelo menos 12 caracteres.", style = MaterialTheme.typography.bodySmall)
@@ -87,23 +91,48 @@ fun CredentialsSetupScreen(viewModel: MainViewModel) {
             error?.let { Text(it, color = MaterialTheme.colorScheme.error) }
             Button(onClick = { viewModel.configureCredentials(username, password) }, enabled = !connecting && username.isNotBlank() && password.toByteArray().size in 12..72 && password == confirmation, modifier = Modifier.fillMaxWidth()) { Text(if (connecting) "Salvando…" else "Salvar e continuar") }
         } else {
-            CircularProgressIndicator()
-            TextButton(onClick = { viewModel.refreshPushRegistration() }) { Text("Tentar novamente") }
+            CircularProgressIndicator(Modifier.align(Alignment.CenterHorizontally))
+            TextButton(onClick = { viewModel.refreshPushRegistration() }, modifier = Modifier.fillMaxWidth()) { Text("Tentar novamente") }
         }
-        TextButton(onClick = viewModel::signOut, enabled = !connecting) { Text("Sair") }
+        TextButton(onClick = viewModel::signOut, enabled = !connecting, modifier = Modifier.fillMaxWidth()) { Text("Sair") }
     }
 }
 
 @Composable
 private fun AccountSurface(content: @Composable ColumnScope.() -> Unit) {
-    Column(Modifier.fillMaxSize().imePadding().verticalScroll(rememberScrollState()).padding(20.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-        Column(Modifier.widthIn(max = 560.dp).fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(16.dp), content = content)
+    BoxWithConstraints(Modifier.fillMaxSize().imePadding()) {
+        val viewportHeight = maxHeight
+        Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState())) {
+            Column(
+                Modifier.fillMaxWidth().heightIn(min = viewportHeight).padding(20.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.Center,
+            ) {
+                Surface(
+                    modifier = Modifier.widthIn(max = 560.dp).fillMaxWidth(),
+                    shape = MaterialTheme.shapes.extraLarge,
+                    color = MaterialTheme.colorScheme.surface,
+                    border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+                ) {
+                    Column(Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(16.dp), content = content)
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun AccountHeading(title: String, description: String) {
+    Column(Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        ValkyrisMark(Modifier.size(64.dp))
+        Text(title, modifier = Modifier.fillMaxWidth(), style = MaterialTheme.typography.headlineMedium, textAlign = TextAlign.Center)
+        Text(description, modifier = Modifier.fillMaxWidth(), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant, textAlign = TextAlign.Center)
     }
 }
 
 @Composable
 fun UsernameField(value: String, onChange: (String) -> Unit, enabled: Boolean = true) {
-    OutlinedTextField(value, onChange, label = { Text("Usuário") }, supportingText = { Text("De 3 a 40 letras sem acento, números, ponto, hífen ou sublinhado.") }, singleLine = true, enabled = enabled, modifier = Modifier.fillMaxWidth())
+    OutlinedTextField(value, onChange, label = { Text("Usuário") }, singleLine = true, enabled = enabled, modifier = Modifier.fillMaxWidth())
 }
 
 @Composable
