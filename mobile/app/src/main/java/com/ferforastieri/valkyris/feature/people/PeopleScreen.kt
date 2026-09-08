@@ -18,6 +18,8 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.toArgb
+import org.osmdroid.views.overlay.infowindow.InfoWindow
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
@@ -47,7 +49,6 @@ import org.osmdroid.views.MapView
 import org.osmdroid.views.overlay.MapEventsOverlay
 import org.osmdroid.views.overlay.Marker
 import org.osmdroid.views.overlay.Polygon
-import org.osmdroid.views.overlay.Polyline
 import org.osmdroid.util.BoundingBox
 
 @Composable
@@ -58,7 +59,6 @@ fun PeopleScreen(vm: PeopleViewModel = hiltViewModel()) {
     val history by vm.history.collectAsStateWithLifecycle()
     val busy by vm.busy.collectAsStateWithLifecycle()
     var placeEditor by remember { mutableStateOf<TrackedPlace?>(null) }
-    var selectedMapUser by remember { mutableStateOf<TrackedPerson?>(null) }
     var historyUser by remember { mutableStateOf<TrackedPerson?>(null) }
     var areaPickerOpen by remember { mutableStateOf(false) }
     var areasOpen by remember { mutableStateOf(false) }
@@ -82,7 +82,6 @@ fun PeopleScreen(vm: PeopleViewModel = hiltViewModel()) {
         ) {
             FamilyMap(
                 users = users,
-                onUserClick = { selectedMapUser = it },
                 places = places,
                 modifier = Modifier.fillMaxSize().clip(MaterialTheme.shapes.extraLarge),
             )
@@ -156,29 +155,30 @@ fun PeopleScreen(vm: PeopleViewModel = hiltViewModel()) {
             },
         )
     }
-    selectedMapUser?.let { user ->
-        ValkyrisBottomSheet(title = user.name, onDismiss = { selectedMapUser = null }) {
-            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(14.dp)) {
-                ProfileAvatar(contentDescription = user.name, avatarData = user.avatarData, modifier = Modifier.size(52.dp))
-                Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                    Text(user.lastLocatedAt?.let { "Atualizado ${formatTime(it)}" } ?: "Sem localização recebida", style = MaterialTheme.typography.bodyMedium)
-                    user.lastAccuracy?.let { Text("Precisão aproximada de ${it.toInt()} m", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant) }
-                }
-            }
-            Button(onClick = { selectedMapUser = null; historyUser = user; vm.history(user) }, modifier = Modifier.fillMaxWidth()) { Text("Ver percurso") }
-        }
-    }
-    historyUser?.let { user -> HistorySheet(user, history) { historyUser = null } }
+    val historyLoading by vm.historyLoading.collectAsStateWithLifecycle()
+    val historyError by vm.historyError.collectAsStateWithLifecycle()
+    val historyMore by vm.historyMore.collectAsStateWithLifecycle()
+    historyUser?.let { user -> HistorySheet(user, history, loading = historyLoading, failed = historyError, more = historyMore, onMore = vm::moreHistory) { historyUser = null } }
+
 }
 
 @Composable
-private fun FamilyMap(users: List<TrackedPerson>, places: List<TrackedPlace>, onUserClick: (TrackedPerson) -> Unit, modifier: Modifier = Modifier) {
+private fun FamilyMap(users: List<TrackedPerson>, places: List<TrackedPlace>, modifier: Modifier = Modifier) {
+    var selectedId by remember { mutableStateOf<String?>(null) }
+    val surface = MaterialTheme.colorScheme.surface.toArgb()
+    val foreground = MaterialTheme.colorScheme.onSurface.toArgb()
+    val outline = MaterialTheme.colorScheme.outlineVariant.toArgb()
     AndroidView(factory = { context ->
         Configuration.getInstance().userAgentValue = context.packageName
         MapView(context).apply {
             setTileSource(TileSourceFactory.MAPNIK); setMultiTouchControls(true); controller.setZoom(13.5); controller.setCenter(GeoPoint(-23.5505, -46.6333))
+            overlays.add(MapEventsOverlay(object : MapEventsReceiver {
+                override fun singleTapConfirmedHelper(point: GeoPoint): Boolean { selectedId = null; return false }
+                override fun longPressHelper(point: GeoPoint) = false
+            }))
         }
     }, update = { map ->
+        InfoWindow.closeAllInfoWindowsOn(map)
         map.overlays.removeAll { it is Marker || it is Polygon }
         places.forEach { place ->
             val circle = Polygon().apply {
@@ -190,11 +190,26 @@ private fun FamilyMap(users: List<TrackedPerson>, places: List<TrackedPlace>, on
         users.forEach { user ->
             val lat = user.lastLatitude ?: return@forEach; val lon = user.lastLongitude ?: return@forEach
             map.overlays.add(Marker(map).apply {
-                setOnMarkerClickListener { _, _ -> onUserClick(user); true }
+                setOnMarkerClickListener { _, _ -> selectedId = if (selectedId == user.id) null else user.id; if (selectedId != null) map.controller.animateTo(position); true }
+                val density = map.resources.displayMetrics.density
+                val label = android.widget.TextView(map.context).apply {
+                    text = "${user.name}\n${user.lastLocatedAt?.let { formatTime(it) } ?: "Sem atualização"}"
+                    textSize = 13f
+                    setTextColor(foreground)
+                    setPadding((14*density).toInt(), (10*density).toInt(), (14*density).toInt(), (10*density).toInt())
+                    background = android.graphics.drawable.GradientDrawable().apply { setColor(surface); cornerRadius = 14*density; setStroke(density.toInt().coerceAtLeast(1), outline) }
+                    elevation = 5*density
+                    maxWidth = (240*density).toInt()
+                    gravity = android.view.Gravity.CENTER
+                    setOnClickListener { selectedId = null }
+                }
+                setInfoWindow(object : InfoWindow(label,map) { override fun onOpen(item: Any?) {} ; override fun onClose() {} })
+                setInfoWindowAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_TOP)
                 position = GeoPoint(lat, lon); title = user.name; snippet = user.lastLocatedAt?.let { "Atualizado ${formatTime(it)}" } ?: "Sem atualização"
                 icon = profileMarkerDrawable(map.context, user.avatarData)
                     ?: ContextCompat.getDrawable(map.context, R.drawable.valkyris_map_marker)
                 setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_BOTTOM)
+                if (selectedId == user.id) showInfoWindow()
             })
         }
         val located = users.filter { it.lastLatitude?.isFinite() == true && it.lastLongitude?.isFinite() == true }
@@ -397,78 +412,31 @@ private fun AreasSheet(
 }
 
 @Composable
-internal fun HistorySheet(user: TrackedPerson, history: List<PersonLocation>, onDismiss: () -> Unit) = ValkyrisBottomSheet(title = "Por onde ${user.name} passou", onDismiss = onDismiss, swipeToDismissEnabled = false) {
-    if (history.isEmpty()) Text("Ainda não há localização registrada.", color = MaterialTheme.colorScheme.onSurfaceVariant)
-    else {
-        val points = remember(history) { history.sortedBy { it.occurredAt } }
-        var selected by remember(points) { mutableIntStateOf(points.lastIndex) }
-        val point = points[selected]
-        val screenHeight = LocalConfiguration.current.screenHeightDp.dp
-        Column(
-            Modifier.fillMaxWidth().heightIn(max = screenHeight * 0.72f).verticalScroll(rememberScrollState()),
-            verticalArrangement = Arrangement.spacedBy(12.dp),
-        ) {
-            Card(Modifier.fillMaxWidth(), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerHigh)) {
-                Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                    Text("Ponto ${selected + 1} de ${points.size}", style = MaterialTheme.typography.titleMedium)
-                    Text(formatHistoryTime(point.occurredAt), style = MaterialTheme.typography.bodyMedium)
-                    Text("Precisão estimada: ${point.accuracy.toInt()} m", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+internal fun HistorySheet(user: TrackedPerson, history: List<PersonLocation>, loading: Boolean = false, failed: Boolean = false, more: Boolean = false, onMore: () -> Unit = {}, onDismiss: () -> Unit) = ValkyrisBottomSheet(title = "Por onde ${user.name} passou", onDismiss = onDismiss) {
+    LazyColumn(Modifier.fillMaxWidth().heightIn(max = LocalConfiguration.current.screenHeightDp.dp * .65f), contentPadding = PaddingValues(bottom = 16.dp)) {
+        items(history, key = { it.id }) { point ->
+            Row(Modifier.fillMaxWidth().height(IntrinsicSize.Min)) {
+                Column(Modifier.width(24.dp).fillMaxHeight(), horizontalAlignment = Alignment.CenterHorizontally) {
+                    Box(Modifier.padding(top = 5.dp).size(9.dp).background(MaterialTheme.colorScheme.secondary, androidx.compose.foundation.shape.CircleShape))
+                    Box(Modifier.width(1.dp).weight(1f).background(MaterialTheme.colorScheme.outlineVariant))
                 }
-            }
-            AndroidView(
-                factory = { context ->
-                    Configuration.getInstance().userAgentValue = context.packageName
-                    MapView(context).apply {
-                        setTileSource(TileSourceFactory.MAPNIK)
-                        setMultiTouchControls(true)
-                        setOnTouchListener { view, event ->
-                            view.parent?.requestDisallowInterceptTouchEvent(event.actionMasked != MotionEvent.ACTION_UP && event.actionMasked != MotionEvent.ACTION_CANCEL)
-                            false
-                        }
-                    }
-                },
-                update = { map ->
-                    if (map.tag != points) {
-                        map.tag = points
-                        map.overlays.clear()
-                        val coordinates = points.map { GeoPoint(it.latitude, it.longitude) }
-                        map.overlays.add(Polyline(map).apply { setPoints(coordinates); outlinePaint.color = AndroidColor.rgb(87, 156, 78); outlinePaint.strokeWidth = 6f })
-                        points.forEachIndexed { index, location ->
-                            map.overlays.add(Marker(map).apply {
-                                position = coordinates[index]
-                                setOnMarkerClickListener { _, _ -> selected = index; true }
-                                title = "Ponto ${index + 1}"
-                                snippet = "${formatHistoryTime(location.occurredAt)} · precisão ${location.accuracy.toInt()} m"
-                                icon = android.graphics.drawable.BitmapDrawable(map.resources, android.graphics.Bitmap.createBitmap(72, 72, android.graphics.Bitmap.Config.ARGB_8888).also { bitmap ->
-                                    val canvas = android.graphics.Canvas(bitmap)
-                                    val paint = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG)
-                                    paint.color = AndroidColor.rgb(87, 156, 78)
-                                    canvas.drawCircle(36f, 36f, 32f, paint)
-                                    paint.color = AndroidColor.WHITE; paint.textSize = 28f; paint.textAlign = android.graphics.Paint.Align.CENTER
-                                    canvas.drawText("${index + 1}", 36f, 36f - (paint.ascent() + paint.descent()) / 2, paint)
-                                })
-                                setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_CENTER)
-                            })
-                        }
-                        map.post {
-                            if (map.tag == points) {
-                                if (coordinates.size == 1) { map.controller.setZoom(17.0); map.controller.setCenter(coordinates.first()) }
-                                else map.zoomToBoundingBox(BoundingBox.fromGeoPoints(coordinates), false, 60, 17.0, null)
-                            }
-                        }
-                        map.invalidate()
-                    }
-                },
-                onRelease = { it.onDetach() },
-                modifier = Modifier.fillMaxWidth().height((screenHeight * 0.36f).coerceIn(160.dp, 320.dp)).clip(RoundedCornerShape(16.dp)),
-            )
-            Text("Toque em um ponto no mapa ou na sequência abaixo.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                points.forEachIndexed { index, _ ->
-                    FilterChip(selected = selected == index, onClick = { selected = index }, label = { Text("${index + 1}") })
+                Column(Modifier.weight(1f).padding(start = 10.dp, bottom = 24.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                    Text(formatHistoryTime(point.occurredAt), style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.secondary)
+                    if (point.lastSeenAt.isNotBlank() && point.lastSeenAt != point.occurredAt) Text("Até ${formatHistoryTime(point.lastSeenAt)}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text(point.address.ifBlank { "Localização registrada" }, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Medium)
+                    if (point.address.isBlank()) Text("%.5f, %.5f".format(java.util.Locale.ROOT, point.latitude, point.longitude), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
             }
         }
+        item {
+            when {
+                loading -> LinearProgressIndicator(Modifier.fillMaxWidth().padding(vertical = 12.dp))
+                failed -> { Text("Não foi possível carregar o histórico."); TextButton(onClick = onMore) { Text("Tentar novamente") } }
+                more -> TextButton(onClick = onMore, modifier = Modifier.fillMaxWidth()) { Text("Ver registros anteriores") }
+                history.isEmpty() -> Text("Ainda não há localização com precisão suficiente para o histórico.", color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+        }
+        item { Text("Endereços: © OpenStreetMap", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant) }
     }
 }
 

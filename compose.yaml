@@ -12,6 +12,7 @@ services:
         condition: service_started
     environment:
       VALKYRIS_LISTEN: :8443
+      VALKYRIS_GEOCODER_URL: ${VALKYRIS_GEOCODER_URL:-https://photon.komoot.io/reverse}
       VALKYRIS_DATA_DIR: /data
       VALKYRIS_DATABASE: /data/valkyris.db
       VALKYRIS_TLS_CERT: /data/tls/server.crt

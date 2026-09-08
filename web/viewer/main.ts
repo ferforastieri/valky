@@ -471,32 +471,36 @@ async function eventDetails(id: string) {
   }
 }
 async function personDetails(id: string) {
-  const p = people.find((p) => p.id === id);
-  if (!p) return;
-  const version = openDetails(p.name, "HISTÓRICO DE LOCALIZAÇÃO");
-  try {
-    const history = await api.get<Location[]>(
-      `/users/${key(id)}/history?limit=100`,
-      modalController.signal,
-    );
-    if (version !== dialogVersion) return;
-    $("#detail-body").innerHTML = `${dl([
-      ["Última atualização", date(p.lastLocatedAt)],
-      [
-        "Precisão informada",
-        p.lastAccuracy ? `${Math.round(p.lastAccuracy)} m` : "Sem registro",
-      ],
-    ])}${history.length ? '<div id="history-map" class="map" style="height:440px;margin-top:20px" aria-label="Percurso cronológico de localização"></div>' : ""}${history.length ? "" : empty("Sem histórico", "Nenhuma localização recebida para este aparelho.")}`;
-    if (history.length) {
-      const { familyMap } = await import("./lib/map");
-      if (version === dialogVersion)
-        modalCleanups.push(familyMap($("#history-map"), [], [], history));
-    }
-  } catch (error) {
-    if (version === dialogVersion)
-      $("#detail-body").textContent =
-        error instanceof Error ? error.message : "Histórico indisponível.";
-  }
+  const person = people.find(p => p.id === id);
+  if (!person) return;
+  const version = openDetails(person.name, "HISTÓRICO DE LOCALIZAÇÃO");
+  $("#detail-body").innerHTML = '<ol id="location-timeline" class="location-timeline"></ol><p id="history-message" class="muted" role="status"></p><button id="history-more" class="quiet">Carregando histórico…</button><p class="muted">Endereços: © OpenStreetMap</p>';
+  let offset = 0;
+  let until = "";
+  let loading = false;
+  const load = async () => {
+    if (loading || version !== dialogVersion) return;
+    loading = true;
+    const button = $<HTMLButtonElement>("#history-more");
+    button.disabled = true;
+    button.textContent = "Carregando histórico…";
+    try {
+      const history = await api.get<Location[]>(`/users/${key(id)}/history?limit=20&offset=${offset}&until=${key(until)}`, modalController.signal);
+      if (version !== dialogVersion) return;
+      $("#location-timeline").insertAdjacentHTML("beforeend", history.map(point => `<li><time datetime="${e(point.occurredAt)}">${date(point.occurredAt)}</time>${point.lastSeenAt && point.lastSeenAt !== point.occurredAt ? `<small>Até ${date(point.lastSeenAt)}</small>` : ''}<strong>${e(point.address || 'Localização registrada')}</strong>${point.address ? '' : `<small>${point.latitude.toFixed(5)}, ${point.longitude.toFixed(5)}</small>`}</li>`).join(''));
+      if (!until && history.length) until = history[0].lastSeenAt || history[0].occurredAt;
+      offset += history.length;
+      $("#history-message").textContent = offset ? '' : 'Ainda não há localização com precisão suficiente para o histórico.';
+      button.hidden = history.length < 20;
+      button.textContent = 'Ver registros anteriores';
+    } catch (error) {
+      if (version !== dialogVersion) return;
+      $("#history-message").textContent = 'Não foi possível carregar o histórico.';
+      button.textContent = 'Tentar novamente';
+    } finally { loading = false; button.disabled = false; }
+  };
+  $("#history-more").addEventListener('click', () => void load());
+  await load();
 }
 async function placeDetails(id: string) {
   const place = places.find((p) => p.id === id);

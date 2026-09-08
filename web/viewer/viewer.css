@@ -1114,3 +1114,10 @@ dialog::backdrop {
     grid-template-columns: 1fr;
   }
 }
+
+.location-timeline { list-style: none; padding: 8px 0 0 8px; margin: 0; }
+.location-timeline li { position: relative; display: grid; gap: 5px; border-left: 1px solid var(--line); padding: 0 0 26px 24px; }
+.location-timeline li::before { content: ""; position: absolute; width: 9px; height: 9px; border-radius: 50%; background: var(--accent); left: -5px; top: 4px; }
+.location-timeline time { color: var(--muted); font: 11px var(--mono); }
+.location-timeline strong { font-size: 14px; font-weight: 550; overflow-wrap: anywhere; }
+.location-timeline small { color: var(--muted); }

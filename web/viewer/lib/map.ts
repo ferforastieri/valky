@@ -1,12 +1,11 @@
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
-import type { Person, Place, Location } from "./api";
+import type { Person, Place } from "./api";
 import { date } from "./api";
 export function familyMap(
   element: HTMLElement,
   people: Person[],
   places: Place[],
-  history: Location[] = [],
 ): () => void {
   const map = L.map(element, { zoomAnimation: false }).setView(
     [-23.5505, -46.6333],
@@ -54,40 +53,12 @@ export function familyMap(
       .bindPopup(text(`${p.name} · ${date(p.lastLocatedAt)}`));
     peopleBounds.push([p.lastLatitude, p.lastLongitude]);
   });
-  if (history.length) {
-    history = [...history].sort(
-      (a, b) => Date.parse(a.occurredAt) - Date.parse(b.occurredAt),
-    );
-    const points = history.map(
-      (p) => [p.latitude, p.longitude] as L.LatLngTuple,
-    );
-    L.polyline(points, { color: "#579c4e", weight: 3 }).addTo(map);
-    history.forEach((p, index) => {
-      const label = text(String(index + 1));
-      label.className = "map-marker";
-      L.marker([p.latitude, p.longitude], {
-        icon: L.divIcon({
-          html: label,
-          className: "history-point",
-          iconSize: [28, 28],
-        }),
-        title: `Ponto ${index + 1} · ${date(p.occurredAt)}`,
-      })
-        .addTo(map)
-        .bindPopup(
-          text(
-            `Ponto ${index + 1} · ${date(p.occurredAt)} · precisão ${Math.round(p.accuracy)} m`,
-          ),
-        );
-    });
-    bounds.push(...points);
-  }
   // Family framing follows people, even when saved areas are far away.
-  const visibleBounds = history.length ? bounds : peopleBounds.length ? peopleBounds : bounds;
+  const visibleBounds = peopleBounds.length ? peopleBounds : bounds;
   if (visibleBounds.length)
     map.fitBounds(L.latLngBounds(visibleBounds), {
       padding: [35, 35],
-      maxZoom: peopleBounds.length && !history.length ? 18 : 16,
+      maxZoom: peopleBounds.length ? 18 : 16,
       animate: false,
     });
   let disposed = false;

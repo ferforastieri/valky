@@ -8,6 +8,7 @@ import (
 )
 
 type Config struct {
+	GeocoderURL         string
 	ViewerDir           string
 	Listen              string
 	DataDir             string
@@ -33,6 +34,7 @@ type Config struct {
 func Load() Config {
 	data := env("VALKYRIS_DATA_DIR", "./data")
 	return Config{
+		GeocoderURL:         env("VALKYRIS_GEOCODER_URL", "https://photon.komoot.io/reverse"),
 		ViewerDir:           env("VALKYRIS_WEB_DIR", "/opt/valkyris/web"),
 		Listen:              env("VALKYRIS_LISTEN", ":8443"),
 		DataDir:             data,

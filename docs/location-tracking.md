@@ -30,6 +30,20 @@ Celulares precisam receber o APK novo para enviar as leituras de confirmação.
 Alertas levam nomes de pessoa e área dentro do payload criptografado. O mesmo
 formatador é usado nas notificações Android, na visão geral e nos eventos.
 
+O histórico usa um critério separado: precisão declarada de até 50 m, distância
+mínima de 200 m entre posições retidas e nenhuma exceção para gravar outra posição
+do usuário ao confirmar uma área. Leituras próximas atualizam `lastSeenAt`. A API
+consolida também os registros antigos antes de paginar, preservando os dados brutos
+e visitas de retorno após um deslocamento. Os dois clientes mostram os intervalos
+em uma linha do tempo vertical, com páginas de 20 itens. O parâmetro `until`,
+obtido do primeiro `lastSeenAt`, mantém as páginas estáveis durante novas leituras.
+
+O Android envia somente coordenadas, precisão e horário. A resolução de endereço
+é responsabilidade do backend, em um worker separado, com nomes de áreas locais
+e [Photon](https://github.com/komoot/photon), cache persistente e limite de uma
+consulta a cada 10 segundos. Falhas de rede não bloqueiam o registro de localização.
+A instalação pode usar uma instância própria via `VALKYRIS_GEOCODER_URL`.
+
 Referências:
 - https://developer.android.com/develop/sensors-and-location/location/geofencing
   (permanência para reduzir alertas breves; raio mínimo recomendado de 100 m).

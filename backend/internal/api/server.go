@@ -713,7 +713,24 @@ func (s *Server) userHistory(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	limit, _ := strconv.Atoi(r.URL.Query().Get("limit"))
-	out, err := s.tracking.UserHistory(r.Context(), r.PathValue("id"), limit)
+	offset := 0
+	var err error
+	if r.URL.Query().Has("offset") {
+		offset, err = strconv.Atoi(r.URL.Query().Get("offset"))
+	}
+	if err != nil || offset < 0 {
+		writeError(w, http.StatusBadRequest, fmt.Errorf("invalid history offset"))
+		return
+	}
+	var until time.Time
+	if value := r.URL.Query().Get("until"); value != "" {
+		until, err = time.Parse(time.RFC3339Nano, value)
+		if err != nil {
+			writeError(w, http.StatusBadRequest, fmt.Errorf("invalid history timestamp"))
+			return
+		}
+	}
+	out, err := s.tracking.UserHistoryBefore(r.Context(), r.PathValue("id"), limit, offset, until)
 	respondWithMessage(w, out, err, "User location history loaded successfully")
 }
 func (s *Server) reportMyLocation(w http.ResponseWriter, r *http.Request) {

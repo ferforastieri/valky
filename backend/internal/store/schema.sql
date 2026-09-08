@@ -194,3 +194,9 @@ CREATE TABLE IF NOT EXISTS geofence_candidates (
  samples INTEGER NOT NULL, place_version TEXT NOT NULL,
  PRIMARY KEY(owner_kind,owner_id,place_id)
 );
+
+CREATE TABLE IF NOT EXISTS location_address_cache (
+ cell TEXT PRIMARY KEY,
+ address TEXT NOT NULL,
+ retry_after INTEGER NOT NULL
+);

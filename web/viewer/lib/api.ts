@@ -57,6 +57,7 @@ export interface Rule {
   };
 }
 export interface Location {
+  lastSeenAt?: string;
   latitude: number;
   longitude: number;
   accuracy: number;

@@ -11,6 +11,8 @@ import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.CancellationException
 import javax.inject.Inject
 
 @HiltViewModel
@@ -23,6 +25,16 @@ class PeopleViewModel @Inject constructor(
     val places = repository.places
     private val _history = MutableStateFlow<List<PersonLocation>>(emptyList())
     val history = _history.asStateFlow()
+    private val _historyLoading = MutableStateFlow(false)
+    val historyLoading = _historyLoading.asStateFlow()
+    private val _historyError = MutableStateFlow(false)
+    val historyError = _historyError.asStateFlow()
+    private val _historyMore = MutableStateFlow(false)
+    val historyMore = _historyMore.asStateFlow()
+    private var historyJob: Job? = null
+    private var historyOwner = ""
+    private var historyGeneration = 0
+    private var historyUntil = ""
     private val _busy = MutableStateFlow(false)
     val busy = _busy.asStateFlow()
 
@@ -32,7 +44,34 @@ class PeopleViewModel @Inject constructor(
         runCatching { repository.refreshMe() }
         runCatching { repository.refreshPlaces() }
     }
-    fun history(person: TrackedPerson) = viewModelScope.launch { _history.value = runCatching { repository.api.userHistory(person.id) }.getOrDefault(emptyList()) }
+    fun history(person: TrackedPerson) {
+        historyGeneration++
+        historyUntil = ""
+        historyJob?.cancel()
+        historyOwner = person.id
+        _history.value = emptyList()
+        _historyMore.value = true
+        _historyLoading.value = false
+        moreHistory()
+    }
+    fun moreHistory() {
+        if (_historyLoading.value || historyOwner.isEmpty()) return
+        _historyLoading.value = true
+        _historyError.value = false
+        val owner = historyOwner
+        val generation = historyGeneration
+        historyJob = viewModelScope.launch {
+            try {
+                val page = repository.api.userHistory(owner, _history.value.size, historyUntil)
+                if (generation != historyGeneration) return@launch
+                if (historyUntil.isEmpty()) historyUntil = page.firstOrNull()?.let { it.lastSeenAt.ifBlank { it.occurredAt } }.orEmpty()
+                _history.value = _history.value + page
+                _historyMore.value = page.size == 20
+            } catch (cancelled: CancellationException) { throw cancelled }
+            catch (_: Exception) { _historyError.value = true }
+            finally { if (historyGeneration == generation) _historyLoading.value = false }
+        }
+    }
     fun updateMe(person: TrackedPerson, done: (Boolean) -> Unit) = action(done) { repository.updateMe(person) }
     fun updateUser(person: TrackedPerson, done: (Boolean) -> Unit) = action(done) { repository.updateUser(person.id, person) }
     fun createPlace(place: TrackedPlace, done: (Boolean) -> Unit) = action(done) { repository.createPlace(place) }

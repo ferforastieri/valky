@@ -21,3 +21,13 @@ A navegação mobile usa um dock flutuante de ícones com rótulos acessíveis; 
 A home do painel e do Android mostram o gráfico abaixo dos cards, com períodos de 12, 24, 36 ou 48 horas. As 12 barras representam intervalos de 1, 2, 3 ou 4 horas. `GET /events/activity?hours=12` agrega os eventos que não são de localização diretamente no banco, sem o limite da lista recente. O mesmo filtro é aplicado no backend antes da paginação dos detalhes; os clientes não filtram os registros. O horário de referência vem do servidor; os clientes exibem os limites no fuso local e atualizam a atividade a cada 15 segundos enquanto a tela está visível.
 
 No Android, tocar em uma barra abre o sheet do intervalo, inclusive quando vazio. Os registros são consultados em páginas de 100 por `GET /events/interval?from=...&to=...&offset=0`, com início inclusivo e fim exclusivo. Cada registro abre o detalhe do evento.
+
+### Linha do tempo de localização
+
+Android e painel mostram uma linha do tempo vertical com horário, último registro próximo e endereço, sem numeração de pontos ou seletor de 200 posições. As páginas de 20 intervalos vêm de `/users/{id}/history?limit=20&offset=0`; filtragem de precisão e consolidação espacial acontecem antes da paginação, no backend. Registros históricos brutos são preservados. Apenas observações consecutivas próximas são reunidas; sair e voltar continua sendo outro intervalo.
+
+O telefone envia latitude, longitude, precisão e horário, usando um DTO sem endereço. O servidor ignora endereços enviados por versões antigas. O histórico novo exige precisão de até 50 m e deslocamento de pelo menos 200 m em relação à posição retida; confirmações de geofence continuam independentes e não criam pontos redundantes. Observações próximas estendem `lastSeenAt`.
+
+A resolução de endereço roda fora da requisição de localização: nomes de áreas cadastradas têm prioridade, depois [Photon](https://github.com/komoot/photon). Um único worker limita consultas a uma a cada 10 segundos, com cache persistente por coordenada arredondada e espera de uma hora após falha. `VALKYRIS_GEOCODER_URL` pode apontar para uma instância Photon própria. O provedor recebe somente coordenadas, sem identidade ou credenciais. Se estiver indisponível, a localização continua funcionando e a interface mostra as coordenadas até o endereço estar disponível. Dados geográficos: © OpenStreetMap.
+
+No mapa Android, tocar no avatar mostra um indicador ancorado acima dele, com nome e horário. Tocar novamente ou no mapa fecha o indicador; o histórico continua acessível na lista da família.

@@ -31,7 +31,7 @@ func locationFixture(t *testing.T) (*Service, *store.Store) {
 func TestRejectRepeatedAndOutOfOrderLocations(t *testing.T) {
 	s, db := locationFixture(t)
 	at := time.Now().UTC().Add(-time.Minute)
-	first := UserLocation{Latitude: 0, Longitude: 0, Accuracy: 100, OccurredAt: at}
+	first := UserLocation{Latitude: 0, Longitude: 0, Accuracy: 8, OccurredAt: at}
 	outside := UserLocation{Latitude: .00291, Longitude: 0, Accuracy: 152, OccurredAt: at.Add(11 * time.Second)}
 	for i := 0; i < 12; i++ {
 		for _, l := range []UserLocation{first, outside} {
@@ -43,7 +43,7 @@ func TestRejectRepeatedAndOutOfOrderLocations(t *testing.T) {
 	}
 	var count int
 	db.DB.QueryRow(`SELECT count(*) FROM user_locations`).Scan(&count)
-	if count != 2 {
+	if count != 1 {
 		t.Fatalf("stored %d duplicate locations", count)
 	}
 	latest, err := s.CurrentUser(context.Background(), "d")

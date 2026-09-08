@@ -84,6 +84,7 @@ type UserLocation struct {
 	Longitude  float64   `json:"longitude"`
 	Accuracy   float64   `json:"accuracy"`
 	Address    string    `json:"address"`
+	LastSeenAt time.Time `json:"lastSeenAt"`
 	OccurredAt time.Time `json:"occurredAt"`
 }
 
@@ -149,28 +150,6 @@ func (s *Service) UpdateCurrentUser(ctx context.Context, deviceID string, in Use
 	return s.UpdateUser(ctx, current.ID, in)
 }
 
-func (s *Service) UserHistory(ctx context.Context, userID string, limit int) ([]UserLocation, error) {
-	if limit < 1 || limit > 500 {
-		limit = 100
-	}
-	rows, err := s.store.DB.QueryContext(ctx, `SELECT id,user_id,latitude,longitude,accuracy,address,occurred_at FROM user_locations WHERE user_id=? ORDER BY occurred_at DESC LIMIT ?`, userID, limit)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	locations := make([]UserLocation, 0)
-	for rows.Next() {
-		var location UserLocation
-		var occurredAt string
-		if err := rows.Scan(&location.ID, &location.UserID, &location.Latitude, &location.Longitude, &location.Accuracy, &location.Address, &occurredAt); err != nil {
-			return nil, err
-		}
-		location.OccurredAt, _ = time.Parse(time.RFC3339Nano, occurredAt)
-		locations = append(locations, location)
-	}
-	return locations, rows.Err()
-}
-
 // ReportMyLocation resolves the authenticated device to its linked user. The
 // caller can never choose another family member's profile.
 func (s *Service) ReportMyLocation(ctx context.Context, deviceID string, location UserLocation) ([]UserTransition, error) {
@@ -184,10 +163,8 @@ func (s *Service) ReportMyLocation(ctx context.Context, deviceID string, locatio
 	if !validCoordinate(location.Latitude, location.Longitude) || math.IsNaN(location.Accuracy) || math.IsInf(location.Accuracy, 0) || location.Accuracy < 0 || location.Accuracy > 10000 {
 		return nil, fmt.Errorf("location is invalid")
 	}
-	location.Address = strings.TrimSpace(location.Address)
-	if len([]rune(location.Address)) > 320 {
-		return nil, fmt.Errorf("location address is invalid")
-	}
+	// Older clients may still send an address; only the server resolves it.
+	location.Address = ""
 	now := s.now().UTC()
 	if location.OccurredAt.IsZero() {
 		location.OccurredAt = now
@@ -246,8 +223,18 @@ func (s *Service) ReportMyLocation(ctx context.Context, deviceID string, locatio
 	if err != nil {
 		return nil, err
 	}
-	if keep || len(transitions) > 0 {
+	if keep {
+		var cached string
+		cacheErr := tx.QueryRowContext(ctx, `SELECT address FROM location_address_cache WHERE cell=printf('%.4f,%.4f',?,?) AND address!=''`, location.Latitude, location.Longitude).Scan(&cached)
+		if cacheErr != nil && cacheErr != sql.ErrNoRows {
+			return nil, cacheErr
+		}
+		location.Address = cached
 		if _, err = tx.ExecContext(ctx, `INSERT INTO user_locations(id,user_id,latitude,longitude,accuracy,address,occurred_at,created_at) VALUES(?,?,?,?,?,?,?,?)`, location.ID, location.UserID, location.Latitude, location.Longitude, location.Accuracy, location.Address, location.OccurredAt.Format(time.RFC3339Nano), now.Format(time.RFC3339Nano)); err != nil {
+			return nil, err
+		}
+	} else if location.Accuracy > 0 && location.Accuracy <= historyAccuracy {
+		if _, err = tx.ExecContext(ctx, `UPDATE user_locations SET last_seen_at=? WHERE id=(SELECT id FROM user_locations WHERE user_id=? AND accuracy>0 AND accuracy<=50 ORDER BY occurred_at DESC LIMIT 1)`, location.OccurredAt.Format(time.RFC3339Nano), user.ID); err != nil {
 			return nil, err
 		}
 	}
@@ -605,15 +592,18 @@ func confidentMembership(latitude, longitude, accuracy float64, place Place) (in
 // Compare against the last retained point, not the latest heartbeat: a slow
 // journey must eventually accumulate enough distance to appear in history.
 func retainHistoryPoint(ctx context.Context, tx *sql.Tx, table, owner, id string, lat, lon, accuracy float64) (bool, error) {
+	if accuracy <= 0 || accuracy > historyAccuracy {
+		return false, nil
+	}
 	var previousLat, previousLon, previousAccuracy float64
-	err := tx.QueryRowContext(ctx, "SELECT latitude,longitude,accuracy FROM "+table+" WHERE "+owner+"=? ORDER BY occurred_at DESC LIMIT 1", id).Scan(&previousLat, &previousLon, &previousAccuracy)
+	err := tx.QueryRowContext(ctx, "SELECT latitude,longitude,accuracy FROM "+table+" WHERE "+owner+"=? AND accuracy>0 AND accuracy<=? ORDER BY occurred_at DESC LIMIT 1", id, historyAccuracy).Scan(&previousLat, &previousLon, &previousAccuracy)
 	if err == sql.ErrNoRows {
 		return true, nil
 	}
 	if err != nil {
 		return false, err
 	}
-	threshold := math.Max(100, previousAccuracy+accuracy)
+	threshold := math.Max(historyDistance, 2*(previousAccuracy+accuracy))
 	return distanceMeters(previousLat, previousLon, lat, lon) >= threshold, nil
 }
 

@@ -46,7 +46,7 @@ func TestReportKeepsHistoryAndCreatesTransitions(t *testing.T) {
 	}
 }
 
-func TestReportMyLocationPersistsResolvedAddress(t *testing.T) {
+func TestReportMyLocationIgnoresClientAddress(t *testing.T) {
 	db, err := store.Open(filepath.Join(t.TempDir(), "valkyris.db"))
 	if err != nil {
 		t.Fatal(err)
@@ -69,7 +69,7 @@ func TestReportMyLocationPersistsResolvedAddress(t *testing.T) {
 	if err != nil || len(history) != 1 {
 		t.Fatalf("history=%d err=%v", len(history), err)
 	}
-	if got, want := history[0].Address, "Avenida Paulista, São Paulo - SP"; got != want {
+	if got, want := history[0].Address, ""; got != want {
 		t.Fatalf("address=%q want %q", got, want)
 	}
 }
@@ -90,7 +90,7 @@ func TestHistorySkipsStationaryHeartbeatsButUpdatesCurrentPosition(t *testing.T)
 		t.Fatal(err)
 	}
 	service := New(db)
-	for i, lat := range []float64{-23, -23.0001, -23.0002, -23.0012} {
+	for i, lat := range []float64{-23, -23.0001, -23.0002, -23.0022} {
 		at := now.Add(time.Duration(i-4) * time.Second)
 		if _, err = service.ReportMyLocation(ctx, "d", UserLocation{Latitude: lat, Longitude: -46, Accuracy: 10, OccurredAt: at}); err != nil {
 			t.Fatal(err)

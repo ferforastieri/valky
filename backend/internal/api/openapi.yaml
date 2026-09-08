@@ -159,8 +159,13 @@ paths:
       responses: {'200': {description: Updated user, content: {application/json: {schema: {$ref: '#/components/schemas/APIResponse'}}}}}
   /users/{id}/history:
     get:
-      summary: List a family user's location history
-      parameters: [{$ref: '#/components/parameters/id'}]
+      summary: List a consolidated family location timeline, newest first
+      description: The backend discards accuracy above 50 metres and merges consecutive observations within 200 metres before pagination. lastSeenAt is the latest observation in that interval. Old raw records are preserved.
+      parameters:
+        - {$ref: '#/components/parameters/id'}
+        - {name: limit, in: query, schema: {type: integer, minimum: 1, maximum: 100, default: 20}}
+        - {name: offset, in: query, schema: {type: integer, minimum: 0, default: 0}}
+        - {name: until, in: query, description: Use the first page latest lastSeenAt for stable subsequent pages, schema: {type: string, format: date-time}}
       responses: {'200': {description: Location history in APIResponse.data, content: {application/json: {schema: {$ref: '#/components/schemas/APIResponse'}}}}}
   /me:
     get:
@@ -173,7 +178,7 @@ paths:
   /me/location:
     post:
       summary: Record the authenticated device user's location
-      requestBody: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/UserLocation'}}}}
+      requestBody: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/LocationReport'}}}}
       responses:
         '200':
           description: Reading accepted; pending confirmations require additional fresh readings
@@ -474,6 +479,14 @@ components:
           description: Normalized image coordinates; x+width and y+height must not exceed 1.
         minDurationSeconds: {type: integer, minimum: 2, maximum: 300, default: 10}
         minChangedFraction: {type: number, minimum: 0.01, maximum: 0.5, default: 0.05}
+    LocationReport:
+      type: object
+      required: [latitude, longitude, accuracy, occurredAt]
+      properties:
+        latitude: {type: number, minimum: -90, maximum: 90}
+        longitude: {type: number, minimum: -180, maximum: 180}
+        accuracy: {type: number, minimum: 0}
+        occurredAt: {type: string, format: date-time}
     UserLocation:
       type: object
       required: [latitude, longitude]
@@ -481,7 +494,8 @@ components:
         latitude: {type: number, minimum: -90, maximum: 90}
         longitude: {type: number, minimum: -180, maximum: 180}
         accuracy: {type: number, minimum: 0}
-        address: {type: string, maxLength: 320, description: Resolved address persisted with the location}
+        address: {type: string, maxLength: 320, readOnly: true, description: Address resolved by the backend}
+        lastSeenAt: {type: string, format: date-time}
         occurredAt: {type: string, format: date-time}
     User:
       type: object

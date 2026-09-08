@@ -238,7 +238,9 @@ Não é necessário criar tags nem executar comandos de release manualmente: bas
 A localização Android usa Fused Location Provider. O servidor combina margem de
 precisão com três observações por pelo menos dois minutos antes de avisar entrada
 ou saída; leituras inconclusivas cancelam a confirmação. O celular envia amostras
-adicionais enquanto necessário, mas o histórico descarta pontos estacionários.
+adicionais enquanto necessário, mas o histórico consolida posições próximas antes de paginar. O Android envia
+apenas coordenadas, precisão e horário; o backend resolve o endereço com cache.
+Android e painel exibem uma linha do tempo simples, sem numeração de pontos.
 Alertas incluem pessoa e área, sem notificar o próprio usuário que se deslocou.
 O percurso tem pontos numerados e detalhes de horário/precisão. Veja
 [localização](docs/location-tracking.md).

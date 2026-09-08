@@ -9,8 +9,6 @@ import android.content.Context
 import android.content.Intent
 import android.content.SharedPreferences
 import android.content.pm.PackageManager
-import android.location.Address
-import android.location.Geocoder
 import android.location.Location
 import android.os.IBinder
 import com.google.android.gms.location.FusedLocationProviderClient
@@ -24,7 +22,7 @@ import android.os.Looper
 import androidx.core.app.NotificationCompat
 import androidx.core.content.ContextCompat
 import com.ferforastieri.valkyris.R
-import com.ferforastieri.valkyris.core.model.PersonLocation
+import com.ferforastieri.valkyris.core.model.LocationReport
 import com.ferforastieri.valkyris.core.network.ValkyrisApi
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.CoroutineScope
@@ -35,7 +33,6 @@ import kotlinx.coroutines.cancel
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import java.time.Instant
-import java.util.Locale
 import javax.inject.Inject
 
 @AndroidEntryPoint
@@ -83,11 +80,10 @@ class LocationTrackingService : Service() {
             reportingMutex.withLock {
                 if (!shouldReport(location)) return@withLock
                 val result = runCatching {
-                    api.reportMyLocation(PersonLocation(
+                    api.reportMyLocation(LocationReport(
                         latitude = location.latitude,
                         longitude = location.longitude,
                         accuracy = location.accuracy.toDouble(),
-                        address = resolveAddress(location),
                         occurredAt = Instant.ofEpochMilli(location.time).toString(),
                     ))
                 }.getOrNull()
@@ -130,28 +126,6 @@ class LocationTrackingService : Service() {
             .putLong(LAST_SENT_LATITUDE, location.latitude.toBits())
             .putLong(LAST_SENT_LONGITUDE, location.longitude.toBits())
             .apply()
-    }
-
-    @Suppress("DEPRECATION")
-    private fun resolveAddress(location: Location): String = runCatching {
-        if (!Geocoder.isPresent()) return@runCatching ""
-        val address = Geocoder(this, Locale.getDefault())
-            .getFromLocation(location.latitude, location.longitude, 1)
-            ?.firstOrNull()
-            ?: return@runCatching ""
-        address.displayAddress()
-    }.getOrDefault("")
-
-    private fun Address.displayAddress(): String {
-        val completeAddress = if (maxAddressLineIndex >= 0) {
-            (0..maxAddressLineIndex).mapNotNull { getAddressLine(it)?.trim()?.takeIf { value -> value.isNotBlank() } }.joinToString(", ")
-        } else ""
-        return completeAddress.ifBlank {
-            listOf(featureName, thoroughfare, subThoroughfare, locality, subAdminArea, adminArea, postalCode, countryName)
-                .mapNotNull { it?.trim()?.takeIf { value -> value.isNotBlank() } }
-                .distinct()
-                .joinToString(", ")
-        }.take(320)
     }
 
     override fun onDestroy() { scope.cancel(); runCatching { locationClient.removeLocationUpdates(locationCallback) }; super.onDestroy() }
