@@ -235,6 +235,14 @@ class ValkyrisApi(
 
     suspend fun updateRetention(settings: RetentionSettings): RetentionSettings = put("/settings/retention", settings, announceBackend = true)
 
+    suspend fun managedUsers(): List<ManagedUser> = get("/admin/users")
+    suspend fun manageUser(user: ManagedUser): ManagedUser = put("/admin/users/${user.id}", user, announceBackend = true)
+    suspend fun removeUser(id: String) {
+        val current = requireNotNull(session())
+        executeUnit(current.fingerprint, announceBackend = true) {
+            it.delete(base() + "/admin/users/$id") { bearerAuth(current.token) }
+        }
+    }
     suspend fun users(): List<TrackedPerson> = get("/users")
     suspend fun me(): TrackedPerson = get("/me")
     suspend fun updateMe(user: TrackedPerson): TrackedPerson = put("/me", user, announceBackend = true)
@@ -424,6 +432,7 @@ class ValkyrisApi(
             record = actions.record,
             notify = actions.notify,
             alarm = actions.alarm,
+            recipientUserIds = actions.recipientUserIds,
         ),
     )
 

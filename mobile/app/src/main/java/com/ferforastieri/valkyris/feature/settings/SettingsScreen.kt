@@ -65,6 +65,10 @@ fun SettingsScreen(main: MainViewModel, viewModel: SettingsViewModel = hiltViewM
     val admin by main.admin.collectAsStateWithLifecycle()
     val invitation by viewModel.invitation.collectAsStateWithLifecycle()
     val retention by viewModel.retention.collectAsStateWithLifecycle()
+    var showUsers by remember { mutableStateOf(false) }
+    val managedUsers by viewModel.users.collectAsStateWithLifecycle()
+    val usersError by viewModel.usersError.collectAsStateWithLifecycle()
+    val usersBusy by viewModel.usersBusy.collectAsStateWithLifecycle()
     var showInvitation by remember { mutableStateOf(false) }
     var showPermissions by remember { mutableStateOf(false) }
     var showLanguage by remember { mutableStateOf(false) }
@@ -112,6 +116,7 @@ fun SettingsScreen(main: MainViewModel, viewModel: SettingsViewModel = hiltViewM
         theme = theme,
         locationAllowed = locationAllowed,
         retention = retention.value,
+        onUsers = { showUsers = true; viewModel.refreshUsers() },
         onInvite = { showInvitation = true },
         onPermissions = { showPermissions = true },
         onLanguage = { showLanguage = true },
@@ -119,6 +124,7 @@ fun SettingsScreen(main: MainViewModel, viewModel: SettingsViewModel = hiltViewM
         onRetention = { showRetention = true },
         onSignOut = main::signOut,
     )
+    if (showUsers && admin) UserManagementSheet(managedUsers, usersError, usersBusy, { viewModel.saveUser(it) }, { viewModel.saveUser(it, true) }, { showUsers = false })
     if (showInvitation) {
         InvitationDialog(
             state = invitation,
@@ -200,6 +206,7 @@ fun SettingsContent(
     locationAllowed: Boolean = false,
     retention: RetentionSettings = RetentionSettings(),
     version: String = BuildConfig.VERSION_NAME,
+    onUsers: () -> Unit = {},
     onInvite: () -> Unit = {},
     onPermissions: () -> Unit = {},
     onLanguage: () -> Unit = {},
@@ -217,6 +224,7 @@ fun SettingsContent(
         val permissions = listOf(notificationsAllowed, fullScreenAllowed, dndAllowed, locationAllowed)
         val readyCount = permissions.count { it }
         if (admin) {
+            SettingsCard(Lucide.UserPlus, "Gerenciar usuários", "Perfis, administradores e acesso ao sistema", onClick = onUsers)
             SettingsCard(
                 Lucide.UserPlus,
                 stringResource(R.string.invite_device),

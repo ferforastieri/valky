@@ -7,12 +7,12 @@ import kotlinx.serialization.json.JsonElement
 @Serializable data class Camera(val id:String,val name:String,val host:String,val icon:String="camera",val port:Int=2020,val profileToken:String="",val capabilities:Capabilities=Capabilities(),val setupStatus:String="ready",val setupStep:String="",val setupError:String="",val setupUpdatedAt:String="",val enabled:Boolean=true)
 @Serializable data class CreateCameraRequest(val name:String,val icon:String="camera",val host:String,val port:Int=2020,val username:String,val password:String)
 @Serializable data class ValkyrisEvent(val id:String,val cameraId:String="",val ruleId:String?=null,val source:String="camera",val subjectId:String="",val type:String,val confidence:Double,val occurredAt:String,val snapshotPath:String?=null,val clipPath:String?=null,val clipStatus:String="not_requested",val clipError:String?=null,val metadata:Map<String,JsonElement> = emptyMap(),val acknowledgedAt:String?=null)
-@Serializable data class RuleActions(val record:Boolean=true,val notify:Boolean=true,val alarm:Boolean=false)
+@Serializable data class RuleActions(val record:Boolean=true,val notify:Boolean=true,val alarm:Boolean=false,val recipientUserIds:List<String>?=null)
 @Serializable data class RuleSchedule(val days:List<Int> = emptyList(),val start:String="",val end:String="",val timezone:String="")
 @Serializable data class MotionRegion(val x:Double,val y:Double,val width:Double,val height:Double)
 @Serializable data class MotionSettings(val region:MotionRegion,val minDurationSeconds:Int=10,val minChangedFraction:Double=0.05)
 @Serializable data class Rule(val id:String="",val cameraId:String,val name:String,val detectorTypes:List<String>,val confirmations:Int=1,val cooldownSeconds:Int=60,val schedule:RuleSchedule=RuleSchedule(),val motion:MotionSettings?=null,val actions:RuleActions=RuleActions(),val enabled:Boolean=true)
-@Serializable data class RuleActionsRequest(val record:Boolean,val notify:Boolean,val alarm:Boolean)
+@Serializable data class RuleActionsRequest(val record:Boolean,val notify:Boolean,val alarm:Boolean,val recipientUserIds:List<String>?=null)
 @Serializable data class RuleUpsertRequest(val cameraId:String,val name:String,val detectorTypes:List<String>,val actions:RuleActionsRequest,val schedule:RuleSchedule=RuleSchedule(),val motion:MotionSettings?=null,val cooldownSeconds:Int=60,val confirmations:Int=1)
 @Serializable data class DetectorKind(val id:String,val label:String,val source:String)
 @Serializable data class AuthStatus(val initialized:Boolean)
@@ -40,3 +40,5 @@ import kotlinx.serialization.json.JsonElement
 @Serializable data class ActivityBucket(val start: String, val end: String, val count: Int)
 
 @Serializable data class LocationReport(val latitude: Double, val longitude: Double, val accuracy: Double, val occurredAt: String)
+
+@Serializable data class ManagedUser(val id:String="",val name:String,val enabled:Boolean=true,val admin:Boolean=false,val devices:Int=0)

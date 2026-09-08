@@ -3,9 +3,10 @@ package rules
 import "time"
 
 type Actions struct {
-	Record bool `json:"record"`
-	Notify bool `json:"notify"`
-	Alarm  bool `json:"alarm"`
+	RecipientUserIDs []string `json:"recipientUserIds"`
+	Record           bool     `json:"record"`
+	Notify           bool     `json:"notify"`
+	Alarm            bool     `json:"alarm"`
 }
 type Schedule struct {
 	Days     []int  `json:"days"`

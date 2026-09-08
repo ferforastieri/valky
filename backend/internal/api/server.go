@@ -119,14 +119,17 @@ func (s *Server) Handler() http.Handler {
 		http.Redirect(w, r, "/app/", http.StatusTemporaryRedirect)
 	})
 	protected := http.NewServeMux()
+	protected.Handle("GET /admin/users", s.auth.RequireAdmin(http.HandlerFunc(s.adminUsers)))
+	protected.Handle("PUT /admin/users/{id}", s.auth.RequireAdmin(http.HandlerFunc(s.adminUpdateUser)))
+	protected.Handle("DELETE /admin/users/{id}", s.auth.RequireAdmin(http.HandlerFunc(s.adminDeleteUser)))
 	protected.HandleFunc("GET /viewer-session", s.auth.ViewerSession)
 	protected.HandleFunc("DELETE /viewer-session", s.auth.EndViewerSession)
 	protected.Handle("POST /pairing-sessions", s.auth.RequireAdmin(http.HandlerFunc(s.pairingSession)))
 	protected.HandleFunc("GET /cameras", s.listCameras)
-	protected.HandleFunc("POST /cameras", s.createCamera)
-	protected.HandleFunc("PUT /cameras/{id}", s.updateCamera)
+	protected.Handle("POST /cameras", s.auth.RequireAdmin(http.HandlerFunc(s.createCamera)))
+	protected.Handle("PUT /cameras/{id}", s.auth.RequireAdmin(http.HandlerFunc(s.updateCamera)))
 	protected.HandleFunc("GET /camera-operations/{id}", s.cameraOperation)
-	protected.HandleFunc("DELETE /cameras/{id}", s.deleteCamera)
+	protected.Handle("DELETE /cameras/{id}", s.auth.RequireAdmin(http.HandlerFunc(s.deleteCamera)))
 	protected.HandleFunc("POST /cameras/{id}/ptz", s.ptz)
 	protected.HandleFunc("GET /cameras/{id}/snapshot", s.snapshot)
 	protected.HandleFunc("GET /cameras/{id}/recording", s.recentRecording)
@@ -135,6 +138,7 @@ func (s *Server) Handler() http.Handler {
 	protected.HandleFunc("DELETE /cameras/{id}/live/webrtc/whep/{session}", s.liveWebRTC)
 	protected.HandleFunc("GET /detectors", s.detectors)
 	protected.HandleFunc("GET /rules", s.listRules)
+	protected.Handle("PUT /rules/{id}/recipients", s.auth.RequireAdmin(http.HandlerFunc(s.ruleRecipients)))
 	protected.HandleFunc("POST /rules", s.createRule)
 	protected.HandleFunc("PUT /rules/{id}", s.updateRule)
 	protected.HandleFunc("DELETE /rules/{id}", s.deleteRule)
@@ -170,7 +174,7 @@ func (s *Server) Handler() http.Handler {
 	protected.Handle("PUT /settings/push", s.auth.RequireAdmin(http.HandlerFunc(s.setPushConfiguration)))
 	protected.HandleFunc("GET /settings/retention", s.getRetention)
 	protected.Handle("PUT /settings/retention", s.auth.RequireAdmin(http.HandlerFunc(s.setRetention)))
-	protected.HandleFunc("POST /detections", s.submitDetection)
+	protected.Handle("POST /detections", s.auth.RequireAdmin(http.HandlerFunc(s.submitDetection)))
 	protected.HandleFunc("GET /system/update", s.systemUpdate)
 	protected.Handle("POST /system/update", s.auth.RequireAdmin(http.HandlerFunc(s.startSystemUpdate)))
 	protected.Handle("/realtime", s.hub)
@@ -219,7 +223,7 @@ func (s *Server) login(w http.ResponseWriter, r *http.Request) {
 	if !decode(w, r, &in) {
 		return
 	}
-	if in.ReadOnly && !auth.ViewerRequestSafe(r) {
+	if (in.ReadOnly || in.BrowserAdmin) && !auth.ViewerRequestSafe(r) {
 		writeError(w, 403, fmt.Errorf("invalid browser request"))
 		return
 	}
@@ -228,7 +232,7 @@ func (s *Server) login(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusUnauthorized, err)
 		return
 	}
-	if in.ReadOnly {
+	if in.ReadOnly || in.BrowserAdmin {
 		auth.SetViewerCookie(w, out.Token)
 		out.Token = ""
 	}

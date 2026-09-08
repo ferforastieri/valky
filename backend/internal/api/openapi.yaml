@@ -8,6 +8,57 @@ servers:
 security:
   - bearerAuth: []
 paths:
+  /admin/users:
+    get:
+      summary: List users, including disabled users (administrator only)
+      responses:
+        '200': {description: Users with name, enabled, admin and device count}
+        '403': {description: Administrator required}
+  /admin/users/{id}:
+    parameters:
+      - {in: path, name: id, required: true, schema: {type: string}}
+    put:
+      summary: Update user name, access and role (administrator only)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name, enabled, admin]
+              properties:
+                id: {type: string}
+                name: {type: string, maxLength: 100}
+                enabled: {type: boolean}
+                admin: {type: boolean}
+                devices: {type: integer, readOnly: true}
+      responses:
+        '200': {description: Updated}
+        '400': {description: Invalid input or last active administrator}
+        '403': {description: Administrator required}
+    delete:
+      summary: Remove user and revoke linked devices (administrator only)
+      responses:
+        '204': {description: Removed}
+        '400': {description: Last active administrator cannot be removed}
+        '403': {description: Administrator required}
+  /rules/{id}/recipients:
+    parameters:
+      - {in: path, name: id, required: true, schema: {type: string}}
+    put:
+      summary: Change notification and alarm recipients (administrator only)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                recipientUserIds: {type: array, nullable: true, items: {type: string}}
+      responses:
+        '200': {description: Recipients saved}
+        '400': {description: Invalid recipients}
+        '403': {description: Administrator required}
   /auth/status:
     get:
       security: []
@@ -535,6 +586,11 @@ components:
         record: {type: boolean}
         notify: {type: boolean}
         alarm: {type: boolean}
+        recipientUserIds:
+          type: array
+          nullable: true
+          description: Null or absent sends to all active users; an empty list sends to nobody.
+          items: {type: string, format: uuid}
     ActivityBucket:
       type: object
       required: [start, end, count]
@@ -610,6 +666,7 @@ components:
       type: object
       required: [password]
       properties:
+        browserAdmin: {type: boolean, description: Request an administrative HttpOnly browser session after password validation.}
         password: {type: string, format: password}
         deviceName: {type: string}
         readOnly: {type: boolean, default: false, description: "Issue a renewable 30-day HttpOnly cookie session; requires X-Valkyris-Viewer: 1; no token is returned in JSON."}

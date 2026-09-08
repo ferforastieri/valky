@@ -16,6 +16,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.ferforastieri.valkyris.core.model.TrackedPerson
 import com.ferforastieri.valkyris.R
 import com.ferforastieri.valkyris.core.model.Camera
 import com.ferforastieri.valkyris.core.model.DetectorKind
@@ -36,6 +37,7 @@ import com.composables.icons.lucide.Video
 
 @Composable
 fun CameraRulesSection(cameraId: String, vm: RulesViewModel = hiltViewModel()) {
+    val people by vm.people.collectAsStateWithLifecycle()
     val rules by vm.rules.collectAsStateWithLifecycle()
     val cameras by vm.cameras.collectAsStateWithLifecycle()
     val detectors by vm.detectors.collectAsStateWithLifecycle()
@@ -63,8 +65,8 @@ fun CameraRulesSection(cameraId: String, vm: RulesViewModel = hiltViewModel()) {
             cameraRules.forEach { RuleCard(it, onEdit = { editing = it }, onDelete = { deleting = it }) }
         }
     }
-    if (creating) RuleEditorDialog(cameras, detectors, fixedCameraID = cameraId, saving = saving, preview = vm::preview, onDismiss = { if (!saving) creating = false }) { vm.create(it) { success -> if (success) creating = false } }
-    editing?.let { existing -> RuleEditorDialog(cameras, detectors, existing, fixedCameraID = cameraId, saving = saving, preview = vm::preview, onDismiss = { if (!saving) editing = null }) { vm.update(existing.id, it) { success -> if (success) editing = null } } }
+    if (creating) RuleEditorDialog(cameras, detectors, fixedCameraID = cameraId, saving = saving, people = people, preview = vm::preview, onDismiss = { if (!saving) creating = false }) { vm.create(it) { success -> if (success) creating = false } }
+    editing?.let { existing -> RuleEditorDialog(cameras, detectors, existing, fixedCameraID = cameraId, saving = saving, people = people, preview = vm::preview, onDismiss = { if (!saving) editing = null }) { vm.update(existing.id, it) { success -> if (success) editing = null } } }
     deleting?.let { rule -> DeleteRuleDialog(rule, saving, { deleting = null }) { vm.delete(rule.id) { if (it) deleting = null } } }
 }
 
@@ -148,10 +150,11 @@ private fun DeleteRuleDialog(rule: Rule, busy: Boolean, onDismiss: () -> Unit, o
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
-fun RuleEditorDialog(cameras: List<Camera>, detectors: List<DetectorKind>, existing: Rule? = null, fixedCameraID: String? = null, saving: Boolean, onDismiss: () -> Unit, preview: (suspend (String) -> ByteArray)? = null, onSave: (Rule) -> Unit) {
+fun RuleEditorDialog(cameras: List<Camera>, detectors: List<DetectorKind>, existing: Rule? = null, fixedCameraID: String? = null, saving: Boolean, onDismiss: () -> Unit, preview: (suspend (String) -> ByteArray)? = null, people: List<TrackedPerson> = emptyList(), onSave: (Rule) -> Unit) {
     var camera by remember(existing?.id) { mutableStateOf(cameras.firstOrNull { it.id == existing?.cameraId } ?: cameras.firstOrNull()) }
     var detector by remember(existing?.id) { mutableStateOf(detectors.firstOrNull { it.id == existing?.detectorTypes?.firstOrNull() } ?: detectors.firstOrNull()) }
     var name by remember(existing?.id) { mutableStateOf(existing?.name.orEmpty()) }
+    var recipients by remember(existing?.id) { mutableStateOf(existing?.actions?.recipientUserIds) }
     var record by remember(existing?.id) { mutableStateOf(existing?.actions?.record ?: true) }
     var notify by remember(existing?.id) { mutableStateOf(existing?.actions?.notify ?: true) }
     var alarm by remember(existing?.id) { mutableStateOf(existing?.actions?.alarm ?: false) }
@@ -190,7 +193,7 @@ fun RuleEditorDialog(cameras: List<Camera>, detectors: List<DetectorKind>, exist
                         schedule = if (scheduled) RuleSchedule(days.sorted(), start, end, timezone) else RuleSchedule(),
                         motion = if (useRegion) MotionSettings(checkNotNull(region), duration.toInt(), fraction.toDouble().coerceIn(.01, .5)) else null,
                         cooldownSeconds = cooldown.toInt(),
-                        actions = RuleActions(record, notify, alarm),
+                        actions = RuleActions(record, notify, alarm, recipients),
                         enabled = existing?.enabled ?: true,
                     ))
                 },
@@ -210,6 +213,14 @@ fun RuleEditorDialog(cameras: List<Camera>, detectors: List<DetectorKind>, exist
             ExposedDropdownMenuBox(detectorExpanded, { detectorExpanded = it }) {
                 OutlinedTextField(detector?.let { stringResource(detectorLabelRes(it.id)) }.orEmpty(), {}, readOnly = true, label = { Text(stringResource(R.string.detector)) }, trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(detectorExpanded) }, modifier = Modifier.menuAnchor(MenuAnchorType.PrimaryNotEditable).fillMaxWidth())
                 ExposedDropdownMenu(detectorExpanded, { detectorExpanded = false }) { detectors.forEach { item -> DropdownMenuItem({ Text(stringResource(detectorLabelRes(item.id))) }, { detector = item; detectorExpanded = false }) } }
+            }
+            Text("Destinatários dos alertas", style = MaterialTheme.typography.titleSmall)
+            RuleActionRow(recipients == null, { recipients = if (it) null else emptyList() }, "Toda a família")
+            if (recipients != null) {
+                people.forEach { person ->
+                    RuleActionRow(person.id in recipients.orEmpty(), { checked -> recipients = if (checked) recipients.orEmpty() + person.id else recipients.orEmpty() - person.id }, person.name)
+                }
+                if (recipients.orEmpty().isEmpty()) Text("Ninguém receberá notificações desta regra.", style = MaterialTheme.typography.bodySmall)
             }
             RuleActionRow(scheduled, { scheduled = it }, "Limitar por horário")
             if (scheduled) {

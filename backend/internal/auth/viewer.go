@@ -2,15 +2,20 @@ package auth
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	appcrypto "github.com/ferforastieri/valkyris/backend/internal/crypto"
 	"github.com/google/uuid"
 	"net/http"
+	"net/url"
 	"strings"
 	"time"
 )
 
 func (m *Manager) issueViewer(ctx context.Context) (PairResponse, error) {
+	return m.issueBrowser(ctx, false)
+}
+func (m *Manager) issueBrowser(ctx context.Context, admin bool) (PairResponse, error) {
 	token, err := appcrypto.RandomToken(32)
 	if err != nil {
 		return PairResponse{}, err
@@ -21,8 +26,8 @@ func (m *Manager) issueViewer(ctx context.Context) (PairResponse, error) {
 		return PairResponse{}, err
 	}
 	id := uuid.NewString()
-	_, err = m.store.DB.ExecContext(ctx, `INSERT INTO viewer_sessions(id,token_hash,expires_at,created_at) VALUES(?,?,?,?)`, id, appcrypto.Hash(token), now.Add(30*24*time.Hour).Format(time.RFC3339Nano), now.Format(time.RFC3339Nano))
-	return PairResponse{DeviceID: id, Token: token, ReadOnly: true}, err
+	_, err = m.store.DB.ExecContext(ctx, `INSERT INTO viewer_sessions(id,token_hash,expires_at,created_at,is_admin) VALUES(?,?,?,?,?)`, id, appcrypto.Hash(token), now.Add(30*24*time.Hour).Format(time.RFC3339Nano), now.Format(time.RFC3339Nano), admin)
+	return PairResponse{DeviceID: id, Token: token, ReadOnly: !admin, Admin: admin}, err
 }
 func (m *Manager) authenticateViewer(ctx context.Context, token string) (string, error) {
 	var id, expiry string
@@ -61,13 +66,22 @@ func SetViewerCookie(w http.ResponseWriter, token string) {
 }
 
 func ViewerRequestSafe(r *http.Request) bool {
-	return r.Header.Get("X-Valkyris-Viewer") == "1" && r.Header.Get("Sec-Fetch-Site") != "cross-site"
+	if r.Header.Get("X-Valkyris-Viewer") != "1" || r.Header.Get("Sec-Fetch-Site") == "cross-site" {
+		return false
+	}
+	if origin := r.Header.Get("Origin"); origin != "" {
+		parsed, err := url.Parse(origin)
+		if err != nil || parsed.Host != r.Host || parsed.Scheme != "https" {
+			return false
+		}
+	}
+	return true
 }
 
 func (m *Manager) ViewerSession(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	w.Header().Set("Cache-Control", "no-store")
-	w.Write([]byte(`{"success":true,"data":{"readOnly":true}}`))
+	json.NewEncoder(w).Encode(map[string]any{"success": true, "data": map[string]bool{"readOnly": !IsAdmin(r.Context()), "admin": IsAdmin(r.Context())}})
 }
 
 func (m *Manager) EndViewerSession(w http.ResponseWriter, r *http.Request) {
@@ -79,4 +93,17 @@ func (m *Manager) EndViewerSession(w http.ResponseWriter, r *http.Request) {
 	http.SetCookie(w, &http.Cookie{Name: ViewerCookie, Value: "", Path: "/", Secure: true, HttpOnly: true, SameSite: http.SameSiteStrictMode, MaxAge: -1})
 	w.Header().Set("Cache-Control", "no-store")
 	w.WriteHeader(http.StatusNoContent)
+}
+
+// Browser administration is deliberately limited to user management and rule
+// recipients; ordinary viewer sessions retain their existing read-only scope.
+func browserAdminRequestAllowed(r *http.Request) bool {
+	parts := strings.Split(strings.Trim(r.URL.Path, "/"), "/")
+	if len(parts) == 3 && parts[0] == "admin" && parts[1] == "users" && parts[2] != "" {
+		return r.Method == "PUT" || r.Method == "DELETE"
+	}
+	if len(parts) == 3 && parts[0] == "rules" && parts[2] == "recipients" {
+		return r.Method == "PUT"
+	}
+	return r.URL.Path == "/pairing-sessions" && r.Method == "POST"
 }

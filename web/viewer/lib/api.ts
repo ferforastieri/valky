@@ -49,7 +49,7 @@ export interface Rule {
   cooldownSeconds: number;
   enabled: boolean;
   schedule: { days: number[]; start: string; end: string; timezone: string };
-  actions: { record: boolean; notify: boolean; alarm: boolean };
+  actions: { record: boolean; notify: boolean; alarm: boolean; recipientUserIds?: string[] | null };
   motion?: {
     region: { x: number; y: number; width: number; height: number };
     minDurationSeconds: number;
@@ -109,7 +109,9 @@ export const clock = (value: string): string =>
       }).format(new Date(value))
     : "—";
 export const key = (value: string) => encodeURIComponent(value);
+export interface ManagedUser { id: string; name: string; enabled: boolean; admin: boolean; devices: number }
 export class API {
+ admin = false;
   token = "";
   constructor() {
     try {
@@ -118,6 +120,7 @@ export class API {
   }
   clear() {
     this.token = "";
+ this.admin = false;
   }
   async restore() {
     const response = await fetch("/api/v1/viewer-session", {
@@ -126,7 +129,7 @@ export class API {
       cache: "no-store",
       signal: AbortSignal.timeout(15000),
     });
-    if (response.ok) this.token = "cookie-session";
+    if (response.ok) { this.token = "cookie-session"; this.admin = (await response.json()).data.admin === true; }
     return response.ok;
   }
   async login(password: string) {
@@ -141,14 +144,15 @@ export class API {
         password,
         deviceName: "Navegador de consulta",
         locale: "pt-BR",
-        readOnly: true,
+        browserAdmin: true,
       }),
       signal: AbortSignal.timeout(15000),
     });
     const body = await response.json();
+ this.admin = body.data?.admin === true;
     if (!response.ok || !body.success)
       throw new Error(body.message || "Não foi possível entrar.");
-    if (!body.data?.readOnly)
+    if (!body.data?.readOnly && !this.admin)
       throw new Error(
         "Atualize o servidor para habilitar o painel de consulta.",
       );
@@ -191,6 +195,11 @@ export class API {
   async blob(path: string, signal?: AbortSignal) {
     return (await this.response(path, signal)).blob();
   }
+  async mutate<T>(path: string, method: string, value?: unknown): Promise<T> {
+ const response = await fetch('/api/v1' + path, {method, credentials:'same-origin', headers:{'Content-Type':'application/json','X-Valkyris-Viewer':'1'}, body:value===undefined?undefined:JSON.stringify(value), signal:AbortSignal.timeout(15000)});
+ if(response.status===204) return undefined as T;
+ const body=await response.json();if(!response.ok||!body.success) throw new Error(body.message||'Não foi possível salvar.');return body.data;
+ }
   async logout() {
     this.clear();
     try {

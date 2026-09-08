@@ -28,6 +28,7 @@ Valkyris transforma um servidor doméstico em uma central privada de monitoramen
 - Regras para movimento e sons residenciais; a confiança mínima é aplicada internamente por detector, sem ajuste manual, e as regras ficam sempre ativas.
 - Mapa familiar com usuários vinculados aos dispositivos pareados, histórico de localização e alertas de entrada e saída de áreas.
 - Eventos com snapshot, reconhecimento, notificação e clipe com pré/pós-evento.
+- Administração de usuários no painel e Android, destinatários por regra e [autorização validada no servidor](docs/security-access.md).
 - Credenciais de câmera cifradas com AES-256-GCM e tokens persistidos somente como hash.
 - Atualização do backend pelo app e download do APK assinado diretamente da release no GitHub.
 - Painel web em /app/, servido pelo próprio backend, para consultar câmeras, eventos, família e configurações.

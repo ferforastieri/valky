@@ -35,6 +35,9 @@ func (s *Service) Create(ctx context.Context, r Rule) (Rule, error) {
 	if err := normalizeRule(&r); err != nil {
 		return r, err
 	}
+	if err := s.validateRecipients(ctx, r.Actions.RecipientUserIDs); err != nil {
+		return r, err
+	}
 	r.ID = uuid.NewString()
 	r.Enabled = true
 	r.CreatedAt = time.Now().UTC()
@@ -65,6 +68,9 @@ func (s *Service) Update(ctx context.Context, id string, r Rule) (Rule, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	if err := normalizeRule(&r); err != nil {
+		return r, err
+	}
+	if err := s.validateRecipients(ctx, r.Actions.RecipientUserIDs); err != nil {
 		return r, err
 	}
 	r.ID = id
@@ -405,4 +411,47 @@ func containsInt(values []int, target int) bool {
 		}
 	}
 	return false
+}
+
+func (s *Service) validateRecipients(ctx context.Context, ids []string) error {
+	if ids == nil {
+		return nil
+	} // Existing rules keep all enabled family members.
+	if len(ids) > 100 {
+		return fmt.Errorf("too many notification recipients")
+	}
+	seen := map[string]bool{}
+	for _, id := range ids {
+		if seen[id] {
+			return fmt.Errorf("duplicate notification recipient")
+		}
+		seen[id] = true
+		var exists bool
+		if err := s.store.DB.QueryRowContext(ctx, `SELECT EXISTS(SELECT 1 FROM users WHERE id=? AND enabled=1)`, id).Scan(&exists); err != nil {
+			return err
+		}
+		if !exists {
+			return fmt.Errorf("notification recipient is unavailable")
+		}
+	}
+	return nil
+}
+
+func (s *Service) SetRecipients(ctx context.Context, id string, ids []string) error {
+	if err := s.validateRecipients(ctx, ids); err != nil {
+		return err
+	}
+	value, err := json.Marshal(ids)
+	if err != nil {
+		return err
+	}
+	result, err := s.store.DB.ExecContext(ctx, `UPDATE rules SET actions_json=json_set(actions_json,'$.recipientUserIds',json(?)),updated_at=? WHERE id=?`, string(value), time.Now().UTC().Format(time.RFC3339Nano), id)
+	if err != nil {
+		return err
+	}
+	n, _ := result.RowsAffected()
+	if n == 0 {
+		return sql.ErrNoRows
+	}
+	return nil
 }

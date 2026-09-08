@@ -17,6 +17,7 @@ class RulesViewModel @Inject constructor(
     private val repository: ValkyrisRepository,
     private val actionGate: MobileActionGate,
 ) : ViewModel() {
+    val people = repository.people
     val rules = repository.rules
     val cameras = repository.cameras
     private val _detectors = MutableStateFlow<List<DetectorKind>>(emptyList())

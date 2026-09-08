@@ -35,11 +35,12 @@ type PairingSession struct {
 }
 
 type LoginRequest struct {
-	ReadOnly   bool   `json:"readOnly,omitempty"`
-	Password   string `json:"password"`
-	DeviceName string `json:"deviceName"`
-	UserName   string `json:"userName"`
-	Locale     string `json:"locale"`
+	BrowserAdmin bool   `json:"browserAdmin,omitempty"`
+	ReadOnly     bool   `json:"readOnly,omitempty"`
+	Password     string `json:"password"`
+	DeviceName   string `json:"deviceName"`
+	UserName     string `json:"userName"`
+	Locale       string `json:"locale"`
 }
 
 type PairRequest struct {
@@ -132,8 +133,8 @@ func (m *Manager) LoginAdmin(ctx context.Context, req LoginRequest) (PairRespons
 		bcrypt.CompareHashAndPassword([]byte(encoded), []byte(req.Password)) != nil {
 		return PairResponse{}, fmt.Errorf("invalid credentials")
 	}
-	if req.ReadOnly {
-		return m.issueViewer(ctx)
+	if req.ReadOnly || req.BrowserAdmin {
+		return m.issueBrowser(ctx, req.BrowserAdmin)
 	}
 	// A phone can lose its local session during an app reinstall. Reuse the
 	// matching administrator device/profile and rotate its token instead of
@@ -287,7 +288,7 @@ func (m *Manager) authenticate(ctx context.Context, token string) (string, bool,
 	}
 	var id string
 	var admin int
-	err := m.store.DB.QueryRowContext(ctx, `SELECT id,is_admin FROM devices WHERE token_hash=? AND enabled=1`, appcrypto.Hash(token)).Scan(&id, &admin)
+	err := m.store.DB.QueryRowContext(ctx, `SELECT id,is_admin FROM devices WHERE token_hash=? AND enabled=1 AND (user_id IS NULL OR EXISTS(SELECT 1 FROM users WHERE users.id=devices.user_id AND users.enabled=1))`, appcrypto.Hash(token)).Scan(&id, &admin)
 	if err != nil {
 		return "", false, err
 	}
@@ -329,7 +330,11 @@ func (m *Manager) Middleware(next http.Handler) http.Handler {
 			return
 		}
 		if viewer {
-			if !viewerRequestAllowed(r) || (cookieAuth && !ViewerRequestSafe(r)) {
+			if err := m.store.DB.QueryRowContext(r.Context(), `SELECT is_admin FROM viewer_sessions WHERE id=?`, id).Scan(&admin); err != nil {
+				writeUnauthorized(w)
+				return
+			}
+			if !(viewerRequestAllowed(r) || (admin && browserAdminRequestAllowed(r))) || (cookieAuth && !ViewerRequestSafe(r)) {
 				w.Header().Set("Content-Type", "application/json")
 				w.WriteHeader(http.StatusForbidden)
 				json.NewEncoder(w).Encode(map[string]any{"success": false, "message": "Acesso de consulta inválido ou operação não permitida."})
@@ -350,6 +355,32 @@ func (m *Manager) Middleware(next http.Handler) http.Handler {
 		w.Header().Set("Cache-Control", "no-store")
 		ctx := context.WithValue(r.Context(), deviceKey, id)
 		ctx = context.WithValue(ctx, adminKey, admin)
+		if r.URL.Path == "/realtime" {
+			connectionCtx, cancel := context.WithCancel(ctx)
+			defer cancel()
+			go func() {
+				ticker := time.NewTicker(15 * time.Second)
+				defer ticker.Stop()
+				for {
+					select {
+					case <-connectionCtx.Done():
+						return
+					case <-ticker.C:
+						var checkErr error
+						if viewer {
+							_, checkErr = m.authenticateViewer(connectionCtx, token)
+						} else {
+							_, _, checkErr = m.authenticate(connectionCtx, token)
+						}
+						if checkErr != nil {
+							cancel()
+							return
+						}
+					}
+				}
+			}()
+			ctx = connectionCtx
+		}
 		next.ServeHTTP(w, r.WithContext(ctx))
 	})
 }

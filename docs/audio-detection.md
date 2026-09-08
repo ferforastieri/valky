@@ -10,12 +10,11 @@ O classificador nativo usa o Zipformer int8 do sherpa-onnx (`2024-04-15`), inclu
 
 Para `baby_cry`:
 
-- Pontuação de pelo menos 0,78 permite uma decisão imediata após a primeira janela completa.
 - Pontuação de pelo menos 0,50 exige duas janelas sem sobreposição, com evidência mantida entre elas: no mínimo 8 segundos de áudio. Depois da confirmação, a evidência permanece válida enquanto a pontuação continuar acima de 0,50.
 - Pontuação menor que 0,50, lacuna de análise ou nova conexão reinicia a evidência.
 - `Crying, sobbing` é registrado separadamente e não é convertido em choro de bebê.
 
-Esses valores são critérios internos, não probabilidades calibradas para o quarto. A amostra oficial de bebê (`6.wav`) foi reconhecida nas três janelas avaliadas, com pontuações de 0,961 a 0,982. Os exemplos de gato, assobio, música e risada não acionaram choro de bebê. Esse conjunto pequeno é uma regressão, não uma medição de sensibilidade em uso real. Ajustes futuros precisam comparar gravações representativas de choro e de sons sem choro do ambiente.
+Esses valores são critérios internos, não probabilidades calibradas para o quarto. A amostra oficial de bebê (`6.wav`) produz pontuações de 0,961 a 0,982 e só é confirmada após duas janelas independentes. Os exemplos de gato, assobio, música e risada não acionaram choro de bebê. Esse conjunto pequeno é uma regressão, não uma medição de sensibilidade em uso real. Ajustes futuros precisam comparar gravações representativas de choro e de sons sem choro do ambiente.
 
 Horários, confirmações adicionais e intervalo entre alertas continuam sendo aplicados pelo serviço de regras. Janelas sobrepostas não contam como confirmações independentes. Os demais detectores preservam seus limiares. A detecção de som não classifica risco clínico.
 
@@ -23,7 +22,7 @@ Horários, confirmações adicionais e intervalo entre alertas continuam sendo a
 
 A tabela interna `audio_decisions` conserva aproximadamente 24 horas de pontuações, RMS do áudio, duração da inferência, identificação da sessão, limites da janela e motivo da decisão. A limpeza acontece a cada 5 minutos durante o processamento. Esses registros não contêm áudio bruto e não aparecem como eventos para a família.
 
-Motivos incluem `strong_baby_cry`, `persistent_baby_cry`, `awaiting_independent_baby_evidence`, `overlapping_baby_evidence`, `below_baby_threshold`, `capture_interrupted`, `classification_failed` e `analysis_lag`. `accepted` indica aprovação pelo detector, não entrega de notificação. O log `audio rule evaluation` informa quantas regras aceitaram a detecção; eventos e fila de notificações permitem acompanhar as etapas seguintes.
+Motivos incluem `persistent_baby_cry`, `awaiting_independent_baby_evidence`, `overlapping_baby_evidence`, `below_baby_threshold`, `capture_interrupted`, `classification_failed` e `analysis_lag`. `accepted` indica aprovação pelo detector, não entrega de notificação. O log `audio rule evaluation` informa quantas regras aceitaram a detecção; eventos e fila de notificações permitem acompanhar as etapas seguintes.
 
 ```sql
 SELECT window_end,
@@ -46,3 +45,7 @@ VALKYRIS_AUDIO_TEST_MODEL_DIR=/caminho/sherpa-onnx-zipformer-small-audio-tagging
 ```
 
 Referências: [modelo e amostras oficiais](https://k2-fsa.github.io/sherpa/onnx/audio-tagging/pretrained_models.html), [áudio tagging por trecho](https://k2-fsa.github.io/sherpa/onnx/audio-tagging/index.html), [classe Baby cry no AudioSet](https://research.google.com/audioset/ontology/baby_cry_infant_cry.html).
+
+## Regressão do falso alerta de 08/09/2026
+
+Às 13:44:07 (America/Sao_Paulo), a regra disparou com score 0,8609 depois de uma janela sobreposta com 0,7159. A janela seguinte caiu para 0,0019. O antigo caminho imediato de confiança alta aceitou esse pico sem evidência independente. Agora todos os scores, inclusive altos, exigem confirmação temporal. A sequência registrada está coberta por teste e não dispara com o critério novo. Isso explica a decisão do software, sem identificar o som que o modelo confundiu.

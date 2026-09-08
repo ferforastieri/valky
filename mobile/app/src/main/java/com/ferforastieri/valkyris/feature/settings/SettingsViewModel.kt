@@ -38,6 +38,21 @@ class SettingsViewModel @Inject constructor(
     private val actionGate: MobileActionGate,
     private val push: FcmRegistration,
 ) : ViewModel() {
+    private val _users = MutableStateFlow<List<com.ferforastieri.valkyris.core.model.ManagedUser>>(emptyList())
+    val users = _users.asStateFlow()
+    private val _usersError = MutableStateFlow<String?>(null)
+    val usersError = _usersError.asStateFlow()
+    private val _usersBusy = MutableStateFlow(false)
+    val usersBusy = _usersBusy.asStateFlow()
+    fun refreshUsers() { viewModelScope.launch { runCatching { api.managedUsers() }.onSuccess { _users.value = it; _usersError.value = null }.onFailure { _usersError.value = it.message } } }
+    fun saveUser(user: com.ferforastieri.valkyris.core.model.ManagedUser, remove: Boolean = false) {
+        if (_usersBusy.value) return
+        _usersBusy.value = true
+        viewModelScope.launch { try {
+            runCatching { if (remove) api.removeUser(user.id) else api.manageUser(user) }
+                .onSuccess { refreshUsers() }.onFailure { _usersError.value = it.message }
+        } finally { _usersBusy.value = false } }
+    }
     private val _invitation = MutableStateFlow(InvitationState())
     val invitation = _invitation.asStateFlow()
     private val _retention = MutableStateFlow(RetentionState())

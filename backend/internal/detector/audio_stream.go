@@ -193,7 +193,7 @@ type cryEvidence struct {
 	sustained bool
 }
 
-// Keep a fast path for strong evidence. Moderate baby-specific evidence must
+// Even strong model scores can be isolated false positives. Baby evidence must
 // occur in two disjoint windows. Generic crying alone never becomes baby_cry.
 func (g *cryEvidence) evaluate(w audioWindow, score float64) (bool, string) {
 	if g.session != w.session || (!g.lastEnd.IsZero() && w.end.Sub(g.lastEnd) > 4*time.Second) {
@@ -203,11 +203,6 @@ func (g *cryEvidence) evaluate(w audioWindow, score float64) (bool, string) {
 		return false, "repeated_window"
 	}
 	g.lastEnd = w.end
-	if score >= rules.AudioThreshold("baby_cry") {
-		g.pending = false
-		g.sustained = true
-		return true, "strong_baby_cry"
-	}
 	if score < .50 {
 		g.pending = false
 		g.sustained = false

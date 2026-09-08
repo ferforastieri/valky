@@ -33,6 +33,7 @@ func Open(path string) (*Store, error) {
 		query  string
 		after  string
 	}{
+		{"viewer_sessions", "is_admin", `ALTER TABLE viewer_sessions ADD COLUMN is_admin INTEGER NOT NULL DEFAULT 0`, ""},
 		{"rules", "motion_json", `ALTER TABLE rules ADD COLUMN motion_json TEXT NOT NULL DEFAULT 'null'`, ""},
 		{"cameras", "media_xaddr", `ALTER TABLE cameras ADD COLUMN media_xaddr TEXT NOT NULL DEFAULT ''`, ""},
 		{"cameras", "events_xaddr", `ALTER TABLE cameras ADD COLUMN events_xaddr TEXT NOT NULL DEFAULT ''`, ""},

@@ -55,6 +55,12 @@ func TestEncryptedPushRetriesAndThenDelivers(t *testing.T) {
 	if _, err = db.DB.Exec(`INSERT INTO devices(id,name,token_hash,created_at,last_seen_at) VALUES('phone','Pixel',x'01',?,?)`, now, now); err != nil {
 		t.Fatal(err)
 	}
+	if _, err = db.DB.Exec(`INSERT INTO users(id,name,created_at,updated_at) VALUES('user','User',?,?)`, now, now); err != nil {
+		t.Fatal(err)
+	}
+	if _, err = db.DB.Exec(`UPDATE devices SET user_id='user' WHERE id='phone'`); err != nil {
+		t.Fatal(err)
+	}
 	secret := "device-side-secret"
 	if err = service.Register(context.Background(), "phone", Registration{Token: "fcm-device-token", Secret: secret}); err != nil {
 		t.Fatal(err)

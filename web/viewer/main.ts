@@ -1,5 +1,6 @@
 import { API, labels, escape as e, date, clock, key } from "./lib/api";
 import type {
+  ManagedUser,
   Camera,
   Event,
   Person,
@@ -223,7 +224,7 @@ function render() {
           $("#family-map").textContent =
             "Não foi possível abrir o mapa. As posições continuam disponíveis no histórico.";
       });
-  if (page === "system") void renderSystem(version);
+  if (page === "system") { void renderSystem(version); if(api.admin) { main.insertAdjacentHTML('beforeend','<section id="user-admin" class="panel panel-pad"><h2>Usuários</h2><p>Carregando…</p></section>'); void renderUsers(); } }
   document.querySelectorAll("[data-page]").forEach((link) => {
     if ((link as HTMLElement).dataset.page === page)
       link.setAttribute("aria-current", "page");
@@ -541,6 +542,11 @@ async function ruleDetails(id: string) {
         ] as [string, string][])
       : []),
   ])}<div class="rule-actions">${actionPills(r)}</div>${r.motion ? `<div class="section-title"><h2>Região monitorada</h2></div><div class="media-stage"><img data-snapshot="${e(r.cameraId)}" alt="Região configurada na câmera" hidden/><span class="region" style="left:${r.motion.region.x * 100}%;top:${r.motion.region.y * 100}%;width:${r.motion.region.width * 100}%;height:${r.motion.region.height * 100}%"></span></div><p class="notice">A região corresponde ao enquadramento configurado. Movimento na região não identifica postura nem risco médico.</p>` : ""}`;
+  if(api.admin) {
+ const selected=r.actions.recipientUserIds;
+ $('#detail-body').insertAdjacentHTML('beforeend',`<form id="recipients"><h3>Quem recebe alertas e notificações</h3><label><input type="checkbox" name="all" ${selected==null?'checked':''}> Toda a família</label>${people.map(p=>`<label style="display:block"><input type="checkbox" name="recipient" value="${e(p.id)}" ${selected?.includes(p.id)?'checked':''}> ${e(p.name)}</label>`).join('')}<p class="muted">Sem pessoas selecionadas, ninguém recebe notificações desta regra.</p><button type="submit">Salvar destinatários</button><p role="status"></p></form>`);
+ const form=$<HTMLFormElement>('#recipients');form.onsubmit=async ev=>{ev.preventDefault();const data=new FormData(form);const ids=data.has('all')?null:data.getAll('recipient').map(String);const button=form.querySelector('button')!;button.disabled=true;try{await api.mutate(`/rules/${key(id)}/recipients`,'PUT',{recipientUserIds:ids});r.actions.recipientUserIds=ids;form.querySelector('[role=status]')!.textContent='Destinatários salvos.';}catch(err){form.querySelector('[role=status]')!.textContent=(err as Error).message;}finally{button.disabled=false;}};
+ }
   void snapshots($("#detail-body"), modalController.signal, modalCleanups);
 }
 async function refresh(force = false) {
@@ -706,3 +712,18 @@ void api
     if (ok) enter();
   })
   .catch(() => {});
+
+async function renderUsers() {
+ const target=document.getElementById('user-admin');if(!target)return;
+ try{
+ const users=await api.get<ManagedUser[]>('/admin/users');if(!target.isConnected)return;
+ target.innerHTML='<h2>Gerenciar usuários</h2><button type="button" id="invite-user">Convidar usuário</button><p id="invite-result" role="status"></p>'+users.map(u=>`<form data-managed="${e(u.id)}" class="panel-pad"><label>Nome <input name="name" value="${e(u.name)}" required maxlength="100"></label><label><input name="enabled" type="checkbox" ${u.enabled?'checked':''}> Ativo</label><label><input name="admin" type="checkbox" ${u.admin?'checked':''}> Administrador</label><small>${u.devices} dispositivos</small><button type="submit">Salvar</button><button type="button" data-remove>Remover</button><p role="status"></p></form>`).join('');
+ target.querySelector<HTMLButtonElement>('#invite-user')!.onclick=async()=>{const button=target.querySelector<HTMLButtonElement>('#invite-user')!;button.disabled=true;try{const invite=await api.mutate<{code:string;expiresAt:string}>('/pairing-sessions','POST');target.querySelector('#invite-result')!.textContent=`Convite: ${invite.code} · válido até ${date(invite.expiresAt)}. Use este código no Android.`;}catch(err){target.querySelector('#invite-result')!.textContent=(err as Error).message;}finally{button.disabled=false;}};
+ target.querySelectorAll<HTMLFormElement>('form').forEach(form=>{
+ const id=form.dataset.managed!;
+ const run=async(remove:boolean)=>{const status=form.querySelector('[role=status]')!;form.querySelectorAll('button').forEach(b=>b.disabled=true);try{const data=new FormData(form);await api.mutate(`/admin/users/${key(id)}`,remove?'DELETE':'PUT',remove?undefined:{name:data.get('name'),enabled:data.has('enabled'),admin:data.has('admin')});if(remove)form.remove();else status.textContent='Usuário atualizado.';}catch(err){status.textContent=(err as Error).message;}finally{form.querySelectorAll('button').forEach(b=>b.disabled=false);}};
+ form.onsubmit=ev=>{ev.preventDefault();void run(false)};
+ form.querySelector<HTMLButtonElement>('[data-remove]')!.onclick=()=>{if(window.confirm('Remover este usuário e revogar o acesso dos seus dispositivos?'))void run(true)};
+ });
+ }catch(err){target.textContent=(err as Error).message;}
+}

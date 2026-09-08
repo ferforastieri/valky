@@ -1121,3 +1121,12 @@ dialog::backdrop {
 .location-timeline time { color: var(--muted); font: 11px var(--mono); }
 .location-timeline strong { font-size: 14px; font-weight: 550; overflow-wrap: anywhere; }
 .location-timeline small { color: var(--muted); }
+
+#user-admin { margin-top: 24px; }
+#user-admin form { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; border-bottom: 1px solid var(--line); }
+#user-admin form > label:first-child { flex: 1 1 220px; }
+#user-admin label, #recipients label { display: flex; align-items: center; gap: 8px; }
+#user-admin input[type="text"], #user-admin input[name="name"] { width: 100%; min-width: 0; }
+#user-admin input[type="checkbox"], #recipients input[type="checkbox"] { width: auto; accent-color: var(--accent); }
+#user-admin [role="status"], #recipients [role="status"] { flex-basis: 100%; }
+#recipients { display: grid; gap: 12px; margin-top: 24px; }

@@ -64,10 +64,11 @@ func TestCryEvidence(t *testing.T) {
 		scores []float64
 		want   []bool
 	}{
-		{"strong", []float64{.9}, []bool{true}},
+		{"strong needs confirmation", []float64{.9}, []bool{false}},
 		{"persistent", []float64{.6, .6, .6, .6, .6}, []bool{false, false, true, true, true}},
 		{"interrupted", []float64{.6, .1, .6}, []bool{false, false, false}},
 		{"weak", []float64{.2, .2, .2}, []bool{false, false, false}},
+		{"reported false alert", []float64{.0013, .7159, .8609, .0019}, []bool{false, false, false, false}},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
