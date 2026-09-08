@@ -235,6 +235,7 @@ class ValkyrisApi(
 
     suspend fun updateRetention(settings: RetentionSettings): RetentionSettings = put("/settings/retention", settings, announceBackend = true)
 
+    suspend fun sessionPermissions(): SessionPermissions = get("/viewer-session")
     suspend fun managedUsers(): List<ManagedUser> = get("/admin/users")
     suspend fun manageUser(user: ManagedUser): ManagedUser = put("/admin/users/${user.id}", user, announceBackend = true)
     suspend fun removeUser(id: String) {

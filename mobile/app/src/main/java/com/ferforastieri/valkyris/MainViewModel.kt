@@ -129,7 +129,18 @@ class MainViewModel @Inject constructor(
 
     fun signOut() { sessions.clear(); _admin.value = false; _paired.value = false; _updateInfo.value = null }
 
-    fun refreshPushRegistration() { if (_paired.value) push.registerCurrent() }
+    fun refreshPushRegistration() {
+        val current = sessions.get() ?: return
+        push.registerCurrent()
+        viewModelScope.launch {
+            runCatching { api.sessionPermissions() }.onSuccess { permissions ->
+                if (sessions.get()?.token == current.token) {
+                    _admin.value = permissions.admin
+                    if (current.admin != permissions.admin) sessions.save(current.copy(admin = permissions.admin))
+                }
+            }.onFailure { if (sessions.get()?.token == current.token) _admin.value = false }
+        }
+    }
 
     fun checkForUpdates(force: Boolean = false) {
         if (!_paired.value) return
