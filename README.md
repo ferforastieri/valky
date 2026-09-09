@@ -48,7 +48,7 @@ Câmera ONVIF / RTSP
  Detectores locais → Regras → Evento + mídia → FCM → alerta nativo Android
 ```
 
-O backend Go é o limite de segurança: o app nunca recebe a senha da câmera e as APIs internas do MediaMTX não são expostas. Apenas a porta de mídia WebRTC 8189 UDP/TCP é publicada. SQLite, certificados, segredos, snapshots e clipes vivem no volume persistente `valkyris-data`.
+O backend Go é o limite de segurança: o app nunca recebe a senha da câmera e as APIs internas do MediaMTX não são expostas. Apenas a porta de mídia WebRTC 8189 UDP/TCP é publicada. SQLite, certificados, segredos, snapshots e clipes vivem no volume persistente `valkyris-data`. O buffer temporário de dez minutos fica em RAM, no volume compartilhado `recording-buffer`, limitado a 384 MiB, evitando gravações contínuas em disco. Veja [dimensionamento e operação 24/7](docs/energy-efficiency.md).
 
 ## Tecnologias
 

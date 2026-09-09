@@ -30,6 +30,11 @@ services:
       - "${VALKYRIS_PORT:-8443}:8443"
     volumes:
       - valkyris-data:/data
+      - type: volume
+        source: recording-buffer
+        target: /data/recordings
+        volume:
+          nocopy: true
     networks: [valkyris]
     healthcheck:
       test: ["CMD", "wget", "--no-check-certificate", "-qO-", "https://localhost:8443/health"]
@@ -82,6 +87,11 @@ services:
         bind:
           create_host_path: false
       - valkyris-data:/data
+      - type: volume
+        source: recording-buffer
+        target: /data/recordings
+        volume:
+          nocopy: true
     expose:
       - "8554"
       - "8889"
@@ -97,3 +107,10 @@ networks:
 
 volumes:
   valkyris-data:
+
+  recording-buffer:
+    driver: local
+    driver_opts:
+      type: tmpfs
+      device: tmpfs
+      o: "size=384m,nodev,nosuid,noexec,mode=0755"
