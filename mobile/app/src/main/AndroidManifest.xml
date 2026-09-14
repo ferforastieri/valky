@@ -42,6 +42,7 @@
             android:theme="@style/Theme.Valkyris.Alarm" />
         <activity
             android:name=".MainActivity"
+            android:configChanges="keyboardHidden|orientation|screenLayout|screenSize"
             android:exported="true"
             android:theme="@style/Theme.Valkyris.Starting"
             android:windowSoftInputMode="adjustResize">

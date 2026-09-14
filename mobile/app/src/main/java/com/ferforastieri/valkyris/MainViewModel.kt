@@ -76,19 +76,6 @@ class MainViewModel @Inject constructor(
         val uri = _pairingLink.value ?: return
         pair(uri.getQueryParameter("url").orEmpty(), uri.getQueryParameter("code").orEmpty(), uri.getQueryParameter("fingerprint").orEmpty(), name, username, password)
     }
-    fun configureCredentials(username: String, password: String) {
-        if (!actionGate.tryAcquire()) return
-        _connecting.value = true
-        _error.value = null
-        viewModelScope.launch {
-            try {
-                api.saveCredentials(username.trim(), password)
-                api.sessionPermissions()
-            } catch (error: Exception) { _error.value = error.message }
-            finally { _connecting.value = false; actionGate.release() }
-        }
-    }
-
     fun acceptLaunch(uri: Uri?, eventId: String?, cameraId: String? = null) {
         acceptPairingLink(uri)
         val deepLinkId = if (uri?.scheme == "valkyris" && uri.host == "event") uri.lastPathSegment else null

@@ -75,14 +75,14 @@ fun ValkyrisTopBar(
                     }
                     if (unreadNotifications > 0) {
                         Surface(
-                            modifier = Modifier.align(Alignment.TopEnd).padding(top = 1.dp, end = 1.dp),
+                            modifier = Modifier.align(Alignment.TopEnd).padding(top = 3.dp, end = 3.dp),
                             shape = CircleShape,
                             color = MaterialTheme.colorScheme.error,
                             contentColor = MaterialTheme.colorScheme.onError,
                         ) {
                             Text(
                                 text = if (unreadNotifications > 99) "99+" else unreadNotifications.toString(),
-                                modifier = Modifier.padding(horizontal = 4.dp),
+                                modifier = Modifier.padding(horizontal = 4.dp, vertical = 2.dp),
                                 style = MaterialTheme.typography.labelSmall,
                                 fontWeight = FontWeight.Bold,
                             )

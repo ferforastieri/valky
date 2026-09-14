@@ -56,7 +56,6 @@ private val destinations = listOf(
 @Composable
 fun ValkyrisApp(main: MainViewModel) {
     val paired by main.paired.collectAsStateWithLifecycle()
-    val permissions by main.permissions.collectAsStateWithLifecycle()
     val actionBusy by main.actionBusy.collectAsStateWithLifecycle()
     val admin by main.admin.collectAsStateWithLifecycle()
     val update by main.updateInfo.collectAsStateWithLifecycle()
@@ -65,8 +64,6 @@ fun ValkyrisApp(main: MainViewModel) {
         Box(Modifier.fillMaxSize().windowInsetsPadding(WindowInsets.safeDrawing)) {
             if (!paired) {
                 OnboardingScreen(main)
-            } else if (!permissions.credentialsConfigured) {
-                com.ferforastieri.valkyris.feature.onboarding.CredentialsSetupScreen(main)
             } else {
                 ConnectedValkyrisApp(main)
             }

@@ -71,34 +71,6 @@ fun OnboardingScreen(viewModel: MainViewModel) {
 }
 
 @Composable
-fun CredentialsSetupScreen(viewModel: MainViewModel) {
-    var username by remember { mutableStateOf("") }
-    var password by remember { mutableStateOf("") }
-    var confirmation by remember { mutableStateOf("") }
-    val connecting by viewModel.connecting.collectAsStateWithLifecycle()
-    val error by viewModel.error.collectAsStateWithLifecycle()
-    val loaded by viewModel.permissionsLoaded.collectAsStateWithLifecycle()
-    AccountSurface {
-        AccountHeading(
-            if (loaded) "Proteja sua conta" else "Verificando sua conta",
-            if (loaded) "Defina seu usuário e senha. Seu perfil e histórico serão mantidos." else "Aguarde enquanto verificamos seu acesso.",
-        )
-        if (loaded) {
-            UsernameField(username, { username = it }, !connecting)
-            PasswordField(password, { password = it }, "Nova senha", !connecting)
-            Text("Use uma frase com pelo menos 12 caracteres.", style = MaterialTheme.typography.bodySmall)
-            PasswordField(confirmation, { confirmation = it }, "Confirmar senha", !connecting)
-            error?.let { Text(it, color = MaterialTheme.colorScheme.error) }
-            Button(onClick = { viewModel.configureCredentials(username, password) }, enabled = !connecting && username.isNotBlank() && password.toByteArray().size in 12..72 && password == confirmation, modifier = Modifier.fillMaxWidth()) { Text(if (connecting) "Salvando…" else "Salvar e continuar") }
-        } else {
-            CircularProgressIndicator(Modifier.align(Alignment.CenterHorizontally))
-            TextButton(onClick = { viewModel.refreshPushRegistration() }, modifier = Modifier.fillMaxWidth()) { Text("Tentar novamente") }
-        }
-        TextButton(onClick = viewModel::signOut, enabled = !connecting, modifier = Modifier.fillMaxWidth()) { Text("Sair") }
-    }
-}
-
-@Composable
 private fun AccountSurface(content: @Composable ColumnScope.() -> Unit) {
     BoxWithConstraints(Modifier.fillMaxSize().imePadding()) {
         val viewportHeight = maxHeight
