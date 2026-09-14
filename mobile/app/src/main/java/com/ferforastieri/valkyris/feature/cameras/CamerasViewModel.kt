@@ -17,17 +17,13 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
-import kotlinx.coroutines.async
-import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.supervisorScope
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import okhttp3.Request
-import java.util.concurrent.TimeUnit
 import java.time.LocalDateTime
 import java.time.format.DateTimeFormatter
 import javax.inject.Inject
@@ -38,7 +34,6 @@ data class CamerasState(
     val deleting: Set<String> = emptySet(),
     val updating: Set<String> = emptySet(),
     val cameras: List<Camera> = emptyList(),
-    val snapshots: Map<String, Bitmap> = emptyMap(),
     val error: String? = null,
 )
 
@@ -60,7 +55,6 @@ class CamerasViewModel @Inject constructor(
                 _state.update { state ->
                     state.copy(
                         cameras = cameras,
-                        snapshots = state.snapshots.filterKeys { id -> cameras.any { it.id == id } },
                         loading = false,
                     )
                 }
@@ -72,7 +66,6 @@ class CamerasViewModel @Inject constructor(
             while (isActive) {
                 delay(STATUS_REFRESH_MS)
                 runCatching { repository.refreshCameras() }
-                refreshSnapshots()
             }
         }
     }
@@ -86,7 +79,6 @@ class CamerasViewModel @Inject constructor(
     private fun refreshStatuses() {
         viewModelScope.launch {
             runCatching { repository.refreshCameras() }
-                .onSuccess { refreshSnapshots() }
         }
     }
 
@@ -96,33 +88,8 @@ class CamerasViewModel @Inject constructor(
             runCatching { repository.refreshCameras() }
                 .onSuccess {
                     _state.update { it.copy(loading = false) }
-                    refreshSnapshots()
                 }
                 .onFailure { error -> _state.update { it.copy(loading = false, error = error.message) } }
-        }
-    }
-
-    private suspend fun refreshSnapshots() {
-        val cameras = _state.value.cameras.filter { it.setupStatus == "ready" }
-        if (cameras.isEmpty()) {
-            _state.update { it.copy(snapshots = emptyMap()) }
-            return
-        }
-        val loaded = supervisorScope {
-            cameras.map { camera -> async(Dispatchers.IO) {
-                runCatching {
-                    val request = Request.Builder().url(api.snapshotUrl(camera.id))
-                        .header("Authorization", "Bearer ${api.token()}").build()
-                    mediaClient.newCall(request).apply { timeout().timeout(15, TimeUnit.SECONDS) }.execute().use { response ->
-                        if (!response.isSuccessful) return@runCatching null
-                        val bytes = response.body.bytes()
-                        BitmapFactory.decodeByteArray(bytes, 0, bytes.size)?.let { camera.id to it }
-                    }
-                }.getOrNull()
-            } }.awaitAll().filterNotNull().toMap()
-        }
-        if (loaded.isNotEmpty()) {
-            _state.update { state -> state.copy(snapshots = state.snapshots + loaded) }
         }
     }
 
@@ -146,7 +113,6 @@ class CamerasViewModel @Inject constructor(
         viewModelScope.launch {
             try {
                 runCatching { repository.updateCamera(id, input) }
-                    .onSuccess { refreshSnapshots() }
                     .onFailure { error -> _state.update { it.copy(error = error.message) } }
             } finally {
                 _state.update { it.copy(updating = it.updating - id) }
@@ -161,7 +127,7 @@ class CamerasViewModel @Inject constructor(
         viewModelScope.launch {
             try {
                 runCatching { repository.deleteCamera(id) }
-                    .onSuccess { _state.update { it.copy(deleting = it.deleting - id, snapshots = it.snapshots - id) } }
+                    .onSuccess { _state.update { it.copy(deleting = it.deleting - id) } }
                     .onFailure { error -> _state.update { it.copy(deleting = it.deleting - id, error = error.message) } }
             } finally {
                 actionGate.release()
@@ -178,6 +144,10 @@ class CamerasViewModel @Inject constructor(
         realtime?.close(1000, "camera screen closed")
         super.onCleared()
     }
+
+    fun whepUrl(cameraId: String) = api.whepUrl(cameraId)
+    fun token() = api.token()
+    fun httpClient() = mediaClient
 }
 @HiltViewModel
 class CameraLiveViewModel @Inject constructor(

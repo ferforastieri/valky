@@ -47,8 +47,8 @@ private data class Destination(val route: String, val label: Int, val icon: Imag
 
 private val destinations = listOf(
     Destination("overview", R.string.overview, Lucide.House),
-    Destination("cameras", R.string.cameras, Lucide.Video),
     Destination("people", R.string.people, Lucide.MapPin),
+    Destination("cameras", R.string.cameras, Lucide.Video),
     Destination("profile", R.string.profile, Lucide.UserRound),
     Destination("settings", R.string.settings, Lucide.Settings),
 )

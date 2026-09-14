@@ -72,6 +72,13 @@ import com.composables.icons.lucide.X
 import com.composables.icons.lucide.Volume2
 import com.composables.icons.lucide.VolumeX
 import org.webrtc.SurfaceViewRenderer
+import okhttp3.OkHttpClient
+
+internal data class CameraListStream(
+    val endpoint: (String) -> String,
+    val token: () -> String,
+    val httpClient: OkHttpClient,
+)
 
 @Composable fun CamerasScreen(onCamera:(String)->Unit,vm:CamerasViewModel=hiltViewModel()){
     LifecycleResumeEffect(Unit) { vm.refresh();onPauseOrDispose {} }
@@ -82,7 +89,7 @@ import org.webrtc.SurfaceViewRenderer
     var deletingCameraId by remember{mutableStateOf<String?>(null)}
     val failedCamera=state.cameras.firstOrNull{it.id==failedCameraId}
     val editingCamera=state.cameras.firstOrNull{it.id==editingCameraId}
-    CamerasContent(state, onCamera={id->
+    CamerasContent(state, stream = CameraListStream(vm::whepUrl, vm::token, vm.httpClient()), onCamera={id->
         val camera=state.cameras.firstOrNull{it.id==id}
         if(camera?.setupStatus=="failed")failedCameraId=id else onCamera(id)
     }, onEdit={editingCameraId=it}, onDelete={deletingCameraId=it}, onAdd = { if (!state.creating) showAdd = true })
@@ -108,7 +115,7 @@ import org.webrtc.SurfaceViewRenderer
 }
 
 @Composable
-fun CamerasContent(state: CamerasState, onCamera: (String) -> Unit = {}, onEdit: (String) -> Unit = {}, onDelete: (String) -> Unit = {}, onAdd: () -> Unit = {}) {
+internal fun CamerasContent(state: CamerasState, stream: CameraListStream? = null, onCamera: (String) -> Unit = {}, onEdit: (String) -> Unit = {}, onDelete: (String) -> Unit = {}, onAdd: () -> Unit = {}) {
     Box(Modifier.fillMaxSize()){
         Column(Modifier.fillMaxSize().padding(horizontal=18.dp)){
             Spacer(Modifier.height(10.dp))
@@ -118,7 +125,7 @@ fun CamerasContent(state: CamerasState, onCamera: (String) -> Unit = {}, onEdit:
             when{
                 state.loading->Box(Modifier.fillMaxSize()){CircularProgressIndicator(Modifier.align(Alignment.Center))}
                 state.cameras.isEmpty()->EmptyCameras()
-                else->LazyColumn(verticalArrangement=Arrangement.spacedBy(12.dp),contentPadding=PaddingValues(bottom=96.dp)){items(state.cameras,key={it.id}){camera->CameraCard(camera,state.snapshots[camera.id],onClick={onCamera(camera.id)},onEdit={onEdit(camera.id)},onDelete={onDelete(camera.id)})}}
+                else->LazyColumn(verticalArrangement=Arrangement.spacedBy(12.dp),contentPadding=PaddingValues(bottom=96.dp)){items(state.cameras,key={it.id}){camera->CameraCard(camera,stream,onClick={onCamera(camera.id)},onEdit={onEdit(camera.id)},onDelete={onDelete(camera.id)})}}
             }
         }
         FloatingActionButton(
@@ -192,13 +199,13 @@ fun CameraFailureSheet(camera:Camera,onDismiss:()->Unit,onEdit:(()->Unit)?=null,
 }
 
 @Composable
-private fun CameraCard(camera: Camera, snapshot: android.graphics.Bitmap?, onClick: () -> Unit, onEdit: () -> Unit, onDelete: () -> Unit) {
+private fun CameraCard(camera: Camera, stream: CameraListStream?, onClick: () -> Unit, onEdit: () -> Unit, onDelete: () -> Unit) {
     val ready = camera.setupStatus == "ready"
     val failed = camera.setupStatus == "failed"
     Card(onClick = onClick, modifier = Modifier.fillMaxWidth(), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface), border = androidx.compose.foundation.BorderStroke(1.dp, if (failed) MaterialTheme.colorScheme.error.copy(alpha = .45f) else MaterialTheme.colorScheme.outlineVariant), elevation = CardDefaults.cardElevation(defaultElevation = 6.dp)) {
         Column {
             Box(Modifier.fillMaxWidth().aspectRatio(16 / 9f).background(ColorTokens.BrandTile)) {
-                if (ready && snapshot != null) Image(snapshot.asImageBitmap(), camera.name, Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
+                if (ready && stream != null) CameraListLivePlayer(camera, stream, Modifier.fillMaxSize())
                 else SignalLine(Modifier.fillMaxWidth().height(70.dp).align(Alignment.Center), if (failed) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.secondary)
                 Surface(Modifier.padding(12.dp).align(Alignment.TopEnd), shape = CircleShape, color = MaterialTheme.colorScheme.surface.copy(alpha = .9f)) {
                     Row(Modifier.padding(horizontal = 10.dp, vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -220,6 +227,50 @@ private fun CameraCard(camera: Camera, snapshot: android.graphics.Bitmap?, onCli
                 }
                 IconButton(onClick=onEdit){Icon(Lucide.Pencil,stringResource(R.string.edit_camera),tint=MaterialTheme.colorScheme.onSurfaceVariant)}
                 IconButton(onClick=onDelete){Icon(Lucide.Trash2,stringResource(R.string.remove_camera),tint=MaterialTheme.colorScheme.error)}
+            }
+        }
+    }
+}
+
+@Composable
+private fun CameraListLivePlayer(camera: Camera, stream: CameraListStream, modifier: Modifier = Modifier) {
+    val context = androidx.compose.ui.platform.LocalContext.current
+    var renderedFirstFrame by remember(camera.id) { mutableStateOf(false) }
+    var failure by remember(camera.id) { mutableStateOf<String?>(null) }
+    var streamForeground by remember(camera.id) { mutableStateOf(true) }
+    LifecycleResumeEffect(camera.id) {
+        streamForeground = true
+        onPauseOrDispose { streamForeground = false }
+    }
+    val controller = remember(camera.id, streamForeground) {
+        WhepLiveController(
+            context = context,
+            http = stream.httpClient,
+            endpoint = stream.endpoint(camera.id),
+            token = stream.token(),
+            onFirstFrame = { renderedFirstFrame = true; failure = null },
+            onFailure = { failure = it },
+        )
+    }
+    DisposableEffect(controller, streamForeground) {
+        if (streamForeground) {
+            controller.setMuted(true)
+            controller.start()
+        }
+        onDispose { controller.close() }
+    }
+    Box(modifier, contentAlignment = Alignment.Center) {
+        if (streamForeground) LivePlayer(controller, Modifier.fillMaxSize())
+        if (streamForeground && !renderedFirstFrame) {
+            CircularProgressIndicator(Modifier.size(28.dp), strokeWidth = 2.dp, color = Color.White)
+        }
+        failure?.let {
+            Surface(
+                modifier = Modifier.padding(16.dp),
+                shape = RoundedCornerShape(12.dp),
+                color = MaterialTheme.colorScheme.errorContainer.copy(alpha = .94f),
+            ) {
+                Text(it, Modifier.padding(12.dp), color = MaterialTheme.colorScheme.onErrorContainer, style = MaterialTheme.typography.bodySmall)
             }
         }
     }
@@ -337,6 +388,7 @@ private fun ReadyCameraContent(camera: Camera, vm: CameraLiveViewModel) {
     val preview by vm.preview.collectAsStateWithLifecycle()
     var muted by remember { mutableStateOf(false) }
     var showFullscreen by rememberSaveable { mutableStateOf(false) }
+    var streamForeground by remember { mutableStateOf(true) }
     var renderedFirstFrame by remember { mutableStateOf(false) }
     var streamFailure by remember { mutableStateOf<String?>(null) }
     var pendingMediaAction by remember { mutableStateOf<MediaAction?>(null) }
@@ -353,7 +405,14 @@ private fun ReadyCameraContent(camera: Camera, vm: CameraLiveViewModel) {
             storagePermission.launch(Manifest.permission.WRITE_EXTERNAL_STORAGE)
         } else if (action == MediaAction.Snapshot) vm.captureSnapshot() else vm.recordRecentClip()
     }
-    val controller = remember(vm.whepUrl()) {
+    LifecycleResumeEffect(camera.id) {
+        streamForeground = true
+        onPauseOrDispose {
+            streamForeground = false
+            showFullscreen = false
+        }
+    }
+    val controller = remember(vm.whepUrl(), streamForeground) {
         WhepLiveController(
             context = context,
             http = vm.httpClient(),
@@ -363,15 +422,17 @@ private fun ReadyCameraContent(camera: Camera, vm: CameraLiveViewModel) {
             onFailure = { streamFailure = it },
         )
     }
-    LaunchedEffect(muted) { controller.setMuted(muted) }
-    DisposableEffect(controller) {
-        controller.start()
+    LaunchedEffect(muted, controller, streamForeground) {
+        if (streamForeground) controller.setMuted(muted)
+    }
+    DisposableEffect(controller, streamForeground) {
+        if (streamForeground) controller.start()
         onDispose { controller.close() }
     }
     Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal=18.dp),verticalArrangement=Arrangement.spacedBy(14.dp)) {
         Surface(Modifier.fillMaxWidth().aspectRatio(16/9f),RoundedCornerShape(22.dp),color=ColorTokens.BrandTile,border=androidx.compose.foundation.BorderStroke(1.dp,MaterialTheme.colorScheme.outlineVariant),shadowElevation=7.dp) {
             Box {
-                if (!showFullscreen) ZoomableLivePlayer(controller,preview,renderedFirstFrame,{showFullscreen=true},Modifier.fillMaxSize())
+                if (streamForeground && !showFullscreen) ZoomableLivePlayer(controller,preview,renderedFirstFrame,{showFullscreen=true},Modifier.fillMaxSize())
                 else Box(Modifier.fillMaxSize().background(Color.Black))
                 streamFailure?.let { message ->
                     Surface(
@@ -421,7 +482,7 @@ private fun ReadyCameraContent(camera: Camera, vm: CameraLiveViewModel) {
         CameraRulesSection(camera.id)
         Spacer(Modifier.height(18.dp))
     }
-    if(showFullscreen) FullscreenLivePlayer(controller,preview,renderedFirstFrame,camera.name,onDismiss={showFullscreen=false})
+    if(streamForeground && showFullscreen) FullscreenLivePlayer(controller,preview,renderedFirstFrame,camera.name,onDismiss={showFullscreen=false})
 }
 
 @Composable
@@ -475,7 +536,7 @@ private fun FullscreenLivePlayer(controller: WhepLiveController,preview:android.
     val configuration = androidx.compose.ui.platform.LocalConfiguration.current
     var scale by remember(configuration.screenWidthDp, configuration.screenHeightDp) { mutableFloatStateOf(1f) }
     var offset by remember(configuration.screenWidthDp, configuration.screenHeightDp) { mutableStateOf(Offset.Zero) }
-    Dialog(onDismissRequest = onDismiss, properties = DialogProperties(usePlatformDefaultWidth = false, decorFitsSystemWindows = false)) {
+    Dialog(onDismissRequest = onDismiss, properties = DialogProperties(usePlatformDefaultWidth = false, decorFitsSystemWindows = true)) {
         Box(Modifier.fillMaxSize().background(Color.Black)) {
             Box(
                 Modifier.fillMaxSize().graphicsLayer {

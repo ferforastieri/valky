@@ -7,13 +7,13 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -57,30 +57,32 @@ fun ValkyrisTopBar(
                 overflow = TextOverflow.Ellipsis,
             )
             Surface(
-                shape = RoundedCornerShape(13.dp),
+                onClick = onNotifications,
+                modifier = Modifier.size(40.dp),
+                shape = RoundedCornerShape(11.dp),
                 color = if (notificationsSelected) MaterialTheme.colorScheme.secondary else MaterialTheme.colorScheme.surface,
                 border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
                 shadowElevation = 3.dp,
             ) {
                 Box {
-                    IconButton(onClick = onNotifications, modifier = Modifier.size(48.dp)) {
+                    Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                         Icon(
                             Lucide.Bell,
                             contentDescription = "Notificações",
-                            modifier = Modifier.size(20.dp),
+                            modifier = Modifier.size(18.dp),
                             tint = if (notificationsSelected) MaterialTheme.colorScheme.onSecondary else MaterialTheme.colorScheme.onSurface,
                         )
                     }
                     if (unreadNotifications > 0) {
                         Surface(
-                            modifier = Modifier.align(Alignment.TopEnd).padding(top = 2.dp, end = 2.dp),
+                            modifier = Modifier.align(Alignment.TopEnd).padding(top = 1.dp, end = 1.dp),
                             shape = CircleShape,
                             color = MaterialTheme.colorScheme.error,
                             contentColor = MaterialTheme.colorScheme.onError,
                         ) {
                             Text(
                                 text = if (unreadNotifications > 99) "99+" else unreadNotifications.toString(),
-                                modifier = Modifier.padding(horizontal = 5.dp, vertical = 1.dp),
+                                modifier = Modifier.padding(horizontal = 4.dp),
                                 style = MaterialTheme.typography.labelSmall,
                                 fontWeight = FontWeight.Bold,
                             )
