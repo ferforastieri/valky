@@ -13,5 +13,14 @@ class ModelTest {
         val encoded = kotlinx.serialization.json.Json.encodeToString(com.ferforastieri.valkyris.core.model.CreateCameraRequest.serializer(), input)
         assertTrue(encoded.contains("\"alerts\":{}"))
     }
+    @Test fun ruleAlertTextsAreSerializedAndResetExplicitly() {
+        val alerts = com.ferforastieri.valkyris.core.model.AlertPresentation(notificationTitle="Choro", notificationBody="Verifique o quarto")
+        val input = com.ferforastieri.valkyris.core.model.RuleActionsRequest(true,true,true,alerts=alerts)
+        val json = kotlinx.serialization.json.Json
+        val encoded = json.encodeToString(com.ferforastieri.valkyris.core.model.RuleActionsRequest.serializer(), input)
+        assertTrue(encoded.contains("Verifique o quarto"))
+        val reset = json.encodeToString(com.ferforastieri.valkyris.core.model.RuleActionsRequest.serializer(), input.copy(alerts=com.ferforastieri.valkyris.core.model.AlertPresentation()))
+        assertTrue(reset.contains("\"alerts\":{}"))
+    }
 }
 

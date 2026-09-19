@@ -54,6 +54,32 @@ async function refreshChart() {
       target.innerHTML = '<p class="muted">Não foi possível carregar a atividade. Tentaremos novamente automaticamente.</p>';
   }
 }
+const updateToast = document.createElement("div");
+updateToast.className = "update-toast";
+updateToast.setAttribute("role", "status");
+updateToast.setAttribute("aria-live", "polite");
+updateToast.hidden = true;
+document.body.append(updateToast);
+let updateToastTimer: ReturnType<typeof setTimeout> | undefined;
+let lastUpdateCheck = 0;
+let announcedUpdate = "";
+async function checkForUpdates() {
+  if (Date.now() - lastUpdateCheck < 15 * 60_000) return;
+  lastUpdateCheck = Date.now();
+  const connection = alive;
+  try {
+    const update = await api.get<Update>("/system/update", connection.signal);
+    if (connection !== alive || connection.signal.aborted || !api.token) return;
+    if (!update.serverUpdateAvailable || announcedUpdate === update.latestVersion) return;
+    announcedUpdate = update.latestVersion;
+    updateToast.textContent = `Versão ${update.latestVersion} disponível para atualização.`;
+    updateToast.hidden = false;
+    clearTimeout(updateToastTimer);
+    updateToastTimer = setTimeout(() => { updateToast.hidden = true; }, 6000);
+  } catch {
+    // Release checks must not interrupt normal use, including offline operation.
+  }
+}
 let refreshing = false;
 let alive = new AbortController();
 let viewController = new AbortController();
@@ -328,7 +354,7 @@ async function renderSystem(version: number) {
         "Atualização",
         update
           ? update.serverUpdateAvailable
-            ? "Disponível no aplicativo"
+            ? "Nova versão disponível"
             : "Servidor atualizado"
           : "Consulta indisponível",
       ],
@@ -352,7 +378,7 @@ async function renderSystem(version: number) {
         ],
         ["Validade da sessão", "30 dias, renovados durante o uso"],
       ],
-    )}<p class="notice" style="margin-top:20px">Gerencie câmeras, regras, áreas e atualizações pelo aplicativo.</p></section>`;
+    )}<p class="notice" style="margin-top:20px">Gerencie câmeras, regras e áreas pelo aplicativo.</p></section>`;
 }
 function dl(rows: [string, string][]) {
   return `<dl class="data-list">${rows.map(([name, value]) => `<div><dt>${e(name)}</dt><dd>${e(value)}</dd></div>`).join("")}</dl>`;
@@ -596,6 +622,7 @@ async function ruleDetails(id: string) {
 async function refresh(force = false) {
   if (refreshing || !api.token || document.hidden) return;
   refreshing = true;
+  void checkForUpdates();
   const token = api.token;
   const connection = alive;
   try {
@@ -645,6 +672,8 @@ async function refresh(force = false) {
   refreshing = false;
 }
 function enter() {
+  lastUpdateCheck = 0;
+  announcedUpdate = "";
   alive.abort();
   alive = new AbortController();
   $("#login").hidden = true;
@@ -654,6 +683,9 @@ function enter() {
   void refresh(true);
 }
 function leave(message = "") {
+  clearTimeout(updateToastTimer);
+  updateToast.hidden = true;
+  updateToast.textContent = "";
   alive.abort();
   api.clear();
   disposeView();

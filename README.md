@@ -28,10 +28,10 @@ Valkyris transforma um servidor doméstico em uma central privada de monitoramen
 - Regras para movimento e sons residenciais; a confiança mínima é aplicada internamente por detector, sem ajuste manual, e as regras ficam sempre ativas.
 - Mapa familiar com usuários vinculados aos dispositivos pareados, histórico de localização e alertas de entrada e saída de áreas.
 - Eventos com snapshot, reconhecimento, notificação e clipe com pré/pós-evento.
-- [Alertas personalizados por câmera](docs/camera-alerts.md), com textos, toque, vibração e tela cheia configuráveis no Android.
+- [Alertas personalizados por regra](docs/camera-alerts.md), com textos, toque, vibração e tela cheia configuráveis no Android.
 - Administração de usuários no painel e Android, destinatários por regra e [autorização validada no servidor](docs/security-access.md).
 - Credenciais de câmera cifradas com AES-256-GCM e tokens persistidos somente como hash.
-- Atualização do backend pelo app e download do APK assinado diretamente da release no GitHub.
+- Avisos de nova versão por toast e download manual do APK assinado nas configurações do app.
 - Painel web em /app/, servido pelo próprio backend, para consultar câmeras, eventos, família e configurações.
 - Interface em PT-BR e inglês, temas claro/escuro e suporte a LAN ou VPN.
 
@@ -80,7 +80,7 @@ No servidor, execute:
 curl -fsSL https://valkyris.vercel.app/install.sh | sh
 ```
 
-O instalador verifica o Compose, baixa os artefatos da release, cria os segredos e o certificado TLS, prepara os arquivos locais e inicia `valkyris`, `mediamtx` e `updater` de forma idempotente.
+O instalador verifica o Compose, baixa os artefatos da release, cria os segredos e o certificado TLS, prepara os arquivos locais e inicia `valkyris` e `mediamtx` de forma idempotente.
 
 Depois:
 
@@ -91,7 +91,7 @@ Depois:
 
 Para acessar de fora de casa, use uma VPN como Tailscale ou WireGuard, ou publique o HTTPS por proxy/túnel. O Cloudflare Tunnel transporta a API e a negociação WHEP, mas não a mídia WebRTC: o cliente precisa alcançar a porta 8189 UDP/TCP por LAN, VPN ou outra rota ICE configurada. O instalador preserva VALKYRIS_WEBRTC_HOSTS com o endereço do servidor; não use o domínio do túnel como endereço de mídia. Veja [conectividade WebRTC](docs/webrtc-connectivity.md).
 
-Abra https://SEU_SERVIDOR/app/ e entre com seu usuário e senha para consultar o painel. Regras ficam nos detalhes da câmera; áreas e percursos ficam em Família. O painel permite gestão de usuários e convites para administradores e edição de destinatários para quem tem permissão; PTZ, edição completa das regras, marcar eventos como lidos e atualizar o servidor continuam no Android.
+Abra https://SEU_SERVIDOR/app/ e entre com seu usuário e senha para consultar o painel. Regras ficam nos detalhes da câmera; áreas e percursos ficam em Família. O painel permite gestão de usuários e convites para administradores e edição de destinatários para quem tem permissão; PTZ, edição completa das regras, e marcar eventos como lidos continuam no Android.
 
 ## Rodar para desenvolvimento
 
@@ -148,7 +148,6 @@ O APK de desenvolvimento será criado em `mobile/app/build/outputs/apk/debug/`.
 backend/   API Go, domínio, ONVIF, mídia, detectores, regras e persistência
 mobile/    aplicativo Android nativo em Kotlin e Jetpack Compose
 web/       landing/documentação Astro; viewer/ contém o painel servido em /app/
-updater/   sidecar isolado para atualizações autorizadas pelo administrador
 docs/      decisões de arquitetura e notas operacionais do repositório
 ```
 
@@ -164,7 +163,6 @@ O arquivo [.env.example](.env.example) lista as variáveis suportadas. As princi
 | `VALKYRIS_TLS_CERT` / `VALKYRIS_TLS_KEY` | Identidade TLS do backend. |
 | `VALKYRIS_MASTER_KEY_FILE` | Chave usada para cifrar credenciais sensíveis. |
 | `VALKYRIS_MEDIA_API` / `VALKYRIS_MEDIA_RTSP` / `VALKYRIS_MEDIA_WEBRTC` / `VALKYRIS_MEDIA_PLAYBACK` | Endereços internos de configuração, monitoramento RTSP, negociação WHEP/WebRTC e reprodução de clipes do MediaMTX. |
-| `VALKYRIS_UPDATER_URL` / `VALKYRIS_UPDATER_TOKEN` | Canal privado do atualizador. |
 | `VALKYRIS_RELEASE_API` | Release estável consultada pelo backend. |
 | `VALKYRIS_FIREBASE_CREDENTIALS_FILE` | Conta de serviço usada pelo backend para enviar alertas pelo FCM. |
 
@@ -229,7 +227,7 @@ Respostas JSON seguem um envelope consistente:
 
 Em pushes e pull requests, o GitHub Actions executa formatação, análise estática e testes Go, build/smoke test Docker, lint/testes/APK Android e typecheck/build/testes do Astro. Todo commit enviado para `main` que concluir a CI com sucesso gera automaticamente a próxima versão, cria sua tag e publica:
 
-- imagens multiarch do backend e atualizador no GHCR;
+- imagem multiarch do backend no GHCR;
 - APK universal assinado;
 - Compose, configuração do MediaMTX, instalador e contrato OpenAPI;
 - checksums SHA-256, SBOM, proveniência e GitHub Release.
@@ -270,8 +268,11 @@ instalar o APK; o servidor não instala aplicativos silenciosamente.
 
 A CI bem-sucedida em main inicia a release: a execução 56 publica 2.0.0, e as
 seguintes incrementam o patch. O versionCode Android continua crescente.
-O updater interno troca apenas o backend; para atualizar Compose, MediaMTX e o
-próprio updater, execute novamente o instalador oficial no servidor.
+O app e o web avisam por toast quando há uma nova versão, sem atualização
+automática. No Android, o download do APK é iniciado manualmente em Configurações,
+e a instalação exige confirmação do sistema. Para atualizar o servidor e o web,
+execute novamente o instalador oficial. O instalador remove o antigo container
+de atualização e as variáveis que ele usava; não há acesso ao Docker pelo backend.
 
 Faça backup consistente do SQLite e preserve junto o volume valkyris-data
 (incluindo secrets/master.key, certificados e mídia), .env, compose.yaml

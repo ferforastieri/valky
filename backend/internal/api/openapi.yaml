@@ -384,19 +384,6 @@ paths:
         - {name: clientVersion, in: query, required: false, schema: {type: string}}
       responses:
         '200': {description: Update state, content: {application/json: {schema: {$ref: '#/components/schemas/UpdateInfoResponse'}}}}
-    post:
-      summary: Start an administrator-authorized backend update and return the signed APK URL
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              type: object
-              required: [clientVersion]
-              properties: {clientVersion: {type: string}}
-      responses:
-        '202': {description: Update accepted, content: {application/json: {schema: {$ref: '#/components/schemas/UpdateInfoResponse'}}}}
-        '403': {description: Administrator access required, content: {application/json: {schema: {$ref: '#/components/schemas/APIError'}}}}
   /realtime:
     get:
       summary: WebSocket stream for event changes
@@ -443,7 +430,7 @@ components:
         audio: {type: boolean}
     AlertPresentation:
       type: object
-      description: Camera-wide alert presentation. Empty text uses localized app defaults. Combined text is limited to 1600 UTF-8 bytes.
+      description: Per-rule alert presentation in actions.alerts. Empty text uses localized app defaults. Combined text is limited to 1600 UTF-8 bytes.
       properties:
         notificationTitle: {type: string, maxLength: 80, default: ''}
         notificationBody: {type: string, maxLength: 240, default: ''}
@@ -456,7 +443,7 @@ components:
       type: object
       required: [id, name, icon, host, capabilities, enabled]
       properties:
-        alerts: {$ref: '#/components/schemas/AlertPresentation'}
+        alerts: {$ref: '#/components/schemas/AlertPresentation', deprecated: true, description: Legacy camera settings retained for migration only}
         id: {type: string, format: uuid}
         name: {type: string}
         icon: {type: string, enum: [camera, nursery, baby, bottle, dog, bedroom, office, entrance, living_room, yard, garage, kitchen, bathroom]}
@@ -473,7 +460,7 @@ components:
       type: object
       required: [name, host, username, password]
       properties:
-        alerts: {$ref: '#/components/schemas/AlertPresentation'}
+        alerts: {$ref: '#/components/schemas/AlertPresentation', deprecated: true, description: Legacy camera settings retained for migration only}
         name: {type: string}
         icon: {type: string, enum: [camera, nursery, baby, bottle, dog, bedroom, office, entrance, living_room, yard, garage, kitchen, bathroom], default: camera}
         host: {type: string}
@@ -610,6 +597,7 @@ components:
     Actions:
       type: object
       properties:
+        alerts: {$ref: '#/components/schemas/AlertPresentation'}
         record: {type: boolean}
         notify: {type: boolean}
         alarm: {type: boolean}

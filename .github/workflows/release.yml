@@ -14,7 +14,6 @@ permissions:
 
 env:
   IMAGE: ghcr.io/ferforastieri/valkyris
-  UPDATER_IMAGE: ghcr.io/ferforastieri/valkyris-updater
   RELEASE_SERIES: '2.0'
   # Run 56 starts 2.0.0; subsequent successful CI runs increment the patch.
   RELEASE_PATCH_OFFSET: 56
@@ -81,18 +80,6 @@ jobs:
           sbom: true
           cache-from: type=gha,scope=release-${{ matrix.arch }}
           cache-to: type=gha,mode=max,scope=release-${{ matrix.arch }}
-      - name: Compilar e publicar atualizador nativo
-        uses: docker/build-push-action@v6
-        with:
-          context: updater
-          file: updater/Dockerfile
-          platforms: ${{ matrix.platform }}
-          push: true
-          tags: ${{ env.UPDATER_IMAGE }}:${{ needs.prepare.outputs.version }}-${{ matrix.arch }}
-          provenance: mode=min
-          sbom: true
-          cache-from: type=gha,scope=release-updater-${{ matrix.arch }}
-          cache-to: type=gha,mode=max,scope=release-updater-${{ matrix.arch }}
 
   manifest:
     name: Manifesto multiarch
@@ -113,12 +100,7 @@ jobs:
             --tag "$IMAGE:$VERSION" \
             "$IMAGE:$VERSION-amd64" \
             "$IMAGE:$VERSION-arm64"
-          docker buildx imagetools create \
-            --tag "$UPDATER_IMAGE:$VERSION" \
-            "$UPDATER_IMAGE:$VERSION-amd64" \
-            "$UPDATER_IMAGE:$VERSION-arm64"
           docker buildx imagetools inspect "$IMAGE:$VERSION"
-          docker buildx imagetools inspect "$UPDATER_IMAGE:$VERSION"
 
   android:
     name: APK assinado
@@ -252,5 +234,4 @@ jobs:
           if [ "$newest" = "$RELEASE_VERSION" ]; then
             gh release edit "$RELEASE_VERSION" --latest
             docker buildx imagetools create --tag "$IMAGE:latest" "$IMAGE:$RELEASE_VERSION"
-            docker buildx imagetools create --tag "$UPDATER_IMAGE:latest" "$UPDATER_IMAGE:$RELEASE_VERSION"
           fi

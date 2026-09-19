@@ -3,7 +3,6 @@
 .env
 data
 mobile
-updater
 web/node_modules
 web/dist
 web/dist-viewer

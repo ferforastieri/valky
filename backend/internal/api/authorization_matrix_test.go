@@ -81,7 +81,21 @@ func TestEveryProtectedRouteRejectsAnonymous(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	for _, route := range []string{"GET /rules", "POST /rules", "PUT /rules/other", "DELETE /rules/other", "GET /admin/users", "PUT /admin/users/other", "DELETE /admin/users/other", "POST /pairing-sessions", "POST /detections", "POST /cameras", "PUT /cameras/other", "DELETE /cameras/other", "PUT /settings/push", "PUT /settings/retention", "POST /system/update", "PUT /rules/other/recipients"} {
+	// Server updates cannot be initiated through the API, even by an admin.
+	if _, err := db.DB.Exec(`UPDATE users SET is_admin=1 WHERE id=(SELECT user_id FROM devices WHERE id=?)`, member.DeviceID); err != nil {
+		t.Fatal(err)
+	}
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/system/update", strings.NewReader(`{"clientVersion":"0.1.0"}`))
+	req.Header.Set("Authorization", "Bearer "+member.Token)
+	res := httptest.NewRecorder()
+	s.Handler().ServeHTTP(res, req)
+	if res.Code != http.StatusMethodNotAllowed {
+		t.Fatalf("removed update route returned %d: %s", res.Code, res.Body.String())
+	}
+	if _, err := db.DB.Exec(`UPDATE users SET is_admin=0 WHERE id=(SELECT user_id FROM devices WHERE id=?)`, member.DeviceID); err != nil {
+		t.Fatal(err)
+	}
+	for _, route := range []string{"GET /rules", "POST /rules", "PUT /rules/other", "DELETE /rules/other", "GET /admin/users", "PUT /admin/users/other", "DELETE /admin/users/other", "POST /pairing-sessions", "POST /detections", "POST /cameras", "PUT /cameras/other", "DELETE /cameras/other", "PUT /settings/push", "PUT /settings/retention", "PUT /rules/other/recipients"} {
 		parts := strings.SplitN(route, " ", 2)
 		req := httptest.NewRequest(parts[0], "/api/v1"+parts[1], strings.NewReader(`{"isAdmin":true}`))
 		req.Header.Set("Authorization", "Bearer "+member.Token)

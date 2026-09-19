@@ -1,6 +1,7 @@
 package com.ferforastieri.valkyris.feature.rules
 
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
@@ -153,6 +154,7 @@ private fun DeleteRuleDialog(rule: Rule, busy: Boolean, onDismiss: () -> Unit, o
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
 fun RuleEditorDialog(cameras: List<Camera>, detectors: List<DetectorKind>, existing: Rule? = null, fixedCameraID: String? = null, saving: Boolean, onDismiss: () -> Unit, preview: (suspend (String) -> ByteArray)? = null, people: List<TrackedPerson> = emptyList(), onSave: (Rule) -> Unit) {
+    var alerts by remember(existing?.id) { mutableStateOf(existing?.actions?.alerts ?: com.ferforastieri.valkyris.core.model.AlertPresentation()) }
     var camera by remember(existing?.id) { mutableStateOf(cameras.firstOrNull { it.id == existing?.cameraId } ?: cameras.firstOrNull()) }
     var detector by remember(existing?.id) { mutableStateOf(detectors.firstOrNull { it.id == existing?.detectorTypes?.firstOrNull() } ?: detectors.firstOrNull()) }
     var name by remember(existing?.id) { mutableStateOf(existing?.name.orEmpty()) }
@@ -195,7 +197,7 @@ fun RuleEditorDialog(cameras: List<Camera>, detectors: List<DetectorKind>, exist
                         schedule = if (scheduled) RuleSchedule(days.sorted(), start, end, timezone) else RuleSchedule(),
                         motion = if (useRegion) MotionSettings(checkNotNull(region), duration.toInt(), fraction.toDouble().coerceIn(.01, .5)) else null,
                         cooldownSeconds = cooldown.toInt(),
-                        actions = RuleActions(record, notify, alarm, recipients),
+                        actions = RuleActions(record, notify, alarm, recipients, alerts),
                         enabled = existing?.enabled ?: true,
                     ))
                 },
@@ -265,6 +267,41 @@ fun RuleEditorDialog(cameras: List<Camera>, detectors: List<DetectorKind>, exist
             RuleActionRow(record, { record = it }, stringResource(R.string.record_media))
             RuleActionRow(notify, { notify = it }, stringResource(R.string.send_notification))
             RuleActionRow(alarm, { alarm = it }, stringResource(R.string.sound_alarm))
+            HorizontalDivider(Modifier.padding(vertical = 8.dp))
+            Text(stringResource(R.string.rule_alerts), style = MaterialTheme.typography.titleLarge)
+            Text(stringResource(R.string.rule_alerts_hint), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            OutlinedTextField(alerts.notificationTitle, { alerts = alerts.copy(notificationTitle = it.take(80)) }, Modifier.fillMaxWidth(), label = { Text(stringResource(R.string.alert_notification_title)) })
+            OutlinedTextField(alerts.notificationBody, { alerts = alerts.copy(notificationBody = it.take(240)) }, Modifier.fillMaxWidth(), label = { Text(stringResource(R.string.alert_notification_body)) })
+            OutlinedTextField(alerts.alarmTitle, { alerts = alerts.copy(alarmTitle = it.take(80)) }, Modifier.fillMaxWidth(), label = { Text(stringResource(R.string.alert_alarm_title)) })
+            OutlinedTextField(alerts.alarmBody, { alerts = alerts.copy(alarmBody = it.take(240)) }, Modifier.fillMaxWidth(), label = { Text(stringResource(R.string.alert_alarm_body)) })
+            Text(stringResource(R.string.alert_alarm_sound), style = MaterialTheme.typography.labelLarge)
+            listOf("alarm" to R.string.alert_sound_alarm, "ringtone" to R.string.alert_sound_ringtone, "silent" to R.string.alert_sound_silent).forEach { (value, label) ->
+                Row(Modifier.fillMaxWidth().clickable { alerts = alerts.copy(alarmSound = value) }, verticalAlignment = Alignment.CenterVertically) {
+                    RadioButton(selected = alerts.alarmSound == value, onClick = { alerts = alerts.copy(alarmSound = value) })
+                    Text(stringResource(label), Modifier.weight(1f))
+                }
+            }
+            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                Text(stringResource(R.string.alert_vibrate), Modifier.weight(1f))
+                Switch(alerts.vibrate, { alerts = alerts.copy(vibrate = it) })
+            }
+            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                Text(stringResource(R.string.alert_full_screen), Modifier.weight(1f))
+                Switch(alerts.fullScreen, { alerts = alerts.copy(fullScreen = it) })
+            }
+            Text(stringResource(R.string.alert_preview), style = MaterialTheme.typography.labelLarge)
+            Card(Modifier.fillMaxWidth(), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)) {
+                Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    Text(name, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text(alerts.notificationTitle.ifBlank { stringResource(R.string.notification_channel_events) }, style = MaterialTheme.typography.titleMedium)
+                    Text(alerts.notificationBody.ifBlank { stringResource(R.string.notification_event_body) })
+                    HorizontalDivider()
+                    Text(alerts.alarmTitle.ifBlank { stringResource(R.string.alarm_title) }, style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.error)
+                    Text(alerts.alarmBody.ifBlank { stringResource(R.string.notification_alarm_body) })
+                }
+            }
+            HorizontalDivider(Modifier.padding(vertical = 8.dp))
+
         }
     }
 }

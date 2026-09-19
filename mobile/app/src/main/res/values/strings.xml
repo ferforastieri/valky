@@ -163,8 +163,6 @@
     <string name="home_preferences">Casa e preferências</string>
     <string name="ready_status">prontos</string>
     <string name="update_available">Atualização disponível</string>
-    <string name="update_event_admin_body">O Valkyris atualizará o backend com segurança e baixará o APK assinado desta release. Seus dados e câmeras permanecem no volume local.</string>
-    <string name="update_event_member_body">Uma nova versão do aplicativo está disponível. Baixe o APK assinado diretamente da release oficial.</string>
     <string name="update_now">Atualizar</string>
     <string name="download_apk">Baixar APK</string>
     <string name="later">Depois</string>
@@ -247,8 +245,8 @@
     <string name="activity_retry">Tentar novamente</string>
     <string name="activity_more">Carregar mais</string>
     <string name="activity_empty">Nenhum evento neste intervalo.</string>
-    <string name="camera_alerts">Notificações e alarme</string>
-    <string name="camera_alerts_hint">Personalize os alertas desta câmera para todos os destinatários. Deixe os textos vazios para usar o padrão do app. As regras definem quando notificar ou tocar o alarme.</string>
+    <string name="rule_alerts">Notificações e alarme</string>
+    <string name="rule_alerts_hint">Personalize os alertas desta regra para seus destinatários. Deixe os textos vazios para usar o padrão do app.</string>
     <string name="alert_notification_title">Título da notificação</string>
     <string name="alert_notification_body">Mensagem da notificação</string>
     <string name="alert_alarm_title">Título do alarme</string>
@@ -270,4 +268,7 @@
     <string name="location_route_hint">Trajeto aproximado entre os registros carregados.</string>
     <string name="location_route_all">Ver tudo</string>
     <string name="location_map_selected">Selecionado no mapa · precisão de %1$d m</string>
+    <string name="update_toast">Versão %1$s disponível. Atualize o aplicativo nas configurações.</string>
+    <string name="server_update_toast">Versão %1$s disponível para o servidor.</string>
+    <string name="download_app_update">Baixar atualização %1$s</string>
 </resources>

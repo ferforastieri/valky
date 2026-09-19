@@ -91,7 +91,7 @@ export function historyMap(
   const fit = () => {
     selected = null;
     accuracy?.remove();
-    markers.forEach(marker => marker.setStyle({ color: "#293d29", fillColor: "#8ae07d", radius: 7 }));
+    markers.forEach(marker => marker.setStyle({ color: "#ffffff", fillColor: "#1d4ed8", radius: 4 }));
     const coordinates = points.filter(validHistoryPoint).map(p => [p.latitude, p.longitude] as L.LatLngTuple);
     if (coordinates.length) map.fitBounds(L.latLngBounds(coordinates), { padding: [25, 25], maxZoom: 17, animate: false });
   };
@@ -99,9 +99,9 @@ export function historyMap(
     const point = points[index];
     if (!point || !validHistoryPoint(point)) return;
     selected = index;
-    markers.forEach((marker, key) => marker.setStyle({ radius: key === index ? 10 : 7, fillColor: key === index ? "#ffffff" : "#8ae07d" }));
+    markers.forEach((marker, key) => marker.setStyle({ radius: key === index ? 6 : 4, fillColor: key === index ? "#9a3412" : "#1d4ed8" }));
     accuracy?.remove();
-    accuracy = L.circle([point.latitude, point.longitude], { radius: Math.max(1, point.accuracy), color: "#5c9853", fillOpacity: .1, weight: 1 }).addTo(layer);
+    accuracy = L.circle([point.latitude, point.longitude], { radius: Math.max(1, point.accuracy), color: "#9a3412", fillOpacity: .06, weight: 1, interactive: false }).addTo(layer);
     map.setView([point.latitude, point.longitude], 17, { animate: false });
     markers.get(index)?.openPopup();
   };
@@ -110,14 +110,18 @@ export function historyMap(
     layer.clearLayers();
     markers.clear();
     historySegments(points).forEach(segment => {
-      L.polyline(segment.map(p => [p.latitude, p.longitude] as L.LatLngTuple), { color: "#5c9853", weight: 3, dashArray: "6 8" }).addTo(layer);
+      const coordinates = segment.map(p => [p.latitude, p.longitude] as L.LatLngTuple);
+      L.polyline(coordinates, { color: "#ffffff", weight: 4, dashArray: "6 4", interactive: false }).addTo(layer);
+      L.polyline(coordinates, { color: "#1d4ed8", weight: 2, dashArray: "6 4", interactive: false }).addTo(layer);
     });
     points.forEach((point, index) => {
       if (!validHistoryPoint(point)) return;
       const popup = document.createElement("span");
       popup.textContent = `${date(point.occurredAt)} · ${point.address || 'Localização registrada'} · precisão de ${Math.round(point.accuracy)} m`;
-      const marker = L.circleMarker([point.latitude, point.longitude], { radius: 7, color: "#293d29", fillColor: "#8ae07d", fillOpacity: 1, weight: 2 })
+      const marker = L.circleMarker([point.latitude, point.longitude], { radius: 4, color: "#ffffff", fillColor: "#1d4ed8", fillOpacity: 1, weight: 1.5 })
         .addTo(layer).bindPopup(popup).on("click", () => onSelect(index));
+      L.circleMarker([point.latitude, point.longitude], { radius: 16, stroke: false, fillOpacity: 0 })
+        .addTo(layer).on("click", () => onSelect(index));
       markers.set(index, marker);
     });
     map.invalidateSize();

@@ -37,7 +37,8 @@ class MainViewModel @Inject constructor(
     val permissionsLoaded = api.permissionsLoaded
     private val _pairingLink = MutableStateFlow<Uri?>(null)
     val pairingLink = _pairingLink.asStateFlow()
-    val notices = api.notices
+    private val updateNotices = MutableSharedFlow<com.ferforastieri.valkyris.core.network.ApiNotice>(extraBufferCapacity = 1)
+    val notices = kotlinx.coroutines.flow.merge(api.notices, updateNotices)
     val actionBusy = actionGate.busy
     private val _paired = MutableStateFlow(sessions.get() != null)
     val paired = _paired.asStateFlow()
@@ -60,6 +61,7 @@ class MainViewModel @Inject constructor(
     private val _apkDownloads = MutableSharedFlow<ApkDownload>(extraBufferCapacity = 1)
     val apkDownloads = _apkDownloads.asSharedFlow()
     private var lastUpdateCheck = 0L
+    private var announcedUpdate: String? = null
     val theme = preferences.theme.stateIn(viewModelScope, SharingStarted.Eagerly, "system")
     val language = preferences.language.stateIn(viewModelScope, SharingStarted.Eagerly, "system")
 
@@ -139,7 +141,7 @@ class MainViewModel @Inject constructor(
         }
     }
 
-    fun signOut() { sessions.clear(); com.ferforastieri.valkyris.feature.people.LocationTrackingService.stop(context); api.clearPermissions(); _pairingLink.value = null; _admin.value = false; _paired.value = false; _updateInfo.value = null }
+    fun signOut() { sessions.clear(); com.ferforastieri.valkyris.feature.people.LocationTrackingService.stop(context); api.clearPermissions(); _pairingLink.value = null; _admin.value = false; _paired.value = false; _updateInfo.value = null; lastUpdateCheck = 0L; announcedUpdate = null }
 
     fun refreshPushRegistration() {
         val current = sessions.get() ?: return
@@ -164,19 +166,28 @@ class MainViewModel @Inject constructor(
         val now = android.os.SystemClock.elapsedRealtime()
         if (!force && lastUpdateCheck != 0L && now - lastUpdateCheck < 15 * 60_000) return
         lastUpdateCheck = now
-        viewModelScope.launch { runCatching { api.updateInfo() }.onSuccess { _updateInfo.value = it.takeIf(UpdateInfo::available) } }
+        val session = sessions.get()
+        viewModelScope.launch {
+            runCatching { api.updateInfo() }.onSuccess { info ->
+                if (!_paired.value || sessions.get() != session) return@onSuccess
+                _updateInfo.value = info.takeIf { it.apkUpdateAvailable && it.apkUrl.isNotBlank() }
+                if (info.available && announcedUpdate != info.latestVersion) {
+                    announcedUpdate = info.latestVersion
+                    val text = if (info.apkUpdateAvailable) R.string.update_toast else R.string.server_update_toast
+                    updateNotices.emit(com.ferforastieri.valkyris.core.network.ApiNotice(context.getString(text, info.latestVersion), true))
+                }
+            }
+        }
     }
-
-    fun dismissUpdate() { _updateInfo.value = null }
 
     fun startUpdate() {
         val available = _updateInfo.value ?: return
-        if (!actionGate.tryAcquire()) return
+        if (!available.apkUpdateAvailable || available.apkUrl.isBlank() || !actionGate.tryAcquire()) return
         _updating.value = true
         viewModelScope.launch {
             try {
-                val result = if (_admin.value) runCatching { api.startUpdate() } else Result.success(available)
-                result.onSuccess { info -> _updateInfo.value = null; if (info.apkUrl.isNotBlank()) _apkDownloads.emit(ApkDownload(info.apkUrl, info.latestVersion)) }.onFailure { _error.value = it.message }
+                _updateInfo.value = null
+                _apkDownloads.emit(ApkDownload(available.apkUrl, available.latestVersion))
             } finally {
                 _updating.value = false
                 actionGate.release()

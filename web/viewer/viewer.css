@@ -1173,3 +1173,26 @@ dialog::backdrop {
   .history-map { height: 220px; }
   .location-history-records { max-height: 260px; }
 }
+
+/* Leaflet's light cartography and popup chrome stay readable in either app theme. */
+.map .leaflet-popup-content-wrapper, .map .leaflet-popup-tip { background: #ffffff; color: #242724; }
+.map .leaflet-control-zoom a { background: #ffffff; color: #242724; }
+.map .leaflet-control-attribution { background: #ffffffe6; color: #374151; }
+.map .leaflet-control-attribution a { color: #1d4ed8; }
+
+.update-toast {
+  position: fixed;
+  z-index: 1000;
+  top: max(18px, env(safe-area-inset-top));
+  left: 50%;
+  transform: translateX(-50%);
+  width: max-content;
+  max-width: min(520px, calc(100vw - 32px));
+  padding: 14px 18px;
+  border: 1px solid var(--signal);
+  border-radius: 14px;
+  background: var(--surface);
+  color: var(--ink);
+  box-shadow: var(--shadow);
+  pointer-events: none;
+}

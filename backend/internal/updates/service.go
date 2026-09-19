@@ -1,7 +1,6 @@
 package updates
 
 import (
-	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -42,78 +41,31 @@ type release struct {
 type Service struct {
 	current    string
 	releaseAPI string
-	updaterURL string
-	token      string
 	http       *http.Client
 	mu         sync.Mutex
 	cached     release
 	cachedAt   time.Time
 }
 
-func New(current, releaseAPI, updaterURL, token string) *Service {
+func New(current, releaseAPI string) *Service {
 	return &Service{
 		current: strings.TrimSpace(current), releaseAPI: strings.TrimSpace(releaseAPI),
-		updaterURL: strings.TrimRight(strings.TrimSpace(updaterURL), "/"), token: strings.TrimSpace(token),
 		http: &http.Client{Timeout: 12 * time.Second},
 	}
 }
 
 func (s *Service) Check(ctx context.Context, clientVersion string) (Info, error) {
-	latest, err := s.latest(ctx, false)
+	latest, err := s.latest(ctx)
 	if err != nil {
 		return Info{}, err
 	}
 	return s.info(latest, clientVersion), nil
 }
 
-func (s *Service) Start(ctx context.Context, clientVersion string) (Info, error) {
-	latest, err := s.latest(ctx, true)
-	if err != nil {
-		return Info{}, err
-	}
-	info := s.info(latest, clientVersion)
-	if !info.Available {
-		info.Message = "Valkyris and the Android app are already up to date"
-		return info, nil
-	}
-	if info.ServerUpdateAvailable {
-		if s.token == "" || s.updaterURL == "" {
-			return Info{}, fmt.Errorf("automatic updater is not configured in this installation")
-		}
-		body, _ := json.Marshal(map[string]string{"version": info.LatestVersion})
-		req, err := http.NewRequestWithContext(ctx, http.MethodPost, s.updaterURL+"/v1/update", bytes.NewReader(body))
-		if err != nil {
-			return Info{}, err
-		}
-		req.Header.Set("Authorization", "Bearer "+s.token)
-		req.Header.Set("Content-Type", "application/json")
-		resp, err := s.http.Do(req)
-		if err != nil {
-			return Info{}, fmt.Errorf("updater unavailable: %w", err)
-		}
-		defer resp.Body.Close()
-		responseBody, _ := io.ReadAll(io.LimitReader(resp.Body, 64<<10))
-		if resp.StatusCode != http.StatusAccepted {
-			var envelope struct {
-				Message string `json:"message"`
-			}
-			_ = json.Unmarshal(responseBody, &envelope)
-			if envelope.Message == "" {
-				envelope.Message = resp.Status
-			}
-			return Info{}, fmt.Errorf("updater rejected the request: %s", envelope.Message)
-		}
-		info.Message = "Backend update started; the latest Android APK is ready to download"
-	} else {
-		info.Message = "The backend is current; the latest Android APK is ready to download"
-	}
-	return info, nil
-}
-
-func (s *Service) latest(ctx context.Context, refresh bool) (release, error) {
+func (s *Service) latest(ctx context.Context) (release, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	if !refresh && s.cached.TagName != "" && time.Since(s.cachedAt) < 15*time.Minute {
+	if s.cached.TagName != "" && time.Since(s.cachedAt) < 15*time.Minute {
 		return s.cached, nil
 	}
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, s.releaseAPI, nil)
@@ -121,7 +73,7 @@ func (s *Service) latest(ctx context.Context, refresh bool) (release, error) {
 		return release{}, err
 	}
 	req.Header.Set("Accept", "application/vnd.github+json")
-	req.Header.Set("User-Agent", "valkyris-updater")
+	req.Header.Set("User-Agent", "valkyris-release-check")
 	req.Header.Set("X-GitHub-Api-Version", "2022-11-28")
 	resp, err := s.http.Do(req)
 	if err != nil {

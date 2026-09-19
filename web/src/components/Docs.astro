@@ -65,7 +65,7 @@ const endpoints = pt ? [
   ['GET · PUT','/api/v1/settings/push','Admin ao alterar','Consulta a configuração FCM ou envia a conta de serviço Base64, cifrada no SQLite.'],
   ['GET · PUT','/api/v1/settings/retention','Admin ao alterar','Lê ou altera os limites de retenção.'],
   ['POST','/api/v1/detections','Autenticado','Recebe uma detecção normalizada de integração local.'],
-  ['GET · POST','/api/v1/system/update','Admin ao atualizar','Consulta uma release ou inicia atualização do backend.'],
+  ['GET','/api/v1/system/update','Autenticado','Consulta a release e o link do APK, sem executar atualizações.'],
   ['GET','/api/v1/realtime','Autenticado','WebSocket para mudanças de câmeras e eventos.'],
 ] : [
   ['GET','/health','Public','Server health.'],
@@ -103,7 +103,7 @@ const endpoints = pt ? [
   ['GET · PUT','/api/v1/settings/push','Admin to change','Reads FCM setup or stores a Base64 service account encrypted in SQLite.'],
   ['GET · PUT','/api/v1/settings/retention','Admin to change','Reads or changes retention limits.'],
   ['POST','/api/v1/detections','Authenticated','Accepts normalized detections from local integrations.'],
-  ['GET · POST','/api/v1/system/update','Admin to update','Checks releases or starts a backend update.'],
+  ['GET','/api/v1/system/update','Authenticated','Checks release metadata and the APK link without executing updates.'],
   ['GET','/api/v1/realtime','Authenticated','WebSocket for camera and event changes.'],
 ];
 ---
@@ -130,7 +130,7 @@ const endpoints = pt ? [
       <article class="docs-content">
         <section id="start">
           <div class="docs-heading"><SquareTerminal size={22}/><div><span>01</span><h2>{pt ? 'Começar' : 'Get started'}</h2></div></div>
-          <p>{pt ? 'O instalador baixa artefatos da release, gera os segredos locais e o certificado TLS, prepara o Compose e inicia Valkyris, MediaMTX e o atualizador.' : 'The installer downloads release artifacts, generates local secrets and a TLS certificate, prepares Compose, then starts Valkyris, MediaMTX and the updater.'}</p>
+          <p>{pt ? 'O instalador baixa artefatos da release, gera os segredos locais e o certificado TLS, prepara o Compose e inicia Valkyris e MediaMTX.' : 'The installer downloads release artifacts, generates local secrets and a TLS certificate, prepares Compose, then starts Valkyris and MediaMTX.'}</p>
           <div class="docs-code"><code>{installCommand}</code><button class="docs-copy" type="button" data-command={installCommand}>{pt ? 'Copiar' : 'Copy'}</button></div>
           <h3>{pt ? 'Requisitos' : 'Requirements'}</h3>
           <ul class="check-list">{text.requirements.map(item=><li><span>✓</span>{item}</li>)}</ul>
@@ -178,7 +178,7 @@ const endpoints = pt ? [
 
         <section id="viewer">
           <div class="docs-heading"><Network size={22}/><div><h2>{pt ? 'Painel web no seu servidor' : 'Web dashboard on your server'}</h2></div></div>
-          <p>{pt ? 'Abra /app/ na URL HTTPS da instalação e use seu usuário e senha. O painel consulta câmeras ao vivo, eventos, família, percursos e informações do servidor. Regras ficam dentro da câmera e áreas em Família. Edição, PTZ, marcar como lido e atualizações continuam no aplicativo.' : 'Open /app/ at your installation HTTPS URL and use the personal username and password. The dashboard displays live cameras, events, family, routes and server information. Rules live inside camera details and areas under Family. Editing, PTZ, marking events as read and updates remain in the app.'}</p>
+          <p>{pt ? 'Abra /app/ na URL HTTPS da instalação e use seu usuário e senha. O painel consulta câmeras ao vivo, eventos, família, percursos e informações do servidor. Regras ficam dentro da câmera e áreas em Família. Edição, PTZ e marcar como lido continuam no aplicativo.' : 'Open /app/ at your installation HTTPS URL and use the personal username and password. The dashboard displays live cameras, events, family, routes and server information. Rules live inside camera details and areas under Family. Editing, PTZ and marking events as read remain in the app.'}</p>
           <p>{pt ? 'A sessão usa cookie Secure, HttpOnly e SameSite=Strict, válido por 30 dias e renovado durante o uso. Sair ou trocar a senha revoga a sessão. O painel vem na imagem Docker e não exige Node nem deploy na Vercel. Dados são consultados a cada 15 segundos com a aba visível.' : 'Sessions use a Secure, HttpOnly, SameSite=Strict cookie, valid for 30 days and renewed during use. Logout or password changes revoke sessions. The dashboard ships in the Docker image and requires neither Node nor Vercel deployment. Data refreshes every 15 seconds while the tab is visible.'}</p>
           <h3>WebRTC · Cloudflare Tunnel</h3>
           <p>{pt ? 'Android e painel usam os mesmos endpoints WHEP. O túnel leva HTTPS e a negociação, mas áudio e vídeo precisam alcançar o MediaMTX por ICE. Libere 8189 UDP/TCP na rede privada e configure VALKYRIS_WEBRTC_HOSTS com endereços LAN/VPN alcançáveis. O domínio do túnel não é endereço de mídia. STUN pode auxiliar conexão direta; NAT restritivo exige VPN, rota pública de mídia ou TURN configurado.' : 'Android and the dashboard use the same WHEP endpoints. The tunnel carries HTTPS and signaling, but audio and video must reach MediaMTX through ICE. Allow 8189 UDP/TCP on the private network and set VALKYRIS_WEBRTC_HOSTS to reachable LAN/VPN addresses. The tunnel hostname is not a media address. STUN can assist direct connections; restrictive NAT requires VPN, a public media route or configured TURN.'}</p>
@@ -209,12 +209,11 @@ const endpoints = pt ? [
               ['VALKYRIS_MEDIA_RTSP','rtsp://mediamtx:8554',pt?'Stream interno para monitoramento e detectores.':'Internal stream for monitoring and detectors.'],
               ['VALKYRIS_MEDIA_WEBRTC','http://mediamtx:8889',pt?'Origem WHEP interna; a mídia WebRTC segue direto ao celular após ICE.':'Internal WHEP origin; WebRTC media goes directly to the phone after ICE.'],
               ['VALKYRIS_MEDIA_PLAYBACK','http://mediamtx:9996',pt?'API interna para gerar clipes recentes.':'Internal API used to generate recent clips.'],
-              ['VALKYRIS_UPDATER_URL','http://updater:8080',pt?'Atualizador interno.':'Internal updater.'],
               ['VALKYRIS_RELEASE_API','api.github.com/…/releases/latest',pt?'Release estável consultada.':'Stable release lookup.'],
               ['VALKYRIS_FIREBASE_CREDENTIALS_FILE','/data/secrets/firebase-service-account.json',pt?'Alternativa legada: arquivo de conta de serviço FCM. O app usa o armazenamento cifrado do SQLite.':'Legacy alternative: FCM service-account file. The app uses encrypted SQLite storage.'],
             ].map(([name,value,meaning])=><div role="row"><code>{name}</code><code>{value}</code><span>{meaning}</span></div>)}
           </div>
-          <p>{pt ? 'O instalador escreve o token privado do atualizador no .env. Não reutilize nem publique esse segredo. O arquivo mediamtx.yml deve existir como arquivo antes de subir o Compose.' : 'The installer writes the private updater token to .env. Do not reuse or publish it. mediamtx.yml must exist as a file before Compose starts.'}</p>
+          <p>{pt ? 'O arquivo mediamtx.yml deve existir como arquivo antes de subir o Compose.' : 'mediamtx.yml must exist as a file before Compose starts.'}</p>
         </section>
 
         <section id="api">
@@ -227,10 +226,10 @@ const endpoints = pt ? [
 
         <section id="updates">
           <div class="docs-heading"><Download size={22}/><div><span>07</span><h2>{pt ? 'Atualizações' : 'Updates'}</h2></div></div>
-          <p>{pt ? 'Quando uma release estável mais nova existir, o app cria um evento de atualização. Um administrador pode atualizar o container do backend pelo botão; depois, o APK assinado é baixado do GitHub e o Android solicita confirmação para instalar.' : 'When a newer stable release exists, the app creates an update event. An administrator can update the backend container from the action; the signed APK is then downloaded from GitHub and Android requests installation confirmation.'}</p>
-          <p>{pt ? 'SQLite, clipes e snapshots permanecem no volume valkyris-data. O atualizador aceita somente tags de release validadas e não é exposto em uma porta do host.' : 'SQLite, clips and snapshots remain in the valkyris-data volume. The updater accepts only validated release tags and exposes no host port.'}</p>
+          <p>{pt ? 'Quando uma release estável mais nova existir, o app e o web exibem um toast, sem atualizar automaticamente. Nas configurações do app, o usuário pode iniciar o download do APK assinado do GitHub; o Android solicita confirmação para instalar.' : 'When a newer stable release exists, mobile and web show a toast without updating automatically. In app settings, the user can start downloading the signed APK from GitHub; Android requests installation confirmation.'}</p>
+          <p>{pt ? 'SQLite, clipes e snapshots permanecem no volume valkyris-data. A API apenas consulta versões; não executa atualizações do servidor.' : 'SQLite, clips and snapshots remain in the valkyris-data volume. The API only checks releases; it cannot execute server updates.'}</p>
 
-          <p>{pt ? 'Na série 2.x, a API permanece /api/v1 e a migração preserva dados. O atualizador interno troca apenas o backend; execute o instalador novamente no host para atualizar também Compose, MediaMTX e o updater. O APK precisa ser instalado em cada celular com confirmação do Android. A consulta de releases tem cache de até 15 minutos.' : 'In the 2.x series the API remains /api/v1 and migration preserves data. The internal updater replaces only the backend; rerun the installer on the host to also update Compose, MediaMTX and the updater. Install the APK on each phone with Android confirmation. Release checks are cached for up to 15 minutes.'}</p>
+          <p>{pt ? 'Na série 2.x, a API permanece /api/v1 e a migração preserva dados. Execute o instalador novamente no host para atualizar o backend, o web, Compose e MediaMTX. O APK precisa ser instalado em cada celular com confirmação do Android. A consulta de releases tem cache de até 15 minutos.' : 'In the 2.x series the API remains /api/v1 and migration preserves data. Rerun the installer on the host to update the backend, web, Compose and MediaMTX. Install the APK on each phone with Android confirmation. Release checks are cached for up to 15 minutes.'}</p>
         </section>
 
         <section id="security">

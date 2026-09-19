@@ -81,3 +81,9 @@ Páginas anteriores acrescentam pontos ao mesmo mapa, mantendo a ordenação e a
 paginação da API. Linhas tracejadas indicam apenas ligações aproximadas entre
 leituras, não o trajeto exato pelas ruas. Intervalos superiores a 30 minutos entre
 uma saída (`lastSeenAt`) e a próxima leitura permanecem separados.
+
+Os pontos do histórico usam círculos compactos (8 dp no Android e 8 px no web;
+12 quando selecionados), com contorno branco. A linha tracejada tem 2 dp/px e
+contorno branco para se separar das ruas. As cores azul e terracota contrastam
+com os tiles claros do OpenStreetMap em ambos os temas, independentemente das
+cores de texto do aplicativo. A área de toque permanece maior que o ponto visível.

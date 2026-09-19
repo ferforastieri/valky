@@ -22,11 +22,11 @@ never receive camera passwords and MediaMTX control/RTSP ports stay internal. On
 6. The Android app receives a minimal encrypted signal, then retrieves the
    authenticated event over LAN or VPN.
 7. On app resume, the authenticated API compares both server and client versions
-   with the latest stable GitHub release. An actionable update event is shown
-   when needed. Only an administrator can ask the internal updater sidecar to
-   pull and recreate the backend; the app downloads the signed APK directly
-   from the trusted GitHub release URL and Android still requires installation
-   confirmation.
+   with the latest stable GitHub release through a read-only endpoint. Mobile
+   and web show a toast once per version in a session. APK downloads begin only
+   when the user taps the update button in Android settings; Android still
+   requires installation confirmation. Server updates are performed manually
+   with the installer, never through the API or the viewer.
 
 Camera credentials and push secrets are encrypted with AES-256-GCM. API bearer
 tokens are stored only as SHA-256 hashes. A fresh installation has no preset
@@ -36,11 +36,8 @@ authenticated administrator may then create short-lived, single-use invitations;
 the Android app combines the invitation code with its already-known server URL
 and renders the QR locally. The Go backend exposes no setup or QR page.
 
-The updater is not published on a host port. Its random token exists only in the
-installation `.env` and the backend/updater containers. It receives a validated
-release tag, pulls the pinned GHCR image through the Docker socket, atomically
-updates `VALKYRIS_VERSION`, and recreates the backend without deleting the
-SQLite/media volume.
+The backend has no Docker socket or server-update execution endpoint. The
+installer removes the legacy updater container using Compose --remove-orphans.
 
 
 The Astro viewer has a separate build (web/viewer → web/dist-viewer) served

@@ -1,17 +1,17 @@
-# Apresentação de alertas por câmera
+# Apresentação de alertas por regra
 
-No Android, abra **Câmeras → Editar câmera → Notificações e alarme**. É possível
+No Android, abra **Câmeras → Regras → Editar regra → Notificações e alarme**. É possível
 editar o título e a mensagem de notificações e de alarmes, escolher alarme padrão,
 toque padrão ou sem som, ativar vibração e permitir abertura em tela cheia.
 Uma prévia mostra os textos. Campos vazios usam o texto traduzido do aplicativo.
 As regras continuam decidindo quais eventos geram notificação ou alarme e quem
-os recebe. A configuração da câmera vale para todos os destinatários.
+os recebe. Cada regra tem seus próprios textos e preferências de alarme.
 
-O objeto `alerts` está disponível em GET/POST/PUT de câmeras. Em atualizações,
+O objeto `actions.alerts` está disponível em GET/POST/PUT de regras. Em atualizações,
 omitir o objeto preserva a configuração; enviar `{}` restaura os padrões. Valores
 `false` são preservados. Títulos têm até 80 caracteres, mensagens até 240 e o total
 dos textos até 1600 bytes UTF-8, para caber no envelope cifrado do FCM. Instalações
-existentes recebem os padrões pela migração automática, sem mudar as regras.
+existentes copiam automaticamente as preferências antigas da câmera para suas regras, preservando configurações próprias. Essa migração ocorre apenas uma vez; novas regras usam os padrões. O campo antigo da câmera fica somente para compatibilidade.
 
 O som usa um serviço de reprodução em primeiro plano, com atributos e foco de
 áudio de alarme. Não depende da Activity de tela cheia. Se o toque do aparelho

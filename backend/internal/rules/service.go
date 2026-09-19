@@ -67,6 +67,18 @@ func (s *Service) Create(ctx context.Context, r Rule) (Rule, error) {
 func (s *Service) Update(ctx context.Context, id string, r Rule) (Rule, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
+	// Older clients omit presentation settings. Preserve them on ordinary edits.
+	if r.Actions.Alerts == nil {
+		var data string
+		if err := s.store.DB.QueryRowContext(ctx, `SELECT actions_json FROM rules WHERE id=?`, id).Scan(&data); err != nil {
+			return r, err
+		}
+		var current Actions
+		if err := json.Unmarshal([]byte(data), &current); err != nil {
+			return r, err
+		}
+		r.Actions.Alerts = current.Alerts
+	}
 	if err := normalizeRule(&r); err != nil {
 		return r, err
 	}
@@ -94,6 +106,11 @@ func (s *Service) Update(ctx context.Context, id string, r Rule) (Rule, error) {
 }
 
 func normalizeRule(r *Rule) error {
+	if r.Actions.Alerts != nil {
+		if err := r.Actions.Alerts.Validate(); err != nil {
+			return err
+		}
+	}
 	r.Name = strings.TrimSpace(r.Name)
 	r.DetectorTypes = canonicalStrings(r.DetectorTypes)
 	if err := validateSchedule(&r.Schedule); err != nil {

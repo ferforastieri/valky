@@ -119,6 +119,10 @@ func Open(path string) (*Store, error) {
 		db.Close()
 		return nil, fmt.Errorf("index event activity: %w", err)
 	}
+	if err = migrateRuleAlerts(ctx, db); err != nil {
+		db.Close()
+		return nil, err
+	}
 	return &Store{DB: db}, nil
 }
 
@@ -285,4 +289,28 @@ func NullTime(value sql.NullString) *time.Time {
 		return nil
 	}
 	return &t
+}
+
+// Copy the previous camera settings once, preserving per-rule overrides and
+// explicit resets. New rules use their own defaults after migration.
+func migrateRuleAlerts(ctx context.Context, db *sql.DB) error {
+	tx, err := db.BeginTx(ctx, nil)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+	var done int
+	if err = tx.QueryRowContext(ctx, `SELECT count(*) FROM settings WHERE key='rule_alerts_migrated'`).Scan(&done); err != nil {
+		return err
+	}
+	if done != 0 {
+		return nil
+	}
+	if _, err = tx.ExecContext(ctx, `UPDATE rules SET actions_json=json_set(actions_json,'$.alerts',json((SELECT alerts_json FROM cameras WHERE cameras.id=rules.camera_id))) WHERE json_type(actions_json,'$.alerts') IS NULL AND EXISTS(SELECT 1 FROM cameras WHERE cameras.id=rules.camera_id AND alerts_json<>'{}')`); err != nil {
+		return fmt.Errorf("migrate rule alerts: %w", err)
+	}
+	if _, err = tx.ExecContext(ctx, `INSERT INTO settings(key,value,updated_at) VALUES('rule_alerts_migrated','1',?)`, time.Now().UTC().Format(time.RFC3339Nano)); err != nil {
+		return err
+	}
+	return tx.Commit()
 }

@@ -32,7 +32,6 @@ import com.ferforastieri.valkyris.feature.profile.ProfileScreen
 import com.ferforastieri.valkyris.feature.settings.SettingsScreen
 import com.ferforastieri.valkyris.feature.settings.StartupAlertPermissions
 import com.ferforastieri.valkyris.core.design.ToastMessageHost
-import com.ferforastieri.valkyris.core.design.UpdateEventDialog
 import com.ferforastieri.valkyris.core.design.FloatingDock
 import com.ferforastieri.valkyris.core.design.ValkyrisTopBar
 import com.ferforastieri.valkyris.feature.overview.OverviewScreen
@@ -57,9 +56,6 @@ private val destinations = listOf(
 fun ValkyrisApp(main: MainViewModel) {
     val paired by main.paired.collectAsStateWithLifecycle()
     val actionBusy by main.actionBusy.collectAsStateWithLifecycle()
-    val admin by main.admin.collectAsStateWithLifecycle()
-    val update by main.updateInfo.collectAsStateWithLifecycle()
-    val updating by main.updating.collectAsStateWithLifecycle()
     Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
         Box(Modifier.fillMaxSize().windowInsetsPadding(WindowInsets.safeDrawing)) {
             if (!paired) {
@@ -71,15 +67,6 @@ fun ValkyrisApp(main: MainViewModel) {
                 notices = main.notices,
                 modifier = Modifier.align(androidx.compose.ui.Alignment.TopCenter).padding(14.dp),
             )
-            update?.let {
-                UpdateEventDialog(
-                    update = it,
-                    admin = admin,
-                    updating = updating,
-                    onUpdate = main::startUpdate,
-                    onDismiss = main::dismissUpdate,
-                )
-            }
             if (actionBusy) {
                 Box(
                     Modifier

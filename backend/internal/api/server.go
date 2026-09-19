@@ -177,7 +177,6 @@ func (s *Server) Handler() http.Handler {
 	protected.Handle("PUT /settings/retention", s.auth.RequireAdmin(http.HandlerFunc(s.setRetention)))
 	protected.Handle("POST /detections", s.auth.RequireAdmin(http.HandlerFunc(s.submitDetection)))
 	protected.HandleFunc("GET /system/update", s.systemUpdate)
-	protected.Handle("POST /system/update", s.auth.RequireAdmin(http.HandlerFunc(s.startSystemUpdate)))
 	protected.Handle("/realtime", s.hub)
 	mux.Handle("/api/v1/", http.StripPrefix("/api/v1", s.auth.Middleware(protected)))
 	return requestLog(s.logger, securityHeaders(newRequestLimits().wrap(localizedResponses(outcomeHeaders(mux)))))
@@ -1067,31 +1066,11 @@ func (s *Server) submitDetection(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) systemUpdate(w http.ResponseWriter, r *http.Request) {
 	if s.updates == nil {
-		writeError(w, http.StatusServiceUnavailable, fmt.Errorf("automatic updater is not configured"))
+		writeError(w, http.StatusServiceUnavailable, fmt.Errorf("release checking is not configured"))
 		return
 	}
 	info, err := s.updates.Check(r.Context(), r.URL.Query().Get("clientVersion"))
 	respondWithMessage(w, info, err, info.Message)
-}
-
-func (s *Server) startSystemUpdate(w http.ResponseWriter, r *http.Request) {
-	if s.updates == nil {
-		writeError(w, http.StatusServiceUnavailable, fmt.Errorf("automatic updater is not configured"))
-		return
-	}
-	var in struct {
-		ClientVersion string `json:"clientVersion"`
-	}
-	if !decode(w, r, &in) {
-		return
-	}
-	info, err := s.updates.Start(r.Context(), in.ClientVersion)
-	if err != nil {
-		writeError(w, http.StatusBadGateway, err)
-		return
-	}
-	s.hub.Broadcast(map[string]any{"type": "system.update.started", "version": info.LatestVersion})
-	writeSuccess(w, http.StatusAccepted, info.Message, info)
 }
 
 func decode(w http.ResponseWriter, r *http.Request, out any) bool {

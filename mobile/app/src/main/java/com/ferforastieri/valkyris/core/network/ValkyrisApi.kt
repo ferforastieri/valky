@@ -234,8 +234,6 @@ class ValkyrisApi(
 
     suspend fun updateInfo(): UpdateInfo = get("/system/update?clientVersion=${BuildConfig.VERSION_NAME.encodeURLParameter()}")
 
-    suspend fun startUpdate(): UpdateInfo = post("/system/update", UpdateRequest(BuildConfig.VERSION_NAME), announceBackend = true)
-
     suspend fun retention(): RetentionSettings = get("/settings/retention")
 
     suspend fun updateRetention(settings: RetentionSettings): RetentionSettings = put("/settings/retention", settings, announceBackend = true)
@@ -440,6 +438,7 @@ class ValkyrisApi(
             notify = actions.notify,
             alarm = actions.alarm,
             recipientUserIds = actions.recipientUserIds,
+            alerts = actions.alerts,
         ),
     )
 

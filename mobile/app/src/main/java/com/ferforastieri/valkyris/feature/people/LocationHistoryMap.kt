@@ -1,15 +1,11 @@
 package com.ferforastieri.valkyris.feature.people
 
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.LocalInspectionMode
 import androidx.compose.ui.viewinterop.AndroidView
-import androidx.core.content.ContextCompat
-import com.ferforastieri.valkyris.R
 import com.ferforastieri.valkyris.core.model.PersonLocation
 import org.osmdroid.config.Configuration
 import org.osmdroid.tileprovider.tilesource.TileSourceFactory
@@ -41,8 +37,10 @@ internal fun historyRouteSegments(history: List<PersonLocation>): List<List<Pers
 @Composable
 internal fun LocationHistoryMap(history: List<PersonLocation>, selected: String?, onSelect: (String) -> Unit) {
     if (LocalInspectionMode.current) { Text("Mapa do histórico"); return }
-    val color = MaterialTheme.colorScheme.primary.toArgb()
-    val selectedColor = MaterialTheme.colorScheme.secondary.toArgb()
+    // OSM tiles retain their own light palette in both app themes. Overlay
+    // colors must contrast with those tiles, not with the surrounding UI.
+    val color = android.graphics.Color.rgb(29, 78, 216)
+    val selectedColor = android.graphics.Color.rgb(154, 52, 18)
     val onSelectNow by rememberUpdatedState(onSelect)
     AndroidView(
         modifier = Modifier.fillMaxSize(),
@@ -54,12 +52,17 @@ internal fun LocationHistoryMap(history: List<PersonLocation>, selected: String?
             val points = history.filter(::validHistoryPoint)
             map.overlays.clear()
             historyRouteSegments(points).forEach { segment ->
-                map.overlays.add(Polyline(map).apply {
-                    setPoints(segment.map { GeoPoint(it.latitude, it.longitude) })
-                    outlinePaint.color = color
-                    outlinePaint.strokeWidth = 5f * map.resources.displayMetrics.density
-                    outlinePaint.pathEffect = android.graphics.DashPathEffect(floatArrayOf(12f, 10f), 0f)
-                })
+                val density = map.resources.displayMetrics.density
+                // White casing keeps a thin route visible over roads and labels.
+                listOf(4f to android.graphics.Color.WHITE, 2f to color).forEach { (width, stroke) ->
+                    map.overlays.add(Polyline(map).apply {
+                        setPoints(segment.map { GeoPoint(it.latitude, it.longitude) })
+                        outlinePaint.color = stroke
+                        outlinePaint.strokeWidth = width * density
+                        outlinePaint.strokeCap = android.graphics.Paint.Cap.ROUND
+                        outlinePaint.pathEffect = android.graphics.DashPathEffect(floatArrayOf(6f * density, 4f * density), 0f)
+                    })
+                }
             }
             points.firstOrNull { it.id == selected }?.let { point ->
                 map.overlays.add(Polygon(map).apply {
@@ -73,10 +76,8 @@ internal fun LocationHistoryMap(history: List<PersonLocation>, selected: String?
                 map.overlays.add(Marker(map).apply {
                     position = GeoPoint(point.latitude, point.longitude)
                     title = point.address.ifBlank { "Localização registrada" }
-                    icon = ContextCompat.getDrawable(map.context, R.drawable.valkyris_map_marker)?.mutate()?.apply {
-                        setTint(if (point.id == selected) selectedColor else color)
-                    }
-                    setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_BOTTOM)
+                    icon = historyPointDrawable(map.resources.displayMetrics.density, point.id == selected, color, selectedColor)
+                    setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_CENTER)
                     setOnMarkerClickListener { _, _ -> onSelectNow(point.id); true }
                 })
             }
@@ -98,3 +99,24 @@ internal fun LocationHistoryMap(history: List<PersonLocation>, selected: String?
         onRelease = { it.onDetach() },
     )
 }
+
+// The transparent 32dp bounds preserve the touch target around an 8/12dp dot.
+internal fun historyPointDrawable(density: Float, selected: Boolean, color: Int, selectedColor: Int): android.graphics.drawable.Drawable =
+    object : android.graphics.drawable.Drawable() {
+        private val paint = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG)
+        override fun getIntrinsicWidth() = (32 * density).toInt()
+        override fun getIntrinsicHeight() = (32 * density).toInt()
+        override fun draw(canvas: android.graphics.Canvas) {
+            val radius = (if (selected) 6f else 4f) * density
+            val x = bounds.exactCenterX(); val y = bounds.exactCenterY()
+            paint.style = android.graphics.Paint.Style.FILL
+            paint.color = android.graphics.Color.WHITE
+            canvas.drawCircle(x, y, radius + 1.5f * density, paint)
+            paint.color = if (selected) selectedColor else color
+            canvas.drawCircle(x, y, radius, paint)
+        }
+        override fun setAlpha(alpha: Int) { paint.alpha = alpha }
+        override fun setColorFilter(filter: android.graphics.ColorFilter?) { paint.colorFilter = filter }
+        @Suppress("DEPRECATION")
+        override fun getOpacity() = android.graphics.PixelFormat.TRANSLUCENT
+    }

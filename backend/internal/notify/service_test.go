@@ -9,14 +9,15 @@ import (
 	"encoding/json"
 	"io"
 	"net/http"
-	"net/http/httptest"
 	"strings"
 	"sync/atomic"
 	"testing"
 	"time"
 
+	"github.com/ferforastieri/valkyris/backend/internal/camera"
 	appcrypto "github.com/ferforastieri/valkyris/backend/internal/crypto"
 	"github.com/ferforastieri/valkyris/backend/internal/event"
+	"github.com/ferforastieri/valkyris/backend/internal/rules"
 	"github.com/ferforastieri/valkyris/backend/internal/store"
 	"golang.org/x/oauth2"
 )
@@ -24,16 +25,15 @@ import (
 func TestEncryptedPushRetriesAndThenDelivers(t *testing.T) {
 	var attempts atomic.Int32
 	var bodies [][]byte
-	endpoint := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	transport := alertTestTransport(func(r *http.Request) (*http.Response, error) {
 		body, _ := io.ReadAll(r.Body)
 		bodies = append(bodies, body)
+		code := http.StatusAccepted
 		if attempts.Add(1) == 1 {
-			http.Error(w, "temporary", http.StatusServiceUnavailable)
-			return
+			code = http.StatusServiceUnavailable
 		}
-		w.WriteHeader(http.StatusAccepted)
-	}))
-	defer endpoint.Close()
+		return &http.Response{StatusCode: code, Status: http.StatusText(code), Header: make(http.Header), Body: io.NopCloser(strings.NewReader("{}"))}, nil
+	})
 
 	db, err := store.Open(t.TempDir() + "/notify.db")
 	if err != nil {
@@ -45,7 +45,7 @@ func TestEncryptedPushRetriesAndThenDelivers(t *testing.T) {
 		t.Fatal(err)
 	}
 	service := NewService(db, vault, "")
-	service.fcmEndpoint = endpoint.URL
+	service.http = &http.Client{Transport: transport}
 	service.projectID = "valkyris-test"
 	service.tokenSource = oauth2.StaticTokenSource(&oauth2.Token{AccessToken: "test-access-token"})
 	now := time.Now().UTC().Format(time.RFC3339Nano)
@@ -68,8 +68,16 @@ func TestEncryptedPushRetriesAndThenDelivers(t *testing.T) {
 	if err = service.Register(context.Background(), "phone", Registration{Token: "fcm-device-token", Secret: secret}); err != nil {
 		t.Fatal(err)
 	}
+	alerts := camera.DefaultAlertPresentation()
+	alerts.AlarmTitle = "Rule alarm"
+	alerts.AlarmSound = "ringtone"
+	alerts.FullScreen = false
+	rule, err := rules.NewService(db).Create(context.Background(), rules.Rule{CameraID: "camera", Name: "Cry", DetectorTypes: []string{"baby_cry"}, Actions: rules.Actions{Alerts: &alerts}})
+	if err != nil {
+		t.Fatal(err)
+	}
 	events := event.NewService(db)
-	created, err := events.Create(context.Background(), event.Event{CameraID: "camera", Type: "baby_cry", Confidence: .91, Metadata: map[string]any{"alarm": true}})
+	created, err := events.Create(context.Background(), event.Event{CameraID: "camera", RuleID: &rule.ID, Type: "baby_cry", Confidence: .91, Metadata: map[string]any{"alarm": true}})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -123,8 +131,8 @@ func TestEncryptedPushRetriesAndThenDelivers(t *testing.T) {
 	if err := json.Unmarshal(plain, &deliveredPayload); err != nil {
 		t.Fatal(err)
 	}
-	if deliveredPayload.CameraName != "Door" || deliveredPayload.Alerts.AlarmTitle != "Nursery alarm" || deliveredPayload.Alerts.AlarmSound != "ringtone" || deliveredPayload.Alerts.FullScreen || !deliveredPayload.Alerts.Vibrate {
-		t.Fatalf("lost camera settings in encrypted push: %+v", deliveredPayload)
+	if deliveredPayload.CameraName != "Door" || deliveredPayload.Alerts.AlarmTitle != "Rule alarm" || deliveredPayload.Alerts.AlarmSound != "ringtone" || deliveredPayload.Alerts.FullScreen || !deliveredPayload.Alerts.Vibrate {
+		t.Fatalf("lost rule settings in encrypted push: %+v", deliveredPayload)
 	}
 	arrival, err := events.Create(context.Background(), event.Event{Source: "tracking", Type: "place_entered", Confidence: 1, Metadata: map[string]any{"personName": "Miriam", "placeName": "Casa"}})
 	if err != nil {
@@ -245,3 +253,7 @@ func TestTrackingNotificationExcludesAllSubjectDevices(t *testing.T) {
 		t.Fatalf("self delivery attempted: %d %v", count, err)
 	}
 }
+
+type alertTestTransport func(*http.Request) (*http.Response, error)
+
+func (f alertTestTransport) RoundTrip(r *http.Request) (*http.Response, error) { return f(r) }

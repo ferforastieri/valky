@@ -22,8 +22,6 @@ type Config struct {
 	MediaRTSP           string
 	RecordingsDir       string
 	ModelsDir           string
-	UpdaterURL          string
-	UpdaterToken        string
 	ReleaseAPI          string
 	FirebaseCredentials string
 	RetentionAge        time.Duration
@@ -48,8 +46,6 @@ func Load() Config {
 		MediaRTSP:           env("VALKYRIS_MEDIA_RTSP", "rtsp://localhost:8554"),
 		RecordingsDir:       env("VALKYRIS_MEDIA_RECORDINGS", filepath.Join(data, "recordings")),
 		ModelsDir:           env("VALKYRIS_MODELS_DIR", "./models"),
-		UpdaterURL:          env("VALKYRIS_UPDATER_URL", "http://updater:8080"),
-		UpdaterToken:        os.Getenv("VALKYRIS_UPDATER_TOKEN"),
 		ReleaseAPI:          env("VALKYRIS_RELEASE_API", "https://api.github.com/repos/ferforastieri/valkyris/releases/latest"),
 		FirebaseCredentials: os.Getenv("VALKYRIS_FIREBASE_CREDENTIALS_FILE"),
 		RetentionAge:        7 * 24 * time.Hour,
