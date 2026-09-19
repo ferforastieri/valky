@@ -561,7 +561,23 @@ func (s *Server) liveWebRTC(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusServiceUnavailable, fmt.Errorf("WebRTC media service is unavailable"))
 		return
 	}
-	mediaPath := "/camera-" + id + "/whep"
+	profile := r.URL.Query().Get("profile")
+	if profile != "" && profile != "browser" {
+		writeError(w, http.StatusBadRequest, fmt.Errorf("invalid WebRTC profile"))
+		return
+	}
+	mediaName := "camera-" + id
+	if profile == "browser" {
+		if r.Method == http.MethodPost {
+			if err := s.media.ConfigureBrowserLive(r.Context(), id); err != nil {
+				s.logger.Warn("configure browser stream", "camera", id, "error", err)
+				writeError(w, http.StatusBadGateway, fmt.Errorf("browser stream is unavailable"))
+				return
+			}
+		}
+		mediaName += "-browser"
+	}
+	mediaPath := "/" + mediaName + "/whep"
 	if session != "" {
 		mediaPath += "/" + session
 	}
@@ -576,6 +592,8 @@ func (s *Server) liveWebRTC(w http.ResponseWriter, r *http.Request) {
 		req.URL.RawQuery = ""
 		req.Host = target.Host
 		req.Header.Del("Authorization")
+		req.Header.Del("Cookie")
+		req.Header.Del("X-Valkyris-Viewer")
 	}
 	proxy.ModifyResponse = func(response *http.Response) error {
 		location := response.Header.Get("Location")
@@ -590,7 +608,11 @@ func (s *Server) liveWebRTC(w http.ResponseWriter, r *http.Request) {
 		if !safeWHEPSession(last) {
 			return fmt.Errorf("MediaMTX returned an invalid WebRTC session location")
 		}
-		response.Header.Set("Location", externalPath+"/"+last)
+		location = externalPath + "/" + last
+		if profile == "browser" {
+			location += "?profile=browser"
+		}
+		response.Header.Set("Location", location)
 		return nil
 	}
 	proxy.ErrorHandler = func(writer http.ResponseWriter, _ *http.Request, proxyErr error) {

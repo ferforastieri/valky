@@ -44,6 +44,14 @@ func (r *Repository) CreatePending(ctx context.Context, in CreateInput) (Camera,
 		in.Port = 2020
 	}
 	in.Icon = normalizeIcon(in.Icon)
+	alerts := DefaultAlertPresentation()
+	if in.Alerts != nil {
+		alerts = *in.Alerts
+	}
+	if err := alerts.Validate(); err != nil {
+		return Camera{}, err
+	}
+	alertsJSON, _ := json.Marshal(alerts)
 	if in.RTSPURI == "" {
 		in.RTSPURI = defaultRTSPURI(in.Host, in.Username, in.Password)
 	}
@@ -60,9 +68,9 @@ func (r *Repository) CreatePending(ctx context.Context, in CreateInput) (Camera,
 		return Camera{}, err
 	}
 	now := time.Now().UTC()
-	c := Camera{ID: uuid.NewString(), Name: in.Name, Icon: in.Icon, Host: in.Host, Port: in.Port, SetupStatus: "pending", SetupStep: "queued", SetupUpdatedAt: now, Enabled: true, CreatedAt: now, UpdatedAt: now}
-	_, err = r.store.DB.ExecContext(ctx, `INSERT INTO cameras(id,name,icon,host,port,username_enc,password_enc,rtsp_uri_enc,profile_token,capabilities_json,media_xaddr,events_xaddr,ptz_xaddr,setup_status,setup_step,setup_error,setup_updated_at,enabled,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
-		c.ID, c.Name, c.Icon, c.Host, c.Port, user, pass, rtsp, "", "{}", "", "", "", c.SetupStatus, c.SetupStep, "", now.Format(time.RFC3339Nano), 1, now.Format(time.RFC3339Nano), now.Format(time.RFC3339Nano))
+	c := Camera{Alerts: alerts, ID: uuid.NewString(), Name: in.Name, Icon: in.Icon, Host: in.Host, Port: in.Port, SetupStatus: "pending", SetupStep: "queued", SetupUpdatedAt: now, Enabled: true, CreatedAt: now, UpdatedAt: now}
+	_, err = r.store.DB.ExecContext(ctx, `INSERT INTO cameras(alerts_json,id,name,icon,host,port,username_enc,password_enc,rtsp_uri_enc,profile_token,capabilities_json,media_xaddr,events_xaddr,ptz_xaddr,setup_status,setup_step,setup_error,setup_updated_at,enabled,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+		string(alertsJSON), c.ID, c.Name, c.Icon, c.Host, c.Port, user, pass, rtsp, "", "{}", "", "", "", c.SetupStatus, c.SetupStep, "", now.Format(time.RFC3339Nano), 1, now.Format(time.RFC3339Nano), now.Format(time.RFC3339Nano))
 	return c, err
 }
 
@@ -82,6 +90,14 @@ func (r *Repository) Update(ctx context.Context, id string, in UpdateInput) (Cam
 		in.Port = 2020
 	}
 	in.Icon = normalizeIcon(in.Icon)
+	alerts := current.Alerts
+	if in.Alerts != nil {
+		alerts = *in.Alerts
+	}
+	if err := alerts.Validate(); err != nil {
+		return Camera{}, false, err
+	}
+	alertsJSON, _ := json.Marshal(alerts)
 	username := strings.TrimSpace(in.Username)
 	if username == "" {
 		username = credentials.Username
@@ -116,10 +132,10 @@ func (r *Repository) Update(ctx context.Context, id string, in UpdateInput) (Cam
 		if err != nil {
 			return Camera{}, false, err
 		}
-		result, err = r.store.DB.ExecContext(ctx, `UPDATE cameras SET name=?,icon=?,host=?,port=?,username_enc=?,password_enc=?,rtsp_uri_enc=?,profile_token='',capabilities_json='{}',media_xaddr='',events_xaddr='',ptz_xaddr='',setup_status='pending',setup_step='queued',setup_error='',setup_updated_at=?,updated_at=? WHERE id=?`,
-			in.Name, in.Icon, in.Host, in.Port, user, pass, rtsp, now, now, id)
+		result, err = r.store.DB.ExecContext(ctx, `UPDATE cameras SET alerts_json=?,name=?,icon=?,host=?,port=?,username_enc=?,password_enc=?,rtsp_uri_enc=?,profile_token='',capabilities_json='{}',media_xaddr='',events_xaddr='',ptz_xaddr='',setup_status='pending',setup_step='queued',setup_error='',setup_updated_at=?,updated_at=? WHERE id=?`,
+			string(alertsJSON), in.Name, in.Icon, in.Host, in.Port, user, pass, rtsp, now, now, id)
 	} else {
-		result, err = r.store.DB.ExecContext(ctx, `UPDATE cameras SET name=?,icon=?,host=?,port=?,updated_at=? WHERE id=?`, in.Name, in.Icon, in.Host, in.Port, now, id)
+		result, err = r.store.DB.ExecContext(ctx, `UPDATE cameras SET alerts_json=?,name=?,icon=?,host=?,port=?,updated_at=? WHERE id=?`, string(alertsJSON), in.Name, in.Icon, in.Host, in.Port, now, id)
 	}
 	if err != nil {
 		return Camera{}, false, err
@@ -172,7 +188,7 @@ func (r *Repository) CompleteSetup(ctx context.Context, id string, caps Capabili
 }
 
 func (r *Repository) List(ctx context.Context) ([]Camera, error) {
-	rows, err := r.store.DB.QueryContext(ctx, `SELECT id,name,icon,host,port,profile_token,capabilities_json,media_xaddr,events_xaddr,ptz_xaddr,setup_status,setup_step,setup_error,setup_updated_at,enabled,created_at,updated_at FROM cameras ORDER BY name`)
+	rows, err := r.store.DB.QueryContext(ctx, `SELECT alerts_json,id,name,icon,host,port,profile_token,capabilities_json,media_xaddr,events_xaddr,ptz_xaddr,setup_status,setup_step,setup_error,setup_updated_at,enabled,created_at,updated_at FROM cameras ORDER BY name`)
 	if err != nil {
 		return nil, err
 	}
@@ -189,17 +205,21 @@ func (r *Repository) List(ctx context.Context) ([]Camera, error) {
 }
 
 func (r *Repository) Get(ctx context.Context, id string) (Camera, Credentials, error) {
-	row := r.store.DB.QueryRowContext(ctx, `SELECT id,name,icon,host,port,profile_token,capabilities_json,media_xaddr,events_xaddr,ptz_xaddr,setup_status,setup_step,setup_error,setup_updated_at,enabled,created_at,updated_at,username_enc,password_enc,rtsp_uri_enc FROM cameras WHERE id=?`, id)
+	row := r.store.DB.QueryRowContext(ctx, `SELECT alerts_json,id,name,icon,host,port,profile_token,capabilities_json,media_xaddr,events_xaddr,ptz_xaddr,setup_status,setup_step,setup_error,setup_updated_at,enabled,created_at,updated_at,username_enc,password_enc,rtsp_uri_enc FROM cameras WHERE id=?`, id)
 	var c Camera
-	var caps string
+	var caps, alertsJSON string
 	var enabled int
 	var setupUpdated, created, updated string
 	var user, pass, rtsp []byte
-	err := row.Scan(&c.ID, &c.Name, &c.Icon, &c.Host, &c.Port, &c.ProfileToken, &caps, &c.Services.Media, &c.Services.Events, &c.Services.PTZ, &c.SetupStatus, &c.SetupStep, &c.SetupError, &setupUpdated, &enabled, &created, &updated, &user, &pass, &rtsp)
+	err := row.Scan(&alertsJSON, &c.ID, &c.Name, &c.Icon, &c.Host, &c.Port, &c.ProfileToken, &caps, &c.Services.Media, &c.Services.Events, &c.Services.PTZ, &c.SetupStatus, &c.SetupStep, &c.SetupError, &setupUpdated, &enabled, &created, &updated, &user, &pass, &rtsp)
 	if err != nil {
 		return c, Credentials{}, err
 	}
 	_ = json.Unmarshal([]byte(caps), &c.Capabilities)
+	c.Alerts = DefaultAlertPresentation()
+	if err := json.Unmarshal([]byte(alertsJSON), &c.Alerts); err != nil {
+		return c, Credentials{}, err
+	}
 	c.Enabled = enabled == 1
 	c.CreatedAt, _ = time.Parse(time.RFC3339Nano, created)
 	c.UpdatedAt, _ = time.Parse(time.RFC3339Nano, updated)
@@ -233,13 +253,17 @@ type scanner interface{ Scan(...any) error }
 
 func scanCamera(s scanner) (Camera, error) {
 	var c Camera
-	var caps, setupUpdated, created, updated string
+	var alertsJSON, caps, setupUpdated, created, updated string
 	var enabled int
-	err := s.Scan(&c.ID, &c.Name, &c.Icon, &c.Host, &c.Port, &c.ProfileToken, &caps, &c.Services.Media, &c.Services.Events, &c.Services.PTZ, &c.SetupStatus, &c.SetupStep, &c.SetupError, &setupUpdated, &enabled, &created, &updated)
+	err := s.Scan(&alertsJSON, &c.ID, &c.Name, &c.Icon, &c.Host, &c.Port, &c.ProfileToken, &caps, &c.Services.Media, &c.Services.Events, &c.Services.PTZ, &c.SetupStatus, &c.SetupStep, &c.SetupError, &setupUpdated, &enabled, &created, &updated)
 	if err != nil {
 		return c, err
 	}
 	_ = json.Unmarshal([]byte(caps), &c.Capabilities)
+	c.Alerts = DefaultAlertPresentation()
+	if err := json.Unmarshal([]byte(alertsJSON), &c.Alerts); err != nil {
+		return c, err
+	}
 	c.Enabled = enabled == 1
 	c.CreatedAt, _ = time.Parse(time.RFC3339Nano, created)
 	c.UpdatedAt, _ = time.Parse(time.RFC3339Nano, updated)

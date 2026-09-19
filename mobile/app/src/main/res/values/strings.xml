@@ -247,4 +247,27 @@
     <string name="activity_retry">Tentar novamente</string>
     <string name="activity_more">Carregar mais</string>
     <string name="activity_empty">Nenhum evento neste intervalo.</string>
+    <string name="camera_alerts">Notificações e alarme</string>
+    <string name="camera_alerts_hint">Personalize os alertas desta câmera para todos os destinatários. Deixe os textos vazios para usar o padrão do app. As regras definem quando notificar ou tocar o alarme.</string>
+    <string name="alert_notification_title">Título da notificação</string>
+    <string name="alert_notification_body">Mensagem da notificação</string>
+    <string name="alert_alarm_title">Título do alarme</string>
+    <string name="alert_alarm_body">Mensagem do alarme</string>
+    <string name="alert_alarm_sound">Som do alarme</string>
+    <string name="alert_sound_alarm">Alarme padrão do celular</string>
+    <string name="alert_sound_ringtone">Toque padrão do celular</string>
+    <string name="alert_sound_silent">Sem som</string>
+    <string name="alert_vibrate">Vibrar</string>
+    <string name="alert_full_screen">Abrir alarme em tela cheia</string>
+    <string name="alert_preview">Prévia dos textos</string>
+    <string name="alarm_ack_failed">O som foi interrompido, mas não foi possível confirmar o evento. Tente novamente.</string>
+    <string name="open_alarm">Abrir alarme</string>
+    <string name="location_updating">Atualizando sua localização…</string>
+    <string name="location_send_failed">Não foi possível enviar sua localização. Verifique o acesso ao servidor.</string>
+    <string name="location_permission_needed">Permita o acesso à localização nas configurações do aplicativo.</string>
+    <string name="location_fix_unavailable">Não foi possível obter uma posição precisa. Confira se a localização do celular está ativada.</string>
+    <string name="location_refresh">Atualizar minha localização</string>
+    <string name="location_route_hint">Trajeto aproximado entre os registros carregados.</string>
+    <string name="location_route_all">Ver tudo</string>
+    <string name="location_map_selected">Selecionado no mapa · precisão de %1$d m</string>
 </resources>

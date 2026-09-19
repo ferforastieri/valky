@@ -477,10 +477,43 @@ async function personDetails(id: string) {
   const person = people.find(p => p.id === id);
   if (!person) return;
   const version = openDetails(person.name, "HISTÓRICO DE LOCALIZAÇÃO");
-  $("#detail-body").innerHTML = '<ol id="location-timeline" class="location-timeline"></ol><p id="history-message" class="muted" role="status"></p><button id="history-more" class="quiet">Carregando histórico…</button><p class="muted">Endereços: © OpenStreetMap</p>';
+  $("#detail-body").innerHTML = `<div class="location-history-layout">
+    <div class="location-history-map-panel"><div id="history-map" class="map history-map" aria-label="Mapa do histórico de localização" hidden></div>
+      <p id="history-map-message" class="muted" role="status"></p>
+      <div class="history-map-caption"><small>Trajeto aproximado entre os registros carregados.</small><button id="history-fit" class="quiet" hidden>Ver tudo</button></div>
+    </div>
+    <div class="location-history-records"><ol id="location-timeline" class="location-timeline"></ol><p id="history-message" class="muted" role="status"></p><button id="history-more" class="quiet">Carregando histórico…</button></div>
+  </div><p class="muted">Mapa e endereços: © OpenStreetMap</p>`;
   let offset = 0;
   let until = "";
   let loading = false;
+  let loaded: Location[] = [];
+  let map: ReturnType<typeof import("./lib/map").historyMap> | undefined;
+  const select = (index: number) => {
+    if (version !== dialogVersion) return;
+    map?.select(index);
+    document.querySelectorAll<HTMLButtonElement>("[data-history-index]").forEach(button => {
+      const selected = Number(button.dataset.historyIndex) === index;
+      button.setAttribute("aria-pressed", String(selected));
+      if (selected) button.scrollIntoView({ block: "nearest", behavior: "smooth" });
+    });
+  };
+  void import("./lib/map").then(({ historyMap }) => {
+    if (version !== dialogVersion) return;
+    map = historyMap($("#history-map"), select);
+    map.update(loaded);
+    modalCleanups.push(() => map?.destroy());
+  }).catch(() => {
+    if (version === dialogVersion) $("#history-map-message").textContent = "Mapa indisponível. Consulte os registros ao lado.";
+  });
+  $("#history-fit").onclick = () => {
+    map?.fit();
+    document.querySelectorAll("[data-history-index]").forEach(button => button.setAttribute("aria-pressed", "false"));
+  };
+  $("#location-timeline").onclick = (event) => {
+    const button = (event.target as HTMLElement).closest<HTMLButtonElement>("[data-history-index]");
+    if (button) select(Number(button.dataset.historyIndex));
+  };
   const load = async () => {
     if (loading || version !== dialogVersion) return;
     loading = true;
@@ -490,13 +523,17 @@ async function personDetails(id: string) {
     try {
       const history = await api.get<Location[]>(`/users/${key(id)}/history?limit=20&offset=${offset}&until=${key(until)}`, modalController.signal);
       if (version !== dialogVersion) return;
-      $("#location-timeline").insertAdjacentHTML("beforeend", history.map(point => `<li><time datetime="${e(point.occurredAt)}">${date(point.occurredAt)}</time>${point.lastSeenAt && point.lastSeenAt !== point.occurredAt ? `<small>Até ${date(point.lastSeenAt)}</small>` : ''}<strong>${e(point.address || 'Localização registrada')}</strong>${point.address ? '' : `<small>${point.latitude.toFixed(5)}, ${point.longitude.toFixed(5)}</small>`}</li>`).join(''));
+      $("#location-timeline").insertAdjacentHTML("beforeend", history.map((point, index) => `<li><button type="button" data-history-index="${offset + index}" aria-pressed="false"><time datetime="${e(point.occurredAt)}">${date(point.occurredAt)}</time>${point.lastSeenAt && point.lastSeenAt !== point.occurredAt ? `<small>Até ${date(point.lastSeenAt)}</small>` : ''}<strong>${e(point.address || 'Localização registrada')}</strong>${point.address ? '' : `<small>${point.latitude.toFixed(5)}, ${point.longitude.toFixed(5)}</small>`}<small>Ver no mapa · precisão de ${Math.round(point.accuracy)} m</small></button></li>`).join(''));
       if (!until && history.length) until = history[0].lastSeenAt || history[0].occurredAt;
       offset += history.length;
+      loaded = [...loaded, ...history];
+      $("#history-map").hidden = !loaded.length;
+      $("#history-fit").hidden = !loaded.length;
+      map?.update(loaded);
       $("#history-message").textContent = offset ? '' : 'Ainda não há localização com precisão suficiente para o histórico.';
       button.hidden = history.length < 20;
       button.textContent = 'Ver registros anteriores';
-    } catch (error) {
+    } catch {
       if (version !== dialogVersion) return;
       $("#history-message").textContent = 'Não foi possível carregar o histórico.';
       button.textContent = 'Tentar novamente';
@@ -505,6 +542,7 @@ async function personDetails(id: string) {
   $("#history-more").addEventListener('click', () => void load());
   await load();
 }
+
 async function placeDetails(id: string) {
   const place = places.find((p) => p.id === id);
   if (!place) return;

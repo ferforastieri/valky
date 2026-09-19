@@ -165,16 +165,16 @@ paths:
   /cameras/{id}/live/webrtc/whep:
     post:
       summary: Start an authenticated WHEP session for the live WebRTC stream
-      parameters: [{$ref: '#/components/parameters/id'}]
+      parameters: [{$ref: '#/components/parameters/id'}, {$ref: '#/components/parameters/webrtcProfile'}]
       responses: {'201': {description: WebRTC SDP answer and session location}}
   /cameras/{id}/live/webrtc/whep/{session}:
     patch:
       summary: Send WebRTC ICE updates to an authenticated WHEP session
-      parameters: [{$ref: '#/components/parameters/id'}, {$ref: '#/components/parameters/session'}]
+      parameters: [{$ref: '#/components/parameters/id'}, {$ref: '#/components/parameters/webrtcProfile'}, {$ref: '#/components/parameters/session'}]
       responses: {'204': {description: ICE update accepted}}
     delete:
       summary: Close an authenticated WHEP session
-      parameters: [{$ref: '#/components/parameters/id'}, {$ref: '#/components/parameters/session'}]
+      parameters: [{$ref: '#/components/parameters/id'}, {$ref: '#/components/parameters/webrtcProfile'}, {$ref: '#/components/parameters/session'}]
       responses: {'204': {description: WebRTC session closed}}
   /detectors:
     get:
@@ -410,6 +410,11 @@ components:
       description: Secure HttpOnly SameSite=Strict cookie; requires X-Valkyris-Viewer 1 for all cookie-authenticated API calls. Read-only except WHEP negotiation and logout.
     bearerAuth: {type: http, scheme: bearer}
   parameters:
+    webrtcProfile:
+      name: profile
+      in: query
+      description: Optional browser-compatible H264 baseline stream, transcoded on demand. Preserve the returned Location for session operations.
+      schema: {type: string, enum: [browser]}
     id: {name: id, in: path, required: true, schema: {type: string, format: uuid}}
     session: {name: session, in: path, required: true, schema: {type: string}}
   schemas:
@@ -436,10 +441,22 @@ components:
         ptz: {type: boolean}
         zoom: {type: boolean}
         audio: {type: boolean}
+    AlertPresentation:
+      type: object
+      description: Camera-wide alert presentation. Empty text uses localized app defaults. Combined text is limited to 1600 UTF-8 bytes.
+      properties:
+        notificationTitle: {type: string, maxLength: 80, default: ''}
+        notificationBody: {type: string, maxLength: 240, default: ''}
+        alarmTitle: {type: string, maxLength: 80, default: ''}
+        alarmBody: {type: string, maxLength: 240, default: ''}
+        alarmSound: {type: string, enum: [alarm, ringtone, silent], default: alarm}
+        vibrate: {type: boolean, default: true}
+        fullScreen: {type: boolean, default: true}
     Camera:
       type: object
       required: [id, name, icon, host, capabilities, enabled]
       properties:
+        alerts: {$ref: '#/components/schemas/AlertPresentation'}
         id: {type: string, format: uuid}
         name: {type: string}
         icon: {type: string, enum: [camera, nursery, baby, bottle, dog, bedroom, office, entrance, living_room, yard, garage, kitchen, bathroom]}
@@ -456,6 +473,7 @@ components:
       type: object
       required: [name, host, username, password]
       properties:
+        alerts: {$ref: '#/components/schemas/AlertPresentation'}
         name: {type: string}
         icon: {type: string, enum: [camera, nursery, baby, bottle, dog, bedroom, office, entrance, living_room, yard, garage, kitchen, bathroom], default: camera}
         host: {type: string}

@@ -11,6 +11,7 @@ CREATE TABLE IF NOT EXISTS cameras (
   id TEXT PRIMARY KEY,
   name TEXT NOT NULL,
   icon TEXT NOT NULL DEFAULT 'camera',
+  alerts_json TEXT NOT NULL DEFAULT '{}',
   host TEXT NOT NULL,
   port INTEGER NOT NULL DEFAULT 2020,
   username_enc BLOB NOT NULL,

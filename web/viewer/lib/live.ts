@@ -1,125 +1,156 @@
 import { key } from "./api";
+
 export function live(
   cameraId: string,
   video: HTMLVideoElement,
   onStatus: (value: string) => void,
 ): () => void {
-  const controller = new AbortController();
-  const pc = new RTCPeerConnection({
-    iceServers: [{ urls: "stun:stun.l.google.com:19302" }],
-  });
-  let session = "";
+  if (!window.isSecureContext || typeof RTCPeerConnection === "undefined") {
+    onStatus("Abra o painel por HTTPS em um navegador com suporte a WebRTC.");
+    return () => {};
+  }
   let closed = false;
-  let timer: ReturnType<typeof setTimeout>;
-  const removeSession = () => {
-    if (session) {
+  let stopAttempt: () => void = () => {};
+  const endpoint = `/api/v1/cameras/${key(cameraId)}/live/webrtc/whep`;
+  video.muted = true;
+  video.playsInline = true;
+
+  const connect = (browser: boolean) => {
+    stopAttempt();
+    if (closed) return;
+    const controller = new AbortController();
+    const pc = new RTCPeerConnection({
+      bundlePolicy: "max-bundle",
+      iceServers: [{ urls: "stun:stun.l.google.com:19302" }],
+    });
+    const stream = new MediaStream();
+    let disposed = false;
+    let session = "";
+    let gatheringTimer: ReturnType<typeof setTimeout> | undefined;
+    let requestTimer: ReturnType<typeof setTimeout> | undefined;
+    let connectionTimer: ReturnType<typeof setTimeout> | undefined;
+    let cancelGathering: (() => void) | undefined;
+    const removeSession = () => {
+      if (!session) return;
       void fetch(session, {
-        method: "DELETE",
-        headers: { "X-Valkyris-Viewer": "1" },
-        keepalive: true,
+        method: "DELETE", headers: { "X-Valkyris-Viewer": "1" }, keepalive: true,
       }).catch(() => {});
       session = "";
-    }
-  };
-  pc.addTransceiver("video", { direction: "recvonly" });
-  pc.addTransceiver("audio", { direction: "recvonly" });
-  const stream = new MediaStream();
-  pc.ontrack = (event) => {
-    stream.addTrack(event.track);
-    video.srcObject = stream;
-    void video.play().catch(() => {});
-  };
-  const onPlaying = () => {
-    if (closed) return;
-    onStatus("Ao vivo · áudio inicialmente silenciado");
-    clearTimeout(timer);
-  };
-  video.addEventListener("playing", onPlaying);
-  pc.onconnectionstatechange = () => {
-    if (pc.connectionState === "failed")
-      onStatus(
-        "Não foi possível conectar o vídeo. Verifique a rede e tente reconectar.",
-      );
-  };
-  timer = setTimeout(
-    () =>
-      onStatus(
-        "O vídeo ainda não conectou. Verifique se a rede permite alcançar o servidor de mídia.",
-      ),
-    18000,
-  );
-  void (async () => {
-    try {
-      onStatus("Conectando ao vídeo ao vivo…");
-      await pc.setLocalDescription(await pc.createOffer());
-      await new Promise<void>((resolve) => {
-        if (pc.iceGatheringState === "complete") {
-          resolve();
-          return;
-        }
-        const t = setTimeout(resolve, 8000);
-        pc.onicegatheringstatechange = () => {
-          if (pc.iceGatheringState === "complete") {
-            clearTimeout(t);
-            resolve();
-          }
-        };
-      });
-      if (closed) return;
-      const offer = pc.localDescription?.sdp;
-      if (!offer?.split(/\r?\n/).some((line) => line.startsWith("a=candidate:")))
-        throw new Error("Não foi possível obter um endereço de rede para conectar a câmera.");
-      const response = await fetch(
-        `/api/v1/cameras/${key(cameraId)}/live/webrtc/whep`,
-        {
-          method: "POST",
-          headers: {
-            "X-Valkyris-Viewer": "1",
-            "Content-Type": "application/sdp",
-          },
-          body: offer,
-          signal: AbortSignal.any([
-            controller.signal,
-            AbortSignal.timeout(15000),
-          ]),
-        },
-      );
-      if (!response.ok)
-        throw new Error("O servidor não conseguiu abrir o vídeo.");
-      const location = response.headers.get("Location");
-      if (location) {
-        const url = new URL(location, window.location.origin);
-        if (
-          url.origin !== window.location.origin ||
-          !url.pathname.startsWith(
-            `/api/v1/cameras/${key(cameraId)}/live/webrtc/whep/`,
-          )
-        )
-          throw new Error("Sessão de vídeo inválida.");
-        session = url.href;
-      }
-      if (closed) {
-        removeSession();
+    };
+    const onPlaying = () => {
+      // Audio can fire `playing` before any video has been decoded.
+      if (disposed || video.videoWidth === 0) return;
+      clearTimeout(connectionTimer);
+      onStatus(browser ? "Ao vivo · vídeo compatível · áudio inicialmente silenciado" : "Ao vivo · áudio inicialmente silenciado");
+    };
+    const dispose = () => {
+      if (disposed) return;
+      disposed = true;
+      controller.abort();
+      clearTimeout(gatheringTimer);
+      clearTimeout(requestTimer);
+      clearTimeout(connectionTimer);
+      cancelGathering?.();
+      video.removeEventListener("playing", onPlaying);
+      video.removeEventListener("resize", onPlaying);
+      pc.close();
+      stream.getTracks().forEach((track) => track.stop());
+      video.srcObject = null;
+      removeSession();
+    };
+    stopAttempt = dispose;
+    const fail = (message: string, tryCompatible = false) => {
+      if (disposed || closed) return;
+      if (tryCompatible && !browser) {
+        connect(true);
         return;
       }
-      await pc.setRemoteDescription({
-        type: "answer",
-        sdp: await response.text(),
+      dispose();
+      onStatus(message);
+    };
+    video.addEventListener("playing", onPlaying);
+    video.addEventListener("resize", onPlaying);
+    pc.addTransceiver("video", { direction: "recvonly" });
+    pc.addTransceiver("audio", { direction: "recvonly" });
+    pc.ontrack = (event) => {
+      if (disposed) return;
+      stream.addTrack(event.track);
+      video.srcObject = stream;
+      void video.play().catch(() => {
+        if (!disposed) onStatus("Toque no botão de reprodução do vídeo para iniciar.");
       });
-    } catch (error) {
-      if (!closed)
-        onStatus(
-          error instanceof Error ? error.message : "Vídeo indisponível.",
-        );
-    }
-  })();
-  return () => {
-    closed = true;
-    controller.abort();
-    clearTimeout(timer);
-    video.removeEventListener("playing", onPlaying);
-    pc.close();
-    video.srcObject = null;
-    removeSession();
+    };
+    pc.onconnectionstatechange = () => {
+      if (pc.connectionState === "failed") {
+        fail("Não foi possível conectar o vídeo. Verifique o acesso à porta de mídia 8189 pela rede ou VPN e tente reconectar.");
+      }
+    };
+    void (async () => {
+      try {
+        onStatus(browser ? "Preparando vídeo compatível com este navegador…" : "Conectando ao vídeo ao vivo…");
+        await pc.setLocalDescription(await pc.createOffer());
+        await new Promise<void>((resolve) => {
+          cancelGathering = resolve;
+          if (pc.iceGatheringState === "complete" || disposed) { resolve(); return; }
+          gatheringTimer = setTimeout(resolve, 8000);
+          pc.onicegatheringstatechange = () => {
+            if (pc.iceGatheringState === "complete") {
+              clearTimeout(gatheringTimer);
+              resolve();
+            }
+          };
+        });
+        if (disposed) return;
+        const offer = pc.localDescription?.sdp;
+        if (!offer) throw new Error("O navegador não conseguiu preparar a conexão de vídeo.");
+        // Some browsers hide local candidates; remote ICE candidates can still
+        // establish a connection. Do not reject a valid offer before signalling.
+        requestTimer = setTimeout(() => controller.abort(), browser ? 30000 : 15000);
+        const response = await fetch(endpoint + (browser ? "?profile=browser" : ""), {
+          method: "POST",
+          headers: { "X-Valkyris-Viewer": "1", "Content-Type": "application/sdp" },
+          body: offer, signal: controller.signal,
+        });
+        clearTimeout(requestTimer);
+        if (!response.ok) {
+          if (response.status === 400 || response.status === 406) {
+            fail("A câmera não ofereceu um formato de vídeo compatível.", true);
+            return;
+          }
+          throw new Error(response.status === 401 ? "A sessão expirou. Entre novamente no painel." :
+            response.status === 429 ? "Muitas tentativas de vídeo. Aguarde um minuto e reconecte." :
+            `O servidor não conseguiu abrir o vídeo (HTTP ${response.status}).`);
+        }
+        const location = response.headers.get("Location");
+        if (location) {
+          const url = new URL(location, window.location.origin);
+          if (url.origin !== window.location.origin || !url.pathname.startsWith(`${endpoint}/`)) {
+            throw new Error("Sessão de vídeo inválida.");
+          }
+          session = url.href;
+        }
+        if (disposed) { removeSession(); return; }
+        const answer = await response.text();
+        if (disposed) return;
+        try {
+          await pc.setRemoteDescription({ type: "answer", sdp: answer });
+        } catch {
+          fail("O navegador não conseguiu negociar o formato de vídeo.", true);
+          return;
+        }
+        if (disposed) return;
+        connectionTimer = setTimeout(() => {
+          const connected = pc.connectionState === "connected";
+          fail(connected ? "A conexão abriu, mas não foi possível reproduzir o vídeo da câmera." :
+            "O vídeo não conectou. Verifique se esta rede ou VPN alcança a porta de mídia 8189 do servidor.", connected);
+        }, 20000);
+        onPlaying();
+      } catch (error) {
+        fail(controller.signal.aborted ? "O servidor demorou para abrir o vídeo. Tente reconectar." :
+          error instanceof Error ? error.message : "Vídeo indisponível.");
+      }
+    })();
   };
+  connect(false);
+  return () => { closed = true; stopAttempt(); };
 }

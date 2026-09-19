@@ -61,6 +61,9 @@ func TestEncryptedPushRetriesAndThenDelivers(t *testing.T) {
 	if _, err = db.DB.Exec(`UPDATE devices SET user_id='user' WHERE id='phone'`); err != nil {
 		t.Fatal(err)
 	}
+	if _, err = db.DB.Exec(`UPDATE cameras SET alerts_json='{"alarmTitle":"Nursery alarm","alarmSound":"ringtone","fullScreen":false}'`); err != nil {
+		t.Fatal(err)
+	}
 	secret := "device-side-secret"
 	if err = service.Register(context.Background(), "phone", Registration{Token: "fcm-device-token", Secret: secret}); err != nil {
 		t.Fatal(err)
@@ -107,6 +110,21 @@ func TestEncryptedPushRetriesAndThenDelivers(t *testing.T) {
 	plain, err := openTestPayload(secret, sealed)
 	if err != nil || !strings.Contains(string(plain), "baby_cry") || !strings.Contains(string(plain), `"target":"event"`) || strings.Contains(string(plain), "fcm-device-token") {
 		t.Fatalf("unexpected decrypted payload %q: %v", plain, err)
+	}
+	var deliveredPayload struct {
+		CameraName string `json:"cameraName"`
+		Alerts     struct {
+			AlarmTitle string `json:"alarmTitle"`
+			AlarmSound string `json:"alarmSound"`
+			FullScreen bool   `json:"fullScreen"`
+			Vibrate    bool   `json:"vibrate"`
+		} `json:"alerts"`
+	}
+	if err := json.Unmarshal(plain, &deliveredPayload); err != nil {
+		t.Fatal(err)
+	}
+	if deliveredPayload.CameraName != "Door" || deliveredPayload.Alerts.AlarmTitle != "Nursery alarm" || deliveredPayload.Alerts.AlarmSound != "ringtone" || deliveredPayload.Alerts.FullScreen || !deliveredPayload.Alerts.Vibrate {
+		t.Fatalf("lost camera settings in encrypted push: %+v", deliveredPayload)
 	}
 	arrival, err := events.Create(context.Background(), event.Event{Source: "tracking", Type: "place_entered", Confidence: 1, Metadata: map[string]any{"personName": "Miriam", "placeName": "Casa"}})
 	if err != nil {

@@ -30,6 +30,7 @@ class MainViewModel @Inject constructor(
     private val preferences: AppPreferences,
     private val push: FcmRegistration,
     private val actionGate: MobileActionGate,
+    @param:dagger.hilt.android.qualifiers.ApplicationContext private val context: android.content.Context,
 ) : ViewModel() {
     val previousServer: String get() = sessions.savedBase()
     val permissions = api.permissions
@@ -138,7 +139,7 @@ class MainViewModel @Inject constructor(
         }
     }
 
-    fun signOut() { sessions.clear(); api.clearPermissions(); _pairingLink.value = null; _admin.value = false; _paired.value = false; _updateInfo.value = null }
+    fun signOut() { sessions.clear(); com.ferforastieri.valkyris.feature.people.LocationTrackingService.stop(context); api.clearPermissions(); _pairingLink.value = null; _admin.value = false; _paired.value = false; _updateInfo.value = null }
 
     fun refreshPushRegistration() {
         val current = sessions.get() ?: return

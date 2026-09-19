@@ -9,6 +9,7 @@ class LocationBootReceiver : BroadcastReceiver() {
         if (intent.action != Intent.ACTION_BOOT_COMPLETED) return
         val enabled = context.getSharedPreferences("location_tracking", Context.MODE_PRIVATE)
             .getBoolean("tracking_enabled", false)
-        if (enabled) LocationTrackingService.start(context)
+        val backgroundAllowed = android.os.Build.VERSION.SDK_INT < 29 || androidx.core.content.ContextCompat.checkSelfPermission(context, android.Manifest.permission.ACCESS_BACKGROUND_LOCATION) == android.content.pm.PackageManager.PERMISSION_GRANTED
+        if (enabled && backgroundAllowed) LocationTrackingService.start(context)
     }
 }

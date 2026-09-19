@@ -17,6 +17,7 @@ import kotlinx.coroutines.flow.update
 @Singleton
 class ValkyrisRepository @Inject constructor(
     val api: ValkyrisApi,
+    private val notifier: com.ferforastieri.valkyris.core.alarm.AlarmNotifier,
 ) {
     private val _cameras = MutableStateFlow<List<Camera>>(emptyList())
     val cameras = _cameras.asStateFlow()
@@ -64,10 +65,12 @@ class ValkyrisRepository @Inject constructor(
 
     suspend fun acknowledge(eventId: String) {
         api.acknowledge(eventId)
+        notifier.cancel(eventId)
     }
 
     suspend fun acknowledgeAll() {
         api.acknowledgeAll()
+        notifier.cancelAll()
     }
 
     suspend fun createRule(rule: Rule): Rule {

@@ -247,4 +247,27 @@
     <string name="activity_retry">Try again</string>
     <string name="activity_more">Load more</string>
     <string name="activity_empty">No events in this interval.</string>
+    <string name="camera_alerts">Notifications and alarm</string>
+    <string name="camera_alerts_hint">Customize this camera’s alerts for all recipients. Leave text empty to use app defaults. Rules decide when to notify or sound the alarm.</string>
+    <string name="alert_notification_title">Notification title</string>
+    <string name="alert_notification_body">Notification message</string>
+    <string name="alert_alarm_title">Alarm title</string>
+    <string name="alert_alarm_body">Alarm message</string>
+    <string name="alert_alarm_sound">Alarm sound</string>
+    <string name="alert_sound_alarm">Phone default alarm</string>
+    <string name="alert_sound_ringtone">Phone default ringtone</string>
+    <string name="alert_sound_silent">Silent</string>
+    <string name="alert_vibrate">Vibrate</string>
+    <string name="alert_full_screen">Open full-screen alarm</string>
+    <string name="alert_preview">Text preview</string>
+    <string name="alarm_ack_failed">Sound stopped, but the event could not be acknowledged. Try again.</string>
+    <string name="open_alarm">Open alarm</string>
+    <string name="location_updating">Updating your location…</string>
+    <string name="location_send_failed">Could not send your location. Check your connection to the server.</string>
+    <string name="location_permission_needed">Allow location access in the app settings.</string>
+    <string name="location_fix_unavailable">Could not obtain an accurate position. Check that phone location is enabled.</string>
+    <string name="location_refresh">Refresh my location</string>
+    <string name="location_route_hint">Approximate route between loaded records.</string>
+    <string name="location_route_all">Show all</string>
+    <string name="location_map_selected">Selected on map · accuracy %1$d m</string>
 </resources>

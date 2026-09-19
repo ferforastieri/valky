@@ -11,6 +11,11 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
+import androidx.lifecycle.compose.LifecycleResumeEffect
+import kotlinx.coroutines.launch
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.*
@@ -53,6 +58,12 @@ import org.osmdroid.util.BoundingBox
 
 @Composable
 fun PeopleScreen(vm: PeopleViewModel = hiltViewModel()) {
+    val context = LocalContext.current
+    val locationStatus by LocationTrackingStatus.state.collectAsStateWithLifecycle()
+    LifecycleResumeEffect(vm) {
+        val job = vm.observe()
+        onPauseOrDispose { job.cancel() }
+    }
     val users by vm.people.collectAsStateWithLifecycle()
     val me by vm.me.collectAsStateWithLifecycle()
     val places by vm.places.collectAsStateWithLifecycle()
@@ -74,8 +85,22 @@ fun PeopleScreen(vm: PeopleViewModel = hiltViewModel()) {
                 Text("Onde a família está agora", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
         }
+        when (locationStatus) {
+            LocationTrackingStatus.State.Locating -> Text(stringResource(R.string.location_updating), style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(bottom = 8.dp))
+            LocationTrackingStatus.State.LocationUnavailable, LocationTrackingStatus.State.SendFailed, LocationTrackingStatus.State.PermissionRequired -> {
+                Column(Modifier.fillMaxWidth().padding(bottom = 8.dp)) {
+                    Text(stringResource(when (locationStatus) {
+                        LocationTrackingStatus.State.SendFailed -> R.string.location_send_failed
+                        LocationTrackingStatus.State.PermissionRequired -> R.string.location_permission_needed
+                        else -> R.string.location_fix_unavailable
+                    }), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error)
+                    TextButton(onClick = { LocationTrackingService.start(context, refresh = true) }) { Text(stringResource(R.string.location_refresh)) }
+                }
+            }
+            else -> Unit
+        }
         Surface(
-            modifier = Modifier.fillMaxWidth().height(285.dp),
+            modifier = Modifier.fillMaxWidth().height((LocalConfiguration.current.screenHeightDp * .32f).coerceIn(160f, 285f).dp),
             shape = MaterialTheme.shapes.extraLarge,
             color = MaterialTheme.colorScheme.surfaceVariant,
             tonalElevation = 1.dp,
@@ -413,31 +438,56 @@ private fun AreasSheet(
 }
 
 @Composable
-internal fun HistorySheet(user: TrackedPerson, history: List<PersonLocation>, loading: Boolean = false, failed: Boolean = false, more: Boolean = false, onMore: () -> Unit = {}, onDismiss: () -> Unit) = ValkyrisBottomSheet(scrollContent = false, title = "Por onde ${user.name} passou", onDismiss = onDismiss) {
-    LazyColumn(Modifier.fillMaxWidth().heightIn(max = LocalConfiguration.current.screenHeightDp.dp * .65f), contentPadding = PaddingValues(bottom = 16.dp)) {
-        items(history, key = { it.id }) { point ->
-            Row(Modifier.fillMaxWidth().height(IntrinsicSize.Min)) {
-                Column(Modifier.width(24.dp).fillMaxHeight(), horizontalAlignment = Alignment.CenterHorizontally) {
-                    Box(Modifier.padding(top = 5.dp).size(9.dp).background(MaterialTheme.colorScheme.secondary, androidx.compose.foundation.shape.CircleShape))
-                    Box(Modifier.width(1.dp).weight(1f).background(MaterialTheme.colorScheme.outlineVariant))
+internal fun HistorySheet(user: TrackedPerson, history: List<PersonLocation>, loading: Boolean = false, failed: Boolean = false, more: Boolean = false, onMore: () -> Unit = {}, onDismiss: () -> Unit) {
+    var selected by remember(user.id) { mutableStateOf<String?>(null) }
+    val listState = rememberLazyListState()
+    val scope = rememberCoroutineScope()
+    ValkyrisBottomSheet(scrollContent = false, title = "Por onde ${user.name} passou", onDismiss = onDismiss) {
+        Column(Modifier.fillMaxWidth().height(LocalConfiguration.current.screenHeightDp.dp * .65f)) {
+            if (history.any(::validHistoryPoint)) {
+                Surface(Modifier.fillMaxWidth().weight(.42f).clip(MaterialTheme.shapes.large), color = MaterialTheme.colorScheme.surfaceVariant) {
+                    LocationHistoryMap(history, selected) { id ->
+                        selected = id
+                        val index = history.indexOfFirst { it.id == id }
+                        if (index >= 0) scope.launch { listState.animateScrollToItem(index) }
+                    }
                 }
-                Column(Modifier.weight(1f).padding(start = 10.dp, bottom = 24.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                    Text(formatHistoryTime(point.occurredAt), style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.secondary)
-                    if (point.lastSeenAt.isNotBlank() && point.lastSeenAt != point.occurredAt) Text("Até ${formatHistoryTime(point.lastSeenAt)}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    Text(point.address.ifBlank { "Localização registrada" }, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Medium)
-                    if (point.address.isBlank()) Text("%.5f, %.5f".format(java.util.Locale.ROOT, point.latitude, point.longitude), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                    Text(stringResource(R.string.location_route_hint), Modifier.weight(1f), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    TextButton(onClick = { selected = null }) { Text(stringResource(R.string.location_route_all)) }
                 }
             }
-        }
-        item {
-            when {
-                loading -> LinearProgressIndicator(Modifier.fillMaxWidth().padding(vertical = 12.dp))
-                failed -> { Text("Não foi possível carregar o histórico."); TextButton(onClick = onMore) { Text("Tentar novamente") } }
-                more -> TextButton(onClick = onMore, modifier = Modifier.fillMaxWidth()) { Text("Ver registros anteriores") }
-                history.isEmpty() -> Text("Ainda não há localização com precisão suficiente para o histórico.", color = MaterialTheme.colorScheme.onSurfaceVariant)
+            LazyColumn(state = listState, modifier = Modifier.fillMaxWidth().weight(.58f), contentPadding = PaddingValues(bottom = 16.dp)) {
+                items(history, key = { it.id }) { point ->
+                    val isSelected = selected == point.id
+                    Row(Modifier.fillMaxWidth().height(IntrinsicSize.Min)
+                        .clip(MaterialTheme.shapes.small)
+                        .background(if (isSelected) MaterialTheme.colorScheme.secondaryContainer else androidx.compose.ui.graphics.Color.Transparent)
+                        .clickable { selected = point.id }.padding(top = 6.dp)) {
+                        Column(Modifier.width(24.dp).fillMaxHeight(), horizontalAlignment = Alignment.CenterHorizontally) {
+                            Box(Modifier.padding(top = 5.dp).size(9.dp).background(MaterialTheme.colorScheme.secondary, androidx.compose.foundation.shape.CircleShape))
+                            Box(Modifier.width(1.dp).weight(1f).background(MaterialTheme.colorScheme.outlineVariant))
+                        }
+                        Column(Modifier.weight(1f).padding(start = 10.dp, end = 8.dp, bottom = 24.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                            Text(formatHistoryTime(point.occurredAt), style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            if (point.lastSeenAt.isNotBlank() && point.lastSeenAt != point.occurredAt) Text("Até ${formatHistoryTime(point.lastSeenAt)}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            Text(point.address.ifBlank { "Localização registrada" }, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Medium)
+                            if (point.address.isBlank()) Text("%.5f, %.5f".format(java.util.Locale.ROOT, point.latitude, point.longitude), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            if (isSelected) Text(stringResource(R.string.location_map_selected, point.accuracy.toInt()), style = MaterialTheme.typography.labelSmall)
+                        }
+                    }
+                }
+                item {
+                    when {
+                        loading -> LinearProgressIndicator(Modifier.fillMaxWidth().padding(vertical = 12.dp))
+                        failed -> { Text("Não foi possível carregar o histórico."); TextButton(onClick = onMore) { Text("Tentar novamente") } }
+                        more -> TextButton(onClick = onMore, modifier = Modifier.fillMaxWidth()) { Text("Ver registros anteriores") }
+                        history.isEmpty() -> Text("Ainda não há localização com precisão suficiente para o histórico.", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                }
+                item { Text("Mapa e endereços: © OpenStreetMap", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant) }
             }
         }
-        item { Text("Endereços: © OpenStreetMap", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant) }
     }
 }
 

@@ -49,3 +49,35 @@ Referências:
   (permanência para reduzir alertas breves; raio mínimo recomendado de 100 m).
 - https://developer.android.com/reference/android/location/Location#getAccuracy()
 - https://developers.google.com/android/reference/com/google/android/gms/location/LocationRequest.Builder
+
+
+## Atualização ao abrir o app e recuperar a conexão
+
+O app inicia ou retoma o serviço ao voltar para primeiro plano e pede uma posição
+nova com `getCurrentLocation`, sem reaproveitar cache antigo. Esse envio não espera
+os 100 metros de movimento ou o heartbeat de 15 minutos; os critérios de precisão
+e idade continuam obrigatórios. Recuperar a conexão também solicita uma leitura
+nova. Uma falha de envio não avança o horário do último envio bem-sucedido, permitindo
+nova tentativa. A tela de localização mostra falhas de obtenção e de envio ao
+servidor, e permite tentar novamente.
+
+A permissão de localização durante o uso permite iniciar o serviço enquanto o app
+está visível. A permissão em segundo plano continua necessária para retomada após
+reiniciar o telefone. Ao sair da conta, o serviço para e os marcadores locais de
+último envio são apagados. Esses marcadores também são isolados por sessão.
+
+A tela Família recarrega ao entrar e a cada 15 segundos enquanto estiver visível,
+além de receber a atualização local após um envio bem-sucedido. Ter internet no
+celular não comprova que a URL configurada do servidor está acessível fora de casa;
+nessa situação o erro de envio agora fica visível, sem apresentar a posição antiga
+como uma leitura nova.
+
+## Mapa do histórico
+
+Android e painel exibem mapa e linha do tempo juntos. Selecionar um registro
+centraliza sua posição e precisão no mapa; selecionar um marcador destaca o
+registro correspondente. “Ver tudo” volta ao enquadramento dos registros carregados.
+Páginas anteriores acrescentam pontos ao mesmo mapa, mantendo a ordenação e a
+paginação da API. Linhas tracejadas indicam apenas ligações aproximadas entre
+leituras, não o trajeto exato pelas ruas. Intervalos superiores a 30 minutos entre
+uma saída (`lastSeenAt`) e a próxima leitura permanecem separados.

@@ -27,7 +27,18 @@ class ValkyrisPushService : FirebaseMessagingService() {
         val ciphertext = message.data["ciphertext"] ?: return
         runCatching {
             val payload = JSONObject(String(open(ciphertext, secrets.getOrCreate())))
+            val alerts = payload.optJSONObject("alerts")
             notifier.show(
+                cameraName = payload.optString("cameraName", ""),
+                alerts = com.ferforastieri.valkyris.core.model.AlertPresentation(
+                    notificationTitle = alerts?.optString("notificationTitle").orEmpty(),
+                    notificationBody = alerts?.optString("notificationBody").orEmpty(),
+                    alarmTitle = alerts?.optString("alarmTitle").orEmpty(),
+                    alarmBody = alerts?.optString("alarmBody").orEmpty(),
+                    alarmSound = alerts?.optString("alarmSound", "alarm") ?: "alarm",
+                    vibrate = alerts?.optBoolean("vibrate", true) ?: true,
+                    fullScreen = alerts?.optBoolean("fullScreen", true) ?: true,
+                ),
                 personName = payload.optString("personName", ""),
                 placeName = payload.optString("placeName", ""),
                 eventId = payload.getString("eventId"),

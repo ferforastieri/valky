@@ -36,6 +36,7 @@ type Manager struct {
 	recordings     string
 	http           *http.Client
 	previewMu      sync.Mutex
+	browserMu      sync.Mutex
 	previews       map[string]cachedFrame
 	previewFlights map[string]*previewFlight
 }
@@ -160,6 +161,9 @@ func mediaMTXResponseError(status string, body []byte, rtspURI string) error {
 func (m *Manager) RemoveCamera(ctx context.Context, id string) error {
 	if !mediaPathID.MatchString(id) {
 		return fmt.Errorf("invalid camera ID for media path")
+	}
+	if err := m.removePath(ctx, "camera-"+id+"-browser"); err != nil {
+		return err
 	}
 	// Stop the raw source (and its FFmpeg hook) before removing the output.
 	if err := m.removePath(ctx, "camera-"+id+"-source"); err != nil {

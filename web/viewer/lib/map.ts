@@ -1,7 +1,8 @@
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
-import type { Person, Place } from "./api";
+import type { Person, Place, Location } from "./api";
 import { date } from "./api";
+import { historySegments, validHistoryPoint } from "./location-history";
 export function familyMap(
   element: HTMLElement,
   people: Person[],
@@ -71,4 +72,58 @@ export function familyMap(
     observer.disconnect();
     map.remove();
   };
+}
+
+export function historyMap(
+  element: HTMLElement,
+  onSelect: (index: number) => void,
+) {
+  const map = L.map(element, { zoomAnimation: false }).setView([0, 0], 2);
+  L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", {
+    maxZoom: 19,
+    attribution: '© <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noreferrer">OpenStreetMap</a>',
+  }).addTo(map);
+  const layer = L.layerGroup().addTo(map);
+  let points: Location[] = [];
+  let selected: number | null = null;
+  let accuracy: L.Circle | undefined;
+  const markers = new Map<number, L.CircleMarker>();
+  const fit = () => {
+    selected = null;
+    accuracy?.remove();
+    markers.forEach(marker => marker.setStyle({ color: "#293d29", fillColor: "#8ae07d", radius: 7 }));
+    const coordinates = points.filter(validHistoryPoint).map(p => [p.latitude, p.longitude] as L.LatLngTuple);
+    if (coordinates.length) map.fitBounds(L.latLngBounds(coordinates), { padding: [25, 25], maxZoom: 17, animate: false });
+  };
+  const select = (index: number) => {
+    const point = points[index];
+    if (!point || !validHistoryPoint(point)) return;
+    selected = index;
+    markers.forEach((marker, key) => marker.setStyle({ radius: key === index ? 10 : 7, fillColor: key === index ? "#ffffff" : "#8ae07d" }));
+    accuracy?.remove();
+    accuracy = L.circle([point.latitude, point.longitude], { radius: Math.max(1, point.accuracy), color: "#5c9853", fillOpacity: .1, weight: 1 }).addTo(layer);
+    map.setView([point.latitude, point.longitude], 17, { animate: false });
+    markers.get(index)?.openPopup();
+  };
+  const update = (next: Location[]) => {
+    points = next;
+    layer.clearLayers();
+    markers.clear();
+    historySegments(points).forEach(segment => {
+      L.polyline(segment.map(p => [p.latitude, p.longitude] as L.LatLngTuple), { color: "#5c9853", weight: 3, dashArray: "6 8" }).addTo(layer);
+    });
+    points.forEach((point, index) => {
+      if (!validHistoryPoint(point)) return;
+      const popup = document.createElement("span");
+      popup.textContent = `${date(point.occurredAt)} · ${point.address || 'Localização registrada'} · precisão de ${Math.round(point.accuracy)} m`;
+      const marker = L.circleMarker([point.latitude, point.longitude], { radius: 7, color: "#293d29", fillColor: "#8ae07d", fillOpacity: 1, weight: 2 })
+        .addTo(layer).bindPopup(popup).on("click", () => onSelect(index));
+      markers.set(index, marker);
+    });
+    map.invalidateSize();
+    if (selected != null) select(selected); else fit();
+  };
+  const observer = new ResizeObserver(() => map.invalidateSize());
+  observer.observe(element);
+  return { update, select, fit, destroy: () => { observer.disconnect(); map.remove(); } };
 }

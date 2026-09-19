@@ -11,6 +11,7 @@ import android.view.ViewGroup
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.core.content.ContextCompat
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.background
 import androidx.compose.foundation.Image
 import androidx.compose.animation.animateColorAsState
@@ -99,7 +100,8 @@ internal data class CameraListStream(
             camera = camera,
             saving = camera.id in state.updating,
             onDismiss = { if (camera.id !in state.updating) editingCameraId = null },
-            onSave = { input -> vm.update(camera.id, input); editingCameraId = null },
+            onSave = { input -> vm.update(camera.id, input) { editingCameraId = null } },
+            error = state.error,
         )
     }
     failedCamera?.let{camera->CameraFailureSheet(camera,onDismiss={failedCameraId=null},onEdit={editingCameraId=camera.id;failedCameraId=null},onDelete={vm.delete(camera.id);failedCameraId=null})}
@@ -164,8 +166,9 @@ fun CameraFailureSheet(camera:Camera,onDismiss:()->Unit,onEdit:(()->Unit)?=null,
     }
 }
 
-@Composable private fun CameraEditorDialog(camera:Camera?=null,saving:Boolean=false,onDismiss:()->Unit,onSave:(CreateCameraRequest)->Unit){
+@Composable private fun CameraEditorDialog(camera:Camera?=null,saving:Boolean=false,error:String?=null,onDismiss:()->Unit,onSave:(CreateCameraRequest)->Unit){
     var name by remember(camera?.id){mutableStateOf(camera?.name.orEmpty())};var icon by remember(camera?.id){mutableStateOf(camera?.icon?:"camera")};var host by remember(camera?.id){mutableStateOf(camera?.host.orEmpty())};var port by remember(camera?.id){mutableStateOf((camera?.port?:2020).toString())};var username by remember(camera?.id){mutableStateOf("")};var password by remember(camera?.id){mutableStateOf("")}
+    var alerts by remember(camera?.id) { mutableStateOf(camera?.alerts ?: com.ferforastieri.valkyris.core.model.AlertPresentation()) }
     val editing=camera!=null
     com.ferforastieri.valkyris.core.design.ValkyrisBottomSheet(
         title = stringResource(if(editing) R.string.edit_camera else R.string.add_camera),
@@ -173,12 +176,13 @@ fun CameraFailureSheet(camera:Camera,onDismiss:()->Unit,onEdit:(()->Unit)?=null,
         dismissEnabled = !saving,
         actions = {
             TextButton(onClick=onDismiss,enabled=!saving) { Text(stringResource(R.string.cancel)) }
-            Button(onClick={onSave(CreateCameraRequest(name=name,icon=icon,host=host,port=port.toIntOrNull()?:2020,username=username,password=password))},enabled=!saving&&name.isNotBlank()&&host.isNotBlank()&&(editing || (username.isNotBlank()&&password.isNotBlank()))){
+            Button(onClick={onSave(CreateCameraRequest(name=name,icon=icon,host=host,port=port.toIntOrNull()?:2020,username=username,password=password,alerts=alerts))},enabled=!saving&&name.isNotBlank()&&host.isNotBlank()&&(editing || (username.isNotBlank()&&password.isNotBlank()))){
                 if(saving)CircularProgressIndicator(Modifier.size(18.dp),strokeWidth=2.dp,color=MaterialTheme.colorScheme.onPrimary) else Text(stringResource(R.string.save))
             }
         },
     ) {
         Column(Modifier.fillMaxWidth().heightIn(max=520.dp).imePadding().verticalScroll(rememberScrollState()),verticalArrangement=Arrangement.spacedBy(8.dp)){
+            error?.let { Text(it, color = MaterialTheme.colorScheme.error) }
             OutlinedTextField(name,{name=it},Modifier.fillMaxWidth(),label={Text(stringResource(R.string.camera_name))})
             Text(stringResource(R.string.camera_icon),style=MaterialTheme.typography.labelLarge)
             Column(verticalArrangement=Arrangement.spacedBy(8.dp)){
@@ -189,6 +193,40 @@ fun CameraFailureSheet(camera:Camera,onDismiss:()->Unit,onEdit:(()->Unit)?=null,
                     }
                 }
             }
+            HorizontalDivider(Modifier.padding(vertical = 8.dp))
+            Text(stringResource(R.string.camera_alerts), style = MaterialTheme.typography.titleLarge)
+            Text(stringResource(R.string.camera_alerts_hint), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            OutlinedTextField(alerts.notificationTitle, { alerts = alerts.copy(notificationTitle = it.take(80)) }, Modifier.fillMaxWidth(), label = { Text(stringResource(R.string.alert_notification_title)) })
+            OutlinedTextField(alerts.notificationBody, { alerts = alerts.copy(notificationBody = it.take(240)) }, Modifier.fillMaxWidth(), label = { Text(stringResource(R.string.alert_notification_body)) })
+            OutlinedTextField(alerts.alarmTitle, { alerts = alerts.copy(alarmTitle = it.take(80)) }, Modifier.fillMaxWidth(), label = { Text(stringResource(R.string.alert_alarm_title)) })
+            OutlinedTextField(alerts.alarmBody, { alerts = alerts.copy(alarmBody = it.take(240)) }, Modifier.fillMaxWidth(), label = { Text(stringResource(R.string.alert_alarm_body)) })
+            Text(stringResource(R.string.alert_alarm_sound), style = MaterialTheme.typography.labelLarge)
+            listOf("alarm" to R.string.alert_sound_alarm, "ringtone" to R.string.alert_sound_ringtone, "silent" to R.string.alert_sound_silent).forEach { (value, label) ->
+                Row(Modifier.fillMaxWidth().clickable { alerts = alerts.copy(alarmSound = value) }, verticalAlignment = Alignment.CenterVertically) {
+                    RadioButton(selected = alerts.alarmSound == value, onClick = { alerts = alerts.copy(alarmSound = value) })
+                    Text(stringResource(label), Modifier.weight(1f))
+                }
+            }
+            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                Text(stringResource(R.string.alert_vibrate), Modifier.weight(1f))
+                Switch(alerts.vibrate, { alerts = alerts.copy(vibrate = it) })
+            }
+            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                Text(stringResource(R.string.alert_full_screen), Modifier.weight(1f))
+                Switch(alerts.fullScreen, { alerts = alerts.copy(fullScreen = it) })
+            }
+            Text(stringResource(R.string.alert_preview), style = MaterialTheme.typography.labelLarge)
+            Card(Modifier.fillMaxWidth()) {
+                Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    Text(name, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text(alerts.notificationTitle.ifBlank { stringResource(R.string.notification_channel_events) }, style = MaterialTheme.typography.titleMedium)
+                    Text(alerts.notificationBody.ifBlank { stringResource(R.string.notification_event_body) })
+                    HorizontalDivider()
+                    Text(alerts.alarmTitle.ifBlank { stringResource(R.string.alarm_title) }, style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.error)
+                    Text(alerts.alarmBody.ifBlank { stringResource(R.string.notification_alarm_body) })
+                }
+            }
+            HorizontalDivider(Modifier.padding(vertical = 8.dp))
             OutlinedTextField(host,{host=it},Modifier.fillMaxWidth(),label={Text(stringResource(R.string.camera_ip))})
             OutlinedTextField(port,{port=it.filter(Char::isDigit)},Modifier.fillMaxWidth(),label={Text(stringResource(R.string.onvif_port))})
             OutlinedTextField(username,{username=it},Modifier.fillMaxWidth(),label={Text(stringResource(R.string.camera_user))})

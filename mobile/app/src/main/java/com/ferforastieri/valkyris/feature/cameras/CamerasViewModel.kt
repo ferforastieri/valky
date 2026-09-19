@@ -107,12 +107,13 @@ class CamerasViewModel @Inject constructor(
         }
     }
 
-    fun update(id: String, input: CreateCameraRequest) {
+    fun update(id: String, input: CreateCameraRequest, onSaved: () -> Unit = {}) {
         if (id in _state.value.updating || !actionGate.tryAcquire()) return
         _state.update { it.copy(updating = it.updating + id, error = null) }
         viewModelScope.launch {
             try {
                 runCatching { repository.updateCamera(id, input) }
+                    .onSuccess { onSaved() }
                     .onFailure { error -> _state.update { it.copy(error = error.message) } }
             } finally {
                 _state.update { it.copy(updating = it.updating - id) }

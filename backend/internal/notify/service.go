@@ -18,6 +18,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/ferforastieri/valkyris/backend/internal/camera"
 	appcrypto "github.com/ferforastieri/valkyris/backend/internal/crypto"
 	"github.com/ferforastieri/valkyris/backend/internal/event"
 	"github.com/ferforastieri/valkyris/backend/internal/store"
@@ -175,7 +176,7 @@ func (s *Service) Run(ctx context.Context) {
 	}
 }
 func (s *Service) deliverBatch(ctx context.Context) {
-	rows, err := s.store.DB.QueryContext(ctx, `SELECT p.id,p.attempts,d.push_endpoint_enc,d.push_secret_enc,e.id,COALESCE(e.camera_id,''),e.type,e.confidence,e.occurred_at,e.metadata_json FROM push_deliveries p JOIN devices d ON d.id=p.device_id JOIN events e ON e.id=p.event_id WHERE d.enabled=1 AND EXISTS(SELECT 1 FROM users u WHERE u.id=d.user_id AND u.enabled=1) AND (e.rule_id IS NULL OR EXISTS(SELECT 1 FROM rules r WHERE r.id=e.rule_id AND (json_type(r.actions_json,'$.recipientUserIds') IS NULL OR json_type(r.actions_json,'$.recipientUserIds')='null' OR d.user_id IN (SELECT value FROM json_each(r.actions_json,'$.recipientUserIds'))))) AND NOT (e.source='tracking' AND e.subject_id<>'' AND (COALESCE(d.user_id,'')=e.subject_id OR EXISTS (SELECT 1 FROM people own WHERE own.id=e.subject_id AND own.device_id=d.id))) AND p.delivered_at IS NULL AND p.next_attempt_at<=? AND p.attempts<10 ORDER BY p.created_at LIMIT 20`, time.Now().UTC().Format(time.RFC3339Nano))
+	rows, err := s.store.DB.QueryContext(ctx, `SELECT p.id,p.attempts,d.push_endpoint_enc,d.push_secret_enc,e.id,COALESCE(e.camera_id,''),e.type,e.confidence,e.occurred_at,e.metadata_json,COALESCE((SELECT alerts_json FROM cameras WHERE id=e.camera_id),'{}'),COALESCE((SELECT name FROM cameras WHERE id=e.camera_id),'') FROM push_deliveries p JOIN devices d ON d.id=p.device_id JOIN events e ON e.id=p.event_id WHERE d.enabled=1 AND EXISTS(SELECT 1 FROM users u WHERE u.id=d.user_id AND u.enabled=1) AND (e.rule_id IS NULL OR EXISTS(SELECT 1 FROM rules r WHERE r.id=e.rule_id AND (json_type(r.actions_json,'$.recipientUserIds') IS NULL OR json_type(r.actions_json,'$.recipientUserIds')='null' OR d.user_id IN (SELECT value FROM json_each(r.actions_json,'$.recipientUserIds'))))) AND NOT (e.source='tracking' AND e.subject_id<>'' AND (COALESCE(d.user_id,'')=e.subject_id OR EXISTS (SELECT 1 FROM people own WHERE own.id=e.subject_id AND own.device_id=d.id))) AND p.delivered_at IS NULL AND p.next_attempt_at<=? AND p.attempts<10 ORDER BY p.created_at LIMIT 20`, time.Now().UTC().Format(time.RFC3339Nano))
 	if err != nil {
 		return
 	}
@@ -184,13 +185,13 @@ func (s *Service) deliverBatch(ctx context.Context) {
 		attempts                               int
 		endpoint, secret                       []byte
 		eventID, cameraID, eventType, occurred string
-		metadata                               string
+		metadata, alerts, cameraName           string
 		confidence                             float64
 	}
 	var items []item
 	for rows.Next() {
 		var i item
-		if rows.Scan(&i.id, &i.attempts, &i.endpoint, &i.secret, &i.eventID, &i.cameraID, &i.eventType, &i.confidence, &i.occurred, &i.metadata) == nil {
+		if rows.Scan(&i.id, &i.attempts, &i.endpoint, &i.secret, &i.eventID, &i.cameraID, &i.eventType, &i.confidence, &i.occurred, &i.metadata, &i.alerts, &i.cameraName) == nil {
 			items = append(items, i)
 		}
 	}
@@ -198,7 +199,9 @@ func (s *Service) deliverBatch(ctx context.Context) {
 	for _, i := range items {
 		var metadata map[string]any
 		_ = json.Unmarshal([]byte(i.metadata), &metadata)
-		s.deliver(ctx, i.id, i.attempts, i.endpoint, i.secret, map[string]any{"eventId": i.eventID, "cameraId": i.cameraID, "type": i.eventType, "confidence": i.confidence, "occurredAt": i.occurred, "alarm": metadata["alarm"], "target": notificationTarget(i.eventType), "personName": metadata["personName"], "placeName": metadata["placeName"]})
+		alerts := camera.DefaultAlertPresentation()
+		_ = json.Unmarshal([]byte(i.alerts), &alerts)
+		s.deliver(ctx, i.id, i.attempts, i.endpoint, i.secret, map[string]any{"alerts": alerts, "cameraName": i.cameraName, "eventId": i.eventID, "cameraId": i.cameraID, "type": i.eventType, "confidence": i.confidence, "occurredAt": i.occurred, "alarm": metadata["alarm"], "target": notificationTarget(i.eventType), "personName": metadata["personName"], "placeName": metadata["placeName"]})
 	}
 }
 

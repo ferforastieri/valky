@@ -1,6 +1,8 @@
 package com.ferforastieri.valkyris
 
 import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.ui.platform.LocalInspectionMode
 import androidx.compose.ui.test.*
 import com.ferforastieri.valkyris.core.design.ValkyrisTheme
 import com.ferforastieri.valkyris.core.model.PersonLocation
@@ -21,13 +23,16 @@ class HistorySheetLayoutTest {
  @Test fun historyShowsTimelineAndRequestsAnOlderPage() {
   var requested = false
   compose.setContent {
-   ValkyrisTheme {
+   CompositionLocalProvider(LocalInspectionMode provides true) { ValkyrisTheme {
     HistorySheet(TrackedPerson(name="Miriam"), (0..5).map {
      PersonLocation(id="location-$it",address="Rua $it",latitude=-23.55+it*0.001,longitude=-46.63,accuracy=12.0,occurredAt="2026-09-07T14:0${it}:00Z")
     }, more = true, onMore = { requested = true }) {}
-   }
+   } }
   }
-  compose.onNodeWithText("Rua 0").assertIsDisplayed()
+  compose.onNodeWithText("Mapa do histórico").assertIsDisplayed()
+  compose.onNodeWithText("Rua 0").assertIsDisplayed().performClick()
+  compose.onNodeWithText("Selecionado no mapa · precisão de 12 m").assertIsDisplayed()
+  compose.onNodeWithText("Ver tudo").performClick()
   compose.onAllNodesWithText("Ponto", substring=true).assertCountEquals(0)
   compose.onNode(hasScrollAction()).performScrollToNode(hasText("Ver registros anteriores"))
   compose.onNodeWithText("Ver registros anteriores").performClick()

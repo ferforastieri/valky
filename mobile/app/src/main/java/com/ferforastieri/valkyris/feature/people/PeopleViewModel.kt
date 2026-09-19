@@ -12,6 +12,8 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.CancellationException
 import javax.inject.Inject
 
@@ -38,7 +40,9 @@ class PeopleViewModel @Inject constructor(
     private val _busy = MutableStateFlow(false)
     val busy = _busy.asStateFlow()
 
-    init { refresh() }
+    fun observe() = viewModelScope.launch {
+        while (isActive) { refresh().join(); delay(15_000) }
+    }
     fun refresh() = viewModelScope.launch {
         runCatching { repository.refreshUsers() }
         runCatching { repository.refreshMe() }

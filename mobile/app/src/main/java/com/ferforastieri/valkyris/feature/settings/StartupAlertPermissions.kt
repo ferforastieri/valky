@@ -87,8 +87,8 @@ fun StartupAlertPermissions() {
     val locationAllowed = foregroundLocationAllowed && backgroundLocationAllowed
     val missingCount = listOf(notificationsAllowed, fullScreenAllowed, dndAllowed, firebaseConfigured, locationAllowed).count { !it }
 
-    LaunchedEffect(locationAllowed) {
-        if (locationAllowed) LocationTrackingService.start(context)
+    LaunchedEffect(foregroundLocationAllowed, refresh) {
+        if (foregroundLocationAllowed) LocationTrackingService.start(context, refresh = true)
     }
 
     LaunchedEffect(notificationsAllowed, firebaseConfigured, locationAllowed, pushConfiguration.loading, startupHandled) {

@@ -138,8 +138,8 @@ func TestRemoveCameraDeletesSourceBeforeOutput(t *testing.T) {
 	if err := New(server.URL, "rtsp://media", "http://webrtc", "http://playback", t.TempDir()).RemoveCamera(context.Background(), "abc"); err != nil {
 		t.Fatal(err)
 	}
-	want := []string{"/v3/config/paths/delete/camera-abc-source", "/v3/config/paths/delete/camera-abc"}
-	if len(paths) != len(want) || paths[0] != want[0] || paths[1] != want[1] {
+	want := []string{"/v3/config/paths/delete/camera-abc-browser", "/v3/config/paths/delete/camera-abc-source", "/v3/config/paths/delete/camera-abc"}
+	if len(paths) != len(want) || paths[0] != want[0] || paths[1] != want[1] || paths[2] != want[2] {
 		t.Fatalf("unexpected deletion order: %v", paths)
 	}
 }

@@ -17,21 +17,22 @@ type ServiceAddresses struct {
 }
 
 type Camera struct {
-	ID             string           `json:"id"`
-	Name           string           `json:"name"`
-	Icon           string           `json:"icon"`
-	Host           string           `json:"host"`
-	Port           int              `json:"port"`
-	ProfileToken   string           `json:"profileToken"`
-	Capabilities   Capabilities     `json:"capabilities"`
-	Services       ServiceAddresses `json:"-"`
-	SetupStatus    string           `json:"setupStatus"`
-	SetupStep      string           `json:"setupStep"`
-	SetupError     string           `json:"setupError,omitempty"`
-	SetupUpdatedAt time.Time        `json:"setupUpdatedAt"`
-	Enabled        bool             `json:"enabled"`
-	CreatedAt      time.Time        `json:"createdAt"`
-	UpdatedAt      time.Time        `json:"updatedAt"`
+	Alerts         AlertPresentation `json:"alerts"`
+	ID             string            `json:"id"`
+	Name           string            `json:"name"`
+	Icon           string            `json:"icon"`
+	Host           string            `json:"host"`
+	Port           int               `json:"port"`
+	ProfileToken   string            `json:"profileToken"`
+	Capabilities   Capabilities      `json:"capabilities"`
+	Services       ServiceAddresses  `json:"-"`
+	SetupStatus    string            `json:"setupStatus"`
+	SetupStep      string            `json:"setupStep"`
+	SetupError     string            `json:"setupError,omitempty"`
+	SetupUpdatedAt time.Time         `json:"setupUpdatedAt"`
+	Enabled        bool              `json:"enabled"`
+	CreatedAt      time.Time         `json:"createdAt"`
+	UpdatedAt      time.Time         `json:"updatedAt"`
 }
 
 type Credentials struct {
@@ -41,13 +42,14 @@ type Credentials struct {
 }
 
 type CreateInput struct {
-	Name     string `json:"name"`
-	Icon     string `json:"icon"`
-	Host     string `json:"host"`
-	Port     int    `json:"port"`
-	Username string `json:"username"`
-	Password string `json:"password"`
-	RTSPURI  string `json:"rtspUri"`
+	Alerts   *AlertPresentation `json:"alerts,omitempty"`
+	Name     string             `json:"name"`
+	Icon     string             `json:"icon"`
+	Host     string             `json:"host"`
+	Port     int                `json:"port"`
+	Username string             `json:"username"`
+	Password string             `json:"password"`
+	RTSPURI  string             `json:"rtspUri"`
 }
 
 var validIcons = map[string]struct{}{
@@ -64,13 +66,14 @@ func normalizeIcon(icon string) string {
 }
 
 type UpdateInput struct {
-	Name     string `json:"name"`
-	Icon     string `json:"icon"`
-	Host     string `json:"host"`
-	Port     int    `json:"port"`
-	Username string `json:"username"`
-	Password string `json:"password"`
-	RTSPURI  string `json:"rtspUri"`
+	Alerts   *AlertPresentation `json:"alerts,omitempty"`
+	Name     string             `json:"name"`
+	Icon     string             `json:"icon"`
+	Host     string             `json:"host"`
+	Port     int                `json:"port"`
+	Username string             `json:"username"`
+	Password string             `json:"password"`
+	RTSPURI  string             `json:"rtspUri"`
 }
 
 type PTZCommand struct {
