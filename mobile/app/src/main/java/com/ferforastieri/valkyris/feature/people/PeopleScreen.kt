@@ -1,8 +1,6 @@
 package com.ferforastieri.valkyris.feature.people
 
-import android.graphics.Color as AndroidColor
 import android.view.MotionEvent
-import androidx.core.content.ContextCompat
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.ui.platform.LocalConfiguration
@@ -39,6 +37,10 @@ import com.composables.icons.lucide.UserRound
 import com.ferforastieri.valkyris.core.design.ValkyrisBottomSheet
 import com.ferforastieri.valkyris.core.design.ProfileAvatar
 import com.ferforastieri.valkyris.core.design.profileMarkerDrawable
+import com.ferforastieri.valkyris.core.design.applyValkyrisMapStyle
+import com.ferforastieri.valkyris.core.design.currentMapVisualStyle
+import com.ferforastieri.valkyris.core.design.mapColorWithAlpha
+import com.ferforastieri.valkyris.core.design.mapMarkerDrawable
 import com.ferforastieri.valkyris.R
 import com.ferforastieri.valkyris.core.model.PersonLocation
 import com.ferforastieri.valkyris.core.model.TrackedPerson
@@ -190,6 +192,7 @@ fun PeopleScreen(vm: PeopleViewModel = hiltViewModel()) {
 @Composable
 private fun FamilyMap(users: List<TrackedPerson>, places: List<TrackedPlace>, modifier: Modifier = Modifier) {
     var selectedId by remember { mutableStateOf<String?>(null) }
+    val mapStyle = currentMapVisualStyle()
     val surface = MaterialTheme.colorScheme.surface.toArgb()
     val foreground = MaterialTheme.colorScheme.onSurface.toArgb()
     val outline = MaterialTheme.colorScheme.outlineVariant.toArgb()
@@ -203,13 +206,14 @@ private fun FamilyMap(users: List<TrackedPerson>, places: List<TrackedPlace>, mo
             }))
         }
     }, update = { map ->
+        map.applyValkyrisMapStyle(mapStyle)
         InfoWindow.closeAllInfoWindowsOn(map)
         map.overlays.removeAll { it is Marker || it is Polygon }
         places.forEach { place ->
             val circle = Polygon().apply {
                 setPoints(Polygon.pointsAsCircle(GeoPoint(place.latitude, place.longitude), place.radiusMeters))
             }
-            circle.fillColor = AndroidColor.argb(36, 91, 91, 214); circle.strokeColor = AndroidColor.rgb(91, 91, 214); circle.title = place.name
+            circle.fillColor = mapColorWithAlpha(mapStyle.accent, 36); circle.strokeColor = mapStyle.accent; circle.title = place.name
             map.overlays.add(circle)
         }
         users.forEach { user ->
@@ -231,8 +235,8 @@ private fun FamilyMap(users: List<TrackedPerson>, places: List<TrackedPlace>, mo
                 setInfoWindow(object : InfoWindow(label,map) { override fun onOpen(item: Any?) {} ; override fun onClose() {} })
                 setInfoWindowAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_TOP)
                 position = GeoPoint(lat, lon); title = user.name; snippet = user.lastLocatedAt?.let { "Atualizado ${formatTime(it)}" } ?: "Sem atualização"
-                icon = profileMarkerDrawable(map.context, user.avatarData)
-                    ?: ContextCompat.getDrawable(map.context, R.drawable.valkyris_map_marker)
+                icon = profileMarkerDrawable(map.context, user.avatarData, mapStyle.accent, mapStyle.surface)
+                    ?: mapMarkerDrawable(map.resources.displayMetrics.density, mapStyle)
                 setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_BOTTOM)
                 if (selectedId == user.id) showInfoWindow()
             })
@@ -336,6 +340,7 @@ private fun AreaPickerMap(
     modifier: Modifier = Modifier,
 ) {
     val currentOnPointSelected by rememberUpdatedState(onPointSelected)
+    val mapStyle = currentMapVisualStyle()
     AndroidView(
         factory = { context ->
             Configuration.getInstance().userAgentValue = context.packageName
@@ -365,12 +370,13 @@ private fun AreaPickerMap(
             }
         },
         update = { map ->
+            map.applyValkyrisMapStyle(mapStyle)
             map.overlays.removeAll { it is Marker }
             selectedPoint?.let { point ->
                 map.overlays.add(Marker(map).apply {
                     position = point
                     title = "Local da área"
-                    icon = ContextCompat.getDrawable(map.context, R.drawable.valkyris_map_marker)
+                    icon = mapMarkerDrawable(map.resources.displayMetrics.density, mapStyle)
                     setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_BOTTOM)
                 })
             }
@@ -442,12 +448,12 @@ internal fun HistorySheet(user: TrackedPerson, history: List<PersonLocation>, lo
     var selected by remember(user.id) { mutableStateOf<String?>(null) }
     val listState = rememberLazyListState()
     val scope = rememberCoroutineScope()
-    val routeColor = androidx.compose.ui.graphics.Color(parsePersonRouteColor(user.color))
+    val routeColor = MaterialTheme.colorScheme.secondary
     ValkyrisBottomSheet(scrollContent = false, title = "Por onde ${user.name} passou", onDismiss = onDismiss) {
         Column(Modifier.fillMaxWidth().height(LocalConfiguration.current.screenHeightDp.dp * .65f)) {
             if (history.any(::validHistoryPoint)) {
                 Surface(Modifier.fillMaxWidth().weight(.42f).clip(MaterialTheme.shapes.large), color = MaterialTheme.colorScheme.surfaceVariant) {
-                    LocationHistoryMap(history, selected, user.color) { id ->
+                    LocationHistoryMap(history, selected) { id ->
                         selected = id
                         val index = history.indexOfFirst { it.id == id }
                         if (index >= 0) scope.launch { listState.animateScrollToItem(index) }

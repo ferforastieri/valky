@@ -23,6 +23,9 @@ import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.exoplayer.source.ProgressiveMediaSource
 import androidx.media3.ui.PlayerView
 import com.ferforastieri.valkyris.R
+import com.ferforastieri.valkyris.core.design.applyValkyrisMapStyle
+import com.ferforastieri.valkyris.core.design.currentMapVisualStyle
+import com.ferforastieri.valkyris.core.design.mapMarkerDrawable
 import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.jsonPrimitive
 import java.time.Instant
@@ -31,6 +34,7 @@ import java.time.format.DateTimeFormatter
 
 @Composable
 fun EventDetailScreen(vm: EventDetailViewModel = hiltViewModel()) {
+    val mapStyle = currentMapVisualStyle()
     val event by vm.event.collectAsStateWithLifecycle()
     val context = androidx.compose.ui.platform.LocalContext.current
     val player = remember(event?.clipPath) {
@@ -67,14 +71,20 @@ fun EventDetailScreen(vm: EventDetailViewModel = hiltViewModel()) {
                         org.osmdroid.config.Configuration.getInstance().userAgentValue = ctx.packageName
                         org.osmdroid.views.MapView(ctx).apply {
                             setTileSource(org.osmdroid.tileprovider.tilesource.TileSourceFactory.MAPNIK)
+                            applyValkyrisMapStyle(mapStyle)
                             setMultiTouchControls(true)
                             controller.setZoom(16.0)
                             val point = org.osmdroid.util.GeoPoint(latitude, longitude)
                             controller.setCenter(point)
-                            overlays.add(org.osmdroid.views.overlay.Marker(this).apply { position = point; title = "Local do evento" })
+                            overlays.add(org.osmdroid.views.overlay.Marker(this).apply {
+                                position = point
+                                title = "Local do evento"
+                                icon = mapMarkerDrawable(resources.displayMetrics.density, mapStyle)
+                                setAnchor(org.osmdroid.views.overlay.Marker.ANCHOR_CENTER, org.osmdroid.views.overlay.Marker.ANCHOR_BOTTOM)
+                            })
                             setOnTouchListener { view, event -> view.parent?.requestDisallowInterceptTouchEvent(event.actionMasked != android.view.MotionEvent.ACTION_UP && event.actionMasked != android.view.MotionEvent.ACTION_CANCEL); false }
                         }
-                    }, onRelease = { it.onDetach() }, modifier = Modifier.fillMaxWidth().height(240.dp))
+                    }, update = { it.applyValkyrisMapStyle(mapStyle) }, onRelease = { it.onDetach() }, modifier = Modifier.fillMaxWidth().height(240.dp))
                 }
             }
         } else Surface(Modifier.fillMaxWidth().aspectRatio(16 / 9f), RoundedCornerShape(22.dp), color = MaterialTheme.colorScheme.surface, border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant), shadowElevation = 5.dp) {

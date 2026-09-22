@@ -1,8 +1,8 @@
 package com.ferforastieri.valkyris
 
 import com.ferforastieri.valkyris.core.model.PersonLocation
+import com.ferforastieri.valkyris.core.design.mapColorWithAlpha
 import com.ferforastieri.valkyris.feature.people.historyRouteSegments
-import com.ferforastieri.valkyris.feature.people.parsePersonRouteColor
 import com.ferforastieri.valkyris.feature.people.validHistoryPoint
 import org.junit.Assert.*
 import org.junit.Test
@@ -22,8 +22,8 @@ class LocationHistoryMapTest {
         assertFalse(validHistoryPoint(point("bad", "10:00").copy(longitude=Double.NaN)))
         assertTrue(historyRouteSegments(listOf(point("single", "10:00"))).isEmpty())
     }
-    @Test fun routeUsesThePersonsColorAndFallsBackForInvalidValues() {
-        assertEquals(0xFFEC625B.toInt(), parsePersonRouteColor("#EC625B"))
-        assertEquals(0xFF5B5BD6.toInt(), parsePersonRouteColor("not-a-color"))
+    @Test fun mapOverlaysPreserveThemeColorWhenApplyingTransparency() {
+        assertEquals(0x247BD66F, mapColorWithAlpha(0xFF7BD66F.toInt(), 0x24))
+        assertEquals(0xFF7BD66F.toInt(), mapColorWithAlpha(0xFF7BD66F.toInt(), 999))
     }
 }

@@ -5,6 +5,10 @@ import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.graphics.Canvas
 import android.graphics.Paint
+import android.graphics.BitmapShader
+import android.graphics.Matrix
+import android.graphics.Shader
+import android.graphics.drawable.BitmapDrawable
 import android.net.Uri
 import android.util.Base64
 import androidx.compose.foundation.Image
@@ -19,7 +23,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
-import androidx.core.graphics.drawable.RoundedBitmapDrawableFactory
 import com.composables.icons.lucide.Lucide
 import com.composables.icons.lucide.UserRound
 import java.io.ByteArrayOutputStream
@@ -49,12 +52,23 @@ fun ProfileAvatar(avatarData: String, contentDescription: String?, modifier: Mod
     }
 }
 
-fun profileMarkerDrawable(context: Context, avatarData: String) = avatarBitmap(avatarData)?.let { bitmap ->
-    val size = (48 * context.resources.displayMetrics.density).toInt()
-    RoundedBitmapDrawableFactory.create(
-        context.resources,
-        Bitmap.createScaledBitmap(bitmap, size, size, true),
-    ).apply { isCircular = true }
+fun profileMarkerDrawable(context: Context, avatarData: String, accentColor: Int, surfaceColor: Int) = avatarBitmap(avatarData)?.let { bitmap ->
+    val density = context.resources.displayMetrics.density
+    val size = (52 * density).toInt()
+    val output = Bitmap.createBitmap(size, size, Bitmap.Config.ARGB_8888)
+    val canvas = Canvas(output)
+    val center = size / 2f
+    canvas.drawCircle(center, center, center, Paint(Paint.ANTI_ALIAS_FLAG).apply { color = accentColor })
+    canvas.drawCircle(center, center, center - 2f * density, Paint(Paint.ANTI_ALIAS_FLAG).apply { color = surfaceColor })
+    val radius = center - 4f * density
+    val shader = BitmapShader(bitmap, Shader.TileMode.CLAMP, Shader.TileMode.CLAMP)
+    val scale = (radius * 2f) / minOf(bitmap.width, bitmap.height)
+    shader.setLocalMatrix(Matrix().apply {
+        setScale(scale, scale)
+        postTranslate(center - bitmap.width * scale / 2f, center - bitmap.height * scale / 2f)
+    })
+    canvas.drawCircle(center, center, radius, Paint(Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG).apply { this.shader = shader })
+    BitmapDrawable(context.resources, output)
 }
 
 fun encodeProfileAvatar(context: Context, uri: Uri): String? = runCatching {

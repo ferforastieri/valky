@@ -68,11 +68,23 @@ func ViewerRequestSafe(r *http.Request) bool {
 	}
 	if origin := r.Header.Get("Origin"); origin != "" {
 		parsed, err := url.Parse(origin)
-		if err != nil || parsed.Host != r.Host || parsed.Scheme != "https" {
+		if err != nil || parsed.Scheme != "https" || parsed.Host != viewerRequestHost(r) {
 			return false
 		}
 	}
 	return true
+}
+
+// Caddy terminates public TLS before forwarding to the private HTTPS service.
+// In that setup r.Host may be the upstream address, while X-Forwarded-Host
+// retains the host that the browser actually used.
+func viewerRequestHost(r *http.Request) string {
+	forwardedHost := strings.TrimSpace(strings.Split(r.Header.Get("X-Forwarded-Host"), ",")[0])
+	forwardedProto := strings.TrimSpace(strings.Split(r.Header.Get("X-Forwarded-Proto"), ",")[0])
+	if forwardedHost != "" && forwardedProto == "https" {
+		return forwardedHost
+	}
+	return r.Host
 }
 
 func (m *Manager) ViewerSession(w http.ResponseWriter, r *http.Request) {

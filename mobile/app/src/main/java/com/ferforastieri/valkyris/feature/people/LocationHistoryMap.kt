@@ -6,6 +6,9 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalInspectionMode
 import androidx.compose.ui.viewinterop.AndroidView
+import com.ferforastieri.valkyris.core.design.applyValkyrisMapStyle
+import com.ferforastieri.valkyris.core.design.currentMapVisualStyle
+import com.ferforastieri.valkyris.core.design.mapColorWithAlpha
 import com.ferforastieri.valkyris.core.model.PersonLocation
 import org.osmdroid.config.Configuration
 import org.osmdroid.tileprovider.tilesource.TileSourceFactory
@@ -35,10 +38,11 @@ internal fun historyRouteSegments(history: List<PersonLocation>): List<List<Pers
 }
 
 @Composable
-internal fun LocationHistoryMap(history: List<PersonLocation>, selected: String?, personColor: String, onSelect: (String) -> Unit) {
+internal fun LocationHistoryMap(history: List<PersonLocation>, selected: String?, onSelect: (String) -> Unit) {
     if (LocalInspectionMode.current) { Text("Mapa do histórico"); return }
-    val color = parsePersonRouteColor(personColor)
-    val selectedColor = color
+    val style = currentMapVisualStyle()
+    val color = style.accent
+    val selectedColor = style.accent
     val onSelectNow by rememberUpdatedState(onSelect)
     AndroidView(
         modifier = Modifier.fillMaxSize(),
@@ -47,12 +51,13 @@ internal fun LocationHistoryMap(history: List<PersonLocation>, selected: String?
             MapView(context).apply { setTileSource(TileSourceFactory.MAPNIK); setMultiTouchControls(true) }
         },
         update = { map ->
+            map.applyValkyrisMapStyle(style)
             val points = history.filter(::validHistoryPoint)
             map.overlays.clear()
             historyRouteSegments(points).forEach { segment ->
                 val density = map.resources.displayMetrics.density
-                // A quiet casing separates the person's color from roads and labels.
-                listOf(6f to 0xB3FFFFFF.toInt(), 3.25f to color).forEach { (width, stroke) ->
+                // A quiet surface casing separates the branded route from roads and labels.
+                listOf(6f to mapColorWithAlpha(style.surface, 210), 3.25f to color).forEach { (width, stroke) ->
                     map.overlays.add(Polyline(map).apply {
                         setPoints(segment.map { GeoPoint(it.latitude, it.longitude) })
                         outlinePaint.color = stroke
@@ -65,7 +70,7 @@ internal fun LocationHistoryMap(history: List<PersonLocation>, selected: String?
             points.firstOrNull { it.id == selected }?.let { point ->
                 map.overlays.add(Polygon(map).apply {
                     setPoints(Polygon.pointsAsCircle(GeoPoint(point.latitude, point.longitude), point.accuracy.coerceAtLeast(1.0)))
-                    fillPaint.color = (selectedColor and 0x00ffffff) or 0x26000000
+                    fillPaint.color = mapColorWithAlpha(selectedColor, 38)
                     outlinePaint.color = selectedColor
                     outlinePaint.strokeWidth = 2f * map.resources.displayMetrics.density
                 })
@@ -74,7 +79,7 @@ internal fun LocationHistoryMap(history: List<PersonLocation>, selected: String?
                 map.overlays.add(Marker(map).apply {
                     position = GeoPoint(point.latitude, point.longitude)
                     title = point.address.ifBlank { "Localização registrada" }
-                    icon = historyPointDrawable(map.resources.displayMetrics.density, point.id == selected, color, selectedColor)
+                    icon = historyPointDrawable(map.resources.displayMetrics.density, point.id == selected, color, selectedColor, style.surface, style.foreground)
                     setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_CENTER)
                     setOnMarkerClickListener { _, _ -> onSelectNow(point.id); true }
                 })
@@ -98,17 +103,8 @@ internal fun LocationHistoryMap(history: List<PersonLocation>, selected: String?
     )
 }
 
-internal fun parsePersonRouteColor(value: String): Int = runCatching {
-    val hex = value.removePrefix("#")
-    when (hex.length) {
-        6 -> (0xFF000000L or hex.toLong(16)).toInt()
-        8 -> hex.toLong(16).toInt()
-        else -> error("invalid color")
-    }
-}.getOrDefault(0xFF5B5BD6.toInt())
-
 // The transparent 32dp bounds preserve the touch target around an 8/12dp dot.
-internal fun historyPointDrawable(density: Float, selected: Boolean, color: Int, selectedColor: Int): android.graphics.drawable.Drawable =
+internal fun historyPointDrawable(density: Float, selected: Boolean, color: Int, selectedColor: Int, surfaceColor: Int, foregroundColor: Int): android.graphics.drawable.Drawable =
     object : android.graphics.drawable.Drawable() {
         private val paint = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG)
         override fun getIntrinsicWidth() = (32 * density).toInt()
@@ -117,14 +113,14 @@ internal fun historyPointDrawable(density: Float, selected: Boolean, color: Int,
             val radius = (if (selected) 6f else 4f) * density
             val x = bounds.exactCenterX(); val y = bounds.exactCenterY()
             paint.style = android.graphics.Paint.Style.FILL
-            paint.color = android.graphics.Color.WHITE
+            paint.color = surfaceColor
             canvas.drawCircle(x, y, radius + 1.5f * density, paint)
             paint.color = if (selected) selectedColor else color
             canvas.drawCircle(x, y, radius, paint)
             if (selected) {
                 paint.style = android.graphics.Paint.Style.STROKE
                 paint.strokeWidth = 1.5f * density
-                paint.color = android.graphics.Color.argb(180, 32, 36, 32)
+                paint.color = mapColorWithAlpha(foregroundColor, 180)
                 canvas.drawCircle(x, y, radius + 2.5f * density, paint)
             }
         }

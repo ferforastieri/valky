@@ -145,3 +145,28 @@ func TestViewerCookieRenewalCSRFAndLogout(t *testing.T) {
 		t.Fatal("revoked token accepted")
 	}
 }
+
+func TestViewerRequestSafeBehindTLSProxy(t *testing.T) {
+	request := func(origin, forwardedHost, forwardedProto, site string) *http.Request {
+		r := httptest.NewRequest(http.MethodPost, "https://192.0.2.23:8443/login", nil)
+		r.Host = "192.0.2.23:8443"
+		r.Header.Set("X-Valkyris-Viewer", "1")
+		r.Header.Set("Origin", origin)
+		r.Header.Set("Sec-Fetch-Site", site)
+		r.Header.Set("X-Forwarded-Host", forwardedHost)
+		r.Header.Set("X-Forwarded-Proto", forwardedProto)
+		return r
+	}
+	if !ViewerRequestSafe(request("https://valkyris.example.com", "valkyris.example.com", "https", "same-origin")) {
+		t.Fatal("same-origin browser request through TLS proxy was rejected")
+	}
+	if ViewerRequestSafe(request("https://evil.example", "valkyris.example.com", "https", "cross-site")) {
+		t.Fatal("cross-site browser request through proxy was accepted")
+	}
+	if ViewerRequestSafe(request("https://valkyris.example.com", "valkyris.example.com", "http", "same-origin")) {
+		t.Fatal("insecure forwarded request was accepted")
+	}
+	if ViewerRequestSafe(request("https://valkyris.example.com", "other.example", "https", "same-origin")) {
+		t.Fatal("mismatched forwarded host was accepted")
+	}
+}
