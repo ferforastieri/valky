@@ -1,5 +1,5 @@
 ---
-import { Boxes, CodeXml, Download, ExternalLink, Menu, Network, ServerCog, ShieldCheck, Smartphone, SquareTerminal } from '@lucide/astro';
+import { Boxes, CodeXml, Download, ExternalLink, Lightbulb, Menu, Network, ServerCog, ShieldCheck, Smartphone, SquareTerminal } from '@lucide/astro';
 import type { Locale } from '../content/copy';
 import BaseLayout from '../layouts/BaseLayout.astro';
 import Navigation from './Navigation.astro';
@@ -11,20 +11,20 @@ const installCommand = 'curl -fsSL https://valkyris.vercel.app/install.sh | sh';
 
 const text = pt ? {
   title: 'Documentação do Valkyris',
-  description: 'Guia de instalação, configuração de câmeras ONVIF, segurança, operação e referência completa da API HTTP do Valkyris.',
+  description: 'Guia de instalação, câmeras ONVIF, iluminação inteligente, segurança, operação e referência completa da API HTTP do Valkyris.',
   eyebrow: 'GUIA OPERACIONAL · API V1',
-  intro: 'Tudo o que você precisa para instalar o servidor, preparar uma câmera, conectar o Android e integrar a API — sem expor RTSP ou a câmera à internet.',
+  intro: 'Tudo o que você precisa para instalar o servidor, preparar câmeras e iluminação, conectar o Android e integrar a API.',
   onThisPage: 'Nesta página',
-  toc: [['start','Começar'],['architecture','Arquitetura'],['camera','Preparar a câmera'],['android','Android'],['viewer','Painel web'],['family','Localização e regras'],['configuration','Configuração'],['api','API HTTP'],['updates','Atualizações'],['security','Segurança'],['diagnostics','Diagnóstico']],
+  toc: [['start','Começar'],['architecture','Arquitetura'],['camera','Preparar a câmera'],['lighting','Iluminação'],['android','Android'],['viewer','Painel web'],['family','Localização e regras'],['configuration','Configuração'],['api','API HTTP'],['updates','Atualizações'],['security','Segurança'],['diagnostics','Diagnóstico']],
   requirements: ['Linux em amd64 ou arm64', 'Docker Engine com Docker Compose v2', 'Android 8.0 (SDK 26) ou mais recente', 'Câmera ONVIF Profile S com RTSP', 'Servidor, celular e câmera acessíveis por LAN ou VPN'],
   methods: 'Bearer no Android e integrações; o painel usa cookie HttpOnly e X-Valkyris-Viewer: 1. Rotas públicas dispensam sessão.',
 } : {
   title: 'Valkyris documentation',
-  description: 'Installation, ONVIF camera setup, security, operations and complete Valkyris HTTP API reference.',
+  description: 'Installation, ONVIF camera setup, smart lighting, security, operations and complete Valkyris HTTP API reference.',
   eyebrow: 'OPERATIONS GUIDE · API V1',
-  intro: 'Everything needed to install the server, prepare a camera, connect Android and integrate the API — without exposing RTSP or the camera to the internet.',
+  intro: 'Everything needed to install the server, prepare cameras and lighting, connect Android and integrate the API.',
   onThisPage: 'On this page',
-  toc: [['start','Get started'],['architecture','Architecture'],['camera','Prepare a camera'],['android','Android'],['viewer','Web dashboard'],['family','Location and rules'],['configuration','Configuration'],['api','HTTP API'],['updates','Updates'],['security','Security'],['diagnostics','Diagnostics']],
+  toc: [['start','Get started'],['architecture','Architecture'],['camera','Prepare a camera'],['lighting','Lighting'],['android','Android'],['viewer','Web dashboard'],['family','Location and rules'],['configuration','Configuration'],['api','HTTP API'],['updates','Updates'],['security','Security'],['diagnostics','Diagnostics']],
   requirements: ['Linux on amd64 or arm64', 'Docker Engine with Docker Compose v2', 'Android 8.0 (SDK 26) or later', 'ONVIF Profile S camera with RTSP', 'Server, phone and camera reachable over LAN or VPN'],
   methods: 'Android and integrations use bearer tokens; the dashboard uses an HttpOnly cookie and X-Valkyris-Viewer: 1. Public routes require no session.',
 };
@@ -41,6 +41,10 @@ const endpoints = pt ? [
   ['PUT · DELETE','/api/v1/cameras/{id}','Autenticado','Edita ou remove uma câmera; uma mudança de conexão reinicia sua configuração.'],
   ['GET','/api/v1/camera-operations/{id}','Autenticado','Acompanha a descoberta ONVIF e a configuração de mídia.'],
   ['POST','/api/v1/cameras/{id}/ptz','Autenticado','Move, para ou aplica zoom quando suportado.'],
+  ['GET · POST','/api/v1/lights','Autenticado / Admin ao criar','Lista lâmpadas ou cadastra um dispositivo Tuya LAN.'],
+  ['GET · PUT · DELETE','/api/v1/lights/{id}','Autenticado / Admin ao alterar','Consulta, edita ou remove uma lâmpada.'],
+  ['PUT','/api/v1/lights/{id}/state','Autenticado','Liga, desliga e altera brilho, branco ou cor.'],
+  ['POST','/api/v1/lights/{id}/test','Admin','Testa a conexão local e atualiza o estado.'],
   ['GET','/api/v1/cameras/{id}/snapshot','Autenticado','Retorna um frame JPEG do stream local atual.'],
   ['GET','/api/v1/cameras/{id}/recording','Autenticado','Baixa os últimos 10 segundos do buffer em MP4.'],
   ['POST · PATCH · DELETE','/api/v1/cameras/{id}/live/webrtc/whep','Autenticado','Negocia e encerra o stream WebRTC autenticado.'],
@@ -66,7 +70,7 @@ const endpoints = pt ? [
   ['GET · PUT','/api/v1/settings/retention','Admin ao alterar','Lê ou altera os limites de retenção.'],
   ['POST','/api/v1/detections','Autenticado','Recebe uma detecção normalizada de integração local.'],
   ['GET','/api/v1/system/update','Autenticado','Consulta a release e o link do APK, sem executar atualizações.'],
-  ['GET','/api/v1/realtime','Autenticado','WebSocket para mudanças de câmeras e eventos.'],
+  ['GET','/api/v1/realtime','Autenticado','WebSocket para mudanças de câmeras, iluminação e eventos.'],
 ] : [
   ['GET','/health','Public','Server health.'],
   ['GET','/openapi.yaml','Public','OpenAPI 3.1 contract served by the backend.'],
@@ -79,6 +83,10 @@ const endpoints = pt ? [
   ['PUT · DELETE','/api/v1/cameras/{id}','Authenticated','Edits or deletes a camera; connection changes restart its setup.'],
   ['GET','/api/v1/camera-operations/{id}','Authenticated','Tracks ONVIF discovery and media setup.'],
   ['POST','/api/v1/cameras/{id}/ptz','Authenticated','Moves, stops or zooms when supported.'],
+  ['GET · POST','/api/v1/lights','Authenticated / Admin to create','Lists bulbs or registers a Tuya LAN device.'],
+  ['GET · PUT · DELETE','/api/v1/lights/{id}','Authenticated / Admin to change','Reads, edits or removes a bulb.'],
+  ['PUT','/api/v1/lights/{id}/state','Authenticated','Turns a bulb on or off and changes brightness, white temperature or color.'],
+  ['POST','/api/v1/lights/{id}/test','Admin','Tests the local connection and refreshes state.'],
   ['GET','/api/v1/cameras/{id}/snapshot','Authenticated','Returns a JPEG frame from the current local stream.'],
   ['GET','/api/v1/cameras/{id}/recording','Authenticated','Downloads the latest 10 seconds from the rolling buffer as MP4.'],
   ['POST · PATCH · DELETE','/api/v1/cameras/{id}/live/webrtc/whep','Authenticated','Negotiates and closes the authenticated WebRTC stream.'],
@@ -104,7 +112,7 @@ const endpoints = pt ? [
   ['GET · PUT','/api/v1/settings/retention','Admin to change','Reads or changes retention limits.'],
   ['POST','/api/v1/detections','Authenticated','Accepts normalized detections from local integrations.'],
   ['GET','/api/v1/system/update','Authenticated','Checks release metadata and the APK link without executing updates.'],
-  ['GET','/api/v1/realtime','Authenticated','WebSocket for camera and event changes.'],
+  ['GET','/api/v1/realtime','Authenticated','WebSocket for camera, lighting and event changes.'],
 ];
 ---
 <BaseLayout locale={locale} title={`${text.title} | Valkyris`} description={text.description}>
@@ -145,7 +153,7 @@ const endpoints = pt ? [
             <article><strong>Go + SQLite</strong><small>{pt ? 'regras · eventos' : 'rules · events'}</small></article><i>→</i>
             <article><strong>Android</strong><small>Compose · push</small></article>
           </div>
-          <p>{pt ? 'O backend é o limite de segurança. O app nunca recebe a senha da câmera. As portas de controle e RTSP do MediaMTX são internas; somente a mídia WebRTC usa a porta 8189 UDP/TCP no host. Credenciais ficam cifradas com AES-256-GCM; tokens são persistidos somente como hash.' : 'The backend is the security boundary. The app never receives camera passwords. MediaMTX control and RTSP ports remain internal; only WebRTC media uses host port 8189 UDP/TCP. Credentials use AES-256-GCM encryption; tokens are stored only as hashes.'}</p>
+          <p>{pt ? 'O backend é o limite de segurança. O app nunca recebe a senha da câmera nem a Local Key da iluminação. Câmeras passam pelo MediaMTX; lâmpadas são controladas diretamente pelo backend via Tuya LAN. Credenciais ficam cifradas com AES-256-GCM; tokens são persistidos somente como hash.' : 'The backend is the security boundary. The app never receives camera passwords or lighting Local Keys. Cameras pass through MediaMTX; bulbs are controlled directly by the backend over Tuya LAN. Credentials use AES-256-GCM encryption; tokens are stored only as hashes.'}</p>
         </section>
 
         <section id="camera">
@@ -153,10 +161,23 @@ const endpoints = pt ? [
           <ol class="docs-steps">
             <li><span>1</span><div><strong>{pt ? 'Conecte ao Wi-Fi' : 'Connect to Wi-Fi'}</strong><p>{pt ? 'Na TC40, use o Tapo uma vez para concluir a configuração inicial.' : 'For a TC40, use Tapo once to complete initial provisioning.'}</p></div></li>
             <li><span>2</span><div><strong>{pt ? 'Crie a Camera Account' : 'Create the Camera Account'}</strong><p>{pt ? 'Use uma credencial exclusiva nas configurações avançadas. Não é a senha da sua conta TP-Link.' : 'Use dedicated credentials in advanced settings. This is not your TP-Link account password.'}</p></div></li>
-            <li><span>3</span><div><strong>{pt ? 'Fixe o endereço local' : 'Reserve the local address'}</strong><p>{pt ? 'Prefira uma reserva DHCP no roteador. Não é necessário ativar IP estático dentro da câmera.' : 'Prefer a DHCP reservation on the router. A static address inside the camera is not required.'}</p></div></li>
+            <li><span>3</span><div><strong>{pt ? 'Confirme a rede local' : 'Check the local network'}</strong><p>{pt ? 'O servidor precisa alcançar a câmera pelas portas ONVIF e RTSP na rede privada.' : 'The server must reach the camera ONVIF and RTSP ports on the private network.'}</p></div></li>
             <li><span>4</span><div><strong>{pt ? 'Cadastre no app' : 'Add it in the app'}</strong><p>{pt ? 'Informe nome, ícone, IP, usuário e senha. O RTSP principal da Tapo é montado automaticamente; use o campo avançado apenas para sobrescrever.' : 'Enter name, icon, IP, username and password. The primary Tapo RTSP URL is built automatically; use the advanced field only to override it.'}</p></div></li>
           </ol>
           <p>{pt ? 'O cadastro é persistido imediatamente. A tela da câmera acompanha queued, probing, stream, ready ou failed em tempo real, e o último erro sanitizado permanece salvo para diagnóstico.' : 'The camera is persisted immediately. Its screen follows queued, probing, stream, ready or failed in real time, and the last sanitized error remains stored for diagnosis.'}</p>
+        </section>
+
+        <section id="lighting">
+          <div class="docs-heading"><Lightbulb size={22}/><div><h2>{pt ? 'Iluminação inteligente' : 'Smart lighting'}</h2></div></div>
+          <p>{pt ? 'O Valkyris controla lâmpadas Tuya LAN compatíveis diretamente pela rede local. A integração inicial foi preparada para a Avant NEO RGB 10 W e oferece energia, brilho, temperatura do branco e cor RGB.' : 'Valkyris controls compatible Tuya LAN bulbs directly over the local network. Initial support targets the Avant NEO RGB 10 W and includes power, brightness, white temperature and RGB color.'}</p>
+          <h3>{pt ? 'Cadastrar pelo Android' : 'Register from Android'}</h3>
+          <ol class="docs-steps">
+            <li><span>1</span><div><strong>{pt ? 'Obtenha as credenciais locais' : 'Get local credentials'}</strong><p>{pt ? 'Separe o Device ID, a Local Key de 16 caracteres e, quando disponível, a versão do protocolo.' : 'Have the Device ID, 16-character Local Key and protocol version when available.'}</p></div></li>
+            <li><span>2</span><div><strong>{pt ? 'Abra Dispositivos' : 'Open Devices'}</strong><p>{pt ? 'No aplicativo, entre em Dispositivos → Iluminação → Adicionar iluminação.' : 'In the app, open Devices → Lighting → Add lighting.'}</p></div></li>
+            <li><span>3</span><div><strong>{pt ? 'Importe ou preencha' : 'Import or enter details'}</strong><p>{pt ? 'Importe um devices.json do TinyTuya ou informe nome, cômodo, Device ID e Local Key manualmente.' : 'Import a TinyTuya devices.json file or enter the name, room, Device ID and Local Key manually.'}</p></div></li>
+            <li><span>4</span><div><strong>{pt ? 'Teste e controle' : 'Test and control'}</strong><p>{pt ? 'Salve e use Testar conexão. A lâmpada passa a aparecer no aplicativo e no painel web.' : 'Save and use Test connection. The bulb then appears in both the app and web dashboard.'}</p></div></li>
+          </ol>
+          <p>{pt ? 'Somente administradores cadastram, editam, testam ou removem dispositivos. Usuários autenticados podem controlar os dispositivos já cadastrados. A Local Key é cifrada no SQLite e nunca é devolvida ao aplicativo ou navegador.' : 'Only administrators can register, edit, test or remove devices. Authenticated users can control registered devices. The Local Key is encrypted in SQLite and is never returned to the app or browser.'}</p>
         </section>
 
         <section id="android">
@@ -178,7 +199,7 @@ const endpoints = pt ? [
 
         <section id="viewer">
           <div class="docs-heading"><Network size={22}/><div><h2>{pt ? 'Painel web no seu servidor' : 'Web dashboard on your server'}</h2></div></div>
-          <p>{pt ? 'Abra /app/ na URL HTTPS da instalação e use seu usuário e senha. O painel consulta câmeras ao vivo, eventos, família, percursos e informações do servidor. Regras ficam dentro da câmera e áreas em Família. Edição, PTZ e marcar como lido continuam no aplicativo.' : 'Open /app/ at your installation HTTPS URL and use the personal username and password. The dashboard displays live cameras, events, family, routes and server information. Rules live inside camera details and areas under Family. Editing, PTZ and marking events as read remain in the app.'}</p>
+          <p>{pt ? 'Abra /app/ na URL HTTPS da instalação e use seu usuário e senha. O painel consulta câmeras ao vivo, controla as lâmpadas cadastradas, exibe eventos, família, percursos e informações do servidor. Cadastro e configuração dos dispositivos continuam no Android.' : 'Open /app/ at your installation HTTPS URL and use the personal username and password. The dashboard displays live cameras, controls registered bulbs, and shows events, family, routes and server information. Device registration and setup remain on Android.'}</p>
           <p>{pt ? 'A sessão usa cookie Secure, HttpOnly e SameSite=Strict, válido por 30 dias e renovado durante o uso. Sair ou trocar a senha revoga a sessão. O painel vem na imagem Docker e não exige Node nem deploy na Vercel. Dados são consultados a cada 15 segundos com a aba visível.' : 'Sessions use a Secure, HttpOnly, SameSite=Strict cookie, valid for 30 days and renewed during use. Logout or password changes revoke sessions. The dashboard ships in the Docker image and requires neither Node nor Vercel deployment. Data refreshes every 15 seconds while the tab is visible.'}</p>
           <h3>WebRTC · Cloudflare Tunnel</h3>
           <p>{pt ? 'Android e painel usam os mesmos endpoints WHEP. O túnel leva HTTPS e a negociação, mas áudio e vídeo precisam alcançar o MediaMTX por ICE. Libere 8189 UDP/TCP na rede privada e configure VALKYRIS_WEBRTC_HOSTS com endereços LAN/VPN alcançáveis. O domínio do túnel não é endereço de mídia. STUN pode auxiliar conexão direta; NAT restritivo exige VPN, rota pública de mídia ou TURN configurado.' : 'Android and the dashboard use the same WHEP endpoints. The tunnel carries HTTPS and signaling, but audio and video must reach MediaMTX through ICE. Allow 8189 UDP/TCP on the private network and set VALKYRIS_WEBRTC_HOSTS to reachable LAN/VPN addresses. The tunnel hostname is not a media address. STUN can assist direct connections; restrictive NAT requires VPN, a public media route or configured TURN.'}</p>

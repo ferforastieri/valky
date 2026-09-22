@@ -427,6 +427,24 @@ main {
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 18px;
 }
+.devices-light-title { margin-top: 42px; }
+.section-title.compact { margin-top: 28px; }
+.light-grid { display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:12px; }
+.light-card { display:flex;align-items:stretch;border:1px solid color-mix(in srgb,var(--light-color) 55%,var(--line));border-radius:16px;background:linear-gradient(135deg,color-mix(in srgb,var(--light-color) var(--light-glow),var(--surface)),var(--surface) 72%);box-shadow:var(--shadow);overflow:hidden; }
+.light-main { flex:1;justify-content:flex-start;border:0;border-radius:0;background:transparent;padding:17px;text-align:left; }
+.light-main > span:not(.light-orb) { display:flex;flex-direction:column;min-width:0; }
+.light-main strong { font-family:var(--display);font-size:17px; }
+.light-main small { white-space:nowrap;overflow:hidden;text-overflow:ellipsis; }
+.light-orb { display:grid;place-items:center;width:44px;height:44px;border-radius:50%;color:var(--light-color);background:color-mix(in srgb,var(--light-color) 20%,var(--surface));box-shadow:0 0 28px color-mix(in srgb,var(--light-color) 35%,transparent); }
+.light-orb.large { width:58px;height:58px; }
+.light-power { align-self:center;margin-right:12px;width:42px;height:42px;padding:0;border-radius:50%; }
+.light-power.active { color:var(--surface);background:var(--light-color);border-color:var(--light-color); }
+.light-detail { --light-color:var(--accent);display:grid;gap:20px; }
+.light-detail-head { display:flex;gap:13px;align-items:center;padding:16px;border-radius:16px;background:color-mix(in srgb,var(--light-color) 12%,var(--soft)); }
+.light-detail-head > div { display:flex;flex:1;flex-direction:column; }
+.light-detail label { display:grid;grid-template-columns:1fr auto;gap:8px;font-weight:650; }
+.light-detail label input[type=range] { grid-column:1/-1;width:100%;accent-color:var(--light-color); }
+.light-detail input[type=color] { width:64px;height:40px;padding:3px;border:1px solid var(--line);border-radius:10px;background:var(--surface); }
 .camera-card,
 .panel,
 .rule-card {

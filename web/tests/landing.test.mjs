@@ -37,6 +37,9 @@ test('controles e navegação possuem nomes acessíveis', async () => {
   assert.match(en, /href="\/en\/docs"/);
   assert.doesNotMatch(pt, /class="docs-shell"/);
   assert.match(pt, /Sua privacidade importa\./);
+  assert.match(pt, /class="lighting-section section"/);
+  assert.match(pt, /energia, brilho, branco e RGB/);
+  assert.match(en, /power, brightness, white temperature and RGB/);
   assert.doesNotMatch(pt, /class="flow section"/);
   assert.doesNotMatch(pt, /class="compatibility section"/);
   assert.doesNotMatch(pt, /class="detect section/);
@@ -102,6 +105,9 @@ test('documentação é uma rota separada, localizada e completa', async () => {
   assert.match(ptDocs, /Documentação do Valkyris/);
   assert.match(enDocs, /Valkyris documentation/);
   assert.match(ptDocs, /\/api\/v1\/cameras/);
+  assert.match(ptDocs, /Iluminação inteligente/);
+  assert.match(ptDocs, /\/api\/v1\/lights\/\{id\}\/state/);
+  assert.match(enDocs, /Smart lighting/);
   assert.match(ptDocs, /\/api\/v1\/realtime/);
   assert.match(ptDocs, /href="\/openapi.yaml"/);
   assert.match(ptDocs, /href="\/pt-BR"/);

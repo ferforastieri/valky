@@ -95,7 +95,7 @@ func TestEveryProtectedRouteRejectsAnonymous(t *testing.T) {
 	if _, err := db.DB.Exec(`UPDATE users SET is_admin=0 WHERE id=(SELECT user_id FROM devices WHERE id=?)`, member.DeviceID); err != nil {
 		t.Fatal(err)
 	}
-	for _, route := range []string{"GET /rules", "POST /rules", "PUT /rules/other", "DELETE /rules/other", "GET /admin/users", "PUT /admin/users/other", "DELETE /admin/users/other", "POST /pairing-sessions", "POST /detections", "POST /cameras", "PUT /cameras/other", "DELETE /cameras/other", "PUT /settings/push", "PUT /settings/retention", "PUT /rules/other/recipients"} {
+	for _, route := range []string{"GET /rules", "POST /rules", "PUT /rules/other", "DELETE /rules/other", "GET /admin/users", "PUT /admin/users/other", "DELETE /admin/users/other", "POST /pairing-sessions", "POST /detections", "POST /cameras", "PUT /cameras/other", "DELETE /cameras/other", "POST /lights", "PUT /lights/other", "DELETE /lights/other", "POST /lights/other/test", "PUT /settings/push", "PUT /settings/retention", "PUT /rules/other/recipients"} {
 		parts := strings.SplitN(route, " ", 2)
 		req := httptest.NewRequest(parts[0], "/api/v1"+parts[1], strings.NewReader(`{"isAdmin":true}`))
 		req.Header.Set("Authorization", "Bearer "+member.Token)

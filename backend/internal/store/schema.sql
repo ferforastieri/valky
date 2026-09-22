@@ -31,6 +31,25 @@ CREATE TABLE IF NOT EXISTS cameras (
   updated_at TEXT NOT NULL
 );
 
+CREATE TABLE IF NOT EXISTS lights (
+  id TEXT PRIMARY KEY,
+  name TEXT NOT NULL,
+  room TEXT NOT NULL DEFAULT '',
+  device_id TEXT NOT NULL UNIQUE,
+  local_key_enc BLOB NOT NULL,
+  protocol_version REAL NOT NULL DEFAULT 3.3,
+  last_ip TEXT NOT NULL DEFAULT '',
+  capabilities_json TEXT NOT NULL DEFAULT '{}',
+  dp_mapping_json TEXT NOT NULL DEFAULT '{}',
+  setup_status TEXT NOT NULL DEFAULT 'pending',
+  setup_error TEXT NOT NULL DEFAULT '',
+  enabled INTEGER NOT NULL DEFAULT 1,
+  last_seen_at TEXT,
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_lights_name ON lights(name COLLATE NOCASE);
+
 CREATE TABLE IF NOT EXISTS rules (
   id TEXT PRIMARY KEY,
   camera_id TEXT NOT NULL REFERENCES cameras(id) ON DELETE CASCADE,

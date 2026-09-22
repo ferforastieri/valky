@@ -231,6 +231,21 @@ class ValkyrisApi(
         announceBackend = true,
     )
 
+    suspend fun lights(): List<LightDevice> = get("/lights")
+    suspend fun createLight(light: CreateLightRequest): LightDevice = post("/lights", light, announceBackend = true)
+    suspend fun updateLight(id: String, light: UpdateLightRequest): LightDevice = put("/lights/$id", light, announceBackend = true)
+    suspend fun controlLight(id: String, patch: LightStatePatch): LightDevice = put("/lights/$id/state", patch)
+    suspend fun testLight(id: String): LightDevice = post("/lights/$id/test", emptyMap<String,String>(), announceBackend = true)
+    suspend fun deleteLight(id: String) {
+        val current = requireNotNull(session())
+        executeUnit(current.fingerprint, announceBackend = true) {
+            it.delete(base() + "/lights/$id") {
+                bearerAuth(current.token)
+                header(HttpHeaders.AcceptLanguage, Locale.getDefault().toLanguageTag())
+            }
+        }
+    }
+
 
     suspend fun updateInfo(): UpdateInfo = get("/system/update?clientVersion=${BuildConfig.VERSION_NAME.encodeURLParameter()}")
 

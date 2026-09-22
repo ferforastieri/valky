@@ -81,7 +81,7 @@ internal data class CameraListStream(
     val httpClient: OkHttpClient,
 )
 
-@Composable fun CamerasScreen(onCamera:(String)->Unit,vm:CamerasViewModel=hiltViewModel()){
+@Composable fun CamerasScreen(onCamera:(String)->Unit,canManage:Boolean=true,vm:CamerasViewModel=hiltViewModel()){
     LifecycleResumeEffect(Unit) { vm.refresh();onPauseOrDispose {} }
     val state by vm.state.collectAsStateWithLifecycle()
     var showAdd by remember{mutableStateOf(false)}
@@ -93,7 +93,7 @@ internal data class CameraListStream(
     CamerasContent(state, stream = CameraListStream(vm::whepUrl, vm::token, vm.httpClient()), onCamera={id->
         val camera=state.cameras.firstOrNull{it.id==id}
         if(camera?.setupStatus=="failed")failedCameraId=id else onCamera(id)
-    }, onEdit={editingCameraId=it}, onDelete={deletingCameraId=it}, onAdd = { if (!state.creating) showAdd = true })
+    }, onEdit={if(canManage)editingCameraId=it}, onDelete={if(canManage)deletingCameraId=it}, onAdd = { if (canManage && !state.creating) showAdd = true }, canManage=canManage)
     if(showAdd)CameraEditorDialog(onDismiss={showAdd=false},onSave={vm.add(it);showAdd=false})
     editingCamera?.let { camera ->
         CameraEditorDialog(
@@ -117,7 +117,7 @@ internal data class CameraListStream(
 }
 
 @Composable
-internal fun CamerasContent(state: CamerasState, stream: CameraListStream? = null, onCamera: (String) -> Unit = {}, onEdit: (String) -> Unit = {}, onDelete: (String) -> Unit = {}, onAdd: () -> Unit = {}) {
+internal fun CamerasContent(state: CamerasState, stream: CameraListStream? = null, onCamera: (String) -> Unit = {}, onEdit: (String) -> Unit = {}, onDelete: (String) -> Unit = {}, onAdd: () -> Unit = {}, canManage:Boolean=true) {
     Box(Modifier.fillMaxSize()){
         Column(Modifier.fillMaxSize().padding(horizontal=18.dp)){
             Spacer(Modifier.height(10.dp))
@@ -127,10 +127,10 @@ internal fun CamerasContent(state: CamerasState, stream: CameraListStream? = nul
             when{
                 state.loading->Box(Modifier.fillMaxSize()){CircularProgressIndicator(Modifier.align(Alignment.Center))}
                 state.cameras.isEmpty()->EmptyCameras()
-                else->LazyColumn(verticalArrangement=Arrangement.spacedBy(12.dp),contentPadding=PaddingValues(bottom=96.dp)){items(state.cameras,key={it.id}){camera->CameraCard(camera,stream,onClick={onCamera(camera.id)},onEdit={onEdit(camera.id)},onDelete={onDelete(camera.id)})}}
+                else->LazyColumn(verticalArrangement=Arrangement.spacedBy(12.dp),contentPadding=PaddingValues(bottom=96.dp)){items(state.cameras,key={it.id}){camera->CameraCard(camera,stream,onClick={onCamera(camera.id)},onEdit=if(canManage){{onEdit(camera.id)}}else null,onDelete=if(canManage){{onDelete(camera.id)}}else null)}}
             }
         }
-        FloatingActionButton(
+        if(canManage) FloatingActionButton(
             onClick = onAdd,
             modifier = Modifier.align(Alignment.BottomEnd).padding(end = 20.dp, bottom = 18.dp),
             containerColor = if (state.creating) MaterialTheme.colorScheme.surfaceVariant else MaterialTheme.colorScheme.secondary,
@@ -202,7 +202,7 @@ fun CameraFailureSheet(camera:Camera,onDismiss:()->Unit,onEdit:(()->Unit)?=null,
 }
 
 @Composable
-private fun CameraCard(camera: Camera, stream: CameraListStream?, onClick: () -> Unit, onEdit: () -> Unit, onDelete: () -> Unit) {
+private fun CameraCard(camera: Camera, stream: CameraListStream?, onClick: () -> Unit, onEdit: (() -> Unit)?, onDelete: (() -> Unit)?) {
     val ready = camera.setupStatus == "ready"
     val failed = camera.setupStatus == "failed"
     Card(onClick = onClick, modifier = Modifier.fillMaxWidth(), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface), border = androidx.compose.foundation.BorderStroke(1.dp, if (failed) MaterialTheme.colorScheme.error.copy(alpha = .45f) else MaterialTheme.colorScheme.outlineVariant), elevation = CardDefaults.cardElevation(defaultElevation = 6.dp)) {
@@ -228,8 +228,8 @@ private fun CameraCard(camera: Camera, stream: CameraListStream?, onClick: () ->
                     Text(camera.name, fontWeight = FontWeight.SemiBold)
                     Text(if (ready) camera.host else setupDescription(camera), color = if (failed) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodySmall, maxLines = 2)
                 }
-                IconButton(onClick=onEdit){Icon(Lucide.Pencil,stringResource(R.string.edit_camera),tint=MaterialTheme.colorScheme.onSurfaceVariant)}
-                IconButton(onClick=onDelete){Icon(Lucide.Trash2,stringResource(R.string.remove_camera),tint=MaterialTheme.colorScheme.error)}
+                onEdit?.let{IconButton(onClick=it){Icon(Lucide.Pencil,stringResource(R.string.edit_camera),tint=MaterialTheme.colorScheme.onSurfaceVariant)}}
+                onDelete?.let{IconButton(onClick=it){Icon(Lucide.Trash2,stringResource(R.string.remove_camera),tint=MaterialTheme.colorScheme.error)}}
             }
         }
     }

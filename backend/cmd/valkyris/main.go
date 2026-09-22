@@ -26,6 +26,7 @@ import (
 	appcrypto "github.com/ferforastieri/valkyris/backend/internal/crypto"
 	"github.com/ferforastieri/valkyris/backend/internal/detector"
 	"github.com/ferforastieri/valkyris/backend/internal/event"
+	"github.com/ferforastieri/valkyris/backend/internal/light"
 	"github.com/ferforastieri/valkyris/backend/internal/media"
 	"github.com/ferforastieri/valkyris/backend/internal/notify"
 	"github.com/ferforastieri/valkyris/backend/internal/preferences"
@@ -71,6 +72,8 @@ func main() {
 		MaxStorageGB: cfg.RetentionBytes / (1024 * 1024 * 1024),
 	})
 	hub := api.NewHub()
+	lightRepo := light.NewRepository(db, vault)
+	lightService := light.NewService(lightRepo, light.NewTuyaDriver(), hub, logger)
 	application := &app.Service{Rules: rulesService, Events: eventService, Media: mediaManager, Notify: notifyService, Hub: hub, DataDir: cfg.DataDir, Logger: logger, Preferences: preferencesService}
 	apiServer := api.NewServer(authManager, cameraRepo, onvif, mediaManager, rulesService, eventService, notifyService, hub, logger)
 	apiServer.SetViewerDirectory(cfg.ViewerDir)
@@ -79,10 +82,12 @@ func main() {
 	apiServer.SetPreferences(preferencesService)
 	trackingService := tracking.New(db)
 	apiServer.SetTracking(trackingService)
+	apiServer.SetLights(lightService)
 	ctx, cancel := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer cancel()
 	go trackingService.RunAddresses(ctx, cfg.GeocoderURL, logger)
 	go notifyService.Run(ctx)
+	go lightService.Run(ctx)
 	go application.RunRetention(ctx, cfg.RetentionAge, cfg.RetentionBytes)
 	go restoreMedia(ctx, cameraRepo, mediaManager, logger)
 	apiServer.ResumeCameraSetups(ctx)

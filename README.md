@@ -5,8 +5,8 @@
 <h1 align="center">Valkyris</h1>
 
 <p align="center">
-  Monitoramento residencial self-hosted para câmeras ONVIF e RTSP.<br>
-  Vídeo, regras e eventos permanecem na sua casa; os alertas chegam a um app Android nativo.
+  Monitoramento e controle residencial self-hosted para câmeras e iluminação inteligente.<br>
+  Vídeo, regras, eventos e comandos permanecem na sua casa; os alertas chegam a um app Android nativo.
 </p>
 
 <p align="center">
@@ -33,6 +33,7 @@ Valkyris transforma um servidor doméstico em uma central privada de monitoramen
 - Credenciais de câmera cifradas com AES-256-GCM e tokens persistidos somente como hash.
 - Avisos de nova versão por toast e download manual do APK assinado nas configurações do app.
 - Painel web em /app/, servido pelo próprio backend, para consultar câmeras, eventos, família e configurações.
+- [Iluminação Tuya local](docs/smart-lighting.md) com energia, brilho, branco ajustável e RGB.
 - Interface em PT-BR e inglês, temas claro/escuro e suporte a LAN ou VPN.
 
 ## Como funciona
@@ -55,7 +56,7 @@ O backend Go é o limite de segurança: o app nunca recebe a senha da câmera e 
 
 | Área | Tecnologias |
 | --- | --- |
-| Backend | Go 1.26, SQLite, ONVIF, FFmpeg, sherpa-onnx, WebSocket |
+| Backend | Go 1.26, SQLite, ONVIF, Tuya LAN 3.1–3.5, FFmpeg, sherpa-onnx, WebSocket |
 | Mídia | MediaMTX, RTSP, WebRTC/WHEP, MP4 |
 | Android | Kotlin, Jetpack Compose, Material 3, Hilt, DataStore, Ktor/OkHttp, Media3, Coil, Firebase Cloud Messaging |
 | Web | Astro, TypeScript, CSS, Lucide, landing estática e painel de consulta incluído na imagem Docker |
@@ -67,12 +68,13 @@ O backend Go é o limite de segurança: o app nunca recebe a senha da câmera e 
 - Android 8.0 (SDK 26) ou superior.
 - Câmera ONVIF Profile S com RTSP; áudio é necessário para detecção sonora.
 - Servidor, câmera e celular na mesma LAN, ou conectados por uma VPN privada.
+- Para iluminação local, servidor e lâmpada precisam conseguir se alcançar pela rede doméstica.
 
 Não encaminhe no roteador as portas RTSP/ONVIF da câmera nem as portas internas `8888` e `9997` do MediaMTX.
 
 ## Instalação
 
-Prepare a câmera no Wi-Fi e crie uma credencial própria de ONVIF/RTSP. Em uma Tapo TC40, essa opção aparece como **Camera Account** nas configurações avançadas; ela não usa a senha da conta TP-Link. Uma reserva DHCP no roteador é recomendada para o IP não mudar.
+Prepare a câmera no Wi-Fi e crie uma credencial própria de ONVIF/RTSP. Em uma Tapo TC40, essa opção aparece como **Camera Account** nas configurações avançadas; ela não usa a senha da conta TP-Link.
 
 No servidor, execute:
 
@@ -91,7 +93,7 @@ Depois:
 
 Para acessar de fora de casa, use uma VPN como Tailscale ou WireGuard, ou publique o HTTPS por proxy/túnel. O Cloudflare Tunnel transporta a API e a negociação WHEP, mas não a mídia WebRTC: o cliente precisa alcançar a porta 8189 UDP/TCP por LAN, VPN ou outra rota ICE configurada. O instalador preserva VALKYRIS_WEBRTC_HOSTS com o endereço do servidor; não use o domínio do túnel como endereço de mídia. Veja [conectividade WebRTC](docs/webrtc-connectivity.md).
 
-Abra https://SEU_SERVIDOR/app/ e entre com seu usuário e senha para consultar o painel. Regras ficam nos detalhes da câmera; áreas e percursos ficam em Família. O painel permite gestão de usuários e convites para administradores e edição de destinatários para quem tem permissão; PTZ, edição completa das regras, e marcar eventos como lidos continuam no Android.
+Abra https://SEU_SERVIDOR/app/ e entre com seu usuário e senha para consultar o painel. Regras ficam nos detalhes da câmera; áreas e percursos ficam em Família. O painel permite gestão de usuários e convites para administradores, edição de destinatários para quem tem permissão e controle das lâmpadas já cadastradas. Cadastro e configuração de dispositivos, PTZ, edição completa das regras e marcar eventos como lidos continuam no Android.
 
 ## Rodar para desenvolvimento
 

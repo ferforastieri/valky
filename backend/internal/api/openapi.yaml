@@ -176,6 +176,41 @@ paths:
       summary: Close an authenticated WHEP session
       parameters: [{$ref: '#/components/parameters/id'}, {$ref: '#/components/parameters/webrtcProfile'}, {$ref: '#/components/parameters/session'}]
       responses: {'204': {description: WebRTC session closed}}
+  /lights:
+    get:
+      summary: List locally controlled lights and their latest state
+      responses: {'200': {description: Lights in APIResponse.data}}
+    post:
+      summary: Register and test a Tuya LAN light (administrator only)
+      requestBody: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/LightInput'}}}}
+      responses: {'201': {description: Light saved; setupStatus reports whether it was reached}}
+  /lights/{id}:
+    get:
+      summary: Get a locally controlled light
+      parameters: [{$ref: '#/components/parameters/id'}]
+      responses: {'200': {description: Light in APIResponse.data}}
+    put:
+      summary: Update local light configuration (administrator only)
+      parameters: [{$ref: '#/components/parameters/id'}]
+      requestBody: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/LightUpdate'}}}}
+      responses: {'200': {description: Updated light}}
+    delete:
+      summary: Remove a light from Valkyris (administrator only)
+      parameters: [{$ref: '#/components/parameters/id'}]
+      responses: {'200': {description: Removed}}
+  /lights/{id}/state:
+    put:
+      summary: Control a light directly over the local network
+      parameters: [{$ref: '#/components/parameters/id'}]
+      requestBody: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/LightStatePatch'}}}}
+      responses:
+        '200': {description: Updated light and state}
+        '502': {description: Light unavailable on the local network}
+  /lights/{id}/test:
+    post:
+      summary: Rediscover and test a light (administrator only)
+      parameters: [{$ref: '#/components/parameters/id'}]
+      responses: {'200': {description: Current light and state}}
   /detectors:
     get:
       summary: List normalized detector types
@@ -394,7 +429,7 @@ components:
       type: apiKey
       in: cookie
       name: __Host-valkyris-viewer
-      description: Secure HttpOnly SameSite=Strict cookie; requires X-Valkyris-Viewer 1 for all cookie-authenticated API calls. Read-only except WHEP negotiation and logout.
+      description: Secure HttpOnly SameSite=Strict cookie; requires X-Valkyris-Viewer 1 for cookie-authenticated calls. The browser can consult data, negotiate WHEP and control registered lights, but cannot register or configure devices.
     bearerAuth: {type: http, scheme: bearer}
   parameters:
     webrtcProfile:
@@ -485,6 +520,65 @@ components:
         success: {type: boolean, const: true}
         message: {type: string}
         data: {$ref: '#/components/schemas/CameraOperation'}
+    LightColor:
+      type: object
+      required: [hue, saturation, value]
+      properties:
+        hue: {type: integer, minimum: 0, maximum: 360}
+        saturation: {type: integer, minimum: 0, maximum: 100}
+        value: {type: integer, minimum: 1, maximum: 100}
+    LightState:
+      type: object
+      properties:
+        online: {type: boolean, readOnly: true}
+        power: {type: boolean}
+        mode: {type: string, enum: [white, color]}
+        brightness: {type: integer, minimum: 1, maximum: 100}
+        temperatureKelvin: {type: integer, minimum: 2700, maximum: 6500}
+        color: {$ref: '#/components/schemas/LightColor'}
+        updatedAt: {type: string, format: date-time, readOnly: true}
+    LightStatePatch:
+      type: object
+      description: Include only the values to change. Setting temperature selects white mode; setting color selects color mode.
+      properties:
+        power: {type: boolean}
+        mode: {type: string, enum: [white, color]}
+        brightness: {type: integer, minimum: 1, maximum: 100}
+        temperatureKelvin: {type: integer, minimum: 2700, maximum: 6500}
+        color: {$ref: '#/components/schemas/LightColor'}
+    Light:
+      type: object
+      properties:
+        id: {type: string, format: uuid}
+        name: {type: string}
+        room: {type: string}
+        deviceId: {type: string}
+        protocolVersion: {type: number, enum: [3.1, 3.2, 3.3, 3.4, 3.5]}
+        setupStatus: {type: string, enum: [pending, ready, failed]}
+        setupError: {type: string}
+        enabled: {type: boolean}
+        lastSeenAt: {type: string, format: date-time}
+        state: {$ref: '#/components/schemas/LightState'}
+    LightInput:
+      type: object
+      required: [name, deviceId, localKey]
+      properties:
+        name: {type: string}
+        room: {type: string}
+        deviceId: {type: string}
+        localKey: {type: string, minLength: 16, maxLength: 16, format: password, writeOnly: true}
+        ip: {type: string, description: Optional initial private IPv4 address; later changes are discovered automatically}
+        protocolVersion: {type: number, enum: [3.1, 3.2, 3.3, 3.4, 3.5], default: 3.3}
+    LightUpdate:
+      type: object
+      required: [name, enabled]
+      properties:
+        name: {type: string}
+        room: {type: string}
+        localKey: {type: string, minLength: 16, maxLength: 16, format: password, writeOnly: true, description: Omit or send an empty value to keep the stored key}
+        ip: {type: string, description: Optional private IPv4 address; an empty value keeps the last known address}
+        protocolVersion: {type: number, enum: [3.1, 3.2, 3.3, 3.4, 3.5]}
+        enabled: {type: boolean}
     UpdateInfo:
       type: object
       required: [currentVersion, latestVersion, available, serverUpdateAvailable, apkUpdateAvailable, releaseUrl, message]

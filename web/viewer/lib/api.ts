@@ -9,6 +9,24 @@ export interface Camera {
   setupError?: string;
   capabilities: { audio: boolean; ptz: boolean; zoom: boolean };
 }
+export interface LightDevice {
+  id: string;
+  name: string;
+  room: string;
+  setupStatus: string;
+  setupError?: string;
+  enabled: boolean;
+  capabilities: { brightness: boolean; color: boolean; colorTemperature: boolean };
+  state: {
+    online: boolean;
+    power: boolean;
+    mode: string;
+    brightness: number;
+    temperatureKelvin: number;
+    color: { hue: number; saturation: number; value: number };
+    updatedAt?: string;
+  };
+}
 export interface Event {
   id: string;
   cameraId?: string;

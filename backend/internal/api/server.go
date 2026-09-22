@@ -24,6 +24,7 @@ import (
 	"github.com/ferforastieri/valkyris/backend/internal/camera"
 	"github.com/ferforastieri/valkyris/backend/internal/detector"
 	"github.com/ferforastieri/valkyris/backend/internal/event"
+	"github.com/ferforastieri/valkyris/backend/internal/light"
 	"github.com/ferforastieri/valkyris/backend/internal/media"
 	"github.com/ferforastieri/valkyris/backend/internal/notify"
 	"github.com/ferforastieri/valkyris/backend/internal/preferences"
@@ -55,6 +56,7 @@ type Server struct {
 	updates      *updates.Service
 	preferences  *preferences.Service
 	tracking     *tracking.Service
+	lights       *light.Service
 }
 
 type CameraOperation struct {
@@ -78,6 +80,7 @@ func (s *Server) SetSubmitter(sub DetectionSubmitter)         { s.submitter = su
 func (s *Server) SetUpdates(service *updates.Service)         { s.updates = service }
 func (s *Server) SetPreferences(service *preferences.Service) { s.preferences = service }
 func (s *Server) SetTracking(service *tracking.Service)       { s.tracking = service }
+func (s *Server) SetLights(service *light.Service)            { s.lights = service }
 
 // ResumeCameraSetups continues cameras that were persisted before an interrupted
 // background probe. Failed cameras remain untouched so their diagnosis is kept.
@@ -131,6 +134,13 @@ func (s *Server) Handler() http.Handler {
 	protected.HandleFunc("GET /camera-operations/{id}", s.cameraOperation)
 	protected.Handle("DELETE /cameras/{id}", s.auth.RequireAdmin(http.HandlerFunc(s.deleteCamera)))
 	protected.HandleFunc("POST /cameras/{id}/ptz", s.ptz)
+	protected.HandleFunc("GET /lights", s.listLights)
+	protected.HandleFunc("GET /lights/{id}", s.getLight)
+	protected.Handle("POST /lights", s.auth.RequireAdmin(http.HandlerFunc(s.createLight)))
+	protected.Handle("PUT /lights/{id}", s.auth.RequireAdmin(http.HandlerFunc(s.updateLight)))
+	protected.Handle("DELETE /lights/{id}", s.auth.RequireAdmin(http.HandlerFunc(s.deleteLight)))
+	protected.HandleFunc("PUT /lights/{id}/state", s.controlLight)
+	protected.Handle("POST /lights/{id}/test", s.auth.RequireAdmin(http.HandlerFunc(s.testLight)))
 	protected.HandleFunc("GET /cameras/{id}/snapshot", s.snapshot)
 	protected.HandleFunc("GET /cameras/{id}/recording", s.recentRecording)
 	protected.HandleFunc("POST /cameras/{id}/live/webrtc/whep", s.liveWebRTC)

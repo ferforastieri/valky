@@ -24,6 +24,7 @@ import com.ferforastieri.valkyris.MainViewModel
 import com.ferforastieri.valkyris.R
 import com.ferforastieri.valkyris.feature.cameras.CameraLiveScreen
 import com.ferforastieri.valkyris.feature.cameras.CamerasScreen
+import com.ferforastieri.valkyris.feature.devices.DevicesScreen
 import com.ferforastieri.valkyris.feature.events.EventDetailScreen
 import com.ferforastieri.valkyris.feature.events.EventsScreen
 import com.ferforastieri.valkyris.feature.onboarding.OnboardingScreen
@@ -41,13 +42,14 @@ import com.composables.icons.lucide.Settings
 import com.composables.icons.lucide.UserRound
 import com.composables.icons.lucide.MapPin
 import com.composables.icons.lucide.Video
+import com.composables.icons.lucide.LayoutGrid
 
 private data class Destination(val route: String, val label: Int, val icon: ImageVector)
 
 private val destinations = listOf(
     Destination("overview", R.string.overview, Lucide.House),
     Destination("people", R.string.people, Lucide.MapPin),
-    Destination("cameras", R.string.cameras, Lucide.Video),
+    Destination("devices", R.string.devices, Lucide.LayoutGrid),
     Destination("profile", R.string.profile, Lucide.UserRound),
     Destination("settings", R.string.settings, Lucide.Settings),
 )
@@ -116,7 +118,7 @@ private fun ConnectedValkyrisApp(main: MainViewModel) {
         topBar = {
             if (showTopBar) {
                 val title = when (currentRoute) {
-                    "cameras" -> stringResource(R.string.cameras)
+                    "devices", "cameras" -> stringResource(R.string.devices)
                     "people" -> stringResource(R.string.people)
                     "profile" -> stringResource(R.string.profile)
                     "settings" -> stringResource(R.string.settings)
@@ -159,12 +161,13 @@ private fun ConnectedValkyrisApp(main: MainViewModel) {
                 OverviewScreen(
                     onCamera = { nav.navigate("camera/$it") },
                     onEvent = { nav.navigate("event/$it") },
-                    onCameras = { nav.openTopLevel("cameras") },
+                    onCameras = { nav.openTopLevel("devices") },
                     onPeople = { nav.openTopLevel("people") },
                     onEvents = { nav.navigate("events") { launchSingleTop = true } },
                 )
             }
-            composable("cameras") { CamerasScreen(onCamera = { nav.navigate("camera/$it") }) }
+            composable("devices") { DevicesScreen(admin = admin, onCamera = { nav.navigate("camera/$it") }) }
+            composable("cameras") { DevicesScreen(admin = admin, onCamera = { nav.navigate("camera/$it") }, initialPage = 0) }
             composable("camera/{id}") { CameraLiveScreen(cameraId = it.arguments?.getString("id").orEmpty()) }
             composable("events") {
                 EventsScreen(
@@ -182,8 +185,8 @@ private fun ConnectedValkyrisApp(main: MainViewModel) {
 }
 
 internal fun NavHostController.openTopLevel(route: String) {
-    if (route == "cameras" && currentDestination?.route == "camera/{id}") {
-        if (popBackStack("cameras", inclusive = false)) return
+    if (route == "devices" && currentDestination?.route == "camera/{id}") {
+        if (popBackStack("devices", inclusive = false)) return
     }
     if (route == "overview") {
         if (!popBackStack("overview", inclusive = false) && currentDestination?.route != "overview") {

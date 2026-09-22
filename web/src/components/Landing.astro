@@ -1,5 +1,5 @@
 ---
-import { ArrowLeft, ArrowRight, BellRing, Check, ChevronDown, Download, ShieldCheck } from '@lucide/astro';
+import { ArrowLeft, ArrowRight, BellRing, Check, ChevronDown, Download, Lightbulb, Palette, ShieldCheck, SlidersHorizontal } from '@lucide/astro';
 import { copy, type Locale } from '../content/copy';
 import BaseLayout from '../layouts/BaseLayout.astro';
 import Navigation from './Navigation.astro';
@@ -50,6 +50,21 @@ const heroLines = locale === 'pt-BR' ? ['Sua casa avisa.', 'Seus dados ficam.'] 
       </div>
     </section>
 
+    <section class="lighting-section section" id="lighting">
+      <div class="lighting-copy">
+        <p class="eyebrow"><span></span>{locale === 'pt-BR' ? 'ILUMINAÇÃO · CONTROLE LOCAL' : 'LIGHTING · LOCAL CONTROL'}</p>
+        <h2>{locale === 'pt-BR' ? 'A mesma casa. Agora também sob a sua luz.' : 'The same home. Now under your light too.'}</h2>
+        <p>{locale === 'pt-BR' ? 'Cadastre lâmpadas compatíveis pelo Android e controle energia, brilho, branco e RGB tanto no aplicativo quanto no painel web.' : 'Register compatible bulbs from Android and control power, brightness, white temperature and RGB from both the app and web dashboard.'}</p>
+        <a class="button quiet" href={`/${locale}/docs#lighting`}>{locale === 'pt-BR' ? 'Configurar iluminação' : 'Set up lighting'}<ArrowRight size={17}/></a>
+      </div>
+      <div class="lighting-console" aria-label={locale === 'pt-BR' ? 'Controles de iluminação disponíveis' : 'Available lighting controls'}>
+        <div class="light-aura"><Lightbulb size={44}/></div>
+        <div class="light-readout"><span>{locale === 'pt-BR' ? 'SALA' : 'LIVING ROOM'}</span><strong>68%</strong><small>4.000 K</small></div>
+        <div class="light-spectrum" aria-hidden="true"></div>
+        <div class="light-capabilities"><span><Lightbulb size={16}/>{locale === 'pt-BR' ? 'Energia' : 'Power'}</span><span><SlidersHorizontal size={16}/>{locale === 'pt-BR' ? 'Brilho e branco' : 'Brightness and white'}</span><span><Palette size={16}/>RGB</span></div>
+      </div>
+    </section>
+
     <section class="install section" id="install">
       <div class="install-header">
         <div><p class="eyebrow"><span></span>QUICK START</p><h2>{t.setupTitle}</h2></div>
@@ -59,7 +74,7 @@ const heroLines = locale === 'pt-BR' ? ['Sua casa avisa.', 'Seus dados ficam.'] 
       <div class="terminal"><div class="terminal-bar"><span></span><span></span><span></span><b>install.sh</b></div><div class="terminal-command"><code>{command}</code><button class="copy-command" data-command={command} aria-label="Copy install command">COPY</button></div><div class="terminal-output"><span>✓ Docker Compose detected</span><span>✓ TLS identity generated</span><span>✓ Valkyris is listening on :8443</span></div></div>
     </section>
 
-    <section class="faq section" id="faq"><div><p class="eyebrow"><span></span>FAQ · ONVIF PROFILE S</p><h2>{t.faqTitle}</h2></div><div class="faq-list">{t.faq.map(([q,a])=><details><summary>{q}<ChevronDown size={18}/></summary><p>{a}</p></details>)}</div></section>
+    <section class="faq section" id="faq"><div><p class="eyebrow"><span></span>{locale === 'pt-BR' ? 'FAQ · CASA CONECTADA' : 'FAQ · CONNECTED HOME'}</p><h2>{t.faqTitle}</h2></div><div class="faq-list">{t.faq.map(([q,a])=><details><summary>{q}<ChevronDown size={18}/></summary><p>{a}</p></details>)}</div></section>
   </main>
 
   <Navigation locale={locale} current="home" />
