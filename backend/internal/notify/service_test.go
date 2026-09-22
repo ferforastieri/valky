@@ -184,6 +184,57 @@ func TestRegisterRequiresFirebaseCredentials(t *testing.T) {
 	}
 }
 
+func TestExpiredPushIsRemovedWithoutDelivery(t *testing.T) {
+	var sends atomic.Int32
+	transport := alertTestTransport(func(r *http.Request) (*http.Response, error) {
+		sends.Add(1)
+		return &http.Response{StatusCode: http.StatusAccepted, Status: http.StatusText(http.StatusAccepted), Header: make(http.Header), Body: io.NopCloser(strings.NewReader("{}"))}, nil
+	})
+	db, err := store.Open(t.TempDir() + "/notify.db")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db.Close()
+	vault, err := appcrypto.LoadOrCreate(t.TempDir() + "/master.key")
+	if err != nil {
+		t.Fatal(err)
+	}
+	service := NewService(db, vault, "")
+	service.http = &http.Client{Transport: transport}
+	service.projectID = "valkyris-test"
+	service.tokenSource = oauth2.StaticTokenSource(&oauth2.Token{AccessToken: "test-access-token"})
+	now := time.Now().UTC()
+	stamp := now.Format(time.RFC3339Nano)
+	if _, err = db.DB.Exec(`INSERT INTO users(id,name,created_at,updated_at) VALUES('user','User',?,?)`, stamp, stamp); err != nil {
+		t.Fatal(err)
+	}
+	if _, err = db.DB.Exec(`INSERT INTO devices(id,user_id,name,token_hash,created_at,last_seen_at) VALUES('phone','user','Pixel',x'01',?,?)`, stamp, stamp); err != nil {
+		t.Fatal(err)
+	}
+	if err = service.Register(context.Background(), "phone", Registration{Token: "fcm-device-token", Secret: "secret"}); err != nil {
+		t.Fatal(err)
+	}
+	created, err := event.NewService(db).Create(context.Background(), event.Event{Type: "smoke_alarm", Confidence: 1, Metadata: map[string]any{"alarm": true}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err = service.Enqueue(context.Background(), created); err != nil {
+		t.Fatal(err)
+	}
+	stale := now.Add(-pushFreshnessWindow - time.Second).Format(time.RFC3339Nano)
+	if _, err = db.DB.Exec(`UPDATE events SET occurred_at=? WHERE id=?`, stale, created.ID); err != nil {
+		t.Fatal(err)
+	}
+	service.deliverBatch(context.Background())
+	var pending int
+	if err = db.DB.QueryRow(`SELECT count(*) FROM push_deliveries WHERE event_id=?`, created.ID).Scan(&pending); err != nil {
+		t.Fatal(err)
+	}
+	if pending != 0 || sends.Load() != 0 {
+		t.Fatalf("expired delivery was not discarded: pending=%d sends=%d", pending, sends.Load())
+	}
+}
+
 func TestNotificationTarget(t *testing.T) {
 	for _, eventType := range []string{"motion", "person", "tamper"} {
 		if got := notificationTarget(eventType); got != "camera" {

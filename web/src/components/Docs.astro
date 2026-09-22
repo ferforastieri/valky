@@ -41,10 +41,9 @@ const endpoints = pt ? [
   ['PUT · DELETE','/api/v1/cameras/{id}','Autenticado','Edita ou remove uma câmera; uma mudança de conexão reinicia sua configuração.'],
   ['GET','/api/v1/camera-operations/{id}','Autenticado','Acompanha a descoberta ONVIF e a configuração de mídia.'],
   ['POST','/api/v1/cameras/{id}/ptz','Autenticado','Move, para ou aplica zoom quando suportado.'],
-  ['GET · POST','/api/v1/lights','Autenticado / Admin ao criar','Lista lâmpadas ou cadastra um dispositivo Tuya LAN.'],
-  ['GET · PUT · DELETE','/api/v1/lights/{id}','Autenticado / Admin ao alterar','Consulta, edita ou remove uma lâmpada.'],
+  ['GET','/api/v1/lights','Autenticado','Lista a iluminação fornecida pelo adaptador local instalado.'],
+  ['GET · DELETE','/api/v1/lights/{id}','Autenticado / Admin ao remover','Consulta ou remove uma iluminação.'],
   ['PUT','/api/v1/lights/{id}/state','Autenticado','Liga, desliga e altera brilho, branco ou cor.'],
-  ['POST','/api/v1/lights/{id}/test','Admin','Testa a conexão local e atualiza o estado.'],
   ['GET','/api/v1/cameras/{id}/snapshot','Autenticado','Retorna um frame JPEG do stream local atual.'],
   ['GET','/api/v1/cameras/{id}/recording','Autenticado','Baixa os últimos 10 segundos do buffer em MP4.'],
   ['POST · PATCH · DELETE','/api/v1/cameras/{id}/live/webrtc/whep','Autenticado','Negocia e encerra o stream WebRTC autenticado.'],
@@ -83,10 +82,9 @@ const endpoints = pt ? [
   ['PUT · DELETE','/api/v1/cameras/{id}','Authenticated','Edits or deletes a camera; connection changes restart its setup.'],
   ['GET','/api/v1/camera-operations/{id}','Authenticated','Tracks ONVIF discovery and media setup.'],
   ['POST','/api/v1/cameras/{id}/ptz','Authenticated','Moves, stops or zooms when supported.'],
-  ['GET · POST','/api/v1/lights','Authenticated / Admin to create','Lists bulbs or registers a Tuya LAN device.'],
-  ['GET · PUT · DELETE','/api/v1/lights/{id}','Authenticated / Admin to change','Reads, edits or removes a bulb.'],
+  ['GET','/api/v1/lights','Authenticated','Lists lighting exposed by the installed local adapter.'],
+  ['GET · DELETE','/api/v1/lights/{id}','Authenticated / Admin to remove','Reads or removes a light.'],
   ['PUT','/api/v1/lights/{id}/state','Authenticated','Turns a bulb on or off and changes brightness, white temperature or color.'],
-  ['POST','/api/v1/lights/{id}/test','Admin','Tests the local connection and refreshes state.'],
   ['GET','/api/v1/cameras/{id}/snapshot','Authenticated','Returns a JPEG frame from the current local stream.'],
   ['GET','/api/v1/cameras/{id}/recording','Authenticated','Downloads the latest 10 seconds from the rolling buffer as MP4.'],
   ['POST · PATCH · DELETE','/api/v1/cameras/{id}/live/webrtc/whep','Authenticated','Negotiates and closes the authenticated WebRTC stream.'],
@@ -153,7 +151,7 @@ const endpoints = pt ? [
             <article><strong>Go + SQLite</strong><small>{pt ? 'regras · eventos' : 'rules · events'}</small></article><i>→</i>
             <article><strong>Android</strong><small>Compose · push</small></article>
           </div>
-          <p>{pt ? 'O backend é o limite de segurança. O app nunca recebe a senha da câmera nem a Local Key da iluminação. Câmeras passam pelo MediaMTX; lâmpadas são controladas diretamente pelo backend via Tuya LAN. Credenciais ficam cifradas com AES-256-GCM; tokens são persistidos somente como hash.' : 'The backend is the security boundary. The app never receives camera passwords or lighting Local Keys. Cameras pass through MediaMTX; bulbs are controlled directly by the backend over Tuya LAN. Credentials use AES-256-GCM encryption; tokens are stored only as hashes.'}</p>
+          <p>{pt ? 'O backend é o limite de segurança. O app nunca recebe a senha da câmera nem segredos de adaptadores locais. Câmeras passam pelo MediaMTX; a iluminação usa uma fronteira de driver independente de fabricante. Credenciais ficam cifradas com AES-256-GCM; tokens são persistidos somente como hash.' : 'The backend is the security boundary. The app never receives camera passwords or local adapter secrets. Cameras pass through MediaMTX; lighting uses a vendor-neutral driver boundary. Credentials use AES-256-GCM encryption; tokens are stored only as hashes.'}</p>
         </section>
 
         <section id="camera">
@@ -169,15 +167,8 @@ const endpoints = pt ? [
 
         <section id="lighting">
           <div class="docs-heading"><Lightbulb size={22}/><div><h2>{pt ? 'Iluminação inteligente' : 'Smart lighting'}</h2></div></div>
-          <p>{pt ? 'O Valkyris controla lâmpadas Tuya LAN compatíveis diretamente pela rede local. A integração inicial foi preparada para a Avant NEO RGB 10 W e oferece energia, brilho, temperatura do branco e cor RGB.' : 'Valkyris controls compatible Tuya LAN bulbs directly over the local network. Initial support targets the Avant NEO RGB 10 W and includes power, brightness, white temperature and RGB color.'}</p>
-          <h3>{pt ? 'Cadastrar pelo Android' : 'Register from Android'}</h3>
-          <ol class="docs-steps">
-            <li><span>1</span><div><strong>{pt ? 'Obtenha as credenciais locais' : 'Get local credentials'}</strong><p>{pt ? 'Separe o Device ID, a Local Key de 16 caracteres e, quando disponível, a versão do protocolo.' : 'Have the Device ID, 16-character Local Key and protocol version when available.'}</p></div></li>
-            <li><span>2</span><div><strong>{pt ? 'Abra Dispositivos' : 'Open Devices'}</strong><p>{pt ? 'No aplicativo, entre em Dispositivos → Iluminação → Adicionar iluminação.' : 'In the app, open Devices → Lighting → Add lighting.'}</p></div></li>
-            <li><span>3</span><div><strong>{pt ? 'Importe ou preencha' : 'Import or enter details'}</strong><p>{pt ? 'Importe um devices.json do TinyTuya ou informe nome, cômodo, Device ID e Local Key manualmente.' : 'Import a TinyTuya devices.json file or enter the name, room, Device ID and Local Key manually.'}</p></div></li>
-            <li><span>4</span><div><strong>{pt ? 'Teste e controle' : 'Test and control'}</strong><p>{pt ? 'Salve e use Testar conexão. A lâmpada passa a aparecer no aplicativo e no painel web.' : 'Save and use Test connection. The bulb then appears in both the app and web dashboard.'}</p></div></li>
-          </ol>
-          <p>{pt ? 'Somente administradores cadastram, editam, testam ou removem dispositivos. Usuários autenticados podem controlar os dispositivos já cadastrados. A Local Key é cifrada no SQLite e nunca é devolvida ao aplicativo ou navegador.' : 'Only administrators can register, edit, test or remove devices. Authenticated users can control registered devices. The Local Key is encrypted in SQLite and is never returned to the app or browser.'}</p>
+          <p>{pt ? 'O modelo comum de energia, brilho, temperatura do branco e RGB permanece no aplicativo e no painel, mas o núcleo não inclui integração proprietária com contas de fabricante. Adaptadores locais padronizados podem ser adicionados atrás da fronteira de driver sem redesenhar as interfaces.' : 'The common power, brightness, white-temperature and RGB model remains available in the app and dashboard, but the core includes no proprietary manufacturer-account integration. Standard local adapters can be added behind the driver boundary without redesigning the interfaces.'}</p>
+          <p>{pt ? 'Registros antigos não são apagados automaticamente durante essa transição. Um administrador ainda pode removê-los pelo aplicativo.' : 'Existing records are not deleted automatically during this transition. An administrator can still remove them from the app.'}</p>
         </section>
 
         <section id="android">

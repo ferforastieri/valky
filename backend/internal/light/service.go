@@ -51,30 +51,6 @@ func (s *Service) Get(ctx context.Context, id string) (Light, error) {
 	return item, nil
 }
 
-func (s *Service) Create(ctx context.Context, input CreateInput) (Light, error) {
-	item, err := s.repo.Create(ctx, input)
-	if err != nil {
-		return item, err
-	}
-	updated, probeErr := s.Refresh(ctx, item.ID)
-	if probeErr != nil {
-		updated, _ = s.Get(ctx, item.ID)
-	}
-	return updated, nil
-}
-
-func (s *Service) Update(ctx context.Context, id string, input UpdateInput) (Light, error) {
-	item, err := s.repo.Update(ctx, id, input)
-	if err != nil {
-		return item, err
-	}
-	updated, probeErr := s.Refresh(ctx, item.ID)
-	if probeErr != nil {
-		updated, _ = s.Get(ctx, item.ID)
-	}
-	return updated, nil
-}
-
 func (s *Service) Delete(ctx context.Context, id string) error {
 	s.mu.Lock()
 	delete(s.states, id)
@@ -92,7 +68,7 @@ func (s *Service) Control(ctx context.Context, id string, patch StatePatch) (Lig
 	if !item.Enabled {
 		return item, fmt.Errorf("light is disabled")
 	}
-	if cred.LastIP == "" {
+	if cred.Address == "" {
 		if _, err = s.discover(ctx, item, cred); err != nil {
 			return item, err
 		}
@@ -114,7 +90,7 @@ func (s *Service) Control(ctx context.Context, id string, patch StatePatch) (Lig
 		return item, err
 	}
 	s.storeState(id, state)
-	_ = s.repo.SetConnection(ctx, id, cred.LastIP, "ready", "", true)
+	_ = s.repo.SetConnection(ctx, id, cred.Address, "ready", "", true)
 	updated, _ := s.Get(ctx, id)
 	s.hub.Broadcast(map[string]any{"type": "light.updated", "light": updated})
 	return updated, nil
@@ -127,7 +103,7 @@ func (s *Service) Refresh(ctx context.Context, id string) (Light, error) {
 	if err != nil {
 		return item, err
 	}
-	if cred.LastIP == "" {
+	if cred.Address == "" {
 		if _, err = s.discover(ctx, item, cred); err != nil {
 			s.markOffline(id)
 			_ = s.repo.SetConnection(ctx, id, "", "failed", "Lâmpada não encontrada na rede local.", false)
@@ -148,24 +124,23 @@ func (s *Service) Refresh(ctx context.Context, id string) (Light, error) {
 		return item, err
 	}
 	s.storeState(id, state)
-	_ = s.repo.SetConnection(ctx, id, cred.LastIP, "ready", "", true)
+	_ = s.repo.SetConnection(ctx, id, cred.Address, "ready", "", true)
 	return s.Get(ctx, id)
 }
 
 func (s *Service) discover(ctx context.Context, item Light, cred Credentials) (string, error) {
-	ip, version, err := s.driver.Discover(ctx, item, cred)
+	address, err := s.driver.Discover(ctx, item, cred)
 	if err != nil {
 		return "", err
 	}
-	if version != item.ProtocolVersion {
-		_, err = s.repo.Update(ctx, item.ID, UpdateInput{Name: item.Name, Room: item.Room, IP: ip, ProtocolVersion: version, Enabled: item.Enabled})
-	} else {
-		err = s.repo.SetConnection(ctx, item.ID, ip, "pending", "", false)
-	}
-	return ip, err
+	err = s.repo.SetConnection(ctx, item.ID, address, "pending", "", false)
+	return address, err
 }
 
 func (s *Service) Run(ctx context.Context) {
+	if !s.driver.Available() {
+		return
+	}
 	ticker := time.NewTicker(20 * time.Second)
 	defer ticker.Stop()
 	s.refreshAll(ctx)

@@ -2,6 +2,7 @@ package com.ferforastieri.valkyris
 
 import com.ferforastieri.valkyris.core.model.PersonLocation
 import com.ferforastieri.valkyris.feature.people.historyRouteSegments
+import com.ferforastieri.valkyris.feature.people.parsePersonRouteColor
 import com.ferforastieri.valkyris.feature.people.validHistoryPoint
 import org.junit.Assert.*
 import org.junit.Test
@@ -20,5 +21,9 @@ class LocationHistoryMapTest {
         assertFalse(validHistoryPoint(point("bad", "10:00").copy(latitude=91.0)))
         assertFalse(validHistoryPoint(point("bad", "10:00").copy(longitude=Double.NaN)))
         assertTrue(historyRouteSegments(listOf(point("single", "10:00"))).isEmpty())
+    }
+    @Test fun routeUsesThePersonsColorAndFallsBackForInvalidValues() {
+        assertEquals(0xFFEC625B.toInt(), parsePersonRouteColor("#EC625B"))
+        assertEquals(0xFF5B5BD6.toInt(), parsePersonRouteColor("not-a-color"))
     }
 }

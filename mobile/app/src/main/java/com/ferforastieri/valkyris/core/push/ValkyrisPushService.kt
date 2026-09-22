@@ -8,6 +8,7 @@ import com.google.firebase.messaging.RemoteMessage
 import dagger.hilt.android.AndroidEntryPoint
 import org.json.JSONObject
 import java.security.MessageDigest
+import java.time.Instant
 import javax.crypto.Cipher
 import javax.crypto.spec.GCMParameterSpec
 import javax.crypto.spec.SecretKeySpec
@@ -27,6 +28,10 @@ class ValkyrisPushService : FirebaseMessagingService() {
         val ciphertext = message.data["ciphertext"] ?: return
         runCatching {
             val payload = JSONObject(String(open(ciphertext, secrets.getOrCreate())))
+            if (!isFreshPush(payload.optString("occurredAt"), message.sentTime, System.currentTimeMillis())) {
+                Log.i("ValkyrisPush", "Discarding expired alert")
+                return@runCatching
+            }
             val alerts = payload.optJSONObject("alerts")
             notifier.show(
                 cameraName = payload.optString("cameraName", ""),
@@ -61,5 +66,20 @@ class ValkyrisPushService : FirebaseMessagingService() {
             GCMParameterSpec(128, sealed.copyOfRange(0, 12)),
         )
         return cipher.doFinal(sealed.copyOfRange(12, sealed.size))
+    }
+}
+
+internal const val PUSH_FRESHNESS_MILLIS = 60_000L
+private const val PUSH_FUTURE_TOLERANCE_MILLIS = 5 * 60_000L
+
+internal fun isFreshPush(occurredAt: String, sentAtMillis: Long, nowMillis: Long): Boolean {
+    val occurredAtMillis = runCatching { Instant.parse(occurredAt).toEpochMilli() }.getOrNull() ?: return false
+    val timestamps = buildList {
+        add(occurredAtMillis)
+        if (sentAtMillis > 0) add(sentAtMillis)
+    }
+    return timestamps.all { timestamp ->
+        val age = nowMillis - timestamp
+        age in -PUSH_FUTURE_TOLERANCE_MILLIS..PUSH_FRESHNESS_MILLIS
     }
 }

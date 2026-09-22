@@ -2,10 +2,12 @@ package light
 
 import (
 	"context"
+	"errors"
 	"io"
 	"log/slog"
 	"path/filepath"
 	"testing"
+	"time"
 
 	appcrypto "github.com/ferforastieri/valkyris/backend/internal/crypto"
 	"github.com/ferforastieri/valkyris/backend/internal/store"
@@ -13,8 +15,9 @@ import (
 
 type fakeDriver struct{ state State }
 
-func (f *fakeDriver) Discover(context.Context, Light, Credentials) (string, float64, error) {
-	return "192.168.1.40", 3.5, nil
+func (f *fakeDriver) Available() bool { return true }
+func (f *fakeDriver) Discover(context.Context, Light, Credentials) (string, error) {
+	return "192.168.1.40", nil
 }
 func (f *fakeDriver) Status(context.Context, Light, Credentials) (State, error) {
 	f.state.Online = true
@@ -35,7 +38,7 @@ type fakeHub struct{ messages []any }
 
 func (h *fakeHub) Broadcast(value any) { h.messages = append(h.messages, value) }
 
-func TestServiceCreatesAndControlsLocalLight(t *testing.T) {
+func TestServiceControlsALightThroughTheProviderNeutralDriver(t *testing.T) {
 	dir := t.TempDir()
 	db, err := store.Open(filepath.Join(dir, "test.db"))
 	if err != nil {
@@ -49,16 +52,18 @@ func TestServiceCreatesAndControlsLocalLight(t *testing.T) {
 	driver := &fakeDriver{state: State{Brightness: 70, TemperatureKelvin: 4000, Mode: "white"}}
 	hub := &fakeHub{}
 	service := NewService(NewRepository(db, vault), driver, hub, slog.New(slog.NewTextHandler(io.Discard, nil)))
-	item, err := service.Create(context.Background(), CreateInput{Name: "Sala", Room: "Sala", DeviceID: "device-1", LocalKey: "1234567890abcdef"})
+	secret, err := vault.EncryptString("adapter-secret")
 	if err != nil {
 		t.Fatal(err)
 	}
-	if item.ProtocolVersion != 3.5 || !item.State.Online {
-		t.Fatalf("unexpected created light: %+v", item)
+	now := time.Now().UTC().Format(time.RFC3339Nano)
+	_, err = db.DB.Exec(`INSERT INTO lights(id,name,room,device_id,local_key_enc,protocol_version,last_ip,capabilities_json,dp_mapping_json,setup_status,enabled,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?)`, "light-1", "Sala", "Sala", "legacy-id", secret, 0, "", `{"brightness":true,"color":true,"colorTemperature":true}`, `{}`, "pending", 1, now, now)
+	if err != nil {
+		t.Fatal(err)
 	}
 	on := true
 	brightness := 45
-	item, err = service.Control(context.Background(), item.ID, StatePatch{Power: &on, Brightness: &brightness})
+	item, err := service.Control(context.Background(), "light-1", StatePatch{Power: &on, Brightness: &brightness})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -69,7 +74,7 @@ func TestServiceCreatesAndControlsLocalLight(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if credentials.LocalKey != "1234567890abcdef" || credentials.LastIP != "192.168.1.40" {
+	if credentials.Secret != "adapter-secret" || credentials.Address != "192.168.1.40" {
 		t.Fatalf("credentials were not preserved: %+v", credentials)
 	}
 	if len(hub.messages) == 0 {
@@ -77,20 +82,10 @@ func TestServiceCreatesAndControlsLocalLight(t *testing.T) {
 	}
 }
 
-func TestEncodeAndDecodeModernLightDPs(t *testing.T) {
-	mapping := DefaultDPMapping()
-	brightness := 80
-	temperature := 4600
-	color := Color{Hue: 220, Saturation: 75, Value: 80}
-	values, err := encodePatch(StatePatch{Brightness: &brightness, TemperatureKelvin: &temperature, Color: &color}, mapping)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if values["22"] != 800 || values["21"] != "colour" {
-		t.Fatalf("unexpected encoded values: %#v", values)
-	}
-	state := decodeState(map[string]any{"20": true, "21": "colour", "22": float64(800), "23": float64(500), "24": "00dc02ee0320"}, mapping)
-	if !state.Power || state.Mode != "color" || state.Brightness != 80 || state.Color.Hue != 220 || state.Color.Saturation != 75 {
-		t.Fatalf("unexpected decoded state: %+v", state)
+func TestUnavailableDriverDoesNotAttemptAProviderConnection(t *testing.T) {
+	driver := NewUnavailableDriver()
+	_, err := driver.Discover(context.Background(), Light{}, Credentials{})
+	if !errors.Is(err, ErrNoLightingAdapter) {
+		t.Fatalf("expected adapter error, got %v", err)
 	}
 }

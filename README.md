@@ -33,7 +33,7 @@ Valkyris transforma um servidor doméstico em uma central privada de monitoramen
 - Credenciais de câmera cifradas com AES-256-GCM e tokens persistidos somente como hash.
 - Avisos de nova versão por toast e download manual do APK assinado nas configurações do app.
 - Painel web em /app/, servido pelo próprio backend, para consultar câmeras, eventos, família e configurações.
-- [Iluminação Tuya local](docs/smart-lighting.md) com energia, brilho, branco ajustável e RGB.
+- [Base de iluminação local](docs/lighting.md) independente de fabricante, com energia, brilho, branco ajustável e RGB.
 - Interface em PT-BR e inglês, temas claro/escuro e suporte a LAN ou VPN.
 
 ## Como funciona
@@ -56,7 +56,7 @@ O backend Go é o limite de segurança: o app nunca recebe a senha da câmera e 
 
 | Área | Tecnologias |
 | --- | --- |
-| Backend | Go 1.26, SQLite, ONVIF, Tuya LAN 3.1–3.5, FFmpeg, sherpa-onnx, WebSocket |
+| Backend | Go 1.26, SQLite, ONVIF, drivers locais de iluminação, FFmpeg, sherpa-onnx, WebSocket |
 | Mídia | MediaMTX, RTSP, WebRTC/WHEP, MP4 |
 | Android | Kotlin, Jetpack Compose, Material 3, Hilt, DataStore, Ktor/OkHttp, Media3, Coil, Firebase Cloud Messaging |
 | Web | Astro, TypeScript, CSS, Lucide, landing estática e painel de consulta incluído na imagem Docker |

@@ -46,7 +46,10 @@ type Configuration struct {
 	Configured bool `json:"configured"`
 }
 
-const firebaseServiceAccountKey = "firebase_service_account_enc"
+const (
+	firebaseServiceAccountKey = "firebase_service_account_enc"
+	pushFreshnessWindow       = 60 * time.Second
+)
 
 func NewService(s *store.Store, v *appcrypto.Vault, credentialsFile string) *Service {
 	return &Service{store: s, vault: v, http: &http.Client{Timeout: 10 * time.Second}, credentialsFile: credentialsFile, fcmEndpoint: "https://fcm.googleapis.com"}
@@ -176,7 +179,13 @@ func (s *Service) Run(ctx context.Context) {
 	}
 }
 func (s *Service) deliverBatch(ctx context.Context) {
-	rows, err := s.store.DB.QueryContext(ctx, `SELECT p.id,p.attempts,d.push_endpoint_enc,d.push_secret_enc,e.id,COALESCE(e.camera_id,''),e.type,e.confidence,e.occurred_at,e.metadata_json,COALESCE((SELECT json_extract(actions_json,'$.alerts') FROM rules WHERE id=e.rule_id),'{}'),COALESCE((SELECT name FROM cameras WHERE id=e.camera_id),'') FROM push_deliveries p JOIN devices d ON d.id=p.device_id JOIN events e ON e.id=p.event_id WHERE d.enabled=1 AND EXISTS(SELECT 1 FROM users u WHERE u.id=d.user_id AND u.enabled=1) AND (e.rule_id IS NULL OR EXISTS(SELECT 1 FROM rules r WHERE r.id=e.rule_id AND (json_type(r.actions_json,'$.recipientUserIds') IS NULL OR json_type(r.actions_json,'$.recipientUserIds')='null' OR d.user_id IN (SELECT value FROM json_each(r.actions_json,'$.recipientUserIds'))))) AND NOT (e.source='tracking' AND e.subject_id<>'' AND (COALESCE(d.user_id,'')=e.subject_id OR EXISTS (SELECT 1 FROM people own WHERE own.id=e.subject_id AND own.device_id=d.id))) AND p.delivered_at IS NULL AND p.next_attempt_at<=? AND p.attempts<10 ORDER BY p.created_at LIMIT 20`, time.Now().UTC().Format(time.RFC3339Nano))
+	now := time.Now().UTC()
+	stamp := now.Format(time.RFC3339Nano)
+	cutoff := now.Add(-pushFreshnessWindow).Format(time.RFC3339Nano)
+	// A push is useful only while the event is current. Removing stale pending
+	// deliveries prevents a reconnect from turning an old event into a new alarm.
+	_, _ = s.store.DB.ExecContext(ctx, `DELETE FROM push_deliveries WHERE delivered_at IS NULL AND (julianday(created_at)<=julianday(?) OR event_id IN (SELECT id FROM events WHERE julianday(occurred_at)<=julianday(?)))`, cutoff, cutoff)
+	rows, err := s.store.DB.QueryContext(ctx, `SELECT p.id,p.attempts,d.push_endpoint_enc,d.push_secret_enc,e.id,COALESCE(e.camera_id,''),e.type,e.confidence,e.occurred_at,e.metadata_json,COALESCE((SELECT json_extract(actions_json,'$.alerts') FROM rules WHERE id=e.rule_id),'{}'),COALESCE((SELECT name FROM cameras WHERE id=e.camera_id),'') FROM push_deliveries p JOIN devices d ON d.id=p.device_id JOIN events e ON e.id=p.event_id WHERE d.enabled=1 AND EXISTS(SELECT 1 FROM users u WHERE u.id=d.user_id AND u.enabled=1) AND (e.rule_id IS NULL OR EXISTS(SELECT 1 FROM rules r WHERE r.id=e.rule_id AND (json_type(r.actions_json,'$.recipientUserIds') IS NULL OR json_type(r.actions_json,'$.recipientUserIds')='null' OR d.user_id IN (SELECT value FROM json_each(r.actions_json,'$.recipientUserIds'))))) AND NOT (e.source='tracking' AND e.subject_id<>'' AND (COALESCE(d.user_id,'')=e.subject_id OR EXISTS (SELECT 1 FROM people own WHERE own.id=e.subject_id AND own.device_id=d.id))) AND p.delivered_at IS NULL AND p.next_attempt_at<=? AND p.attempts<10 AND julianday(p.created_at)>julianday(?) AND julianday(e.occurred_at)>julianday(?) ORDER BY p.created_at LIMIT 20`, stamp, cutoff, cutoff)
 	if err != nil {
 		return
 	}

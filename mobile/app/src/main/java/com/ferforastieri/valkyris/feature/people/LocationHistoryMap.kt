@@ -35,12 +35,10 @@ internal fun historyRouteSegments(history: List<PersonLocation>): List<List<Pers
 }
 
 @Composable
-internal fun LocationHistoryMap(history: List<PersonLocation>, selected: String?, onSelect: (String) -> Unit) {
+internal fun LocationHistoryMap(history: List<PersonLocation>, selected: String?, personColor: String, onSelect: (String) -> Unit) {
     if (LocalInspectionMode.current) { Text("Mapa do histórico"); return }
-    // OSM tiles retain their own light palette in both app themes. Overlay
-    // colors must contrast with those tiles, not with the surrounding UI.
-    val color = android.graphics.Color.rgb(29, 78, 216)
-    val selectedColor = android.graphics.Color.rgb(154, 52, 18)
+    val color = parsePersonRouteColor(personColor)
+    val selectedColor = color
     val onSelectNow by rememberUpdatedState(onSelect)
     AndroidView(
         modifier = Modifier.fillMaxSize(),
@@ -53,23 +51,23 @@ internal fun LocationHistoryMap(history: List<PersonLocation>, selected: String?
             map.overlays.clear()
             historyRouteSegments(points).forEach { segment ->
                 val density = map.resources.displayMetrics.density
-                // White casing keeps a thin route visible over roads and labels.
-                listOf(4f to android.graphics.Color.WHITE, 2f to color).forEach { (width, stroke) ->
+                // A quiet casing separates the person's color from roads and labels.
+                listOf(6f to 0xB3FFFFFF.toInt(), 3.25f to color).forEach { (width, stroke) ->
                     map.overlays.add(Polyline(map).apply {
                         setPoints(segment.map { GeoPoint(it.latitude, it.longitude) })
                         outlinePaint.color = stroke
                         outlinePaint.strokeWidth = width * density
                         outlinePaint.strokeCap = android.graphics.Paint.Cap.ROUND
-                        outlinePaint.pathEffect = android.graphics.DashPathEffect(floatArrayOf(6f * density, 4f * density), 0f)
+                        outlinePaint.strokeJoin = android.graphics.Paint.Join.ROUND
                     })
                 }
             }
             points.firstOrNull { it.id == selected }?.let { point ->
                 map.overlays.add(Polygon(map).apply {
                     setPoints(Polygon.pointsAsCircle(GeoPoint(point.latitude, point.longitude), point.accuracy.coerceAtLeast(1.0)))
-                    fillPaint.color = (selectedColor and 0x00ffffff) or 0x22000000
+                    fillPaint.color = (selectedColor and 0x00ffffff) or 0x26000000
                     outlinePaint.color = selectedColor
-                    outlinePaint.strokeWidth = 2f
+                    outlinePaint.strokeWidth = 2f * map.resources.displayMetrics.density
                 })
             }
             points.forEach { point ->
@@ -100,6 +98,15 @@ internal fun LocationHistoryMap(history: List<PersonLocation>, selected: String?
     )
 }
 
+internal fun parsePersonRouteColor(value: String): Int = runCatching {
+    val hex = value.removePrefix("#")
+    when (hex.length) {
+        6 -> (0xFF000000L or hex.toLong(16)).toInt()
+        8 -> hex.toLong(16).toInt()
+        else -> error("invalid color")
+    }
+}.getOrDefault(0xFF5B5BD6.toInt())
+
 // The transparent 32dp bounds preserve the touch target around an 8/12dp dot.
 internal fun historyPointDrawable(density: Float, selected: Boolean, color: Int, selectedColor: Int): android.graphics.drawable.Drawable =
     object : android.graphics.drawable.Drawable() {
@@ -114,6 +121,12 @@ internal fun historyPointDrawable(density: Float, selected: Boolean, color: Int,
             canvas.drawCircle(x, y, radius + 1.5f * density, paint)
             paint.color = if (selected) selectedColor else color
             canvas.drawCircle(x, y, radius, paint)
+            if (selected) {
+                paint.style = android.graphics.Paint.Style.STROKE
+                paint.strokeWidth = 1.5f * density
+                paint.color = android.graphics.Color.argb(180, 32, 36, 32)
+                canvas.drawCircle(x, y, radius + 2.5f * density, paint)
+            }
         }
         override fun setAlpha(alpha: Int) { paint.alpha = alpha }
         override fun setColorFilter(filter: android.graphics.ColorFilter?) { paint.colorFilter = filter }

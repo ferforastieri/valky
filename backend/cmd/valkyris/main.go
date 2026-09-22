@@ -73,7 +73,7 @@ func main() {
 	})
 	hub := api.NewHub()
 	lightRepo := light.NewRepository(db, vault)
-	lightService := light.NewService(lightRepo, light.NewTuyaDriver(), hub, logger)
+	lightService := light.NewService(lightRepo, light.NewUnavailableDriver(), hub, logger)
 	application := &app.Service{Rules: rulesService, Events: eventService, Media: mediaManager, Notify: notifyService, Hub: hub, DataDir: cfg.DataDir, Logger: logger, Preferences: preferencesService}
 	apiServer := api.NewServer(authManager, cameraRepo, onvif, mediaManager, rulesService, eventService, notifyService, hub, logger)
 	apiServer.SetViewerDirectory(cfg.ViewerDir)

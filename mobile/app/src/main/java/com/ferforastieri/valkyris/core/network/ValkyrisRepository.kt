@@ -57,10 +57,7 @@ class ValkyrisRepository @Inject constructor(
     }
 
     suspend fun refreshLights() = api.lights().also { _lights.value = it }
-    suspend fun createLight(input: CreateLightRequest) = api.createLight(input).also { created -> _lights.update { (it + created).distinctBy(LightDevice::id) } }
-    suspend fun updateLight(id: String, input: UpdateLightRequest) = api.updateLight(id, input).also { updated -> _lights.update { list -> list.map { if (it.id == id) updated else it } } }
     suspend fun controlLight(id: String, patch: LightStatePatch) = api.controlLight(id, patch).also { updated -> _lights.update { list -> list.map { if (it.id == id) updated else it } } }
-    suspend fun testLight(id: String) = api.testLight(id).also { updated -> _lights.update { list -> list.map { if (it.id == id) updated else it } } }
     suspend fun deleteLight(id: String) { api.deleteLight(id); _lights.update { list -> list.filterNot { it.id == id } } }
 
     suspend fun refreshEvents(): List<ValkyrisEvent> {

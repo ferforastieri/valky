@@ -442,11 +442,12 @@ internal fun HistorySheet(user: TrackedPerson, history: List<PersonLocation>, lo
     var selected by remember(user.id) { mutableStateOf<String?>(null) }
     val listState = rememberLazyListState()
     val scope = rememberCoroutineScope()
+    val routeColor = androidx.compose.ui.graphics.Color(parsePersonRouteColor(user.color))
     ValkyrisBottomSheet(scrollContent = false, title = "Por onde ${user.name} passou", onDismiss = onDismiss) {
         Column(Modifier.fillMaxWidth().height(LocalConfiguration.current.screenHeightDp.dp * .65f)) {
             if (history.any(::validHistoryPoint)) {
                 Surface(Modifier.fillMaxWidth().weight(.42f).clip(MaterialTheme.shapes.large), color = MaterialTheme.colorScheme.surfaceVariant) {
-                    LocationHistoryMap(history, selected) { id ->
+                    LocationHistoryMap(history, selected, user.color) { id ->
                         selected = id
                         val index = history.indexOfFirst { it.id == id }
                         if (index >= 0) scope.launch { listState.animateScrollToItem(index) }
@@ -462,11 +463,11 @@ internal fun HistorySheet(user: TrackedPerson, history: List<PersonLocation>, lo
                     val isSelected = selected == point.id
                     Row(Modifier.fillMaxWidth().height(IntrinsicSize.Min)
                         .clip(MaterialTheme.shapes.small)
-                        .background(if (isSelected) MaterialTheme.colorScheme.secondaryContainer else androidx.compose.ui.graphics.Color.Transparent)
+                        .background(if (isSelected) routeColor.copy(alpha = .14f) else androidx.compose.ui.graphics.Color.Transparent)
                         .clickable { selected = point.id }.padding(top = 6.dp)) {
                         Column(Modifier.width(24.dp).fillMaxHeight(), horizontalAlignment = Alignment.CenterHorizontally) {
-                            Box(Modifier.padding(top = 5.dp).size(9.dp).background(MaterialTheme.colorScheme.secondary, androidx.compose.foundation.shape.CircleShape))
-                            Box(Modifier.width(1.dp).weight(1f).background(MaterialTheme.colorScheme.outlineVariant))
+                            Box(Modifier.padding(top = 5.dp).size(9.dp).background(routeColor, androidx.compose.foundation.shape.CircleShape))
+                            Box(Modifier.width(1.dp).weight(1f).background(routeColor.copy(alpha = .28f)))
                         }
                         Column(Modifier.weight(1f).padding(start = 10.dp, end = 8.dp, bottom = 24.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                             Text(formatHistoryTime(point.occurredAt), style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)

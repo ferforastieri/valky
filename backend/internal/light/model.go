@@ -25,56 +25,22 @@ type State struct {
 }
 
 type Light struct {
-	ID              string       `json:"id"`
-	Name            string       `json:"name"`
-	Room            string       `json:"room"`
-	DeviceID        string       `json:"deviceId"`
-	ProtocolVersion float64      `json:"protocolVersion"`
-	Capabilities    Capabilities `json:"capabilities"`
-	SetupStatus     string       `json:"setupStatus"`
-	SetupError      string       `json:"setupError,omitempty"`
-	Enabled         bool         `json:"enabled"`
-	LastSeenAt      *time.Time   `json:"lastSeenAt,omitempty"`
-	State           State        `json:"state"`
-	CreatedAt       time.Time    `json:"createdAt"`
-	UpdatedAt       time.Time    `json:"updatedAt"`
+	ID           string       `json:"id"`
+	Name         string       `json:"name"`
+	Room         string       `json:"room"`
+	Capabilities Capabilities `json:"capabilities"`
+	SetupStatus  string       `json:"setupStatus"`
+	SetupError   string       `json:"setupError,omitempty"`
+	Enabled      bool         `json:"enabled"`
+	LastSeenAt   *time.Time   `json:"lastSeenAt,omitempty"`
+	State        State        `json:"state"`
+	CreatedAt    time.Time    `json:"createdAt"`
+	UpdatedAt    time.Time    `json:"updatedAt"`
 }
 
 type Credentials struct {
-	LocalKey string
-	LastIP   string
-	Mapping  DPMapping
-}
-
-type DPMapping struct {
-	Power       int `json:"power"`
-	Mode        int `json:"mode"`
-	Brightness  int `json:"brightness"`
-	Temperature int `json:"temperature"`
-	Color       int `json:"color"`
-	Scale       int `json:"scale"`
-}
-
-func DefaultDPMapping() DPMapping {
-	return DPMapping{Power: 20, Mode: 21, Brightness: 22, Temperature: 23, Color: 24, Scale: 1000}
-}
-
-type CreateInput struct {
-	Name            string  `json:"name"`
-	Room            string  `json:"room"`
-	DeviceID        string  `json:"deviceId"`
-	LocalKey        string  `json:"localKey"`
-	IP              string  `json:"ip,omitempty"`
-	ProtocolVersion float64 `json:"protocolVersion,omitempty"`
-}
-
-type UpdateInput struct {
-	Name            string  `json:"name"`
-	Room            string  `json:"room"`
-	LocalKey        string  `json:"localKey,omitempty"`
-	IP              string  `json:"ip,omitempty"`
-	ProtocolVersion float64 `json:"protocolVersion,omitempty"`
-	Enabled         bool    `json:"enabled"`
+	Secret  string
+	Address string
 }
 
 type StatePatch struct {
