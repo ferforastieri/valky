@@ -181,6 +181,7 @@
     <string name="ready_status">prontos</string>
     <string name="update_available">Atualização disponível</string>
     <string name="update_now">Atualizar</string>
+    <string name="update_sheet_body">A versão %1$s do Valkyris está pronta para instalar.</string>
     <string name="download_apk">Baixar APK</string>
     <string name="later">Depois</string>
     <string name="downloading_update">Baixando a atualização assinada do aplicativo</string>
@@ -285,7 +286,4 @@
     <string name="location_route_hint">Trajeto aproximado entre os registros carregados.</string>
     <string name="location_route_all">Ver tudo</string>
     <string name="location_map_selected">Selecionado no mapa · precisão de %1$d m</string>
-    <string name="update_toast">Versão %1$s disponível. Atualize o aplicativo nas configurações.</string>
-    <string name="server_update_toast">Versão %1$s disponível para o servidor.</string>
-    <string name="download_app_update">Baixar atualização %1$s</string>
 </resources>

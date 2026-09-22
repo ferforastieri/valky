@@ -181,6 +181,7 @@
     <string name="ready_status">ready</string>
     <string name="update_available">Update available</string>
     <string name="update_now">Update</string>
+    <string name="update_sheet_body">Valkyris version %1$s is ready to install.</string>
     <string name="download_apk">Download APK</string>
     <string name="later">Later</string>
     <string name="downloading_update">Downloading the signed application update</string>
@@ -285,7 +286,4 @@
     <string name="location_route_hint">Approximate route between loaded records.</string>
     <string name="location_route_all">Show all</string>
     <string name="location_map_selected">Selected on map · accuracy %1$d m</string>
-    <string name="update_toast">Version %1$s is available. Update the app in settings.</string>
-    <string name="server_update_toast">Server version %1$s is available.</string>
-    <string name="download_app_update">Download update %1$s</string>
 </resources>

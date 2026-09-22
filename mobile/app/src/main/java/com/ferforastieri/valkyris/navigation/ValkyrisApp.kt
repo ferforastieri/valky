@@ -32,6 +32,7 @@ import com.ferforastieri.valkyris.feature.people.PeopleScreen
 import com.ferforastieri.valkyris.feature.profile.ProfileScreen
 import com.ferforastieri.valkyris.feature.settings.SettingsScreen
 import com.ferforastieri.valkyris.feature.settings.StartupAlertPermissions
+import com.ferforastieri.valkyris.feature.settings.UpdateAvailableSheet
 import com.ferforastieri.valkyris.core.design.ToastMessageHost
 import com.ferforastieri.valkyris.core.design.FloatingDock
 import com.ferforastieri.valkyris.core.design.ValkyrisTopBar
@@ -91,7 +92,17 @@ private fun ConnectedValkyrisApp(main: MainViewModel) {
     val eventsViewModel: com.ferforastieri.valkyris.feature.events.EventsViewModel = androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel()
     val events by eventsViewModel.events.collectAsStateWithLifecycle()
     val unreadNotifications = events.count { it.acknowledgedAt == null }
-    StartupAlertPermissions()
+    val update by main.updateInfo.collectAsStateWithLifecycle()
+    val updating by main.updating.collectAsStateWithLifecycle()
+    if (update == null) {
+        StartupAlertPermissions()
+    } else {
+        UpdateAvailableSheet(
+            version = update!!.latestVersion,
+            updating = updating,
+            onUpdate = main::startUpdate,
+        )
+    }
     val entry by nav.currentBackStackEntryAsState()
     val currentRoute = entry?.destination?.route
     val selectedIndex = destinations.indexOfFirst { it.route == currentRoute }

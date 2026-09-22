@@ -37,8 +37,7 @@ class MainViewModel @Inject constructor(
     val permissionsLoaded = api.permissionsLoaded
     private val _pairingLink = MutableStateFlow<Uri?>(null)
     val pairingLink = _pairingLink.asStateFlow()
-    private val updateNotices = MutableSharedFlow<com.ferforastieri.valkyris.core.network.ApiNotice>(extraBufferCapacity = 1)
-    val notices = kotlinx.coroutines.flow.merge(api.notices, updateNotices)
+    val notices = api.notices
     val actionBusy = actionGate.busy
     private val _paired = MutableStateFlow(sessions.get() != null)
     val paired = _paired.asStateFlow()
@@ -61,7 +60,6 @@ class MainViewModel @Inject constructor(
     private val _apkDownloads = MutableSharedFlow<ApkDownload>(extraBufferCapacity = 1)
     val apkDownloads = _apkDownloads.asSharedFlow()
     private var lastUpdateCheck = 0L
-    private var announcedUpdate: String? = null
     val theme = preferences.theme.stateIn(viewModelScope, SharingStarted.Eagerly, "system")
     val language = preferences.language.stateIn(viewModelScope, SharingStarted.Eagerly, "system")
 
@@ -132,7 +130,7 @@ class MainViewModel @Inject constructor(
         viewModelScope.launch {
             try {
                 runCatching { api.pair(url, fingerprint, com.ferforastieri.valkyris.core.model.PairRequest(code, android.os.Build.MODEL, userName.trim(), Locale.getDefault().toLanguageTag(), username.trim(), password)) }
-                    .onSuccess { sessions.save(Session(url, it.token, fingerprint, it.admin)); _admin.value = it.admin; _paired.value = true; _pairingLink.value = null; runCatching { api.sessionPermissions() }; push.registerCurrent() }
+                    .onSuccess { sessions.save(Session(url, it.token, fingerprint, it.admin)); _admin.value = it.admin; _paired.value = true; _pairingLink.value = null; runCatching { api.sessionPermissions() }; push.registerCurrent(); checkForUpdates(force = true) }
                     .onFailure { _error.value = it.message }
             } finally {
                 _connecting.value = false
@@ -141,7 +139,7 @@ class MainViewModel @Inject constructor(
         }
     }
 
-    fun signOut() { sessions.clear(); com.ferforastieri.valkyris.feature.people.LocationTrackingService.stop(context); api.clearPermissions(); _pairingLink.value = null; _admin.value = false; _paired.value = false; _updateInfo.value = null; lastUpdateCheck = 0L; announcedUpdate = null }
+    fun signOut() { sessions.clear(); com.ferforastieri.valkyris.feature.people.LocationTrackingService.stop(context); api.clearPermissions(); _pairingLink.value = null; _admin.value = false; _paired.value = false; _updateInfo.value = null; _updating.value = false; lastUpdateCheck = 0L }
 
     fun refreshPushRegistration() {
         val current = sessions.get() ?: return
@@ -171,11 +169,6 @@ class MainViewModel @Inject constructor(
             runCatching { api.updateInfo() }.onSuccess { info ->
                 if (!_paired.value || sessions.get() != session) return@onSuccess
                 _updateInfo.value = info.takeIf { it.apkUpdateAvailable && it.apkUrl.isNotBlank() }
-                if (info.available && announcedUpdate != info.latestVersion) {
-                    announcedUpdate = info.latestVersion
-                    val text = if (info.apkUpdateAvailable) R.string.update_toast else R.string.server_update_toast
-                    updateNotices.emit(com.ferforastieri.valkyris.core.network.ApiNotice(context.getString(text, info.latestVersion), true))
-                }
             }
         }
     }
@@ -186,7 +179,6 @@ class MainViewModel @Inject constructor(
         _updating.value = true
         viewModelScope.launch {
             try {
-                _updateInfo.value = null
                 _apkDownloads.emit(ApkDownload(available.apkUrl, available.latestVersion))
             } finally {
                 _updating.value = false

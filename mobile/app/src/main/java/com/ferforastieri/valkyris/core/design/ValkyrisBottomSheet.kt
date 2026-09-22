@@ -37,7 +37,7 @@ import com.ferforastieri.valkyris.R
 
 /**
  * The single modal surface used by Valkyris. It supports swipe-to-dismiss,
- * outside-tap dismissal and an explicit close action in the top-right corner.
+ * outside-tap dismissal and, when appropriate, an explicit close action.
  */
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
@@ -46,6 +46,7 @@ fun ValkyrisBottomSheet(
     onDismiss: () -> Unit,
     dismissEnabled: Boolean = true,
     swipeToDismissEnabled: Boolean = true,
+    showCloseButton: Boolean = true,
     scrollContent: Boolean = true,
     actions: (@Composable FlowRowScope.() -> Unit)? = null,
     content: @Composable ColumnScope.() -> Unit,
@@ -72,12 +73,14 @@ fun ValkyrisBottomSheet(
                 style = MaterialTheme.typography.titleLarge,
                 fontWeight = FontWeight.SemiBold,
             )
-            IconButton(onClick = onDismiss, enabled = dismissEnabled) {
-                Icon(
-                    Lucide.X,
-                    contentDescription = stringResource(R.string.close),
-                    modifier = Modifier.size(22.dp),
-                )
+            if (showCloseButton) {
+                IconButton(onClick = onDismiss, enabled = dismissEnabled) {
+                    Icon(
+                        Lucide.X,
+                        contentDescription = stringResource(R.string.close),
+                        modifier = Modifier.size(22.dp),
+                    )
+                }
             }
         }
         Column(Modifier.weight(1f, fill = false).fillMaxWidth().then(if (scrollContent) Modifier.verticalScroll(rememberScrollState()) else Modifier).padding(horizontal = 20.dp), content = content)

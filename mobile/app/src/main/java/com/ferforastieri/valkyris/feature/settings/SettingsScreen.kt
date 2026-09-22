@@ -60,8 +60,6 @@ fun SettingsScreen(main: MainViewModel, viewModel: SettingsViewModel = hiltViewM
     val context = LocalContext.current
     val manager = context.getSystemService(NotificationManager::class.java)
     var permissionRefresh by remember { mutableIntStateOf(0) }
-    val update by main.updateInfo.collectAsStateWithLifecycle()
-    val updating by main.updating.collectAsStateWithLifecycle()
     val theme by main.theme.collectAsStateWithLifecycle()
     val language by main.language.collectAsStateWithLifecycle()
     val admin by main.admin.collectAsStateWithLifecycle()
@@ -125,9 +123,6 @@ fun SettingsScreen(main: MainViewModel, viewModel: SettingsViewModel = hiltViewM
         onTheme = { showTheme = true },
         onRetention = { showRetention = true },
         onSignOut = main::signOut,
-        updateVersion = update?.latestVersion,
-        updating = updating,
-        onUpdate = main::startUpdate,
     )
     if (showUsers && admin) UserManagementSheet(managedUsers, usersError, usersBusy, { viewModel.saveUser(it) }, { viewModel.saveUser(it, true) }, { showUsers = false })
     if (showInvitation) {
@@ -218,9 +213,6 @@ fun SettingsContent(
     onTheme: () -> Unit = {},
     onRetention: () -> Unit = {},
     onSignOut: () -> Unit = {},
-    updateVersion: String? = null,
-    updating: Boolean = false,
-    onUpdate: () -> Unit = {},
 ) {
     Column(
         Modifier
@@ -255,11 +247,6 @@ fun SettingsContent(
             )
         }
         Spacer(Modifier.height(8.dp))
-        if (updateVersion != null) {
-            OutlinedButton(onUpdate, Modifier.fillMaxWidth(), enabled = !updating) {
-                Text(stringResource(R.string.download_app_update, updateVersion))
-            }
-        }
         OutlinedButton(onSignOut, Modifier.fillMaxWidth()) { Text(stringResource(R.string.disconnect_phone)) }
         Column(
             Modifier.align(Alignment.CenterHorizontally),
