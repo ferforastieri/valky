@@ -21,6 +21,7 @@ type Device struct {
 	Kind            string     `json:"kind"`
 	Host            string     `json:"host"`
 	Port            int        `json:"port"`
+	MAC             string     `json:"mac"`
 	SetupStatus     string     `json:"setupStatus"`
 	SetupError      string     `json:"setupError,omitempty"`
 	TokenConfigured bool       `json:"tokenConfigured"`
@@ -28,6 +29,12 @@ type Device struct {
 	LastSeenAt      *time.Time `json:"lastSeenAt,omitempty"`
 	CreatedAt       time.Time  `json:"createdAt"`
 	UpdatedAt       time.Time  `json:"updatedAt"`
+}
+
+// App is an installed application on the TV.
+type App struct {
+	ID   string `json:"id"`
+	Name string `json:"name"`
 }
 
 // Credentials carries the decrypted token to the protocol driver.
@@ -47,6 +54,7 @@ type UpdateInput struct {
 	Name    *string `json:"name,omitempty"`
 	Host    *string `json:"host,omitempty"`
 	Port    *int    `json:"port,omitempty"`
+	MAC     *string `json:"mac,omitempty"`
 	Enabled *bool   `json:"enabled,omitempty"`
 }
 

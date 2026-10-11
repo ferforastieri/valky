@@ -314,6 +314,13 @@
     <string name="remote_host_hint">IP ou host da TV na rede local (ex.: 192.168.0.10).</string>
     <string name="remote_port">Porta</string>
     <string name="remote_manual_hint">O controle envia apenas teclas para a TV e não altera nenhuma configuração dela.</string>
+    <string name="remote_apps_title">Aplicativos</string>
+    <string name="remote_apps_load">Carregar aplicativos da TV</string>
+    <string name="remote_apps_empty">Não foi possível carregar os aplicativos da TV.</string>
+    <string name="remote_wake">Ligar (Wake-on-LAN)</string>
+    <string name="remote_wake_hint">Liga a TV em standby. Requer “Power On with Mobile” ativado na TV.</string>
+    <string name="remote_power_off">Desligar</string>
+    <string name="remote_refresh">Atualizar</string>
     <string name="remote_searching">Procurando TVs na sua rede…</string>
     <string name="remote_found_count">%1$d TV(s) encontrada(s) na rede</string>
     <string name="remote_discovered_title">Encontradas na rede</string>

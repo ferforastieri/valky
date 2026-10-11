@@ -39,21 +39,20 @@ import kotlinx.coroutines.launch
  * pages.
  */
 @Composable
-fun DevicesScreen(admin: Boolean, onCamera: (String) -> Unit, initialPage: Int = 0) {
+fun DevicesScreen(admin: Boolean, onCamera: (String) -> Unit, onRemote: (String) -> Unit = {}, initialPage: Int = 0) {
     val pagerState = rememberPagerState(initialPage = initialPage.coerceIn(0, 2)) { 3 }
     val scope = rememberCoroutineScope()
     Column(Modifier.fillMaxSize()) {
-        Box(Modifier.fillMaxWidth().padding(top = 10.dp, bottom = 6.dp), contentAlignment = Alignment.Center) {
-            DeviceKindSelector(
-                selected = pagerState.currentPage,
-                onSelect = { scope.launch { pagerState.animateScrollToPage(it) } },
-            )
-        }
+        DeviceKindSelector(
+            selected = pagerState.currentPage,
+            onSelect = { scope.launch { pagerState.animateScrollToPage(it) } },
+            modifier = Modifier.padding(horizontal = 18.dp, vertical = 8.dp),
+        )
         HorizontalPager(state = pagerState, modifier = Modifier.weight(1f)) { page ->
             when (page) {
                 0 -> CamerasScreen(onCamera = onCamera, canManage = admin)
                 1 -> LightsScreen(admin = admin)
-                else -> RemotesScreen(admin = admin)
+                else -> RemotesScreen(admin = admin, onRemote = onRemote)
             }
         }
     }

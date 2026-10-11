@@ -29,6 +29,7 @@ import com.ferforastieri.valkyris.R
 import com.ferforastieri.valkyris.feature.cameras.CameraLiveScreen
 import com.ferforastieri.valkyris.feature.cameras.CamerasScreen
 import com.ferforastieri.valkyris.feature.devices.DevicesScreen
+import com.ferforastieri.valkyris.feature.devices.RemoteControlScreen
 import com.ferforastieri.valkyris.feature.events.EventDetailScreen
 import com.ferforastieri.valkyris.feature.events.EventsScreen
 import com.ferforastieri.valkyris.feature.onboarding.OnboardingScreen
@@ -184,9 +185,10 @@ private fun ConnectedValkyrisApp(main: MainViewModel) {
                     onEvents = { nav.navigate("events") { launchSingleTop = true } },
                 )
             }
-            composable("devices") { DevicesScreen(admin = admin, onCamera = { nav.navigate("camera/$it") }) }
-            composable("cameras") { DevicesScreen(admin = admin, onCamera = { nav.navigate("camera/$it") }, initialPage = 0) }
+            composable("devices") { DevicesScreen(admin = admin, onCamera = { nav.navigate("camera/$it") }, onRemote = { nav.navigate("remote/$it") }) }
+            composable("cameras") { DevicesScreen(admin = admin, onCamera = { nav.navigate("camera/$it") }, onRemote = { nav.navigate("remote/$it") }, initialPage = 0) }
             composable("camera/{id}") { CameraLiveScreen(cameraId = it.arguments?.getString("id").orEmpty()) }
+            composable("remote/{id}") { RemoteControlScreen(onBack = { nav.popBackStack() }) }
             composable("events") {
                 EventsScreen(
                     onEvent = { nav.navigate("event/$it") },

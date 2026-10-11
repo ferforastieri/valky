@@ -73,6 +73,32 @@ TV. A API rejeita qualquer comando fora dessa lista.
 `KEY_GUIDE`, `KEY_TOOLS`, `KEY_SOURCE`, `KEY_TV`, `KEY_HDMI`, `KEY_0` a `KEY_9`,
 `KEY_RED`, `KEY_GREEN`, `KEY_YELLOW`, `KEY_BLUE`.
 
+## Aplicativos instalados
+
+Quando o controle está pareado, o app lista os aplicativos instalados na TV
+(evento `ed.installedApp.get` no canal de controle) e abre qualquer um deles
+(`ed.apps.launch`). A barra de aplicativos aparece no topo do controle; se a TV
+não responder, há um botão para tentar de novo. A disponibilidade depende do
+modelo — em algumas TVs a lista não é exposta.
+
+## Wake-on-LAN (ligar a TV em standby)
+
+O botão **Ligar (Wake-on-LAN)** envia um magic packet (UDP porta 9) para acordar
+a TV. O `KEY_POWER` continua apenas desligando.
+
+**Na TV (uma vez):**
+1. Configurações → Geral → Rede → Configurações especialistas → **Power On with
+   Mobile** → **Ligar**.
+2. Deixe a TV em **standby** (desligada pelo controle), não fora da tomada.
+3. O MAC da TV (Configurações → Geral → Rede → Status da rede) é capturado
+   automaticamente ao parear; se necessário, informe-o no controle.
+
+**No servidor:** como o backend roda em Docker, o firewall do CT precisa
+permitir `UDP 9` para o broadcast da LAN (ex.: `192.0.2.0/24`).
+
+**Limites:** Wi‑Fi (WoWLAN) é bem menos confiável que cabo Ethernet — pode
+precisar de 2–3 tentativas e alguns modelos/roteadores não acordam por Wi‑Fi.
+
 ## Limites
 
 - A TV precisa estar ligada e acessível a partir do servidor. Ligar uma TV

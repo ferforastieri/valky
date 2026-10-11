@@ -3,6 +3,7 @@ package remote
 import (
 	"context"
 	"database/sql"
+	"strings"
 	"time"
 
 	appcrypto "github.com/ferforastieri/valkyris/backend/internal/crypto"
@@ -19,7 +20,7 @@ func NewRepository(s *store.Store, v *appcrypto.Vault) *Repository {
 }
 
 func (r *Repository) List(ctx context.Context) ([]Device, error) {
-	rows, err := r.store.DB.QueryContext(ctx, `SELECT id,name,kind,host,port,token_enc,setup_status,setup_error,enabled,last_seen_at,created_at,updated_at FROM remotes ORDER BY name COLLATE NOCASE`)
+	rows, err := r.store.DB.QueryContext(ctx, `SELECT id,name,kind,host,port,mac,token_enc,setup_status,setup_error,enabled,last_seen_at,created_at,updated_at FROM remotes ORDER BY name COLLATE NOCASE`)
 	if err != nil {
 		return nil, err
 	}
@@ -36,7 +37,7 @@ func (r *Repository) List(ctx context.Context) ([]Device, error) {
 }
 
 func (r *Repository) Get(ctx context.Context, id string) (Device, Credentials, error) {
-	row := r.store.DB.QueryRowContext(ctx, `SELECT id,name,kind,host,port,token_enc,setup_status,setup_error,enabled,last_seen_at,created_at,updated_at FROM remotes WHERE id=?`, id)
+	row := r.store.DB.QueryRowContext(ctx, `SELECT id,name,kind,host,port,mac,token_enc,setup_status,setup_error,enabled,last_seen_at,created_at,updated_at FROM remotes WHERE id=?`, id)
 	return scanDevice(row, r.vault)
 }
 
@@ -46,8 +47,8 @@ func (r *Repository) Create(ctx context.Context, item Device, token string) (Dev
 		return Device{}, err
 	}
 	now := time.Now().UTC().Format(time.RFC3339Nano)
-	_, err = r.store.DB.ExecContext(ctx, `INSERT INTO remotes(id,name,kind,host,port,token_enc,setup_status,setup_error,enabled,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?,?,?)`,
-		item.ID, item.Name, item.Kind, item.Host, item.Port, sealed, item.SetupStatus, item.SetupError, boolToInt(item.Enabled), now, now)
+	_, err = r.store.DB.ExecContext(ctx, `INSERT INTO remotes(id,name,kind,host,port,mac,token_enc,setup_status,setup_error,enabled,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?)`,
+		item.ID, item.Name, item.Kind, item.Host, item.Port, item.MAC, sealed, item.SetupStatus, item.SetupError, boolToInt(item.Enabled), now, now)
 	if err != nil {
 		return Device{}, err
 	}
@@ -61,6 +62,7 @@ func (r *Repository) Update(ctx context.Context, id string, in UpdateInput) (Dev
 		return Device{}, err
 	}
 	name, host, port, enabled := current.Name, current.Host, current.Port, current.Enabled
+	mac := current.MAC
 	if in.Name != nil && *in.Name != "" {
 		name = *in.Name
 	}
@@ -70,11 +72,14 @@ func (r *Repository) Update(ctx context.Context, id string, in UpdateInput) (Dev
 	if in.Port != nil && *in.Port > 0 {
 		port = *in.Port
 	}
+	if in.MAC != nil {
+		mac = strings.TrimSpace(*in.MAC)
+	}
 	if in.Enabled != nil {
 		enabled = *in.Enabled
 	}
 	now := time.Now().UTC().Format(time.RFC3339Nano)
-	if _, err = r.store.DB.ExecContext(ctx, `UPDATE remotes SET name=?,host=?,port=?,enabled=?,updated_at=? WHERE id=?`, name, host, port, boolToInt(enabled), now, id); err != nil {
+	if _, err = r.store.DB.ExecContext(ctx, `UPDATE remotes SET name=?,host=?,port=?,mac=?,enabled=?,updated_at=? WHERE id=?`, name, host, port, mac, boolToInt(enabled), now, id); err != nil {
 		return Device{}, err
 	}
 	updated, _, err := r.Get(ctx, id)
@@ -103,6 +108,13 @@ func (r *Repository) SetToken(ctx context.Context, id, token string) error {
 	return err
 }
 
+// SetMAC stores the device network address used for Wake-on-LAN.
+func (r *Repository) SetMAC(ctx context.Context, id, mac string) error {
+	now := time.Now().UTC().Format(time.RFC3339Nano)
+	_, err := r.store.DB.ExecContext(ctx, `UPDATE remotes SET mac=?,updated_at=? WHERE id=?`, mac, now, id)
+	return err
+}
+
 func (r *Repository) SetStatus(ctx context.Context, id, status, setupError string, seen bool) error {
 	now := time.Now().UTC().Format(time.RFC3339Nano)
 	var seenAt any
@@ -128,7 +140,7 @@ func scanDevice(s rowScanner, vault *appcrypto.Vault) (Device, Credentials, erro
 	var enabled int
 	var lastSeen sql.NullString
 	var created, updated string
-	if err := s.Scan(&item.ID, &item.Name, &item.Kind, &item.Host, &item.Port, &sealed, &item.SetupStatus, &item.SetupError, &enabled, &lastSeen, &created, &updated); err != nil {
+	if err := s.Scan(&item.ID, &item.Name, &item.Kind, &item.Host, &item.Port, &item.MAC, &sealed, &item.SetupStatus, &item.SetupError, &enabled, &lastSeen, &created, &updated); err != nil {
 		return item, Credentials{}, err
 	}
 	item.Enabled = enabled == 1

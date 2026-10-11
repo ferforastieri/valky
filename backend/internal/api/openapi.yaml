@@ -266,6 +266,27 @@ paths:
       responses:
         '200': {description: Command accepted by the device}
         '502': {description: The device is unreachable or refused the command}
+  /remotes/{id}/apps:
+    get:
+      summary: List the applications installed on the TV
+      parameters: [{$ref: '#/components/parameters/id'}]
+      responses:
+        '200': {description: Apps in APIResponse.data}
+        '502': {description: TV unreachable or not paired}
+  /remotes/{id}/apps/{app}/launch:
+    post:
+      summary: Launch an installed application
+      parameters: [{$ref: '#/components/parameters/id'}, {$ref: '#/components/parameters/app'}]
+      responses:
+        '200': {description: Command accepted}
+        '502': {description: TV unreachable}
+  /remotes/{id}/wake:
+    post:
+      summary: Send a Wake-on-LAN magic packet so a standby TV powers on
+      parameters: [{$ref: '#/components/parameters/id'}]
+      responses:
+        '200': {description: Magic packet sent}
+        '502': {description: MAC unknown or network error}
   /detectors:
     get:
       summary: List normalized detector types
@@ -495,6 +516,7 @@ components:
     id: {name: id, in: path, required: true, schema: {type: string, format: uuid}}
     session: {name: session, in: path, required: true, schema: {type: string}}
     token: {name: token, in: path, required: true, schema: {type: string}, description: PTZ preset token stored on the camera}
+    app: {name: app, in: path, required: true, schema: {type: string}, description: Application identifier reported by the TV}
   schemas:
     APIResponse:
       type: object
@@ -623,6 +645,7 @@ components:
         kind: {type: string, enum: [smart_tv]}
         host: {type: string}
         port: {type: integer, default: 8002}
+        mac: {type: string, description: Network address used for Wake-on-LAN}
         setupStatus: {type: string, enum: [pending, ready, failed]}
         setupError: {type: string}
         tokenConfigured: {type: boolean, description: Whether the TV already authorized this controller}
@@ -650,6 +673,12 @@ components:
       required: [key]
       properties:
         key: {type: string, description: Whitelisted remote key such as KEY_HOME, KEY_VOLUP or KEY_ENTER}
+    RemoteApp:
+      type: object
+      required: [id, name]
+      properties:
+        id: {type: string}
+        name: {type: string}
     UpdateInfo:
       type: object
       required: [currentVersion, latestVersion, available, serverUpdateAvailable, apkUpdateAvailable, releaseUrl, message]

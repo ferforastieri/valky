@@ -219,6 +219,9 @@ Além do contrato completo em OpenAPI, as rotas adicionadas recentemente são:
 | `GET · POST · PUT · DELETE` | `/api/v1/remotes` | Autenticado / Admin ao alterar | Lista, cadastra, edita e remove controles remotos de TV. |
 | `POST` | `/api/v1/remotes/{id}/pair` | Administrador | Pareia com a TV; aceite o aviso exibido nela. |
 | `POST` | `/api/v1/remotes/{id}/keys` | Autenticado | Envia uma tecla ao dispositivo pareado. |
+| `GET` | `/api/v1/remotes/{id}/apps` | Autenticado | Lista os aplicativos instalados na TV. |
+| `POST` | `/api/v1/remotes/{id}/apps/{app}/launch` | Autenticado | Abre um aplicativo instalado. |
+| `POST` | `/api/v1/remotes/{id}/wake` | Autenticado | Envia o magic packet (Wake-on-LAN) para ligar a TV. |
 | `GET · POST` | `/api/v1/cameras/{id}/ptz/presets` | Autenticado | Lista e salva posições PTZ na câmera. |
 | `POST` | `/api/v1/cameras/{id}/ptz/presets/{token}/goto` | Autenticado | Move a câmera para uma posição salva. |
 | `DELETE` | `/api/v1/cameras/{id}/ptz/presets/{token}` | Autenticado | Remove uma posição salva. |

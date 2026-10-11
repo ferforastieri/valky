@@ -59,6 +59,7 @@ CREATE TABLE IF NOT EXISTS remotes (
   kind TEXT NOT NULL DEFAULT 'smart_tv',
   host TEXT NOT NULL,
   port INTEGER NOT NULL DEFAULT 8002,
+  mac TEXT NOT NULL DEFAULT '',
   token_enc BLOB,
   setup_status TEXT NOT NULL DEFAULT 'pending',
   setup_error TEXT NOT NULL DEFAULT '',

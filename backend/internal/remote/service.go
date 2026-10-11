@@ -124,6 +124,12 @@ func (s *Service) Pair(ctx context.Context, id string) (Device, error) {
 	if err := s.repo.SetToken(ctx, id, token); err != nil {
 		return Device{}, err
 	}
+	// The TV is reachable now: capture its MAC so Wake-on-LAN works later.
+	macCtx, macCancel := context.WithTimeout(ctx, 8*time.Second)
+	if mac, macErr := s.driver.DeviceMAC(macCtx, item); macErr == nil && strings.TrimSpace(mac) != "" {
+		_ = s.repo.SetMAC(ctx, id, strings.TrimSpace(mac))
+	}
+	macCancel()
 	updated, err := s.Get(ctx, id)
 	if err == nil {
 		s.broadcast("remote.updated", updated)
@@ -161,6 +167,80 @@ func (s *Service) Send(ctx context.Context, id, key string) (Device, error) {
 		return Device{}, err
 	}
 	_ = s.repo.SetStatus(ctx, id, "ready", "", true)
+	updated, err := s.Get(ctx, id)
+	if err == nil {
+		s.broadcast("remote.updated", updated)
+	}
+	return updated, err
+}
+
+// Apps lists the applications installed on the TV.
+func (s *Service) Apps(ctx context.Context, id string) ([]App, error) {
+	unlock := s.lock(id)
+	defer unlock()
+	item, credentials, err := s.repo.Get(ctx, id)
+	if err != nil {
+		return nil, err
+	}
+	if credentials.Token == "" {
+		return nil, fmt.Errorf("pareie o controle com a TV antes de listar os apps")
+	}
+	if !s.Available() {
+		return nil, ErrNoRemoteAdapter
+	}
+	callCtx, cancel := context.WithTimeout(ctx, 15*time.Second)
+	defer cancel()
+	return s.driver.Apps(callCtx, item, credentials.Token)
+}
+
+// Launch opens an installed application on the TV.
+func (s *Service) Launch(ctx context.Context, id, appID string) error {
+	appID = strings.TrimSpace(appID)
+	if appID == "" {
+		return fmt.Errorf("informe o aplicativo")
+	}
+	unlock := s.lock(id)
+	defer unlock()
+	item, credentials, err := s.repo.Get(ctx, id)
+	if err != nil {
+		return err
+	}
+	if credentials.Token == "" {
+		return fmt.Errorf("pareie o controle com a TV antes de abrir apps")
+	}
+	if !s.Available() {
+		return ErrNoRemoteAdapter
+	}
+	callCtx, cancel := context.WithTimeout(ctx, 12*time.Second)
+	defer cancel()
+	return s.driver.Launch(callCtx, item, credentials.Token, appID)
+}
+
+// Wake sends a Wake-on-LAN magic packet so a standby TV powers on.
+func (s *Service) Wake(ctx context.Context, id string) (Device, error) {
+	unlock := s.lock(id)
+	defer unlock()
+	item, _, err := s.repo.Get(ctx, id)
+	if err != nil {
+		return Device{}, err
+	}
+	mac := strings.TrimSpace(item.MAC)
+	if mac == "" {
+		macCtx, cancel := context.WithTimeout(ctx, 8*time.Second)
+		if fetched, macErr := s.driver.DeviceMAC(macCtx, item); macErr == nil {
+			mac = strings.TrimSpace(fetched)
+		}
+		cancel()
+	}
+	if mac == "" {
+		return Device{}, fmt.Errorf("não foi possível descobrir o MAC da TV; informe-o no controle")
+	}
+	if err := sendMagicPacket(mac, item.Host); err != nil {
+		return Device{}, err
+	}
+	if mac != item.MAC {
+		_ = s.repo.SetMAC(ctx, id, mac)
+	}
 	updated, err := s.Get(ctx, id)
 	if err == nil {
 		s.broadcast("remote.updated", updated)
@@ -211,4 +291,52 @@ func normalizeAddress(raw string, port int) (string, int, error) {
 		return "", 0, fmt.Errorf("porta inválida para o controle remoto")
 	}
 	return host, port, nil
+}
+
+// sendMagicPacket broadcasts the Wake-on-LAN magic packet. It targets the
+// limited broadcast, the subnet broadcast and the TV address so both wired and
+// Wi-Fi wake-ups are covered.
+func sendMagicPacket(mac, host string) error {
+	hw, err := net.ParseMAC(mac)
+	if err != nil {
+		return fmt.Errorf("MAC inválido: %w", err)
+	}
+	packet := make([]byte, 6+16*len(hw))
+	for i := 0; i < 6; i++ {
+		packet[i] = 0xff
+	}
+	for i := 0; i < 16; i++ {
+		copy(packet[6+i*len(hw):], hw)
+	}
+	targets := []string{"255.255.255.255"}
+	if ip := net.ParseIP(host).To4(); ip != nil {
+		targets = append(targets, ip.String())
+		if mask := net.CIDRMask(24, 32); mask != nil {
+			broadcast := make(net.IP, len(ip))
+			for i := range ip {
+				broadcast[i] = ip[i] | ^mask[i]
+			}
+			targets = append(targets, broadcast.String())
+		}
+	}
+	var lastErr error
+	for _, target := range targets {
+		address := &net.UDPAddr{IP: net.ParseIP(target), Port: 9}
+		if address.IP == nil {
+			continue
+		}
+		conn, dialErr := net.DialUDP("udp4", nil, address)
+		if dialErr != nil {
+			lastErr = dialErr
+			continue
+		}
+		for i := 0; i < 3; i++ {
+			if _, writeErr := conn.Write(packet); writeErr != nil {
+				lastErr = writeErr
+			}
+			time.Sleep(60 * time.Millisecond)
+		}
+		conn.Close()
+	}
+	return lastErr
 }

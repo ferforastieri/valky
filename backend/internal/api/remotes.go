@@ -105,3 +105,46 @@ func (s *Server) sendRemoteKey(w http.ResponseWriter, r *http.Request) {
 	}
 	writeSuccess(w, http.StatusOK, "Remote command sent", item)
 }
+
+func (s *Server) listRemoteApps(w http.ResponseWriter, r *http.Request) {
+	if s.remotes == nil {
+		writeError(w, http.StatusServiceUnavailable, errors.New("remote control is not configured"))
+		return
+	}
+	apps, err := s.remotes.Apps(r.Context(), r.PathValue("id"))
+	if errors.Is(err, sql.ErrNoRows) {
+		writeError(w, http.StatusNotFound, err)
+		return
+	}
+	if err != nil {
+		writeError(w, http.StatusBadGateway, err)
+		return
+	}
+	writeSuccess(w, http.StatusOK, "Remote apps listed", apps)
+}
+
+func (s *Server) launchRemoteApp(w http.ResponseWriter, r *http.Request) {
+	err := s.remotes.Launch(r.Context(), r.PathValue("id"), r.PathValue("app"))
+	if errors.Is(err, sql.ErrNoRows) {
+		writeError(w, http.StatusNotFound, err)
+		return
+	}
+	if err != nil {
+		writeError(w, http.StatusBadGateway, err)
+		return
+	}
+	writeSuccess(w, http.StatusOK, "Application launched", nil)
+}
+
+func (s *Server) wakeRemote(w http.ResponseWriter, r *http.Request) {
+	item, err := s.remotes.Wake(r.Context(), r.PathValue("id"))
+	if errors.Is(err, sql.ErrNoRows) {
+		writeError(w, http.StatusNotFound, err)
+		return
+	}
+	if err != nil {
+		writeError(w, http.StatusBadGateway, err)
+		return
+	}
+	writeSuccess(w, http.StatusOK, "Wake-on-LAN sent", item)
+}

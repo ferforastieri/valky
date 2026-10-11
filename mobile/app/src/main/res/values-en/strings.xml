@@ -314,6 +314,13 @@
     <string name="remote_host_hint">IP or host of the TV on the local network (e.g. 192.168.0.10).</string>
     <string name="remote_port">Port</string>
     <string name="remote_manual_hint">The remote only sends keys to the TV and does not change any of its settings.</string>
+    <string name="remote_apps_title">Apps</string>
+    <string name="remote_apps_load">Load TV apps</string>
+    <string name="remote_apps_empty">Could not load the TV apps.</string>
+    <string name="remote_wake">Power on (Wake-on-LAN)</string>
+    <string name="remote_wake_hint">Turns on a standby TV. Requires “Power On with Mobile” enabled on the TV.</string>
+    <string name="remote_power_off">Power off</string>
+    <string name="remote_refresh">Refresh</string>
     <string name="remote_searching">Searching for TVs on your network…</string>
     <string name="remote_found_count">%1$d TV(s) found on the network</string>
     <string name="remote_discovered_title">Found on the network</string>
