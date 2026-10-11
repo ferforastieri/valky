@@ -1,6 +1,5 @@
 package com.ferforastieri.valkyris.feature.settings
 
-import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -16,39 +15,39 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import com.composables.icons.lucide.Download
 import com.composables.icons.lucide.Lucide
 import com.composables.icons.lucide.Smartphone
-import com.composables.icons.lucide.TriangleAlert
 import com.ferforastieri.valkyris.R
 import com.ferforastieri.valkyris.core.design.ValkyrisBottomSheet
 
 /**
- * Mandatory update gate. The sheet cannot be dismissed, swiped away or closed
- * with the back gesture: the app stays blocked until the signed update starts
- * installing. This restores the previous behaviour over the transient toast.
+ * Update notice shown when a new signed APK is available. It is dismissible so
+ * the app stays fully usable, but the caller re-opens it every time the app is
+ * opened until the phone is updated.
  */
 @Composable
 fun UpdateAvailableSheet(
     version: String,
     updating: Boolean,
     onUpdate: () -> Unit,
+    onDismiss: () -> Unit,
 ) {
-    // The modal sheet already ignores taps outside; keep the system back button
-    // from escaping the mandatory update as well.
-    BackHandler(enabled = true) { /* Stay on the update sheet. */ }
     ValkyrisBottomSheet(
         title = stringResource(R.string.update_available),
-        onDismiss = {},
-        dismissEnabled = false,
-        swipeToDismissEnabled = false,
-        showCloseButton = false,
+        onDismiss = onDismiss,
+        dismissEnabled = !updating,
+        swipeToDismissEnabled = !updating,
+        showCloseButton = true,
         actions = {
+            TextButton(onClick = onDismiss, enabled = !updating) { Text(stringResource(R.string.later)) }
             Button(
                 onClick = onUpdate,
                 enabled = !updating,
@@ -74,7 +73,7 @@ fun UpdateAvailableSheet(
                 }
                 Spacer(Modifier.width(12.dp))
                 Text(
-                    stringResource(R.string.update_required_body, version),
+                    stringResource(R.string.update_sheet_body, version),
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     style = MaterialTheme.typography.bodyMedium,
                 )
@@ -82,23 +81,17 @@ fun UpdateAvailableSheet(
             Surface(
                 Modifier.fillMaxWidth(),
                 shape = MaterialTheme.shapes.medium,
-                color = MaterialTheme.colorScheme.errorContainer,
+                color = MaterialTheme.colorScheme.secondaryContainer,
             ) {
                 Row(Modifier.padding(14.dp), verticalAlignment = Alignment.CenterVertically) {
-                    Icon(Lucide.TriangleAlert, null, Modifier.size(20.dp), tint = MaterialTheme.colorScheme.onErrorContainer)
+                    Icon(Lucide.Download, null, Modifier.size(20.dp), tint = MaterialTheme.colorScheme.onSecondaryContainer)
                     Spacer(Modifier.width(10.dp))
-                    Column {
-                        Text(
-                            stringResource(R.string.update_required_title),
-                            fontWeight = FontWeight.SemiBold,
-                            color = MaterialTheme.colorScheme.onErrorContainer,
-                        )
-                        Text(
-                            stringResource(R.string.update_install_hint),
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onErrorContainer,
-                        )
-                    }
+                    Text(
+                        stringResource(R.string.update_install_hint),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSecondaryContainer,
+                        fontWeight = FontWeight.Medium,
+                    )
                 }
             }
         }

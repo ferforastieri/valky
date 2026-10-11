@@ -7,12 +7,16 @@ import androidx.compose.animation.ExitTransition
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.remember
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.compose.LifecycleEventEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavGraph.Companion.findStartDestination
 import androidx.navigation.NavHostController
@@ -94,13 +98,16 @@ private fun ConnectedValkyrisApp(main: MainViewModel) {
     val unreadNotifications = events.count { it.acknowledgedAt == null }
     val update by main.updateInfo.collectAsStateWithLifecycle()
     val updating by main.updating.collectAsStateWithLifecycle()
-    if (update == null) {
-        StartupAlertPermissions()
-    } else {
+    var updateDismissed by remember { mutableStateOf(false) }
+    // The notice is dismissible but re-opens every time the app is opened.
+    LifecycleEventEffect(Lifecycle.Event.ON_RESUME) { updateDismissed = false }
+    StartupAlertPermissions()
+    update?.takeIf { !updateDismissed }?.let { info ->
         UpdateAvailableSheet(
-            version = update!!.latestVersion,
+            version = info.latestVersion,
             updating = updating,
             onUpdate = main::startUpdate,
+            onDismiss = { updateDismissed = true },
         )
     }
     val entry by nav.currentBackStackEntryAsState()

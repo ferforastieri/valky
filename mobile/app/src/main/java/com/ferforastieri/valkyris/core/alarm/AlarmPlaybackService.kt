@@ -27,6 +27,7 @@ import com.ferforastieri.valkyris.R
 class AlarmPlaybackService : Service() {
     private var player: MediaPlayer? = null
     private var focus: AudioFocusRequest? = null
+    private var alarmLevel = 1f
     private val handler = Handler(Looper.getMainLooper())
     private val timeout = Runnable { stopSelf() }
     private val attributes = AudioAttributes.Builder()
@@ -66,6 +67,9 @@ class AlarmPlaybackService : Service() {
         runCatching {
             audio.setStreamVolume(AudioManager.STREAM_ALARM, audio.getStreamMaxVolume(AudioManager.STREAM_ALARM), 0)
         }
+        // Per-device level chosen in Settings; the alarm stream stays at max so
+        // the setting is a predictable fraction of full volume.
+        alarmLevel = AlarmVolume.read(this) / 100f
         play(uri ?: fallbackUri(), fallback = uri == null)
         if (intent.getBooleanExtra("vibrate", true)) {
             getSystemService(Vibrator::class.java).vibrate(VibrationEffect.createWaveform(longArrayOf(0, 800, 400), 0), attributes)
@@ -81,7 +85,7 @@ class AlarmPlaybackService : Service() {
         runCatching {
             next.setAudioAttributes(attributes)
             next.setWakeMode(this, PowerManager.PARTIAL_WAKE_LOCK)
-            next.setVolume(1f, 1f)
+            next.setVolume(alarmLevel, alarmLevel)
             next.setDataSource(this, uri)
             next.isLooping = true
             next.setOnPreparedListener { it.start() }

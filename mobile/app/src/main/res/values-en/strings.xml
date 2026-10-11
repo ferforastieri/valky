@@ -292,6 +292,10 @@
     <string name="alert_preview">Text preview</string>
     <string name="alarm_ack_failed">Sound stopped, but the event could not be acknowledged. Try again.</string>
     <string name="open_alarm">Open alarm</string>
+    <string name="alarm_volume">Alarm volume</string>
+    <string name="alarm_volume_value">%1$d%%</string>
+    <string name="alarm_volume_hint">Set the alarm volume on this phone.</string>
+    <string name="alarm_volume_device_hint">This setting applies to this phone only.</string>
     <string name="location_updating">Updating your location…</string>
     <string name="location_send_failed">Could not send your location. Check your connection to the server.</string>
     <string name="location_permission_needed">Allow location access in the app settings.</string>
