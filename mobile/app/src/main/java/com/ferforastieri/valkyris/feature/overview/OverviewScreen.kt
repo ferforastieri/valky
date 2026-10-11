@@ -11,7 +11,6 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -253,15 +252,16 @@ private fun MetricCard(icon: androidx.compose.ui.graphics.vector.ImageVector, va
         border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
         elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
     ) {
-        Column(
-            Modifier.fillMaxWidth().heightIn(min = 108.dp).padding(14.dp),
-            verticalArrangement = Arrangement.SpaceBetween,
+        Row(
+            Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 14.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(10.dp),
         ) {
             Surface(shape = RoundedCornerShape(12.dp), color = tint.copy(alpha = .14f)) {
                 Icon(icon, null, Modifier.padding(8.dp).size(20.dp), tint = tint)
             }
-            Column {
-                Text(value, style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.SemiBold)
+            Column(Modifier.weight(1f)) {
+                Text(value, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold, maxLines = 1)
                 Text(
                     label,
                     style = MaterialTheme.typography.labelSmall,

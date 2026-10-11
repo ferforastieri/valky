@@ -185,7 +185,7 @@ fun PeopleScreen(vm: PeopleViewModel = hiltViewModel()) {
     val historyLoading by vm.historyLoading.collectAsStateWithLifecycle()
     val historyError by vm.historyError.collectAsStateWithLifecycle()
     val historyMore by vm.historyMore.collectAsStateWithLifecycle()
-    historyUser?.let { user -> HistorySheet(user, history, loading = historyLoading, failed = historyError, more = historyMore, onMore = vm::moreHistory) { historyUser = null } }
+    historyUser?.let { user -> HistorySheet(user, history, loading = historyLoading, error = historyError, more = historyMore, onMore = vm::moreHistory) { historyUser = null } }
 
 }
 
@@ -444,7 +444,7 @@ private fun AreasSheet(
 }
 
 @Composable
-internal fun HistorySheet(user: TrackedPerson, history: List<PersonLocation>, loading: Boolean = false, failed: Boolean = false, more: Boolean = false, onMore: () -> Unit = {}, onDismiss: () -> Unit) {
+internal fun HistorySheet(user: TrackedPerson, history: List<PersonLocation>, loading: Boolean = false, error: String? = null, more: Boolean = false, onMore: () -> Unit = {}, onDismiss: () -> Unit) {
     var selected by remember(user.id) { mutableStateOf<String?>(null) }
     val listState = rememberLazyListState()
     val scope = rememberCoroutineScope()
@@ -487,7 +487,7 @@ internal fun HistorySheet(user: TrackedPerson, history: List<PersonLocation>, lo
                 item {
                     when {
                         loading -> LinearProgressIndicator(Modifier.fillMaxWidth().padding(vertical = 12.dp))
-                        failed -> { Text("Não foi possível carregar o histórico."); TextButton(onClick = onMore) { Text("Tentar novamente") } }
+                        error != null -> { Text(error); TextButton(onClick = onMore) { Text("Tentar novamente") } }
                         more -> TextButton(onClick = onMore, modifier = Modifier.fillMaxWidth()) { Text("Ver registros anteriores") }
                         history.isEmpty() -> Text("Ainda não há localização com precisão suficiente para o histórico.", color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }

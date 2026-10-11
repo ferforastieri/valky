@@ -29,7 +29,7 @@ class PeopleViewModel @Inject constructor(
     val history = _history.asStateFlow()
     private val _historyLoading = MutableStateFlow(false)
     val historyLoading = _historyLoading.asStateFlow()
-    private val _historyError = MutableStateFlow(false)
+    private val _historyError = MutableStateFlow<String?>(null)
     val historyError = _historyError.asStateFlow()
     private val _historyMore = MutableStateFlow(false)
     val historyMore = _historyMore.asStateFlow()
@@ -61,7 +61,7 @@ class PeopleViewModel @Inject constructor(
     fun moreHistory() {
         if (_historyLoading.value || historyOwner.isEmpty()) return
         _historyLoading.value = true
-        _historyError.value = false
+        _historyError.value = null
         val owner = historyOwner
         val generation = historyGeneration
         historyJob = viewModelScope.launch {
@@ -72,7 +72,7 @@ class PeopleViewModel @Inject constructor(
                 _history.value = _history.value + page
                 _historyMore.value = page.size == 20
             } catch (cancelled: CancellationException) { throw cancelled }
-            catch (_: Exception) { _historyError.value = true }
+            catch (error: Exception) { _historyError.value = error.message }
             finally { if (historyGeneration == generation) _historyLoading.value = false }
         }
     }

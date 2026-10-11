@@ -48,17 +48,17 @@ class ActivityViewModel @Inject constructor(repository: ValkyrisRepository) : Vi
 fun OverviewActivityChart(onEvent: (String) -> Unit, vm: ActivityViewModel = hiltViewModel()) {
     var hours by rememberSaveable { mutableIntStateOf(12) }
     var buckets by remember { mutableStateOf<List<ActivityBucket>?>(null) }
-    var failed by remember { mutableStateOf(false) }
+    var failed by remember { mutableStateOf<String?>(null) }
     var selected by remember { mutableStateOf<ActivityBucket?>(null) }
     val lifecycle = LocalLifecycleOwner.current.lifecycle
     LaunchedEffect(hours, lifecycle) {
         buckets = null
-        failed = false
+        failed = null
         lifecycle.repeatOnLifecycle(Lifecycle.State.STARTED) {
             while (true) {
-                try { buckets = vm.api.activity(hours); failed = false }
+                try { buckets = vm.api.activity(hours); failed = null }
                 catch (cancelled: CancellationException) { throw cancelled }
-                catch (_: Exception) { failed = true }
+                catch (error: Exception) { failed = error.message }
                 delay(15_000)
             }
         }
@@ -70,7 +70,7 @@ fun OverviewActivityChart(onEvent: (String) -> Unit, vm: ActivityViewModel = hil
 }
 
 @Composable
-fun ActivityChart(hours: Int, buckets: List<ActivityBucket>?, failed: Boolean = false, onHours: (Int) -> Unit = {}, onBucket: (ActivityBucket) -> Unit = {}) {
+fun ActivityChart(hours: Int, buckets: List<ActivityBucket>?, failed: String? = null, onHours: (Int) -> Unit = {}, onBucket: (ActivityBucket) -> Unit = {}) {
     Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)) {
         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             var periodExpanded by remember { mutableStateOf(false) }
@@ -85,8 +85,8 @@ fun ActivityChart(hours: Int, buckets: List<ActivityBucket>?, failed: Boolean = 
                     }
                 }
             }
-            if (failed) Text(stringResource(R.string.activity_chart_error), color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
-            if (buckets == null && !failed) LinearProgressIndicator(Modifier.fillMaxWidth())
+            failed?.let { Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall) }
+            if (buckets == null && failed == null) LinearProgressIndicator(Modifier.fillMaxWidth())
             buckets?.let { data ->
                 Text(stringResource(R.string.activity_chart_count, data.sumOf { it.count }, hours / 12), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 val max = data.maxOfOrNull { it.count }?.coerceAtLeast(1) ?: 1
@@ -115,17 +115,17 @@ internal fun ActivitySheet(bucket: ActivityBucket, load: suspend (Int) -> List<V
     var offset by remember(bucket) { mutableIntStateOf(0) }
     var retry by remember(bucket) { mutableIntStateOf(0) }
     var loading by remember(bucket) { mutableStateOf(true) }
-    var failed by remember(bucket) { mutableStateOf(false) }
+    var failed by remember(bucket) { mutableStateOf<String?>(null) }
     var more by remember(bucket) { mutableStateOf(false) }
     LaunchedEffect(bucket, offset, retry) {
         loading = true
-        failed = false
+        failed = null
         try {
             val page = load(offset)
             events = events + page
             more = page.size == 100
         } catch (cancelled: CancellationException) { throw cancelled }
-        catch (_: Exception) { failed = true }
+        catch (error: Exception) { failed = error.message }
         finally { loading = false }
     }
     ValkyrisBottomSheet(title = stringResource(R.string.activity_chart_title), onDismiss = onDismiss, scrollContent = false) {
@@ -143,7 +143,7 @@ internal fun ActivitySheet(bucket: ActivityBucket, load: suspend (Int) -> List<V
             item {
                 when {
                     loading -> LinearProgressIndicator(Modifier.fillMaxWidth().padding(vertical = 12.dp))
-                    failed -> { Text(stringResource(R.string.activity_chart_error)); TextButton(onClick = { retry++ }) { Text(stringResource(R.string.activity_retry)) } }
+                    failed != null -> { Text(failed!!); TextButton(onClick = { retry++ }) { Text(stringResource(R.string.activity_retry)) } }
                     more -> TextButton(onClick = { loading = true; offset += 100 }) { Text(stringResource(R.string.activity_more)) }
                     events.isEmpty() -> Text(stringResource(R.string.activity_empty), Modifier.padding(vertical = 16.dp))
                 }
