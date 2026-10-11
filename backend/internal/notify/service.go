@@ -12,6 +12,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"log/slog"
 	"net/http"
 	"os"
 	"strings"
@@ -31,6 +32,7 @@ type Service struct {
 	store           *store.Store
 	vault           *appcrypto.Vault
 	http            *http.Client
+	Logger          *slog.Logger
 	tokenSource     oauth2.TokenSource
 	projectID       string
 	fcmEndpoint     string
@@ -48,7 +50,12 @@ type Configuration struct {
 
 const (
 	firebaseServiceAccountKey = "firebase_service_account_enc"
-	pushFreshnessWindow       = 60 * time.Second
+	// Pending deliveries must survive long enough for a retry and for a phone
+	// that is briefly offline. The FCM TTL matches this window.
+	pushFreshnessWindow = 10 * time.Minute
+	// fcmTTL is the Android message lifetime. FCM HTTP v1 expects a protobuf
+	// duration string in seconds; "10m" is rejected with 400 INVALID_ARGUMENT.
+	fcmTTL = "600s"
 )
 
 func NewService(s *store.Store, v *appcrypto.Vault, credentialsFile string) *Service {
@@ -157,6 +164,7 @@ func (s *Service) Enqueue(ctx context.Context, e event.Event) error {
 	if err = rows.Close(); err != nil {
 		return err
 	}
+	s.logger().Info("push enqueue", "event", e.ID, "type", e.Type, "source", e.Source, "devices", len(devices))
 	for _, device := range devices {
 		_, err = s.store.DB.ExecContext(ctx, `INSERT INTO push_deliveries(id,event_id,device_id,next_attempt_at,created_at)VALUES(?,?,?,?,?)`, uuid.NewString(), e.ID, device, now, now)
 		if err != nil {
@@ -164,6 +172,13 @@ func (s *Service) Enqueue(ctx context.Context, e event.Event) error {
 		}
 	}
 	return nil
+}
+
+func (s *Service) logger() *slog.Logger {
+	if s.Logger != nil {
+		return s.Logger
+	}
+	return slog.Default()
 }
 
 func (s *Service) Run(ctx context.Context) {
@@ -182,9 +197,6 @@ func (s *Service) deliverBatch(ctx context.Context) {
 	now := time.Now().UTC()
 	stamp := now.Format(time.RFC3339Nano)
 	cutoff := now.Add(-pushFreshnessWindow).Format(time.RFC3339Nano)
-	// A push is useful only while the event is current. Removing stale pending
-	// deliveries prevents a reconnect from turning an old event into a new alarm.
-	_, _ = s.store.DB.ExecContext(ctx, `DELETE FROM push_deliveries WHERE delivered_at IS NULL AND (julianday(created_at)<=julianday(?) OR event_id IN (SELECT id FROM events WHERE julianday(occurred_at)<=julianday(?)))`, cutoff, cutoff)
 	rows, err := s.store.DB.QueryContext(ctx, `SELECT p.id,p.attempts,d.push_endpoint_enc,d.push_secret_enc,e.id,COALESCE(e.camera_id,''),e.type,e.confidence,e.occurred_at,e.metadata_json,COALESCE((SELECT json_extract(actions_json,'$.alerts') FROM rules WHERE id=e.rule_id),'{}'),COALESCE((SELECT name FROM cameras WHERE id=e.camera_id),'') FROM push_deliveries p JOIN devices d ON d.id=p.device_id JOIN events e ON e.id=p.event_id WHERE d.enabled=1 AND EXISTS(SELECT 1 FROM users u WHERE u.id=d.user_id AND u.enabled=1) AND (e.rule_id IS NULL OR EXISTS(SELECT 1 FROM rules r WHERE r.id=e.rule_id AND (json_type(r.actions_json,'$.recipientUserIds') IS NULL OR json_type(r.actions_json,'$.recipientUserIds')='null' OR d.user_id IN (SELECT value FROM json_each(r.actions_json,'$.recipientUserIds'))))) AND NOT (e.source='tracking' AND e.subject_id<>'' AND (COALESCE(d.user_id,'')=e.subject_id OR EXISTS (SELECT 1 FROM people own WHERE own.id=e.subject_id AND own.device_id=d.id))) AND p.delivered_at IS NULL AND p.next_attempt_at<=? AND p.attempts<10 AND julianday(p.created_at)>julianday(?) AND julianday(e.occurred_at)>julianday(?) ORDER BY p.created_at LIMIT 20`, stamp, cutoff, cutoff)
 	if err != nil {
 		return
@@ -245,11 +257,9 @@ func (s *Service) deliver(ctx context.Context, id string, attempts int, endpoint
 	body, _ := json.Marshal(map[string]any{"message": map[string]any{
 		"token": deviceToken,
 		"data":  map[string]string{"ciphertext": base64.RawURLEncoding.EncodeToString(sealed)},
-		// A high-priority message wakes a dozing phone, but a short TTL makes
-		// FCM drop alerts while the device is briefly offline. Keep the window
-		// aligned with the client freshness check so a delayed baby-cry alarm
-		// still arrives.
-		"android": map[string]any{"priority": "high", "ttl": "10m"},
+		// FCM HTTP v1 requires a duration string in seconds ("600s"). A value
+		// like "10m" is rejected with 400 INVALID_ARGUMENT, so keep this format.
+		"android": map[string]any{"priority": "high", "ttl": fcmTTL},
 	}})
 	endpoint := strings.TrimRight(s.fcmEndpoint, "/") + "/v1/projects/" + s.projectID + "/messages:send"
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, endpoint, bytes.NewReader(body))
@@ -347,6 +357,7 @@ func parseCredentials(data []byte) (*google.Credentials, error) {
 }
 func (s *Service) fail(ctx context.Context, id string, attempts int, err error) {
 	delay := time.Duration(1<<min(attempts, 8)) * time.Minute
+	s.logger().Warn("push delivery failed", "delivery", id, "attempts", attempts, "error", err)
 	_, _ = s.store.DB.ExecContext(ctx, `UPDATE push_deliveries SET attempts=attempts+1,next_attempt_at=?,last_error=? WHERE id=?`, time.Now().UTC().Add(delay).Format(time.RFC3339Nano), err.Error(), id)
 }
 func seal(secret, plain []byte) ([]byte, error) {

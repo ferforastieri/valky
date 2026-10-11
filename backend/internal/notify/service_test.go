@@ -184,7 +184,7 @@ func TestRegisterRequiresFirebaseCredentials(t *testing.T) {
 	}
 }
 
-func TestExpiredPushIsRemovedWithoutDelivery(t *testing.T) {
+func TestExpiredPushIsNotDelivered(t *testing.T) {
 	var sends atomic.Int32
 	transport := alertTestTransport(func(r *http.Request) (*http.Response, error) {
 		sends.Add(1)
@@ -226,12 +226,15 @@ func TestExpiredPushIsRemovedWithoutDelivery(t *testing.T) {
 		t.Fatal(err)
 	}
 	service.deliverBatch(context.Background())
-	var pending int
-	if err = db.DB.QueryRow(`SELECT count(*) FROM push_deliveries WHERE event_id=?`, created.ID).Scan(&pending); err != nil {
+	var pending, delivered int
+	if err = db.DB.QueryRow(`SELECT count(*), coalesce(sum(delivered_at IS NOT NULL),0) FROM push_deliveries WHERE event_id=?`, created.ID).Scan(&pending, &delivered); err != nil {
 		t.Fatal(err)
 	}
-	if pending != 0 || sends.Load() != 0 {
-		t.Fatalf("expired delivery was not discarded: pending=%d sends=%d", pending, sends.Load())
+	// Expired deliveries are never sent: the freshness filter excludes them.
+	// They are intentionally not deleted, so a real delivery failure stays
+	// visible instead of being silently purged.
+	if sends.Load() != 0 || delivered != 0 {
+		t.Fatalf("expired delivery was sent: pending=%d delivered=%d sends=%d", pending, delivered, sends.Load())
 	}
 }
 

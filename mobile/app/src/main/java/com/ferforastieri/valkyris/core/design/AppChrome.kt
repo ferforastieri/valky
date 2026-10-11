@@ -2,10 +2,12 @@ package com.ferforastieri.valkyris.core.design
 
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
@@ -20,8 +22,10 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.composables.icons.lucide.Bell
@@ -56,35 +60,37 @@ fun ValkyrisTopBar(
                 maxLines = 3,
                 overflow = TextOverflow.Ellipsis,
             )
-            Surface(
-                onClick = onNotifications,
-                modifier = Modifier.size(40.dp),
-                shape = RoundedCornerShape(11.dp),
-                color = if (notificationsSelected) MaterialTheme.colorScheme.secondary else MaterialTheme.colorScheme.surface,
-                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
-                shadowElevation = 3.dp,
+            Box(
+                modifier = Modifier.size(40.dp).clip(CircleShape).clickable(onClick = onNotifications),
+                contentAlignment = Alignment.Center,
             ) {
-                Box {
-                    Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                        Icon(
-                            Lucide.Bell,
-                            contentDescription = "Notificações",
-                            modifier = Modifier.size(18.dp),
-                            tint = if (notificationsSelected) MaterialTheme.colorScheme.onSecondary else MaterialTheme.colorScheme.onSurface,
-                        )
-                    }
-                    if (unreadNotifications > 0) {
-                        Surface(
-                            modifier = Modifier.align(Alignment.TopEnd).padding(top = 3.dp, end = 3.dp),
-                            shape = CircleShape,
-                            color = MaterialTheme.colorScheme.error,
-                            contentColor = MaterialTheme.colorScheme.onError,
+                Icon(
+                    Lucide.Bell,
+                    contentDescription = "Notificações",
+                    modifier = Modifier.size(22.dp),
+                    tint = if (notificationsSelected) MaterialTheme.colorScheme.secondary else MaterialTheme.colorScheme.onSurface,
+                )
+                if (unreadNotifications > 0) {
+                    val badge = if (unreadNotifications > 99) "99+" else unreadNotifications.toString()
+                    Surface(
+                        modifier = if (badge.length <= 1) {
+                            Modifier.align(Alignment.TopEnd).size(18.dp)
+                        } else {
+                            Modifier.align(Alignment.TopEnd).defaultMinSize(minWidth = 18.dp, minHeight = 18.dp)
+                        },
+                        shape = CircleShape,
+                        color = MaterialTheme.colorScheme.error,
+                        contentColor = MaterialTheme.colorScheme.onError,
+                    ) {
+                        Box(
+                            Modifier.padding(horizontal = if (badge.length <= 1) 0.dp else 5.dp),
+                            contentAlignment = Alignment.Center,
                         ) {
                             Text(
-                                text = if (unreadNotifications > 99) "99+" else unreadNotifications.toString(),
-                                modifier = Modifier.padding(horizontal = 4.dp, vertical = 2.dp),
+                                text = badge,
                                 style = MaterialTheme.typography.labelSmall,
                                 fontWeight = FontWeight.Bold,
+                                textAlign = TextAlign.Center,
                             )
                         }
                     }
