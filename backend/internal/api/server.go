@@ -28,6 +28,7 @@ import (
 	"github.com/ferforastieri/valkyris/backend/internal/media"
 	"github.com/ferforastieri/valkyris/backend/internal/notify"
 	"github.com/ferforastieri/valkyris/backend/internal/preferences"
+	"github.com/ferforastieri/valkyris/backend/internal/remote"
 	"github.com/ferforastieri/valkyris/backend/internal/rules"
 	"github.com/ferforastieri/valkyris/backend/internal/tracking"
 	"github.com/ferforastieri/valkyris/backend/internal/updates"
@@ -57,6 +58,7 @@ type Server struct {
 	preferences  *preferences.Service
 	tracking     *tracking.Service
 	lights       *light.Service
+	remotes      *remote.Service
 }
 
 type CameraOperation struct {
@@ -81,6 +83,7 @@ func (s *Server) SetUpdates(service *updates.Service)         { s.updates = serv
 func (s *Server) SetPreferences(service *preferences.Service) { s.preferences = service }
 func (s *Server) SetTracking(service *tracking.Service)       { s.tracking = service }
 func (s *Server) SetLights(service *light.Service)            { s.lights = service }
+func (s *Server) SetRemotes(service *remote.Service)          { s.remotes = service }
 
 // ResumeCameraSetups continues cameras that were persisted before an interrupted
 // background probe. Failed cameras remain untouched so their diagnosis is kept.
@@ -138,6 +141,13 @@ func (s *Server) Handler() http.Handler {
 	protected.HandleFunc("GET /lights/{id}", s.getLight)
 	protected.Handle("DELETE /lights/{id}", s.auth.RequireAdmin(http.HandlerFunc(s.deleteLight)))
 	protected.HandleFunc("PUT /lights/{id}/state", s.controlLight)
+	protected.HandleFunc("GET /remotes", s.listRemotes)
+	protected.Handle("POST /remotes", s.auth.RequireAdmin(http.HandlerFunc(s.createRemote)))
+	protected.HandleFunc("GET /remotes/{id}", s.getRemote)
+	protected.Handle("PUT /remotes/{id}", s.auth.RequireAdmin(http.HandlerFunc(s.updateRemote)))
+	protected.Handle("DELETE /remotes/{id}", s.auth.RequireAdmin(http.HandlerFunc(s.deleteRemote)))
+	protected.Handle("POST /remotes/{id}/pair", s.auth.RequireAdmin(http.HandlerFunc(s.pairRemote)))
+	protected.HandleFunc("POST /remotes/{id}/keys", s.sendRemoteKey)
 	protected.HandleFunc("GET /cameras/{id}/snapshot", s.snapshot)
 	protected.HandleFunc("GET /cameras/{id}/recording", s.recentRecording)
 	protected.HandleFunc("POST /cameras/{id}/live/webrtc/whep", s.liveWebRTC)

@@ -243,9 +243,13 @@ func (s *Service) deliver(ctx context.Context, id string, attempts int, endpoint
 		return
 	}
 	body, _ := json.Marshal(map[string]any{"message": map[string]any{
-		"token":   deviceToken,
-		"data":    map[string]string{"ciphertext": base64.RawURLEncoding.EncodeToString(sealed)},
-		"android": map[string]any{"priority": "high", "ttl": "60s"},
+		"token": deviceToken,
+		"data":  map[string]string{"ciphertext": base64.RawURLEncoding.EncodeToString(sealed)},
+		// A high-priority message wakes a dozing phone, but a short TTL makes
+		// FCM drop alerts while the device is briefly offline. Keep the window
+		// aligned with the client freshness check so a delayed baby-cry alarm
+		// still arrives.
+		"android": map[string]any{"priority": "high", "ttl": "10m"},
 	}})
 	endpoint := strings.TrimRight(s.fcmEndpoint, "/") + "/v1/projects/" + s.projectID + "/messages:send"
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, endpoint, bytes.NewReader(body))

@@ -85,7 +85,9 @@ fun StartupAlertPermissions() {
     val foregroundLocationAllowed = ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED
     val backgroundLocationAllowed = Build.VERSION.SDK_INT < Build.VERSION_CODES.Q || ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_BACKGROUND_LOCATION) == PackageManager.PERMISSION_GRANTED
     val locationAllowed = foregroundLocationAllowed && backgroundLocationAllowed
-    val missingCount = listOf(notificationsAllowed, fullScreenAllowed, dndAllowed, firebaseConfigured, locationAllowed).count { !it }
+    val batteryUnrestricted = context.getSystemService(android.os.PowerManager::class.java)
+        .isIgnoringBatteryOptimizations(context.packageName)
+    val missingCount = listOf(notificationsAllowed, fullScreenAllowed, dndAllowed, firebaseConfigured, locationAllowed, batteryUnrestricted).count { !it }
 
     LaunchedEffect(foregroundLocationAllowed, refresh) {
         if (foregroundLocationAllowed) LocationTrackingService.start(context, refresh = true)
@@ -107,10 +109,11 @@ fun StartupAlertPermissions() {
     if (!dialogVisible || missingCount == 0) return
 
     val nextTitle = when {
-        !locationAllowed -> "localização em segundo plano"
+        !locationAllowed -> stringResource(R.string.background_location)
         !notificationsAllowed -> stringResource(R.string.notification_permission)
         !fullScreenAllowed -> stringResource(R.string.full_screen_alarms)
-        else -> stringResource(R.string.do_not_disturb_access)
+        !dndAllowed -> stringResource(R.string.do_not_disturb_access)
+        else -> stringResource(R.string.battery_optimization)
     }
     ValkyrisBottomSheet(
         title = stringResource(R.string.alert_readiness_title),
@@ -133,6 +136,7 @@ fun StartupAlertPermissions() {
                                     .setData(Uri.parse("package:${context.packageName}")),
                             )
                         !dndAllowed -> context.startActivity(Intent(Settings.ACTION_NOTIFICATION_POLICY_ACCESS_SETTINGS))
+                        else -> requestIgnoreBatteryOptimizations(context)
                     }
                 },
                 enabled = !pushConfiguration.saving,
@@ -166,8 +170,19 @@ fun StartupAlertPermissions() {
             PermissionRow(stringResource(R.string.full_screen_alarms), fullScreenAllowed)
             PermissionRow(stringResource(R.string.do_not_disturb_access), dndAllowed)
             PermissionRow(stringResource(R.string.firebase_service_account), firebaseConfigured)
-            PermissionRow("Localização em segundo plano", locationAllowed)
+            PermissionRow(stringResource(R.string.background_location), locationAllowed)
+            PermissionRow(stringResource(R.string.battery_optimization), batteryUnrestricted)
         }
+    }
+}
+
+private fun requestIgnoreBatteryOptimizations(context: android.content.Context) {
+    val packageUri = Uri.parse("package:${context.packageName}")
+    val requested = runCatching {
+        context.startActivity(Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS).setData(packageUri))
+    }.isSuccess
+    if (!requested) {
+        runCatching { context.startActivity(Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).setData(packageUri)) }
     }
 }
 

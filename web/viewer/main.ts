@@ -10,6 +10,7 @@ import type {
   Location,
   Update,
   LightDevice,
+  Remote,
 } from "./lib/api";
 import { live } from "./lib/live";
 const $ = <T extends HTMLElement = HTMLElement>(selector: string) =>
@@ -25,6 +26,7 @@ const paths: Record<string, string> = {
     "M15 21v-3a5 5 0 0 0-10 0v3M10 3a4 4 0 1 0 0 8 4 4 0 1 0 0-8M17 4a4 4 0 0 1 0 8M19 15a4 4 0 0 1 2 4v2",
   shield: "m12 2 8 4v6c0 5-8 10-8 10S4 17 4 12V6l8-4M8 12l3 3 5-6",
   light: "M9 18h6M10 22h4M8.5 14.5A6 6 0 1 1 15.5 14.5C14.5 15.3 14 16.2 14 18h-4c0-1.8-.5-2.7-1.5-3.5",
+  tv: "M4 4h16v12H4zM8 20h8M12 16v4",
 };
 const icon = (name: string, cls = "") =>
   `<svg class="${cls}" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="${paths[name] || paths.camera}"/></svg>`;
@@ -34,6 +36,7 @@ const main = $("#main");
 const dialog = $<HTMLDialogElement>("#detail");
 let cameras: Camera[] = [];
 let lights: LightDevice[] = [];
+let remotes: Remote[] = [];
 let events: Event[] = [];
 let people: Person[] = [];
 let places: Place[] = [];
@@ -58,12 +61,11 @@ async function refreshChart() {
   }
 }
 const updateToast = document.createElement("div");
-updateToast.className = "update-toast";
+updateToast.className = "update-toast update-banner";
 updateToast.setAttribute("role", "status");
 updateToast.setAttribute("aria-live", "polite");
 updateToast.hidden = true;
 document.body.append(updateToast);
-let updateToastTimer: ReturnType<typeof setTimeout> | undefined;
 let lastUpdateCheck = 0;
 let announcedUpdate = "";
 async function checkForUpdates() {
@@ -75,10 +77,14 @@ async function checkForUpdates() {
     if (connection !== alive || connection.signal.aborted || !api.token) return;
     if (!update.serverUpdateAvailable || announcedUpdate === update.latestVersion) return;
     announcedUpdate = update.latestVersion;
-    updateToast.textContent = `Versão ${update.latestVersion} disponível para atualização.`;
+    // A new server release is not applied automatically: keep a persistent,
+    // dismissible notice instead of a transient toast so nobody misses it.
+    const release = update.releaseUrl
+      ? `<a href="${e(update.releaseUrl)}" target="_blank" rel="noreferrer">Ver release</a>`
+      : "";
+    updateToast.innerHTML = `<span class="update-banner-text"><strong>Nova versão ${e(update.latestVersion)} disponível</strong><small>Execute o instalador oficial para atualizar o servidor.</small></span>${release}<button type="button" class="update-dismiss" aria-label="Fechar aviso">×</button>`;
     updateToast.hidden = false;
-    clearTimeout(updateToastTimer);
-    updateToastTimer = setTimeout(() => { updateToast.hidden = true; }, 6000);
+    updateToast.querySelector(".update-dismiss")?.addEventListener("click", () => { updateToast.hidden = true; });
   } catch {
     // Release checks must not interrupt normal use, including offline operation.
   }
@@ -104,7 +110,7 @@ const messages: Record<string, [string, string]> = {
   ],
   devices: [
     "Dispositivos",
-    "Acompanhe as câmeras e controle a iluminação da casa.",
+    "Acompanhe as câmeras e controle a iluminação e a TV da casa.",
   ],
   events: ["Eventos", "Consulte os últimos 200 registros e suas mídias."],
   family: ["Família", "Últimas posições recebidas dos aparelhos da casa."],
@@ -142,6 +148,9 @@ const lightColor = (light: LightDevice) => light.state.mode === "color"
 const lightGrid = (list: LightDevice[]) => list.length
   ? `<div class="light-grid">${list.map(light => `<article class="light-card" style="--light-color:${e(lightColor(light))};--light-glow:${light.state.power ? '18%' : '4%'}"><button class="light-main" data-light="${e(light.id)}"><span class="light-orb">${icon('light')}</span><span><strong>${e(light.name)}</strong><small>${e(light.room || 'Sem cômodo')} · ${light.state.online ? `${light.state.brightness}%` : 'Indisponível'}</small></span></button><button class="light-power ${light.state.power ? 'active' : ''}" data-light-power="${e(light.id)}" aria-label="${light.state.power ? 'Desligar' : 'Ligar'} ${e(light.name)}" ${light.state.online ? '' : 'disabled'}>${icon('light')}</button></article>`).join('')}</div>`
   : empty("Nenhuma iluminação cadastrada", "Cadastre uma lâmpada pelo aplicativo para controlá-la aqui.");
+const remoteGrid = (list: Remote[]) => list.length
+  ? `<div class="remote-grid">${list.map(remote => `<button class="remote-card" data-remote="${e(remote.id)}"><span class="tile-icon">${icon('tv')}</span><span><strong>${e(remote.name)}</strong><small>${e(remote.host)}:${remote.port} · ${remote.tokenConfigured ? 'Pareado' : 'Não pareado'}</small></span><span class="arrow">${icon('arrow')}</span></button>`).join('')}</div>`
+  : empty("Nenhum controle remoto", "Cadastre sua TV Samsung pelo aplicativo para controlá-la aqui.");
 const avatar = (p: Person) =>
   `<span class="avatar">${p.avatarData?.startsWith("data:image/jpeg;base64,") ? `<img src="${e(p.avatarData)}" alt=""/>` : e(p.name.slice(0, 1).toUpperCase())}</span>`;
 const members = (list: Person[]) =>
@@ -193,7 +202,7 @@ function render() {
       ...(api.viewRules ? [["Regras", rules.length, "Configuradas no aplicativo", "rule"]] : []),
     ];
     content = `<div class="stats">${stats.map(([label, value, hint, ico]) => `<div class="stat"><div class="stat-label">${label}${icon(String(ico), "stat-icon")}</div><div class="stat-value">${value}</div><small>${hint}</small></div>`).join("")}</div><section class="activity-summary"><div class="section-title"><h2>Atividade registrada</h2><select id="activity-hours" aria-label="Período da atividade">${[12,24,36,48].map(h => `<option value="${h}" ${chartHours === h ? 'selected' : ''}>Últimas ${h} horas</option>`).join('')}</select></div><div id="activity-chart" class="panel panel-pad" aria-live="polite">Carregando atividade…</div></section><div class="section-title"><h2>Um olhar em casa</h2><a class="text-link" href="#devices">Todos os dispositivos →</a></div>${cameraGrid(cameras.slice(0, 3))}${lights.length ? `<div class="section-title compact"><h2>Iluminação</h2></div>${lightGrid(lights.slice(0,4))}` : ''}<div class="dashboard-bottom"><section><div class="section-title"><h2>Aconteceu por aqui</h2><a class="text-link" href="#events">Ver eventos →</a></div>${activity(events.slice(0, 5))}</section><section><div class="section-title"><h2>Família</h2><a class="text-link" href="#family">Abrir mapa →</a></div>${people.length ? members(people.slice(0, 3)) : empty("Aguardando a família", "Os aparelhos vinculados aparecerão aqui.")}</section></div>`;
-  } else if (page === "devices") content = `<div class="section-title"><h2>Câmeras</h2></div>${cameraGrid(cameras)}<div class="section-title devices-light-title"><h2>Iluminação</h2><small>Cadastro e configuração ficam no aplicativo Android.</small></div>${lightGrid(lights)}`;
+  } else if (page === "devices") content = `<div class="section-title"><h2>Câmeras</h2></div>${cameraGrid(cameras)}<div class="section-title devices-light-title"><h2>Iluminação</h2><small>Cadastro e configuração ficam no aplicativo Android.</small></div>${lightGrid(lights)}<div class="section-title devices-light-title"><h2>Controle remoto</h2><small>Cadastro e pareamento ficam no aplicativo Android.</small></div>${remoteGrid(remotes)}`;
   else if (page === "events")
     content = `<div class="filter-bar"><input id="event-search" aria-label="Buscar eventos" placeholder="Buscar acontecimento…" value="${e(search)}"/><select id="event-camera" aria-label="Filtrar câmera"><option value="">Todas as câmeras</option>${cameras.map((c) => `<option value="${e(c.id)}" ${eventCamera === c.id ? "selected" : ""}>${e(c.name)}</option>`).join("")}<option value="tracking" ${eventCamera === "tracking" ? "selected" : ""}>Localização</option></select><select id="event-type" aria-label="Filtrar tipo"><option value="">Todos os tipos</option>${Object.entries(
       labels,
@@ -457,6 +466,63 @@ function lightDetails(id:string){const light=lights.find(item=>item.id===id);if(
  const run=async(patch:Record<string,unknown>)=>{try{await applyLight(id,patch);if(dialog.open)lightDetails(id)}catch(error){if(dialog.open)$('#light-result').textContent=(error as Error).message}};
  $('#light-toggle').onclick=()=>void run({power:!light.state.power});const brightness=$<HTMLInputElement>('#light-brightness');brightness.oninput=()=>{$('#brightness-value').textContent=`${brightness.value}%`};brightness.onchange=()=>void run({brightness:Number(brightness.value)});const temperature=$<HTMLInputElement>('#light-temperature');temperature.oninput=()=>{$('#temperature-value').textContent=`${temperature.value} K`};temperature.onchange=()=>void run({temperatureKelvin:Number(temperature.value)});$<HTMLInputElement>('#light-color').onchange=event=>void run({color:hexToHsv((event.target as HTMLInputElement).value)});
 }
+const remoteKeypad: [string, string][] = [
+  ["KEY_POWER", "Energia"],
+  ["KEY_HOME", "Início"],
+  ["KEY_RETURN", "Voltar"],
+  ["KEY_MENU", "Menu"],
+  ["KEY_UP", "▲"],
+  ["KEY_ENTER", "OK"],
+  ["KEY_DOWN", "▼"],
+  ["KEY_LEFT", "◀"],
+  ["KEY_RIGHT", "▶"],
+  ["KEY_VOLUP", "Volume +"],
+  ["KEY_MUTE", "Mudo"],
+  ["KEY_VOLDOWN", "Volume −"],
+  ["KEY_CHUP", "Canal +"],
+  ["KEY_CHDOWN", "Canal −"],
+  ["KEY_CH_LIST", "Canais"],
+  ["KEY_REWIND", "◀◀"],
+  ["KEY_PLAY", "▶"],
+  ["KEY_PAUSE", "⏸"],
+  ["KEY_FF", "▶▶"],
+];
+function remoteDetails(id: string) {
+  const remote = remotes.find((item) => item.id === id);
+  if (!remote) return;
+  openDetails(remote.name, "CONTROLE REMOTO");
+  const ready = remote.tokenConfigured;
+  const pairAction = ready
+    ? ""
+    : api.admin
+      ? '<button id="remote-pair" class="primary">Parear</button>'
+      : '<p class="muted">Peça a um administrador para parear o controle no aplicativo.</p>';
+  $("#detail-body").innerHTML = `<div class="remote-detail"><div class="remote-detail-head"><span class="tile-icon">${icon("tv")}</span><div><strong>${e(remote.host)}:${remote.port}</strong><small>${ready ? "Pareado" : "Não pareado"}</small></div>${pairAction}</div>${ready ? `<div class="remote-keypad">${remoteKeypad.map(([k, l]) => `<button data-remote-key="${k}">${e(l)}</button>`).join("")}</div>` : ""}<p id="remote-result" class="error" role="status"></p></div>`;
+  const pair = $("#remote-pair");
+  if (pair) pair.onclick = async () => {
+    pair.setAttribute("disabled", "");
+    try {
+      await api.mutate(`/remotes/${key(id)}/pair`, "POST");
+      signature = "";
+      remotes = await api.get<Remote[]>("/remotes");
+      if (dialog.open) remoteDetails(id);
+    } catch (error) {
+      if (dialog.open) $("#remote-result").textContent = (error as Error).message;
+    }
+  };
+  $("#detail-body").querySelectorAll<HTMLButtonElement>("[data-remote-key]").forEach((button) => {
+    button.onclick = async () => {
+      button.setAttribute("disabled", "");
+      try {
+        await api.mutate(`/remotes/${key(id)}/keys`, "POST", { key: button.dataset.remoteKey });
+      } catch (error) {
+        if (dialog.open) $("#remote-result").textContent = (error as Error).message;
+      } finally {
+        button.removeAttribute("disabled");
+      }
+    };
+  });
+}
 async function eventDetails(id: string) {
   const version = openDetails("Evento", "ACONTECIMENTO");
   try {
@@ -651,6 +717,7 @@ async function refresh(force = false) {
   const response = await Promise.allSettled([
     api.get<Camera[]>("/cameras", alive.signal),
     api.get<LightDevice[]>("/lights", alive.signal),
+    api.get<Remote[]>("/remotes", alive.signal),
     api.get<Event[]>("/events?limit=200", alive.signal),
     api.get<Person[]>("/users", alive.signal),
     api.get<Place[]>("/places", alive.signal),
@@ -666,12 +733,13 @@ async function refresh(force = false) {
     const value = r.value || [];
     if (i === 0) cameras = value as Camera[];
     if (i === 1) lights = value as LightDevice[];
-    if (i === 2) events = value as Event[];
-    if (i === 3) people = value as Person[];
-    if (i === 4) places = value as Place[];
-    if (i === 5) rules = value as Rule[];
+    if (i === 2) remotes = value as Remote[];
+    if (i === 3) events = value as Event[];
+    if (i === 4) people = value as Person[];
+    if (i === 5) places = value as Place[];
+    if (i === 6) rules = value as Rule[];
   });
-  const next = JSON.stringify([cameras, lights, events, people, places, rules, api.admin, api.viewRules, api.editRules]);
+  const next = JSON.stringify([cameras, lights, remotes, events, people, places, rules, api.admin, api.viewRules, api.editRules]);
   if (next !== signature || !hasLoaded || force) {
     signature = next;
     hasLoaded = true;
@@ -683,7 +751,7 @@ async function refresh(force = false) {
   $("#global-error").textContent = failures.length
     ? "Alguns dados não puderam ser atualizados. Tentaremos novamente automaticamente."
     : "";
-  $("#count-devices").textContent = String(cameras.length + lights.length);
+  $("#count-devices").textContent = String(cameras.length + lights.length + remotes.length);
   $("#count-events").textContent = String(
     events.filter((ev) => !ev.acknowledgedAt).length || "",
   );
@@ -701,7 +769,6 @@ function enter() {
   void refresh(true);
 }
 function leave(message = "") {
-  clearTimeout(updateToastTimer);
   updateToast.hidden = true;
   updateToast.textContent = "";
   alive.abort();
@@ -711,6 +778,7 @@ function leave(message = "") {
   closeDetails();
   cameras = [];
   lights = [];
+  remotes = [];
   events = [];
   people = [];
   places = [];
@@ -776,12 +844,13 @@ window.addEventListener("hashchange", () => {
 });
 document.addEventListener("click", (event) => {
   const el = (event.target as Element).closest<HTMLElement>(
-    "[data-camera],[data-light],[data-light-power],[data-event],[data-person],[data-rule],[data-place]",
+    "[data-camera],[data-light],[data-light-power],[data-remote],[data-event],[data-person],[data-rule],[data-place]",
   );
   if (!el) return;
   if(el.dataset.lightPower){const light=lights.find(item=>item.id===el.dataset.lightPower);if(light){el.setAttribute('disabled','');void applyLight(light.id,{power:!light.state.power}).catch(error=>{$('#global-error').hidden=false;$('#global-error').textContent=(error as Error).message})}return}
   if (el.dataset.camera) void cameraDetails(el.dataset.camera);
   if (el.dataset.light) void lightDetails(el.dataset.light);
+  if (el.dataset.remote) void remoteDetails(el.dataset.remote);
   if (el.dataset.event) void eventDetails(el.dataset.event);
   if (el.dataset.person) void personDetails(el.dataset.person);
   if (el.dataset.rule) void ruleDetails(el.dataset.rule);

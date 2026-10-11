@@ -27,6 +27,17 @@ export interface LightDevice {
     updatedAt?: string;
   };
 }
+export interface Remote {
+  id: string;
+  name: string;
+  kind: string;
+  host: string;
+  port: number;
+  setupStatus: string;
+  setupError?: string;
+  tokenConfigured: boolean;
+  enabled: boolean;
+}
 export interface Event {
   id: string;
   cameraId?: string;
@@ -86,6 +97,7 @@ export interface Update {
   currentVersion: string;
   latestVersion: string;
   serverUpdateAvailable: boolean;
+  releaseUrl?: string;
 }
 export const labels: Record<string, string> = {
   motion: "Movimento",

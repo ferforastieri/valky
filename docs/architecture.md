@@ -23,10 +23,11 @@ never receive camera passwords and MediaMTX control/RTSP ports stay internal. On
    authenticated event over LAN or VPN.
 7. On app resume, the authenticated API compares both server and client versions
    with the latest stable GitHub release through a read-only endpoint. Mobile
-   and web show a toast once per version in a session. APK downloads begin only
-   when the user taps the update button in Android settings; Android still
-   requires installation confirmation. Server updates are performed manually
-   with the installer, never through the API or the viewer.
+   blocks the app with a mandatory, non-dismissible update sheet once per new
+   APK, while web shows a persistent update notice. APK downloads begin from
+   that sheet; Android still requires installation confirmation. Server updates
+   are performed manually with the installer, never through the API or the
+   viewer.
 
 Camera credentials and push secrets are encrypted with AES-256-GCM. API bearer
 tokens are stored only as SHA-256 hashes. A fresh installation has no preset

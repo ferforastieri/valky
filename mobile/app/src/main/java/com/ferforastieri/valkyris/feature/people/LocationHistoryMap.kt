@@ -9,9 +9,9 @@ import androidx.compose.ui.viewinterop.AndroidView
 import com.ferforastieri.valkyris.core.design.applyValkyrisMapStyle
 import com.ferforastieri.valkyris.core.design.currentMapVisualStyle
 import com.ferforastieri.valkyris.core.design.mapColorWithAlpha
+import com.ferforastieri.valkyris.core.design.valkyrisTileSource
 import com.ferforastieri.valkyris.core.model.PersonLocation
 import org.osmdroid.config.Configuration
-import org.osmdroid.tileprovider.tilesource.TileSourceFactory
 import org.osmdroid.util.BoundingBox
 import org.osmdroid.util.GeoPoint
 import org.osmdroid.views.MapView
@@ -48,7 +48,7 @@ internal fun LocationHistoryMap(history: List<PersonLocation>, selected: String?
         modifier = Modifier.fillMaxSize(),
         factory = { context ->
             Configuration.getInstance().userAgentValue = context.packageName
-            MapView(context).apply { setTileSource(TileSourceFactory.MAPNIK); setMultiTouchControls(true) }
+            MapView(context).apply { setTileSource(valkyrisTileSource(style)); setMultiTouchControls(true) }
         },
         update = { map ->
             map.applyValkyrisMapStyle(style)

@@ -197,6 +197,43 @@ paths:
       responses:
         '200': {description: Updated light and state}
         '502': {description: Light unavailable on the local network}
+  /remotes:
+    get:
+      summary: List remote controls (Samsung TVs today) and their pairing state
+      responses: {'200': {description: Remote controls in APIResponse.data}}
+    post:
+      summary: Register a remote control (administrator only)
+      requestBody: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/RemoteInput'}}}}
+      responses: {'201': {description: Created remote control in APIResponse.data}}
+  /remotes/{id}:
+    get:
+      summary: Get a remote control
+      parameters: [{$ref: '#/components/parameters/id'}]
+      responses: {'200': {description: Remote control in APIResponse.data}}
+    put:
+      summary: Update a remote control (administrator only)
+      parameters: [{$ref: '#/components/parameters/id'}]
+      requestBody: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/RemoteUpdate'}}}}
+      responses: {'200': {description: Updated remote control in APIResponse.data}}
+    delete:
+      summary: Remove a remote control (administrator only)
+      parameters: [{$ref: '#/components/parameters/id'}]
+      responses: {'200': {description: Removed}}
+  /remotes/{id}/pair:
+    post:
+      summary: Pair the controller with the TV (administrator only); accept the prompt shown on the TV
+      parameters: [{$ref: '#/components/parameters/id'}]
+      responses:
+        '200': {description: Paired remote control with a stored token}
+        '502': {description: The TV did not authorize or was unreachable}
+  /remotes/{id}/keys:
+    post:
+      summary: Send one remote key to a paired device
+      parameters: [{$ref: '#/components/parameters/id'}]
+      requestBody: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/RemoteKey'}}}}
+      responses:
+        '200': {description: Command accepted by the device}
+        '502': {description: The device is unreachable or refused the command}
   /detectors:
     get:
       summary: List normalized detector types
@@ -415,7 +452,7 @@ components:
       type: apiKey
       in: cookie
       name: __Host-valkyris-viewer
-      description: Secure HttpOnly SameSite=Strict cookie; requires X-Valkyris-Viewer 1 for cookie-authenticated calls. The browser can consult data, negotiate WHEP and control registered lights, but cannot register or configure devices.
+      description: Secure HttpOnly SameSite=Strict cookie; requires X-Valkyris-Viewer 1 for cookie-authenticated calls. The browser can consult data, negotiate WHEP and control registered lights and remote controls, but cannot register or configure devices.
     bearerAuth: {type: http, scheme: bearer}
   parameters:
     webrtcProfile:
@@ -543,6 +580,42 @@ components:
         enabled: {type: boolean}
         lastSeenAt: {type: string, format: date-time}
         state: {$ref: '#/components/schemas/LightState'}
+    Remote:
+      type: object
+      required: [id, name, kind, host, port, setupStatus, tokenConfigured, enabled]
+      properties:
+        id: {type: string, format: uuid}
+        name: {type: string}
+        kind: {type: string, enum: [samsung]}
+        host: {type: string}
+        port: {type: integer, default: 8002}
+        setupStatus: {type: string, enum: [pending, ready, failed]}
+        setupError: {type: string}
+        tokenConfigured: {type: boolean, description: Whether the TV already authorized this controller}
+        enabled: {type: boolean}
+        lastSeenAt: {type: string, format: date-time}
+        createdAt: {type: string, format: date-time}
+        updatedAt: {type: string, format: date-time}
+    RemoteInput:
+      type: object
+      required: [name, host]
+      properties:
+        name: {type: string, maxLength: 60}
+        kind: {type: string, enum: [samsung], default: samsung}
+        host: {type: string, description: TV IPv4/IPv6/hostname, with or without a scheme and port}
+        port: {type: integer, default: 8002}
+    RemoteUpdate:
+      type: object
+      properties:
+        name: {type: string}
+        host: {type: string}
+        port: {type: integer}
+        enabled: {type: boolean}
+    RemoteKey:
+      type: object
+      required: [key]
+      properties:
+        key: {type: string, description: Whitelisted Samsung key such as KEY_HOME, KEY_VOLUP or KEY_ENTER}
     UpdateInfo:
       type: object
       required: [currentVersion, latestVersion, available, serverUpdateAvailable, apkUpdateAvailable, releaseUrl, message]

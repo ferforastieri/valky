@@ -31,9 +31,10 @@ Valkyris transforma um servidor doméstico em uma central privada de monitoramen
 - [Alertas personalizados por regra](docs/camera-alerts.md), com textos, toque, vibração e tela cheia configuráveis no Android.
 - Administração de usuários no painel e Android, destinatários por regra e [autorização validada no servidor](docs/security-access.md).
 - Credenciais de câmera cifradas com AES-256-GCM e tokens persistidos somente como hash.
-- Avisos de nova versão por toast e download manual do APK assinado nas configurações do app.
+- Avisos de nova versão por sheet obrigatório no app e download manual do APK assinado.
 - Painel web em /app/, servido pelo próprio backend, para consultar câmeras, eventos, família e configurações.
 - [Base de iluminação local](docs/lighting.md) independente de fabricante, com energia, brilho, branco ajustável e RGB.
+- [Controle remoto de TVs Samsung](docs/remote-control.md) pelo backend, com pareamento autorizado na TV e token cifrado.
 - Interface em PT-BR e inglês, temas claro/escuro e suporte a LAN ou VPN.
 
 ## Como funciona
@@ -214,6 +215,9 @@ Além do contrato completo em OpenAPI, as rotas adicionadas recentemente são:
 | `POST` | `/api/v1/events/acknowledge-all` | Autenticado | Marca todos os eventos pendentes como lidos. |
 | `GET` | `/api/v1/settings/push` | Autenticado | Informa apenas se o FCM está configurado. |
 | `PUT` | `/api/v1/settings/push` | Administrador | Recebe `{ "serviceAccountBase64": "..." }`, valida e cifra a conta de serviço no SQLite. |
+| `GET · POST · PUT · DELETE` | `/api/v1/remotes` | Autenticado / Admin ao alterar | Lista, cadastra, edita e remove controles remotos (Samsung TV). |
+| `POST` | `/api/v1/remotes/{id}/pair` | Administrador | Pareia com a TV; aceite o aviso exibido nela. |
+| `POST` | `/api/v1/remotes/{id}/keys` | Autenticado | Envia uma tecla ao dispositivo pareado. |
 
 Respostas JSON seguem um envelope consistente:
 
@@ -270,9 +274,10 @@ instalar o APK; o servidor não instala aplicativos silenciosamente.
 
 A CI bem-sucedida em main inicia a release: a execução 56 publica 2.0.0, e as
 seguintes incrementam o patch. O versionCode Android continua crescente.
-O app e o web avisam por toast quando há uma nova versão, sem atualização
-automática. No Android, o download do APK é iniciado manualmente em Configurações,
-e a instalação exige confirmação do sistema. Para atualizar o servidor e o web,
+O app bloqueia o uso com um sheet obrigatório quando há um APK novo e o painel
+web mostra um aviso persistente; não há atualização automática. No Android, o
+download do APK é iniciado no próprio sheet, e a instalação exige confirmação
+do sistema. Para atualizar o servidor e o web,
 execute novamente o instalador oficial. O instalador remove o antigo container
 de atualização e as variáveis que ele usava; não há acesso ao Docker pelo backend.
 

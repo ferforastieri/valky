@@ -1,7 +1,5 @@
 package com.ferforastieri.valkyris.core.design
 
-import android.graphics.ColorMatrix
-import android.graphics.ColorMatrixColorFilter
 import android.graphics.Paint
 import android.graphics.Path
 import android.graphics.PixelFormat
@@ -11,6 +9,8 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Immutable
 import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.graphics.toArgb
+import org.osmdroid.tileprovider.tilesource.ITileSource
+import org.osmdroid.tileprovider.tilesource.XYTileSource
 import org.osmdroid.views.MapView
 
 @Immutable
@@ -37,24 +37,27 @@ fun currentMapVisualStyle(): MapVisualStyle {
 fun MapView.applyValkyrisMapStyle(style: MapVisualStyle) {
     mapOverlay.setLoadingBackgroundColor(style.surface)
     mapOverlay.setLoadingLineColor(style.outline)
-    val scale = if (style.dark) -.34f else .68f
-    val offset = if (style.dark) 105f else 70f
-    val red = .213f * scale
-    val green = .715f * scale
-    val blue = .072f * scale
-    mapOverlay.setColorFilter(
-        ColorMatrixColorFilter(
-            ColorMatrix(
-                floatArrayOf(
-                    red, green, blue, 0f, offset,
-                    red, green, blue, 0f, offset,
-                    red, green, blue, 0f, offset,
-                    0f, 0f, 0f, 1f, 0f,
-                ),
-            ),
-        ),
-    )
     setBackgroundColor(style.surface)
+}
+
+/**
+ * Open-source raster tiles with a Google-Maps-like look (CARTO Voyager) and a
+ * matching dark variant. CARTO's basemaps are free for low-volume use, need no
+ * API key and are derived from OpenStreetMap data, so the attribution is kept.
+ */
+fun valkyrisTileSource(style: MapVisualStyle): ITileSource {
+    val dark = style.dark
+    val baseUrl = if (dark) "https://basemaps.cartocdn.com/dark_all" else "https://basemaps.cartocdn.com/rastertiles/voyager"
+    val copyright = "© OpenStreetMap contributors © CARTO"
+    return XYTileSource(
+        if (dark) "valkyris-carto-dark" else "valkyris-carto-voyager",
+        0,
+        20,
+        256,
+        ".png",
+        arrayOf(baseUrl),
+        copyright,
+    )
 }
 
 fun mapMarkerDrawable(density: Float, style: MapVisualStyle): Drawable = object : Drawable() {

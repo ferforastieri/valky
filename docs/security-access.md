@@ -16,7 +16,7 @@ Login, convite e bootstrap têm limite global de 30 e de 10 tentativas/minuto po
 
 ## Operações autenticadas
 
-Todas as rotas registradas no mux protegido são verificadas por um teste que exige 401 sem credencial, inclusive com `isAdmin` forjado. Administradores são exigidos para gerenciar usuários, convites, cadastro/alteração/remoção de câmeras, configuração de push, retenção, atualização do servidor e envio manual de detecções. Os membros continuam compartilhando consulta de câmeras/eventos/mapa, PTZ e áreas no Android. Regras exigem permissões próprias de visualização e edição. Localização usa o dono do dispositivo autenticado; não aceita escolher outro usuário em `/me/location`.
+Todas as rotas registradas no mux protegido são verificadas por um teste que exige 401 sem credencial, inclusive com `isAdmin` forjado. Administradores são exigidos para gerenciar usuários, convites, cadastro/alteração/remoção de câmeras, controles remotos (cadastro, edição, remoção e pareamento), configuração de push, retenção, atualização do servidor e envio manual de detecções. Os membros continuam compartilhando consulta de câmeras/eventos/mapa, PTZ, áreas e comandos de controles remotos no Android. Regras exigem permissões próprias de visualização e edição. Localização usa o dono do dispositivo autenticado; não aceita escolher outro usuário em `/me/location`.
 
 `GET/PUT/DELETE /api/v1/admin/users` (com ID nos dois últimos) lista também usuários desativados, permite editar nome, acesso e papel, e revoga credenciais ao remover. O último administrador ativo não pode ser removido, desativado ou rebaixado. Criação continua pelo fluxo de convite/pareamento, evitando perfis sem dispositivo.
 

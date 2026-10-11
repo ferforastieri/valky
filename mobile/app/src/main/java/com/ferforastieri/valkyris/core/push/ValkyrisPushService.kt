@@ -69,7 +69,10 @@ class ValkyrisPushService : FirebaseMessagingService() {
     }
 }
 
-internal const val PUSH_FRESHNESS_MILLIS = 60_000L
+// A delayed alert is still worth showing: phones in Doze or on flaky networks
+// deliver FCM messages minutes late, and dropping a baby-cry alarm because of a
+// 60-second window is worse than showing it slightly late.
+internal const val PUSH_FRESHNESS_MILLIS = 10 * 60_000L
 private const val PUSH_FUTURE_TOLERANCE_MILLIS = 5 * 60_000L
 
 internal fun isFreshPush(occurredAt: String, sentAtMillis: Long, nowMillis: Long): Boolean {

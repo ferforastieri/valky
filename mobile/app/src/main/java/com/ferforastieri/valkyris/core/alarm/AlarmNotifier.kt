@@ -26,7 +26,23 @@ import javax.inject.Singleton
 class AlarmNotifier @Inject constructor(@param:ApplicationContext private val context: Context) {
     fun createChannels() {
         val manager = context.getSystemService(NotificationManager::class.java)
+        // Remove the pre-versioned channels so users do not keep a stale,
+        // possibly silenced, entry in the system settings.
+        listOf("valkyris_events", "valkyris_alarms").forEach { manager.deleteNotificationChannel(it) }
         val sound = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_ALARM)
+        val policyAccess = manager.isNotificationPolicyAccessGranted
+        // Channel importance, sound and DND bypass are immutable after creation.
+        // If a phone kept a channel from an older or misconfigured install, drop
+        // it so the alert is recreated loud and able to break through silent
+        // mode. This is what fixes phones that stopped showing baby-cry alarms.
+        manager.getNotificationChannel(ALARMS)?.let { existing ->
+            if (existing.importance != NotificationManager.IMPORTANCE_HIGH || existing.sound == null || (policyAccess && !existing.canBypassDnd())) {
+                manager.deleteNotificationChannel(ALARMS)
+            }
+        }
+        manager.getNotificationChannel(EVENTS)?.let { existing ->
+            if (existing.importance != NotificationManager.IMPORTANCE_HIGH) manager.deleteNotificationChannel(EVENTS)
+        }
         manager.createNotificationChannel(
             NotificationChannel(EVENTS, context.getString(R.string.notification_channel_events), NotificationManager.IMPORTANCE_HIGH).apply {
                 enableVibration(true)
@@ -37,7 +53,7 @@ class AlarmNotifier @Inject constructor(@param:ApplicationContext private val co
                 enableVibration(true)
                 setSound(sound, AudioAttributes.Builder().setUsage(AudioAttributes.USAGE_ALARM).build())
                 lockscreenVisibility = Notification.VISIBILITY_PUBLIC
-                setBypassDnd(manager.isNotificationPolicyAccessGranted)
+                setBypassDnd(policyAccess)
             },
         )
     }
@@ -176,9 +192,14 @@ class AlarmNotifier @Inject constructor(@param:ApplicationContext private val co
     }
 
     companion object {
-        const val EVENTS = "valkyris_events"
-        const val EVENT_GROUP = "valkyris-home-events"
+        // Channel settings are immutable after creation, so the IDs carry a
+        // version. Bumping it forces Android to recreate the channels with the
+        // current importance, sound and vibration instead of the values cached
+        // from a previous install (the cause of phones that stopped alerting).
+        private const val CHANNEL_VERSION = "v2"
+        val EVENTS = "valkyris_events_$CHANNEL_VERSION"
+        val EVENT_GROUP = "valkyris-home-events"
         const val SUMMARY_ID = 0x56414C
-        const val ALARMS = "valkyris_alarms"
+        val ALARMS = "valkyris_alarms_$CHANNEL_VERSION"
     }
 }

@@ -30,6 +30,7 @@ import (
 	"github.com/ferforastieri/valkyris/backend/internal/media"
 	"github.com/ferforastieri/valkyris/backend/internal/notify"
 	"github.com/ferforastieri/valkyris/backend/internal/preferences"
+	"github.com/ferforastieri/valkyris/backend/internal/remote"
 	"github.com/ferforastieri/valkyris/backend/internal/rules"
 	"github.com/ferforastieri/valkyris/backend/internal/store"
 	"github.com/ferforastieri/valkyris/backend/internal/tracking"
@@ -74,6 +75,8 @@ func main() {
 	hub := api.NewHub()
 	lightRepo := light.NewRepository(db, vault)
 	lightService := light.NewService(lightRepo, light.NewUnavailableDriver(), hub, logger)
+	remoteRepo := remote.NewRepository(db, vault)
+	remoteService := remote.NewService(remoteRepo, remote.NewSamsungDriver(), hub, logger)
 	application := &app.Service{Rules: rulesService, Events: eventService, Media: mediaManager, Notify: notifyService, Hub: hub, DataDir: cfg.DataDir, Logger: logger, Preferences: preferencesService}
 	apiServer := api.NewServer(authManager, cameraRepo, onvif, mediaManager, rulesService, eventService, notifyService, hub, logger)
 	apiServer.SetViewerDirectory(cfg.ViewerDir)
@@ -83,6 +86,7 @@ func main() {
 	trackingService := tracking.New(db)
 	apiServer.SetTracking(trackingService)
 	apiServer.SetLights(lightService)
+	apiServer.SetRemotes(remoteService)
 	ctx, cancel := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer cancel()
 	go trackingService.RunAddresses(ctx, cfg.GeocoderURL, logger)

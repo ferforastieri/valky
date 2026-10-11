@@ -243,6 +243,21 @@ class ValkyrisApi(
         }
     }
 
+    suspend fun remotes(): List<RemoteDevice> = get("/remotes")
+    suspend fun createRemote(input: RemoteInput): RemoteDevice = post("/remotes", input, announceBackend = true)
+    suspend fun updateRemote(id: String, input: RemoteUpdate): RemoteDevice = put("/remotes/$id", input, announceBackend = true)
+    suspend fun pairRemote(id: String): RemoteDevice = post("/remotes/$id/pair", emptyMap<String, String>(), announceBackend = true)
+    suspend fun sendRemoteKey(id: String, key: String): RemoteDevice = post("/remotes/$id/keys", RemoteKeyInput(key))
+    suspend fun deleteRemote(id: String) {
+        val current = requireNotNull(session())
+        executeUnit(current.fingerprint, announceBackend = true) {
+            it.delete(base() + "/remotes/$id") {
+                bearerAuth(current.token)
+                header(HttpHeaders.AcceptLanguage, Locale.getDefault().toLanguageTag())
+            }
+        }
+    }
+
 
     suspend fun updateInfo(): UpdateInfo = get("/system/update?clientVersion=${BuildConfig.VERSION_NAME.encodeURLParameter()}")
 

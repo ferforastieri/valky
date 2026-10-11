@@ -60,6 +60,12 @@ class AlarmPlaybackService : Service() {
         }
         val type = if (intent.getStringExtra("sound") == "ringtone") RingtoneManager.TYPE_RINGTONE else RingtoneManager.TYPE_ALARM
         val uri = RingtoneManager.getActualDefaultRingtoneUri(this, type)
+        // The alarm stream volume is the only one the user may have lowered.
+        // Raise it to the maximum for the alert, matching the previous
+        // guaranteed-loud behaviour on phones that never alerted audibly.
+        runCatching {
+            audio.setStreamVolume(AudioManager.STREAM_ALARM, audio.getStreamMaxVolume(AudioManager.STREAM_ALARM), 0)
+        }
         play(uri ?: fallbackUri(), fallback = uri == null)
         if (intent.getBooleanExtra("vibrate", true)) {
             getSystemService(Vibrator::class.java).vibrate(VibrationEffect.createWaveform(longArrayOf(0, 800, 400), 0), attributes)
@@ -75,6 +81,7 @@ class AlarmPlaybackService : Service() {
         runCatching {
             next.setAudioAttributes(attributes)
             next.setWakeMode(this, PowerManager.PARTIAL_WAKE_LOCK)
+            next.setVolume(1f, 1f)
             next.setDataSource(this, uri)
             next.isLooping = true
             next.setOnPreparedListener { it.start() }

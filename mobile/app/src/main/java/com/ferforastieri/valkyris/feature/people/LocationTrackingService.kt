@@ -2,8 +2,10 @@ package com.ferforastieri.valkyris.feature.people
 
 import android.Manifest
 import android.annotation.SuppressLint
+import android.app.AlarmManager
 import android.app.NotificationChannel
 import android.app.NotificationManager
+import android.app.PendingIntent
 import android.app.Service
 import android.content.Context
 import android.content.Intent
@@ -12,6 +14,7 @@ import android.content.pm.PackageManager
 import android.location.Location
 import android.os.IBinder
 import android.os.Handler
+import android.os.SystemClock
 import android.net.ConnectivityManager
 import android.net.Network
 import com.google.android.gms.location.CurrentLocationRequest
@@ -88,15 +91,18 @@ class LocationTrackingService : Service() {
         if (preferences.getString("owner", null) != owner) preferences.edit().clear().putString("owner", owner).apply()
         preferences.edit().putBoolean(TRACKING_ENABLED, true).apply()
         startForeground(NOTIFICATION_ID, notification())
+        scheduleWatchdog()
         // Re-entering the app must request a new fix even if periodic updates
         // were already registered before an OEM suspended location delivery.
-        if (intent?.getBooleanExtra("refresh", false) == true || !updatesRegistered) requestFreshLocation()
+        if (intent?.getBooleanExtra("refresh", false) == true || intent?.getBooleanExtra(EXTRA_WATCHDOG, false) == true || !updatesRegistered) requestFreshLocation()
         if (updatesRegistered) return START_STICKY
         val request = LocationRequest.Builder(Priority.PRIORITY_HIGH_ACCURACY, CHECK_INTERVAL_MS)
             .setMinUpdateIntervalMillis(CHECK_INTERVAL_MS)
             .setMinUpdateDistanceMeters(0f)
             .setMaxUpdateAgeMillis(0L)
-            .setWaitForAccurateLocation(true)
+            // Waiting for a perfect fix can stall delivery indefinitely on weak
+            // GPS, so accept timely updates and filter poor accuracy afterwards.
+            .setWaitForAccurateLocation(false)
             .build()
         updatesRegistered = true
         runCatching {
@@ -210,6 +216,43 @@ class LocationTrackingService : Service() {
         if (networkRegistered) runCatching { getSystemService(ConnectivityManager::class.java).unregisterNetworkCallback(networkCallback) }
         super.onDestroy()
     }
+
+    // Swiping the task away must not stop location sharing. Ask the system to
+    // bring the tracker back a moment later; the watchdog alarm keeps it alive
+    // even when an OEM aggressively freezes background work.
+    override fun onTaskRemoved(rootIntent: Intent?) {
+        if (!destroyed) {
+            runCatching {
+                val restart = PendingIntent.getForegroundService(
+                    this,
+                    RESTART_REQUEST,
+                    Intent(this, LocationTrackingService::class.java),
+                    PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
+                )
+                getSystemService(AlarmManager::class.java)
+                    .set(AlarmManager.ELAPSED_REALTIME_WAKEUP, SystemClock.elapsedRealtime() + 2_000, restart)
+            }
+        }
+        super.onTaskRemoved(rootIntent)
+    }
+
+    private fun scheduleWatchdog() {
+        runCatching {
+            val watchdog = PendingIntent.getForegroundService(
+                this,
+                WATCHDOG_REQUEST,
+                Intent(this, LocationTrackingService::class.java).putExtra(EXTRA_WATCHDOG, true),
+                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
+            )
+            getSystemService(AlarmManager::class.java).setInexactRepeating(
+                AlarmManager.ELAPSED_REALTIME_WAKEUP,
+                SystemClock.elapsedRealtime() + WATCHDOG_INTERVAL_MS,
+                WATCHDOG_INTERVAL_MS,
+                watchdog,
+            )
+        }
+    }
+
     override fun onBind(intent: Intent?): IBinder? = null
     private fun hasLocationPermission() = ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED
     private fun createChannel() {
@@ -245,12 +288,28 @@ class LocationTrackingService : Service() {
         private const val LAST_SENT_LONGITUDE = "last_sent_longitude"
         private const val CHECK_INTERVAL_MS = 60 * 1000L
         private const val MOVEMENT_DISTANCE_METERS = 100f
+        private const val EXTRA_WATCHDOG = "watchdog"
+        private const val WATCHDOG_REQUEST = 118
+        private const val RESTART_REQUEST = 119
+        private const val WATCHDOG_INTERVAL_MS = 15 * 60_000L
         fun start(context: Context, refresh: Boolean = false) {
             runCatching { ContextCompat.startForegroundService(context, Intent(context, LocationTrackingService::class.java).putExtra("refresh", refresh)) }
                 .onFailure { LocationTrackingStatus.set(LocationTrackingStatus.State.PermissionRequired) }
         }
         fun stop(context: Context) {
             context.getSharedPreferences(PREFERENCES, Context.MODE_PRIVATE).edit().clear().apply()
+            runCatching {
+                val manager = context.getSystemService(AlarmManager::class.java)
+                listOf(WATCHDOG_REQUEST, RESTART_REQUEST).forEach { request ->
+                    val pending = PendingIntent.getForegroundService(
+                        context,
+                        request,
+                        Intent(context, LocationTrackingService::class.java),
+                        PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
+                    )
+                    manager.cancel(pending)
+                }
+            }
             context.stopService(Intent(context, LocationTrackingService::class.java))
             LocationTrackingStatus.set(LocationTrackingStatus.State.Idle)
         }

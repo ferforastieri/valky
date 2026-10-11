@@ -43,14 +43,14 @@ import com.composables.icons.lucide.Settings
 import com.composables.icons.lucide.UserRound
 import com.composables.icons.lucide.MapPin
 import com.composables.icons.lucide.Video
-import com.composables.icons.lucide.LayoutGrid
+import com.composables.icons.lucide.MonitorSmartphone
 
 private data class Destination(val route: String, val label: Int, val icon: ImageVector)
 
 private val destinations = listOf(
     Destination("overview", R.string.overview, Lucide.House),
     Destination("people", R.string.people, Lucide.MapPin),
-    Destination("devices", R.string.devices, Lucide.LayoutGrid),
+    Destination("devices", R.string.devices, Lucide.MonitorSmartphone),
     Destination("profile", R.string.profile, Lucide.UserRound),
     Destination("settings", R.string.settings, Lucide.Settings),
 )

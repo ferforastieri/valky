@@ -14,13 +14,19 @@ class PushFreshnessTest {
     }
 
     @Test
+    fun `accepts an alert delayed by a dozing phone`() {
+        assertTrue(isFreshPush("2026-09-22T11:55:00Z", now - 10_000, now))
+        assertTrue(isFreshPush("2026-09-22T11:59:50Z", now - 5 * 60_000, now))
+    }
+
+    @Test
     fun `rejects an alert retained while the device was offline`() {
-        assertFalse(isFreshPush("2026-09-22T11:55:00Z", now - 10_000, now))
+        assertFalse(isFreshPush("2026-09-22T11:45:00Z", now - 10_000, now))
     }
 
     @Test
     fun `rejects a current event carried by an expired FCM message`() {
-        assertFalse(isFreshPush("2026-09-22T11:59:50Z", now - 61_000, now))
+        assertFalse(isFreshPush("2026-09-22T11:59:50Z", now - 11 * 60_000, now))
     }
 
     @Test
