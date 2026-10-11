@@ -38,6 +38,7 @@ func Open(path string) (*Store, error) {
 		{"cameras", "media_xaddr", `ALTER TABLE cameras ADD COLUMN media_xaddr TEXT NOT NULL DEFAULT ''`, ""},
 		{"cameras", "events_xaddr", `ALTER TABLE cameras ADD COLUMN events_xaddr TEXT NOT NULL DEFAULT ''`, ""},
 		{"cameras", "ptz_xaddr", `ALTER TABLE cameras ADD COLUMN ptz_xaddr TEXT NOT NULL DEFAULT ''`, ""},
+		{"cameras", "startup_preset_token", `ALTER TABLE cameras ADD COLUMN startup_preset_token TEXT NOT NULL DEFAULT ''`, ""},
 		{"cameras", "setup_status", `ALTER TABLE cameras ADD COLUMN setup_status TEXT NOT NULL DEFAULT 'ready'`, ""},
 		{"cameras", "setup_step", `ALTER TABLE cameras ADD COLUMN setup_step TEXT NOT NULL DEFAULT ''`, ""},
 		{"cameras", "setup_error", `ALTER TABLE cameras ADD COLUMN setup_error TEXT NOT NULL DEFAULT ''`, ""},

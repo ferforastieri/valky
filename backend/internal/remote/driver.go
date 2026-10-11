@@ -6,7 +6,8 @@ import (
 )
 
 // Driver is the provider-neutral boundary between the remote domain and a
-// concrete device protocol. Samsung Tizen is the first implementation.
+// concrete device protocol. The smart-TV WebSocket channel is the first
+// implementation.
 type Driver interface {
 	Available() bool
 	// Pair connects without a token and waits for the TV to authorize this

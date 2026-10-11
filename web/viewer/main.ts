@@ -150,7 +150,7 @@ const lightGrid = (list: LightDevice[]) => list.length
   : empty("Nenhuma iluminação cadastrada", "Cadastre uma lâmpada pelo aplicativo para controlá-la aqui.");
 const remoteGrid = (list: Remote[]) => list.length
   ? `<div class="remote-grid">${list.map(remote => `<button class="remote-card" data-remote="${e(remote.id)}"><span class="tile-icon">${icon('tv')}</span><span><strong>${e(remote.name)}</strong><small>${e(remote.host)}:${remote.port} · ${remote.tokenConfigured ? 'Pareado' : 'Não pareado'}</small></span><span class="arrow">${icon('arrow')}</span></button>`).join('')}</div>`
-  : empty("Nenhum controle remoto", "Cadastre sua TV Samsung pelo aplicativo para controlá-la aqui.");
+  : empty("Nenhum controle remoto", "Cadastre sua TV pelo aplicativo para controlá-la aqui.");
 const avatar = (p: Person) =>
   `<span class="avatar">${p.avatarData?.startsWith("data:image/jpeg;base64,") ? `<img src="${e(p.avatarData)}" alt=""/>` : e(p.name.slice(0, 1).toUpperCase())}</span>`;
 const members = (list: Person[]) =>

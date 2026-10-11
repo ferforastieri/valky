@@ -30,6 +30,7 @@ type Camera struct {
 	SetupStep      string            `json:"setupStep"`
 	SetupError     string            `json:"setupError,omitempty"`
 	SetupUpdatedAt time.Time         `json:"setupUpdatedAt"`
+	StartupPreset  string            `json:"startupPresetToken"`
 	Enabled        bool              `json:"enabled"`
 	CreatedAt      time.Time         `json:"createdAt"`
 	UpdatedAt      time.Time         `json:"updatedAt"`
@@ -81,4 +82,18 @@ type PTZCommand struct {
 	Pan    float64 `json:"pan"`
 	Tilt   float64 `json:"tilt"`
 	Zoom   float64 `json:"zoom"`
+}
+
+// PTZPreset is a named position stored on the camera itself.
+type PTZPreset struct {
+	Token string `json:"token"`
+	Name  string `json:"name"`
+}
+
+type PresetInput struct {
+	Name string `json:"name"`
+}
+
+type StartupPresetInput struct {
+	Token string `json:"token"`
 }

@@ -375,6 +375,36 @@ class ValkyrisApi(
         }
     }
 
+    suspend fun ptzPresets(cameraId: String): List<PTZPreset> = get("/cameras/$cameraId/ptz/presets")
+
+    suspend fun savePTZPreset(cameraId: String, name: String): PTZPreset = post("/cameras/$cameraId/ptz/presets", PresetInput(name))
+
+    suspend fun gotoPTZPreset(cameraId: String, token: String) {
+        val current = requireNotNull(session())
+        executeUnit(current.fingerprint) {
+            it.post(base() + "/cameras/$cameraId/ptz/presets/${Uri.encode(token)}/goto") {
+                bearerAuth(current.token)
+                header(HttpHeaders.AcceptLanguage, Locale.getDefault().toLanguageTag())
+            }
+        }
+    }
+
+    suspend fun deletePTZPreset(cameraId: String, token: String) {
+        val current = requireNotNull(session())
+        executeUnit(current.fingerprint) {
+            it.delete(base() + "/cameras/$cameraId/ptz/presets/${Uri.encode(token)}") {
+                bearerAuth(current.token)
+                header(HttpHeaders.AcceptLanguage, Locale.getDefault().toLanguageTag())
+            }
+        }
+    }
+
+    suspend fun setStartupPreset(cameraId: String, token: String): Camera = put(
+        "/cameras/$cameraId/ptz/startup",
+        StartupPresetInput(token),
+        announceBackend = true,
+    )
+
     suspend fun registerPush(registration: PushRegistration) {
         val current = requireNotNull(session())
         executeUnit(current.fingerprint) {

@@ -76,7 +76,7 @@ func main() {
 	lightRepo := light.NewRepository(db, vault)
 	lightService := light.NewService(lightRepo, light.NewUnavailableDriver(), hub, logger)
 	remoteRepo := remote.NewRepository(db, vault)
-	remoteService := remote.NewService(remoteRepo, remote.NewSamsungDriver(), hub, logger)
+	remoteService := remote.NewService(remoteRepo, remote.NewSmartTVDriver(), hub, logger)
 	application := &app.Service{Rules: rulesService, Events: eventService, Media: mediaManager, Notify: notifyService, Hub: hub, DataDir: cfg.DataDir, Logger: logger, Preferences: preferencesService}
 	apiServer := api.NewServer(authManager, cameraRepo, onvif, mediaManager, rulesService, eventService, notifyService, hub, logger)
 	apiServer.SetViewerDirectory(cfg.ViewerDir)
@@ -95,6 +95,17 @@ func main() {
 	go application.RunRetention(ctx, cfg.RetentionAge, cfg.RetentionBytes)
 	go restoreMedia(ctx, cameraRepo, mediaManager, logger)
 	apiServer.ResumeCameraSetups(ctx)
+	go func() {
+		// Give media and ONVIF a moment to settle, then pin PTZ positions.
+		timer := time.NewTimer(15 * time.Second)
+		defer timer.Stop()
+		select {
+		case <-ctx.Done():
+			return
+		case <-timer.C:
+			apiServer.ApplyStartupPresets(ctx)
+		}
+	}()
 	var classifier *detector.NativeClassifier
 	model := filepath.Join(cfg.ModelsDir, "model.int8.onnx")
 	labels := filepath.Join(cfg.ModelsDir, "class_labels_indices.csv")

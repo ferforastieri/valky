@@ -48,10 +48,10 @@ func (s *Service) Create(ctx context.Context, in CreateInput) (Device, error) {
 	}
 	kind := strings.ToLower(strings.TrimSpace(in.Kind))
 	if kind == "" {
-		kind = KindSamsung
+		kind = KindSmartTV
 	}
-	if kind != KindSamsung {
-		return Device{}, fmt.Errorf("tipo de controle remoto não suportado: %s", kind)
+	if len(kind) > 32 {
+		return Device{}, fmt.Errorf("tipo de controle remoto inválido")
 	}
 	host, port, err := normalizeAddress(in.Host, in.Port)
 	if err != nil {

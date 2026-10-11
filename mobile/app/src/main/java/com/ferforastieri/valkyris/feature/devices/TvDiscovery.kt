@@ -20,27 +20,32 @@ import kotlinx.coroutines.withContext
 data class DiscoveredTv(val host: String, val name: String, val model: String = "")
 
 /**
- * Finds Samsung TVs on the same network as the phone. SSDP (UPnP discovery) is
- * the primary path because the TVs answer the RemoteControlReceiver search
- * target directly. When multicast is blocked by the access point, fall back to a
- * quick TCP probe of the local /24 on the TV REST port.
+ * Finds TVs on the same network as the phone, regardless of brand. SSDP (UPnP)
+ * discovery runs first; when the access point blocks multicast, a quick TCP
+ * probe of the local /24 on the well-known smart-TV control ports is used.
  */
 object TvDiscovery {
     private const val SSDP_HOST = "239.255.255.250"
     private const val SSDP_PORT = 1900
-    private const val SAMSUNG_PORT = 8001
-    private const val SAMSUNG_SECURE_PORT = 8002
-    private const val PROBE_TIMEOUT_MS = 350
+    private const val PROBE_TIMEOUT_MS = 300
+
+    // Control ports used by the main smart-TV platforms. Kept generic so the
+    // listing is not tied to one vendor.
+    private val TV_CONTROL_PORTS = listOf(8001, 8002, 8060, 3000, 3001)
+    private val SSDP_TARGETS = listOf(
+        "urn:dial-multiscreen-org:service:dial:1",
+        "urn:schemas-upnp-org:device:MediaRenderer:1",
+        "ssdp:all",
+    )
 
     suspend fun discover(context: Context): List<DiscoveredTv> = withContext(Dispatchers.IO) {
         val lock = acquireMulticastLock(context)
         try {
-            // SSDP answers are trusted only when the host actually exposes the
-            // TV control ports, so a DIAL response from another device (a
-            // Chromecast, for example) is not mistaken for a Samsung TV.
-            val ssdp = ssdpHosts().filter { reachable(it, SAMSUNG_PORT) || reachable(it, SAMSUNG_SECURE_PORT) }
+            // Trust an SSDP answer only when the host exposes a TV control port,
+            // so a DIAL response from an unrelated device is not mistaken for a TV.
+            val ssdp = ssdpHosts().filter { host -> TV_CONTROL_PORTS.any { reachable(host, it) } }
             val hosts = if (ssdp.isNotEmpty()) ssdp else probeLocalSubnet()
-            hosts.map { DiscoveredTv(host = it, name = "TV Samsung") }.distinctBy { it.host }
+            hosts.map { DiscoveredTv(host = it, name = "TV") }.distinctBy { it.host }
         } finally {
             runCatching { lock?.release() }
         }
@@ -66,10 +71,7 @@ object TvDiscovery {
                 socket.soTimeout = 400
                 socket.broadcast = true
                 val group = InetAddress.getByName(SSDP_HOST)
-                listOf(
-                    "urn:samsung.com:device:RemoteControlReceiver:1",
-                    "urn:dial-multiscreen-org:service:dial:1",
-                ).forEach { target ->
+                SSDP_TARGETS.forEach { target ->
                     val request = (
                         "M-SEARCH * HTTP/1.1\r\n" +
                             "HOST: $SSDP_HOST:$SSDP_PORT\r\n" +
@@ -104,22 +106,19 @@ object TvDiscovery {
         val prefix = local.substringBeforeLast('.', "")
         if (prefix.isEmpty()) return emptySet()
         val hosts = Collections.synchronizedSet(LinkedHashSet<String>())
-        val executor = Executors.newFixedThreadPool(32)
+        val executor = Executors.newFixedThreadPool(48)
         val latch = CountDownLatch(254)
         for (index in 1..254) {
             val host = "$prefix.$index"
             executor.execute {
                 try {
-                    Socket().use { it.connect(InetSocketAddress(host, SAMSUNG_PORT), PROBE_TIMEOUT_MS) }
-                    hosts += host
-                } catch (_: Exception) {
-                    // Unreachable host: expected during a subnet sweep.
+                    if (TV_CONTROL_PORTS.any { reachable(host, it) }) hosts += host
                 } finally {
                     latch.countDown()
                 }
             }
         }
-        runCatching { latch.await(6, TimeUnit.SECONDS) }
+        runCatching { latch.await(8, TimeUnit.SECONDS) }
         executor.shutdownNow()
         return hosts
     }

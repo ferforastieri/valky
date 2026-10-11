@@ -150,6 +150,38 @@ paths:
       parameters: [{$ref: '#/components/parameters/id'}]
       requestBody: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/PTZCommand'}}}}
       responses: {'200': {description: Command accepted with message envelope, content: {application/json: {schema: {$ref: '#/components/schemas/APIResponse'}}}}}
+  /cameras/{id}/ptz/presets:
+    get:
+      summary: List the named PTZ positions stored on the camera
+      parameters: [{$ref: '#/components/parameters/id'}]
+      responses: {'200': {description: Presets in APIResponse.data}}
+    post:
+      summary: Save the camera's current position as a named preset
+      parameters: [{$ref: '#/components/parameters/id'}]
+      requestBody: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/PresetInput'}}}}
+      responses:
+        '201': {description: Saved preset in APIResponse.data}
+        '502': {description: Camera unreachable}
+  /cameras/{id}/ptz/presets/{token}/goto:
+    post:
+      summary: Move the camera to a stored position
+      parameters: [{$ref: '#/components/parameters/id'}, {$ref: '#/components/parameters/token'}]
+      responses:
+        '200': {description: Command accepted}
+        '502': {description: Camera unreachable}
+  /cameras/{id}/ptz/presets/{token}:
+    delete:
+      summary: Remove a stored position from the camera
+      parameters: [{$ref: '#/components/parameters/id'}, {$ref: '#/components/parameters/token'}]
+      responses:
+        '200': {description: Removed}
+        '502': {description: Camera unreachable}
+  /cameras/{id}/ptz/startup:
+    put:
+      summary: Pin the position applied when the camera starts or restarts
+      parameters: [{$ref: '#/components/parameters/id'}]
+      requestBody: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/StartupPresetInput'}}}}
+      responses: {'200': {description: Updated camera in APIResponse.data}}
   /cameras/{id}/snapshot:
     get:
       summary: Get a current JPEG frame from the authenticated local stream
@@ -199,7 +231,7 @@ paths:
         '502': {description: Light unavailable on the local network}
   /remotes:
     get:
-      summary: List remote controls (Samsung TVs today) and their pairing state
+      summary: List remote controls (smart TVs) and their pairing state
       responses: {'200': {description: Remote controls in APIResponse.data}}
     post:
       summary: Register a remote control (administrator only)
@@ -462,6 +494,7 @@ components:
       schema: {type: string, enum: [browser]}
     id: {name: id, in: path, required: true, schema: {type: string, format: uuid}}
     session: {name: session, in: path, required: true, schema: {type: string}}
+    token: {name: token, in: path, required: true, schema: {type: string}, description: PTZ preset token stored on the camera}
   schemas:
     APIResponse:
       type: object
@@ -513,6 +546,7 @@ components:
         setupStep: {type: string, enum: [queued, probing, stream, ready, failed]}
         setupError: {type: string, description: Persisted diagnostic from the latest setup attempt}
         setupUpdatedAt: {type: string, format: date-time}
+        startupPresetToken: {type: string, description: PTZ preset applied when the camera starts or restarts; empty disables it}
         enabled: {type: boolean}
     CameraInput:
       type: object
@@ -586,7 +620,7 @@ components:
       properties:
         id: {type: string, format: uuid}
         name: {type: string}
-        kind: {type: string, enum: [samsung]}
+        kind: {type: string, enum: [smart_tv]}
         host: {type: string}
         port: {type: integer, default: 8002}
         setupStatus: {type: string, enum: [pending, ready, failed]}
@@ -601,7 +635,7 @@ components:
       required: [name, host]
       properties:
         name: {type: string, maxLength: 60}
-        kind: {type: string, enum: [samsung], default: samsung}
+        kind: {type: string, enum: [smart_tv], default: smart_tv}
         host: {type: string, description: TV IPv4/IPv6/hostname, with or without a scheme and port}
         port: {type: integer, default: 8002}
     RemoteUpdate:
@@ -615,7 +649,7 @@ components:
       type: object
       required: [key]
       properties:
-        key: {type: string, description: Whitelisted Samsung key such as KEY_HOME, KEY_VOLUP or KEY_ENTER}
+        key: {type: string, description: Whitelisted remote key such as KEY_HOME, KEY_VOLUP or KEY_ENTER}
     UpdateInfo:
       type: object
       required: [currentVersion, latestVersion, available, serverUpdateAvailable, apkUpdateAvailable, releaseUrl, message]
@@ -645,6 +679,20 @@ components:
         pan: {type: number, minimum: -1, maximum: 1}
         tilt: {type: number, minimum: -1, maximum: 1}
         zoom: {type: number, minimum: -1, maximum: 1}
+    PTZPreset:
+      type: object
+      required: [token, name]
+      properties:
+        token: {type: string}
+        name: {type: string}
+    PresetInput:
+      type: object
+      properties:
+        name: {type: string, maxLength: 60, description: Defaults to a generic label when empty}
+    StartupPresetInput:
+      type: object
+      properties:
+        token: {type: string, description: Preset token to apply on startup; empty clears it}
     Rule:
       type: object
       required: [cameraId, name, detectorTypes, actions]

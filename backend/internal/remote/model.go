@@ -2,17 +2,18 @@ package remote
 
 import "time"
 
-// KindSamsung identifies the Samsung Tizen WebSocket remote protocol.
-const KindSamsung = "samsung"
+// KindSmartTV identifies the WebSocket remote channel used by smart TVs. The
+// domain is brand-agnostic: additional protocols can be added as drivers.
+const KindSmartTV = "smart_tv"
 
-// DefaultPort is the secure Tizen remote channel. Port 8001 is the legacy
-// unencrypted channel used by some pre-2016 models.
+// DefaultPort is the secure remote channel. Port 8001 is the legacy
+// unencrypted channel used by some older models.
 const (
 	DefaultPort = 8002
 	LegacyPort  = 8001
 )
 
-// Device is a controllable appliance (currently a Samsung TV). The access token
+// Device is a controllable appliance (a smart TV today). The access token
 // issued by the TV is never part of the public model: only whether one exists.
 type Device struct {
 	ID              string     `json:"id"`
@@ -53,7 +54,7 @@ type KeyInput struct {
 	Key string `json:"key"`
 }
 
-// AllowedKeys is the whitelist of Samsung remote keys accepted by the API.
+// AllowedKeys is the whitelist of remote keys accepted by the API.
 // Restricting the set keeps the backend from forwarding arbitrary payloads to
 // the TV while still covering the common navigation, volume and playback keys.
 var AllowedKeys = map[string]struct{}{

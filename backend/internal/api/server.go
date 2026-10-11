@@ -137,6 +137,11 @@ func (s *Server) Handler() http.Handler {
 	protected.HandleFunc("GET /camera-operations/{id}", s.cameraOperation)
 	protected.Handle("DELETE /cameras/{id}", s.auth.RequireAdmin(http.HandlerFunc(s.deleteCamera)))
 	protected.HandleFunc("POST /cameras/{id}/ptz", s.ptz)
+	protected.HandleFunc("GET /cameras/{id}/ptz/presets", s.listPTZPresets)
+	protected.HandleFunc("POST /cameras/{id}/ptz/presets", s.createPTZPreset)
+	protected.HandleFunc("POST /cameras/{id}/ptz/presets/{token}/goto", s.gotoPTZPreset)
+	protected.HandleFunc("DELETE /cameras/{id}/ptz/presets/{token}", s.deletePTZPreset)
+	protected.HandleFunc("PUT /cameras/{id}/ptz/startup", s.setStartupPreset)
 	protected.HandleFunc("GET /lights", s.listLights)
 	protected.HandleFunc("GET /lights/{id}", s.getLight)
 	protected.Handle("DELETE /lights/{id}", s.auth.RequireAdmin(http.HandlerFunc(s.deleteLight)))
@@ -386,6 +391,7 @@ func (s *Server) completeCameraCreation(operationID string, in camera.CreateInpu
 		s.failCameraOperation(operationID, in, err)
 		return
 	}
+	s.applyStartupPreset(ctx, cam, credentials)
 	s.finishCameraOperation(operationID, CameraOperation{Status: "completed", Message: "Camera is ready and its ONVIF capabilities were discovered", Camera: &cam})
 }
 
@@ -481,6 +487,146 @@ func (s *Server) ptz(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeSuccess(w, http.StatusOK, "PTZ command accepted", nil)
+}
+
+func (s *Server) listPTZPresets(w http.ResponseWriter, r *http.Request) {
+	cam, cred, err := s.cameras.Get(r.Context(), r.PathValue("id"))
+	if err != nil {
+		respond(w, nil, err)
+		return
+	}
+	if !cam.Capabilities.PTZ {
+		writeError(w, http.StatusConflict, fmt.Errorf("camera does not advertise PTZ"))
+		return
+	}
+	presets, err := s.onvif.PTZPresets(r.Context(), cam, cred)
+	if err != nil {
+		writeError(w, 502, err)
+		return
+	}
+	writeSuccess(w, http.StatusOK, "PTZ presets listed", presets)
+}
+
+func (s *Server) createPTZPreset(w http.ResponseWriter, r *http.Request) {
+	cam, cred, err := s.cameras.Get(r.Context(), r.PathValue("id"))
+	if err != nil {
+		respond(w, nil, err)
+		return
+	}
+	if !cam.Capabilities.PTZ {
+		writeError(w, http.StatusConflict, fmt.Errorf("camera does not advertise PTZ"))
+		return
+	}
+	var in camera.PresetInput
+	if !decode(w, r, &in) {
+		return
+	}
+	name := strings.TrimSpace(in.Name)
+	if name == "" {
+		name = "Posição"
+	}
+	if runes := []rune(name); len(runes) > 60 {
+		name = string(runes[:60])
+	}
+	preset, err := s.onvif.SetPTZPreset(r.Context(), cam, cred, name)
+	if err != nil {
+		writeError(w, 502, err)
+		return
+	}
+	writeSuccess(w, http.StatusCreated, "PTZ preset saved", preset)
+}
+
+func (s *Server) gotoPTZPreset(w http.ResponseWriter, r *http.Request) {
+	cam, cred, err := s.cameras.Get(r.Context(), r.PathValue("id"))
+	if err != nil {
+		respond(w, nil, err)
+		return
+	}
+	if !cam.Capabilities.PTZ {
+		writeError(w, http.StatusConflict, fmt.Errorf("camera does not advertise PTZ"))
+		return
+	}
+	if err = s.onvif.GotoPTZPreset(r.Context(), cam, cred, r.PathValue("token")); err != nil {
+		writeError(w, 502, err)
+		return
+	}
+	writeSuccess(w, http.StatusOK, "PTZ preset applied", nil)
+}
+
+func (s *Server) deletePTZPreset(w http.ResponseWriter, r *http.Request) {
+	cam, cred, err := s.cameras.Get(r.Context(), r.PathValue("id"))
+	if err != nil {
+		respond(w, nil, err)
+		return
+	}
+	if !cam.Capabilities.PTZ {
+		writeError(w, http.StatusConflict, fmt.Errorf("camera does not advertise PTZ"))
+		return
+	}
+	token := r.PathValue("token")
+	if err = s.onvif.RemovePTZPreset(r.Context(), cam, cred, token); err != nil {
+		writeError(w, 502, err)
+		return
+	}
+	if cam.StartupPreset == token {
+		_ = s.cameras.SetStartupPreset(r.Context(), cam.ID, "")
+	}
+	writeSuccess(w, http.StatusOK, "PTZ preset removed", map[string]string{"token": token})
+}
+
+func (s *Server) setStartupPreset(w http.ResponseWriter, r *http.Request) {
+	cam, _, err := s.cameras.Get(r.Context(), r.PathValue("id"))
+	if err != nil {
+		respond(w, nil, err)
+		return
+	}
+	var in camera.StartupPresetInput
+	if !decode(w, r, &in) {
+		return
+	}
+	if err = s.cameras.SetStartupPreset(r.Context(), cam.ID, strings.TrimSpace(in.Token)); err != nil {
+		respond(w, nil, err)
+		return
+	}
+	updated, _, err := s.cameras.Get(r.Context(), cam.ID)
+	if err != nil {
+		respond(w, nil, err)
+		return
+	}
+	writeSuccess(w, http.StatusOK, "Startup position updated", updated)
+}
+
+// applyStartupPreset moves a PTZ camera to the position the user pinned for
+// restarts. It is best effort: a camera that is not ready yet simply logs.
+func (s *Server) applyStartupPreset(ctx context.Context, cam camera.Camera, cred camera.Credentials) {
+	if cam.StartupPreset == "" || !cam.Capabilities.PTZ {
+		return
+	}
+	if err := s.onvif.GotoPTZPreset(ctx, cam, cred, cam.StartupPreset); err != nil {
+		s.logger.Warn("apply startup preset", "camera", cam.ID, "error", err)
+	}
+}
+
+// ApplyStartupPresets re-applies every pinned position once, used when the
+// backend starts and restores its cameras.
+func (s *Server) ApplyStartupPresets(ctx context.Context) {
+	cameras, err := s.cameras.List(ctx)
+	if err != nil {
+		s.logger.Warn("list cameras for startup presets", "error", err)
+		return
+	}
+	for _, cam := range cameras {
+		if cam.SetupStatus != "ready" || cam.StartupPreset == "" || !cam.Capabilities.PTZ {
+			continue
+		}
+		_, cred, getErr := s.cameras.Get(ctx, cam.ID)
+		if getErr != nil {
+			continue
+		}
+		poll, cancel := context.WithTimeout(ctx, 15*time.Second)
+		s.applyStartupPreset(poll, cam, cred)
+		cancel()
+	}
 }
 
 func (s *Server) snapshot(w http.ResponseWriter, r *http.Request) {

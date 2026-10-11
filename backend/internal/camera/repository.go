@@ -188,7 +188,7 @@ func (r *Repository) CompleteSetup(ctx context.Context, id string, caps Capabili
 }
 
 func (r *Repository) List(ctx context.Context) ([]Camera, error) {
-	rows, err := r.store.DB.QueryContext(ctx, `SELECT alerts_json,id,name,icon,host,port,profile_token,capabilities_json,media_xaddr,events_xaddr,ptz_xaddr,setup_status,setup_step,setup_error,setup_updated_at,enabled,created_at,updated_at FROM cameras ORDER BY name`)
+	rows, err := r.store.DB.QueryContext(ctx, `SELECT alerts_json,id,name,icon,host,port,profile_token,capabilities_json,media_xaddr,events_xaddr,ptz_xaddr,startup_preset_token,setup_status,setup_step,setup_error,setup_updated_at,enabled,created_at,updated_at FROM cameras ORDER BY name`)
 	if err != nil {
 		return nil, err
 	}
@@ -205,13 +205,13 @@ func (r *Repository) List(ctx context.Context) ([]Camera, error) {
 }
 
 func (r *Repository) Get(ctx context.Context, id string) (Camera, Credentials, error) {
-	row := r.store.DB.QueryRowContext(ctx, `SELECT alerts_json,id,name,icon,host,port,profile_token,capabilities_json,media_xaddr,events_xaddr,ptz_xaddr,setup_status,setup_step,setup_error,setup_updated_at,enabled,created_at,updated_at,username_enc,password_enc,rtsp_uri_enc FROM cameras WHERE id=?`, id)
+	row := r.store.DB.QueryRowContext(ctx, `SELECT alerts_json,id,name,icon,host,port,profile_token,capabilities_json,media_xaddr,events_xaddr,ptz_xaddr,startup_preset_token,setup_status,setup_step,setup_error,setup_updated_at,enabled,created_at,updated_at,username_enc,password_enc,rtsp_uri_enc FROM cameras WHERE id=?`, id)
 	var c Camera
 	var caps, alertsJSON string
 	var enabled int
 	var setupUpdated, created, updated string
 	var user, pass, rtsp []byte
-	err := row.Scan(&alertsJSON, &c.ID, &c.Name, &c.Icon, &c.Host, &c.Port, &c.ProfileToken, &caps, &c.Services.Media, &c.Services.Events, &c.Services.PTZ, &c.SetupStatus, &c.SetupStep, &c.SetupError, &setupUpdated, &enabled, &created, &updated, &user, &pass, &rtsp)
+	err := row.Scan(&alertsJSON, &c.ID, &c.Name, &c.Icon, &c.Host, &c.Port, &c.ProfileToken, &caps, &c.Services.Media, &c.Services.Events, &c.Services.PTZ, &c.StartupPreset, &c.SetupStatus, &c.SetupStep, &c.SetupError, &setupUpdated, &enabled, &created, &updated, &user, &pass, &rtsp)
 	if err != nil {
 		return c, Credentials{}, err
 	}
@@ -237,6 +237,18 @@ func (r *Repository) Get(ctx context.Context, id string) (Camera, Credentials, e
 	return c, cred, err
 }
 
+func (r *Repository) SetStartupPreset(ctx context.Context, id, token string) error {
+	now := time.Now().UTC().Format(time.RFC3339Nano)
+	result, err := r.store.DB.ExecContext(ctx, `UPDATE cameras SET startup_preset_token=?,updated_at=? WHERE id=?`, token, now, id)
+	if err != nil {
+		return err
+	}
+	if n, _ := result.RowsAffected(); n == 0 {
+		return sql.ErrNoRows
+	}
+	return nil
+}
+
 func (r *Repository) Delete(ctx context.Context, id string) error {
 	result, err := r.store.DB.ExecContext(ctx, `DELETE FROM cameras WHERE id=?`, id)
 	if err != nil {
@@ -255,7 +267,7 @@ func scanCamera(s scanner) (Camera, error) {
 	var c Camera
 	var alertsJSON, caps, setupUpdated, created, updated string
 	var enabled int
-	err := s.Scan(&alertsJSON, &c.ID, &c.Name, &c.Icon, &c.Host, &c.Port, &c.ProfileToken, &caps, &c.Services.Media, &c.Services.Events, &c.Services.PTZ, &c.SetupStatus, &c.SetupStep, &c.SetupError, &setupUpdated, &enabled, &created, &updated)
+	err := s.Scan(&alertsJSON, &c.ID, &c.Name, &c.Icon, &c.Host, &c.Port, &c.ProfileToken, &caps, &c.Services.Media, &c.Services.Events, &c.Services.PTZ, &c.StartupPreset, &c.SetupStatus, &c.SetupStep, &c.SetupError, &setupUpdated, &enabled, &created, &updated)
 	if err != nil {
 		return c, err
 	}

@@ -15,34 +15,38 @@ import (
 	"github.com/coder/websocket"
 )
 
-// SamsungDriver speaks the Tizen remote-control WebSocket channel used by
-// 2016+ Samsung TVs. It connects to
-// wss://HOST:8002/api/v2/channels/samsung.remote.control, falls back to the
-// legacy ws://HOST:8001 channel, and exchanges the small JSON envelope the TV
-// expects. The TV shows an on-screen prompt the first time a controller pairs;
-// the token it returns afterwards authorizes later key presses without prompts.
-type SamsungDriver struct {
+// SmartTVDriver speaks the WebSocket remote-control channel used by smart TVs.
+// It connects to wss://HOST:8002/api/v2/channels/samsung.remote.control, falls
+// back to the legacy ws://HOST:8001 channel, and exchanges the small JSON
+// envelope the TV expects. The TV shows an on-screen prompt the first time a
+// controller pairs; the token it returns afterwards authorizes later key
+// presses without prompts.
+//
+// The channel path is a fixed protocol identifier and is kept verbatim; the
+// domain and API stay brand-agnostic so other TV protocols can be added as
+// separate drivers.
+type SmartTVDriver struct {
 	applicationName string
 	client          *http.Client
 }
 
-func NewSamsungDriver() *SamsungDriver {
-	// Samsung TVs present a self-signed certificate on the secure channel, so
-	// the client validates reachability but not the certificate chain.
+func NewSmartTVDriver() *SmartTVDriver {
+	// These TVs present a self-signed certificate on the secure channel, so the
+	// client validates reachability but not the certificate chain.
 	transport := &http.Transport{
 		TLSClientConfig:       &tls.Config{InsecureSkipVerify: true},
 		ResponseHeaderTimeout: 10 * time.Second,
 		DialContext:           (&net.Dialer{Timeout: 6 * time.Second}).DialContext,
 	}
-	return &SamsungDriver{
+	return &SmartTVDriver{
 		applicationName: "Valkyris",
 		client:          &http.Client{Transport: transport},
 	}
 }
 
-func (*SamsungDriver) Available() bool { return true }
+func (*SmartTVDriver) Available() bool { return true }
 
-func (d *SamsungDriver) Pair(ctx context.Context, device Device) (string, error) {
+func (d *SmartTVDriver) Pair(ctx context.Context, device Device) (string, error) {
 	conn, err := d.dial(ctx, device, "")
 	if err != nil {
 		return "", err
@@ -66,7 +70,7 @@ func (d *SamsungDriver) Pair(ctx context.Context, device Device) (string, error)
 	}
 }
 
-func (d *SamsungDriver) Send(ctx context.Context, device Device, token, key string) error {
+func (d *SmartTVDriver) Send(ctx context.Context, device Device, token, key string) error {
 	conn, err := d.dial(ctx, device, token)
 	if err != nil {
 		return err
@@ -103,7 +107,7 @@ func (d *SamsungDriver) Send(ctx context.Context, device Device, token, key stri
 	return nil
 }
 
-func (d *SamsungDriver) dial(ctx context.Context, device Device, token string) (*websocket.Conn, error) {
+func (d *SmartTVDriver) dial(ctx context.Context, device Device, token string) (*websocket.Conn, error) {
 	port := device.Port
 	if port == 0 {
 		port = DefaultPort
@@ -151,7 +155,7 @@ func remoteURL(scheme, address, applicationName, token string) string {
 	return url
 }
 
-type samsungEvent struct {
+type tvEvent struct {
 	Event string `json:"event"`
 	Data  struct {
 		Token string `json:"token"`
@@ -163,7 +167,7 @@ func readEvent(ctx context.Context, conn *websocket.Conn) (string, string, error
 	if err != nil {
 		return "", "", err
 	}
-	var payload samsungEvent
+	var payload tvEvent
 	if err := json.Unmarshal(data, &payload); err != nil {
 		return "", "", err
 	}

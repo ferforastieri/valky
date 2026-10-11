@@ -145,6 +145,77 @@ func (c *ONVIFClient) PTZ(ctx context.Context, cam Camera, cred Credentials, com
 	return err
 }
 
+func (c *ONVIFClient) ptzEndpoint(cam Camera) string {
+	if cam.Services.PTZ != "" {
+		return cam.Services.PTZ
+	}
+	return fmt.Sprintf("http://%s:%d/onvif/PTZ", cam.Host, cam.Port)
+}
+
+// PTZPresets lists the named positions stored on the camera.
+func (c *ONVIFClient) PTZPresets(ctx context.Context, cam Camera, cred Credentials) ([]PTZPreset, error) {
+	body, err := c.call(ctx, c.ptzEndpoint(cam), cred.Username, cred.Password,
+		"http://www.onvif.org/ver20/ptz/wsdl/GetPresets",
+		fmt.Sprintf(`<tptz:GetPresets><tptz:ProfileToken>%s</tptz:ProfileToken></tptz:GetPresets>`, escape(cam.ProfileToken)))
+	if err != nil {
+		return nil, err
+	}
+	var response struct {
+		Presets []struct {
+			Token string `xml:"token,attr"`
+			Name  string `xml:"Name"`
+		} `xml:"Body>GetPresetsResponse>Preset"`
+	}
+	if err := xml.Unmarshal(body, &response); err != nil {
+		return nil, err
+	}
+	out := make([]PTZPreset, 0, len(response.Presets))
+	for _, preset := range response.Presets {
+		if preset.Token == "" {
+			continue
+		}
+		out = append(out, PTZPreset{Token: preset.Token, Name: preset.Name})
+	}
+	return out, nil
+}
+
+// SetPTZPreset stores the camera's current position under a name.
+func (c *ONVIFClient) SetPTZPreset(ctx context.Context, cam Camera, cred Credentials, name string) (PTZPreset, error) {
+	body, err := c.call(ctx, c.ptzEndpoint(cam), cred.Username, cred.Password,
+		"http://www.onvif.org/ver20/ptz/wsdl/SetPreset",
+		fmt.Sprintf(`<tptz:SetPreset><tptz:ProfileToken>%s</tptz:ProfileToken><tptz:PresetName>%s</tptz:PresetName></tptz:SetPreset>`, escape(cam.ProfileToken), escape(name)))
+	if err != nil {
+		return PTZPreset{}, err
+	}
+	var response struct {
+		Preset struct {
+			Token string `xml:"token,attr"`
+			Name  string `xml:"Name"`
+		} `xml:"Body>SetPresetResponse>Preset"`
+	}
+	_ = xml.Unmarshal(body, &response)
+	if response.Preset.Name == "" {
+		response.Preset.Name = name
+	}
+	return PTZPreset{Token: response.Preset.Token, Name: response.Preset.Name}, nil
+}
+
+// GotoPTZPreset moves the camera to a stored position.
+func (c *ONVIFClient) GotoPTZPreset(ctx context.Context, cam Camera, cred Credentials, token string) error {
+	_, err := c.call(ctx, c.ptzEndpoint(cam), cred.Username, cred.Password,
+		"http://www.onvif.org/ver20/ptz/wsdl/GotoPreset",
+		fmt.Sprintf(`<tptz:GotoPreset><tptz:ProfileToken>%s</tptz:ProfileToken><tptz:PresetToken>%s</tptz:PresetToken></tptz:GotoPreset>`, escape(cam.ProfileToken), escape(token)))
+	return err
+}
+
+// RemovePTZPreset deletes a stored position from the camera.
+func (c *ONVIFClient) RemovePTZPreset(ctx context.Context, cam Camera, cred Credentials, token string) error {
+	_, err := c.call(ctx, c.ptzEndpoint(cam), cred.Username, cred.Password,
+		"http://www.onvif.org/ver20/ptz/wsdl/RemovePreset",
+		fmt.Sprintf(`<tptz:RemovePreset><tptz:ProfileToken>%s</tptz:ProfileToken><tptz:PresetToken>%s</tptz:PresetToken></tptz:RemovePreset>`, escape(cam.ProfileToken), escape(token)))
+	return err
+}
+
 // MonitorEvents maintains a renewable ONVIF PullPoint subscription. Returning
 // errors are retried with bounded backoff so a camera reboot does not require
 // restarting Valkyris.

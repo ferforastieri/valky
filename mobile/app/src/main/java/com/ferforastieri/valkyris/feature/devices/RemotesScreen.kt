@@ -1,7 +1,6 @@
 package com.ferforastieri.valkyris.feature.devices
 
 import androidx.compose.foundation.BorderStroke
-import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -24,7 +23,6 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -35,6 +33,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -42,6 +41,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -53,7 +53,6 @@ import com.composables.icons.lucide.ChevronDown
 import com.composables.icons.lucide.ChevronLeft
 import com.composables.icons.lucide.ChevronRight
 import com.composables.icons.lucide.ChevronUp
-import com.composables.icons.lucide.CircleCheck
 import com.composables.icons.lucide.House
 import com.composables.icons.lucide.Link
 import com.composables.icons.lucide.List
@@ -62,7 +61,6 @@ import com.composables.icons.lucide.Menu
 import com.composables.icons.lucide.Pause
 import com.composables.icons.lucide.Pencil
 import com.composables.icons.lucide.Play
-import com.composables.icons.lucide.Plus
 import com.composables.icons.lucide.Power
 import com.composables.icons.lucide.Radar
 import com.composables.icons.lucide.SkipBack
@@ -77,33 +75,51 @@ import com.ferforastieri.valkyris.R
 import com.ferforastieri.valkyris.core.design.ValkyrisBottomSheet
 import com.ferforastieri.valkyris.core.model.RemoteDevice
 import com.ferforastieri.valkyris.core.model.RemoteInput
+import com.ferforastieri.valkyris.core.model.RemoteUpdate
 
 @Composable
 fun RemotesScreen(admin: Boolean, vm: RemotesViewModel = hiltViewModel()) {
+    val context = LocalContext.current
     LifecycleResumeEffect(Unit) { vm.refresh(); onPauseOrDispose {} }
+    // Entering the listing already starts looking for TVs on the network.
+    LaunchedEffect(Unit) { vm.discover(context) }
     val state by vm.state.collectAsStateWithLifecycle()
-    var showAdd by remember { mutableStateOf(false) }
     var editingId by remember { mutableStateOf<String?>(null) }
     var openId by remember { mutableStateOf<String?>(null) }
     var removingId by remember { mutableStateOf<String?>(null) }
+    var manualAdd by remember { mutableStateOf(false) }
     val editing = state.remotes.firstOrNull { it.id == editingId }
     val open = state.remotes.firstOrNull { it.id == openId }
     val removing = state.remotes.firstOrNull { it.id == removingId }
 
-    Box(Modifier.fillMaxSize()) {
-        Column(Modifier.fillMaxSize().padding(horizontal = 18.dp)) {
-            Spacer(Modifier.height(10.dp))
-            state.error?.let {
-                Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
+    Column(Modifier.fillMaxSize().padding(horizontal = 18.dp)) {
+        state.error?.let {
+            Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(top = 8.dp))
+        }
+        if (admin) {
+            DiscoveryHeader(
+                discovering = state.discovering,
+                found = state.discovered.size,
+                onRetry = { vm.discover(context) },
+                modifier = Modifier.padding(top = 10.dp),
+            )
+        }
+        LazyColumn(
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+            contentPadding = PaddingValues(top = 12.dp, bottom = 24.dp),
+        ) {
+            if (admin && state.discovered.isNotEmpty()) {
+                item { Text(stringResource(R.string.remote_discovered_title), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold) }
+                items(state.discovered, key = { "found-${it.host}" }) { tv ->
+                    DiscoveredTvCard(tv, onConnect = { vm.addAndPair(RemoteInput(name = tv.name, host = tv.host, port = 8002)) })
+                }
+                item { HorizontalDivider() }
             }
-            if (state.remotes.isEmpty() && !state.loading) EmptyRemotes()
             if (state.loading && state.remotes.isEmpty()) {
-                Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { CircularProgressIndicator() }
+                item { Box(Modifier.fillMaxWidth().padding(top = 40.dp), contentAlignment = Alignment.Center) { CircularProgressIndicator() } }
             }
-            LazyColumn(
-                verticalArrangement = Arrangement.spacedBy(12.dp),
-                contentPadding = PaddingValues(top = 12.dp, bottom = 96.dp),
-            ) {
+            if (state.remotes.isNotEmpty()) {
+                item { Text(stringResource(R.string.remote_my_controls), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold) }
                 items(state.remotes, key = { it.id }) { remote ->
                     RemoteCard(
                         remote = remote,
@@ -114,34 +130,32 @@ fun RemotesScreen(admin: Boolean, vm: RemotesViewModel = hiltViewModel()) {
                     )
                 }
             }
+            if (!state.loading && state.remotes.isEmpty() && (state.discovered.isEmpty() || !admin)) {
+                item { EmptyRemotes() }
+            }
+            if (admin) {
+                item {
+                    TextButton(onClick = { manualAdd = true }, modifier = Modifier.fillMaxWidth()) {
+                        Icon(Lucide.Pencil, null, Modifier.size(18.dp))
+                        Spacer(Modifier.width(6.dp))
+                        Text(stringResource(R.string.remote_manual_add))
+                    }
+                }
+            }
         }
-        if (admin) FloatingActionButton(
-            onClick = { showAdd = true },
-            modifier = Modifier.align(Alignment.BottomEnd).padding(end = 20.dp, bottom = 18.dp),
-            containerColor = MaterialTheme.colorScheme.secondary,
-            contentColor = MaterialTheme.colorScheme.onSecondary,
-        ) { Icon(Lucide.Plus, stringResource(R.string.add_remote)) }
     }
 
-    val context = androidx.compose.ui.platform.LocalContext.current
-    if (showAdd) RemoteEditorSheet(
+    if (manualAdd) RemoteEditorSheet(
         saving = false,
-        discovering = state.discovering,
-        discovered = state.discovered,
-        onDiscover = { vm.discover(context) },
-        onPick = { tv ->
-            showAdd = false
-            vm.addAndPair(com.ferforastieri.valkyris.core.model.RemoteInput(name = tv.name, host = tv.host, port = 8002))
-        },
-        onDismiss = { showAdd = false },
-        onSave = { input -> vm.add(input) { if (it) showAdd = false } },
+        onDismiss = { manualAdd = false },
+        onSave = { input -> vm.add(input) { if (it) manualAdd = false } },
     )
     editing?.let { remote ->
         RemoteEditorSheet(
             initial = remote,
             saving = false,
             onDismiss = { editingId = null },
-            onSave = { input -> vm.update(remote.id, com.ferforastieri.valkyris.core.model.RemoteUpdate(name = input.name, host = input.host, port = input.port)) { if (it) editingId = null } },
+            onSave = { input -> vm.update(remote.id, RemoteUpdate(name = input.name, host = input.host, port = input.port)) { if (it) editingId = null } },
         )
     }
     open?.let { remote ->
@@ -171,24 +185,70 @@ fun RemotesScreen(admin: Boolean, vm: RemotesViewModel = hiltViewModel()) {
 }
 
 @Composable
-private fun EmptyRemotes() = Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-    Surface(
-        shape = MaterialTheme.shapes.large,
-        color = MaterialTheme.colorScheme.surface,
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
-        shadowElevation = 3.dp,
-    ) {
-        Column(
-            Modifier.padding(horizontal = 26.dp, vertical = 24.dp).width(300.dp),
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(10.dp),
-        ) {
+private fun DiscoveryHeader(discovering: Boolean, found: Int, onRetry: () -> Unit, modifier: Modifier = Modifier) {
+    Column(modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
             Surface(shape = CircleShape, color = MaterialTheme.colorScheme.secondaryContainer) {
-                Icon(Lucide.Tv, null, Modifier.padding(13.dp).size(28.dp), tint = MaterialTheme.colorScheme.onSecondaryContainer)
+                Icon(Lucide.Radar, null, Modifier.padding(9.dp).size(18.dp), tint = MaterialTheme.colorScheme.onSecondaryContainer)
             }
-            Text(stringResource(R.string.no_remotes), fontWeight = FontWeight.SemiBold, style = MaterialTheme.typography.titleMedium)
-            Text(stringResource(R.string.no_remotes_body), color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodyMedium)
+            Spacer(Modifier.width(10.dp))
+            Text(
+                when {
+                    discovering -> stringResource(R.string.remote_searching)
+                    found > 0 -> stringResource(R.string.remote_found_count, found)
+                    else -> stringResource(R.string.remote_discover_empty)
+                },
+                Modifier.weight(1f),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            TextButton(onClick = onRetry, enabled = !discovering) { Text(stringResource(R.string.remote_discover_action)) }
         }
+        if (discovering) LinearProgressIndicator(Modifier.fillMaxWidth())
+    }
+}
+
+@Composable
+private fun DiscoveredTvCard(tv: DiscoveredTv, onConnect: () -> Unit) {
+    Surface(
+        onClick = onConnect,
+        modifier = Modifier.fillMaxWidth(),
+        shape = MaterialTheme.shapes.large,
+        color = MaterialTheme.colorScheme.secondaryContainer,
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.secondary.copy(alpha = .35f)),
+        shadowElevation = 2.dp,
+    ) {
+        Row(Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
+            Surface(shape = CircleShape, color = MaterialTheme.colorScheme.secondary) {
+                Icon(Lucide.Tv, null, Modifier.padding(10.dp).size(22.dp), tint = MaterialTheme.colorScheme.onSecondary)
+            }
+            Spacer(Modifier.width(13.dp))
+            Column(Modifier.weight(1f)) {
+                Text(tv.name, fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.onSecondaryContainer)
+                Text(tv.host, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSecondaryContainer)
+            }
+            Icon(Lucide.Link, stringResource(R.string.remote_pair), Modifier.size(20.dp), tint = MaterialTheme.colorScheme.onSecondaryContainer)
+        }
+    }
+}
+
+@Composable
+private fun EmptyRemotes() = Surface(
+    modifier = Modifier.fillMaxWidth(),
+    shape = MaterialTheme.shapes.large,
+    color = MaterialTheme.colorScheme.surface,
+    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+) {
+    Column(
+        Modifier.fillMaxWidth().padding(horizontal = 26.dp, vertical = 24.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(10.dp),
+    ) {
+        Surface(shape = CircleShape, color = MaterialTheme.colorScheme.secondaryContainer) {
+            Icon(Lucide.Tv, null, Modifier.padding(13.dp).size(28.dp), tint = MaterialTheme.colorScheme.onSecondaryContainer)
+        }
+        Text(stringResource(R.string.no_remotes), fontWeight = FontWeight.SemiBold, style = MaterialTheme.typography.titleMedium)
+        Text(stringResource(R.string.no_remotes_body), color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodyMedium)
     }
 }
 
@@ -235,10 +295,6 @@ private fun RemoteCard(
 private fun RemoteEditorSheet(
     initial: RemoteDevice? = null,
     saving: Boolean,
-    discovering: Boolean = false,
-    discovered: List<DiscoveredTv> = emptyList(),
-    onDiscover: () -> Unit = {},
-    onPick: (DiscoveredTv) -> Unit = {},
     onDismiss: () -> Unit,
     onSave: (RemoteInput) -> Unit,
 ) {
@@ -261,51 +317,10 @@ private fun RemoteEditorSheet(
         },
     ) {
         Column(Modifier.fillMaxWidth().heightIn(max = 560.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-            if (initial == null) {
-                Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                    Column(Modifier.weight(1f)) {
-                        Text(stringResource(R.string.remote_discover), fontWeight = FontWeight.SemiBold)
-                        Text(stringResource(R.string.remote_discover_hint), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    }
-                    Button(onClick = onDiscover, enabled = !discovering) {
-                        if (discovering) CircularProgressIndicator(Modifier.size(16.dp), strokeWidth = 2.dp, color = MaterialTheme.colorScheme.onPrimary)
-                        else Icon(Lucide.Radar, null, Modifier.size(18.dp))
-                        Spacer(Modifier.width(6.dp))
-                        Text(stringResource(if (discovering) R.string.remote_discovering else R.string.remote_discover_action))
-                    }
-                }
-                when {
-                    discovering -> LinearProgressIndicator(Modifier.fillMaxWidth())
-                    discovered.isNotEmpty() -> Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                        discovered.forEach { tv ->
-                            Surface(
-                                onClick = { onPick(tv) },
-                                modifier = Modifier.fillMaxWidth(),
-                                shape = MaterialTheme.shapes.medium,
-                                color = MaterialTheme.colorScheme.surfaceVariant,
-                                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
-                            ) {
-                                Row(Modifier.padding(14.dp), verticalAlignment = Alignment.CenterVertically) {
-                                    Icon(Lucide.Tv, null, Modifier.size(22.dp), tint = MaterialTheme.colorScheme.secondary)
-                                    Spacer(Modifier.width(12.dp))
-                                    Column(Modifier.weight(1f)) {
-                                        Text(tv.name, fontWeight = FontWeight.SemiBold)
-                                        Text(tv.host, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                                    }
-                                    Icon(Lucide.Link, null, Modifier.size(18.dp), tint = MaterialTheme.colorScheme.secondary)
-                                }
-                            }
-                        }
-                        Text(stringResource(R.string.remote_discover_connect), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    }
-                    else -> Text(stringResource(R.string.remote_discover_empty), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                }
-                HorizontalDivider()
-            }
             OutlinedTextField(name, { name = it }, Modifier.fillMaxWidth(), label = { Text(stringResource(R.string.remote_name)) }, singleLine = true)
             OutlinedTextField(host, { host = it }, Modifier.fillMaxWidth(), label = { Text(stringResource(R.string.remote_host)) }, supportingText = { Text(stringResource(R.string.remote_host_hint)) }, singleLine = true)
             OutlinedTextField(port, { port = it.filter(Char::isDigit) }, Modifier.fillMaxWidth(), label = { Text(stringResource(R.string.remote_port)) }, singleLine = true)
-            Text(stringResource(R.string.remote_samsung_hint), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Text(stringResource(R.string.remote_manual_hint), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
     }
 }
@@ -354,28 +369,28 @@ private fun RemoteControlSheet(
                 }
             }
             if (remote.tokenConfigured) {
-                DPad(enabled = enabled, onSend = onSend)
+                NavigationPad(enabled = enabled, onSend = onSend)
                 RemoteRow {
-                    RemoteButton(Lucide.Volume2, stringResource(R.string.remote_volume_up), enabled, Modifier.weight(1f)) { onSend("KEY_VOLUP") }
-                    RemoteButton(Lucide.VolumeX, stringResource(R.string.remote_mute), enabled, Modifier.weight(1f)) { onSend("KEY_MUTE") }
-                    RemoteButton(Lucide.Volume1, stringResource(R.string.remote_volume_down), enabled, Modifier.weight(1f)) { onSend("KEY_VOLDOWN") }
+                    RemoteAction(Lucide.Volume2, stringResource(R.string.remote_volume_up), enabled, Modifier.weight(1f)) { onSend("KEY_VOLUP") }
+                    RemoteAction(Lucide.VolumeX, stringResource(R.string.remote_mute), enabled, Modifier.weight(1f)) { onSend("KEY_MUTE") }
+                    RemoteAction(Lucide.Volume1, stringResource(R.string.remote_volume_down), enabled, Modifier.weight(1f)) { onSend("KEY_VOLDOWN") }
                 }
                 RemoteRow {
-                    RemoteButton(Lucide.ChevronUp, stringResource(R.string.remote_channel_up), enabled, Modifier.weight(1f)) { onSend("KEY_CHUP") }
-                    RemoteButton(Lucide.ChevronDown, stringResource(R.string.remote_channel_down), enabled, Modifier.weight(1f)) { onSend("KEY_CHDOWN") }
-                    RemoteButton(Lucide.List, stringResource(R.string.remote_channel_list), enabled, Modifier.weight(1f)) { onSend("KEY_CH_LIST") }
+                    RemoteAction(Lucide.ChevronUp, stringResource(R.string.remote_channel_up), enabled, Modifier.weight(1f)) { onSend("KEY_CHUP") }
+                    RemoteAction(Lucide.ChevronDown, stringResource(R.string.remote_channel_down), enabled, Modifier.weight(1f)) { onSend("KEY_CHDOWN") }
+                    RemoteAction(Lucide.List, stringResource(R.string.remote_channel_list), enabled, Modifier.weight(1f)) { onSend("KEY_CH_LIST") }
                 }
                 RemoteRow {
-                    RemoteButton(Lucide.SkipBack, stringResource(R.string.remote_rewind), enabled, Modifier.weight(1f)) { onSend("KEY_REWIND") }
-                    RemoteButton(Lucide.Play, stringResource(R.string.remote_play), enabled, Modifier.weight(1f)) { onSend("KEY_PLAY") }
-                    RemoteButton(Lucide.Pause, stringResource(R.string.remote_pause), enabled, Modifier.weight(1f)) { onSend("KEY_PAUSE") }
-                    RemoteButton(Lucide.SkipForward, stringResource(R.string.remote_forward), enabled, Modifier.weight(1f)) { onSend("KEY_FF") }
+                    RemoteAction(Lucide.SkipBack, stringResource(R.string.remote_rewind), enabled, Modifier.weight(1f)) { onSend("KEY_REWIND") }
+                    RemoteAction(Lucide.Play, stringResource(R.string.remote_play), enabled, Modifier.weight(1f)) { onSend("KEY_PLAY") }
+                    RemoteAction(Lucide.Pause, stringResource(R.string.remote_pause), enabled, Modifier.weight(1f)) { onSend("KEY_PAUSE") }
+                    RemoteAction(Lucide.SkipForward, stringResource(R.string.remote_forward), enabled, Modifier.weight(1f)) { onSend("KEY_FF") }
                 }
                 RemoteRow {
-                    RemoteButton(Lucide.House, stringResource(R.string.remote_home), enabled, Modifier.weight(1f)) { onSend("KEY_HOME") }
-                    RemoteButton(Lucide.ArrowLeft, stringResource(R.string.remote_back), enabled, Modifier.weight(1f)) { onSend("KEY_RETURN") }
-                    RemoteButton(Lucide.Menu, stringResource(R.string.remote_menu), enabled, Modifier.weight(1f)) { onSend("KEY_MENU") }
-                    RemoteButton(Lucide.Power, stringResource(R.string.remote_power), enabled, Modifier.weight(1f), tint = MaterialTheme.colorScheme.error) { onSend("KEY_POWER") }
+                    RemoteAction(Lucide.House, stringResource(R.string.remote_home), enabled, Modifier.weight(1f)) { onSend("KEY_HOME") }
+                    RemoteAction(Lucide.ArrowLeft, stringResource(R.string.remote_back), enabled, Modifier.weight(1f)) { onSend("KEY_RETURN") }
+                    RemoteAction(Lucide.Menu, stringResource(R.string.remote_menu), enabled, Modifier.weight(1f)) { onSend("KEY_MENU") }
+                    RemoteAction(Lucide.Power, stringResource(R.string.remote_power), enabled, Modifier.weight(1f), tint = MaterialTheme.colorScheme.error) { onSend("KEY_POWER") }
                 }
                 Text(stringResource(R.string.remote_power_hint), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
@@ -383,32 +398,52 @@ private fun RemoteControlSheet(
     }
 }
 
+// Mirrors the camera PTZ pad so both controllers feel like the same product.
 @Composable
-private fun DPad(enabled: Boolean, onSend: (String) -> Unit) {
+private fun NavigationPad(enabled: Boolean, onSend: (String) -> Unit) {
     Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
         Surface(
-            Modifier.size(210.dp),
+            Modifier.size(200.dp),
             shape = CircleShape,
             color = MaterialTheme.colorScheme.surfaceVariant,
             border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
             tonalElevation = 1.dp,
         ) {
-            Box(Modifier.fillMaxSize().padding(12.dp)) {
-                RemoteButton(Lucide.ChevronUp, stringResource(R.string.remote_up), enabled, Modifier.align(Alignment.TopCenter).size(56.dp)) { onSend("KEY_UP") }
-                RemoteButton(Lucide.ChevronDown, stringResource(R.string.remote_down), enabled, Modifier.align(Alignment.BottomCenter).size(56.dp)) { onSend("KEY_DOWN") }
-                RemoteButton(Lucide.ChevronLeft, stringResource(R.string.remote_left), enabled, Modifier.align(Alignment.CenterStart).size(56.dp)) { onSend("KEY_LEFT") }
-                RemoteButton(Lucide.ChevronRight, stringResource(R.string.remote_right), enabled, Modifier.align(Alignment.CenterEnd).size(56.dp)) { onSend("KEY_RIGHT") }
+            Box(Modifier.fillMaxSize().padding(10.dp)) {
+                PadKey(Lucide.ChevronUp, stringResource(R.string.remote_up), enabled, Modifier.align(Alignment.TopCenter)) { onSend("KEY_UP") }
+                PadKey(Lucide.ChevronDown, stringResource(R.string.remote_down), enabled, Modifier.align(Alignment.BottomCenter)) { onSend("KEY_DOWN") }
+                PadKey(Lucide.ChevronLeft, stringResource(R.string.remote_left), enabled, Modifier.align(Alignment.CenterStart)) { onSend("KEY_LEFT") }
+                PadKey(Lucide.ChevronRight, stringResource(R.string.remote_right), enabled, Modifier.align(Alignment.CenterEnd)) { onSend("KEY_RIGHT") }
                 Surface(
                     onClick = { onSend("KEY_ENTER") },
                     enabled = enabled,
-                    modifier = Modifier.align(Alignment.Center).size(78.dp),
+                    modifier = Modifier.align(Alignment.Center).size(76.dp),
                     shape = CircleShape,
-                    color = MaterialTheme.colorScheme.secondary,
-                    contentColor = MaterialTheme.colorScheme.onSecondary,
+                    color = MaterialTheme.colorScheme.surface,
+                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
                 ) {
-                    Box(contentAlignment = Alignment.Center) { Text(stringResource(R.string.remote_ok), fontWeight = FontWeight.SemiBold) }
+                    Box(contentAlignment = Alignment.Center) {
+                        Text(stringResource(R.string.remote_ok), fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.secondary)
+                    }
                 }
             }
+        }
+    }
+}
+
+@Composable
+private fun PadKey(icon: ImageVector, label: String, enabled: Boolean, modifier: Modifier, onClick: () -> Unit) {
+    Surface(
+        onClick = onClick,
+        enabled = enabled,
+        modifier = modifier.size(50.dp),
+        shape = CircleShape,
+        color = MaterialTheme.colorScheme.surface,
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+        shadowElevation = 3.dp,
+    ) {
+        Box(contentAlignment = Alignment.Center) {
+            Icon(icon, label, Modifier.size(22.dp), tint = MaterialTheme.colorScheme.secondary)
         }
     }
 }
@@ -418,8 +453,9 @@ private fun RemoteRow(content: @Composable androidx.compose.foundation.layout.Ro
     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically, content = content)
 }
 
+// Matches the camera action tiles (rounded surface with icon over label).
 @Composable
-private fun RemoteButton(
+private fun RemoteAction(
     icon: ImageVector,
     label: String,
     enabled: Boolean,
@@ -430,19 +466,19 @@ private fun RemoteButton(
     Surface(
         onClick = onClick,
         enabled = enabled,
-        modifier = modifier.heightIn(min = 54.dp),
-        shape = RoundedCornerShape(15.dp),
+        modifier = modifier.heightIn(min = 62.dp),
+        shape = RoundedCornerShape(17.dp),
         color = MaterialTheme.colorScheme.surface,
         border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
-        shadowElevation = 2.dp,
+        shadowElevation = 3.dp,
     ) {
         Column(
-            Modifier.fillMaxWidth().padding(vertical = 10.dp, horizontal = 6.dp),
+            Modifier.fillMaxWidth().padding(vertical = 11.dp, horizontal = 6.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.Center,
         ) {
             Icon(icon, label, Modifier.size(20.dp), tint = tint ?: MaterialTheme.colorScheme.secondary)
-            Spacer(Modifier.height(3.dp))
+            Spacer(Modifier.height(5.dp))
             Text(label, style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Medium, maxLines = 1)
         }
     }

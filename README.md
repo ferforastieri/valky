@@ -23,6 +23,7 @@ Valkyris transforma um servidor doméstico em uma central privada de monitoramen
 - Descoberta de capacidades e do perfil principal por ONVIF Profile S; previews são extraídos do stream local já conectado.
 - Live WebRTC autenticado, com uma única conexão RTSP por câmera e conversão apenas do áudio G.711 para Opus.
 - Movimento PTZ por pressionar e segurar e zoom quando anunciado pela câmera.
+- Posições PTZ salvas na própria câmera, com uma posição fixada para ela voltar sozinha ao iniciar ou reiniciar.
 - Cadastro assíncrono: a câmera aparece imediatamente e o progresso ou erro fica persistido.
 - [Detecção sonora contínua](docs/audio-detection.md), com janelas sobrepostas, confirmação temporal de choro de bebê e diagnóstico de pontuações por 24 horas.
 - Regras para movimento e sons residenciais; a confiança mínima é aplicada internamente por detector, sem ajuste manual, e as regras ficam sempre ativas.
@@ -34,7 +35,7 @@ Valkyris transforma um servidor doméstico em uma central privada de monitoramen
 - Avisos de nova versão por sheet obrigatório no app e download manual do APK assinado.
 - Painel web em /app/, servido pelo próprio backend, para consultar câmeras, eventos, família e configurações.
 - [Base de iluminação local](docs/lighting.md) independente de fabricante, com energia, brilho, branco ajustável e RGB.
-- [Controle remoto de TVs Samsung](docs/remote-control.md) pelo backend, com pareamento autorizado na TV e token cifrado.
+- [Controle remoto de TVs](docs/remote-control.md) pelo backend, com descoberta na rede, pareamento autorizado na TV e token cifrado.
 - Interface em PT-BR e inglês, temas claro/escuro e suporte a LAN ou VPN.
 
 ## Como funciona
@@ -215,9 +216,13 @@ Além do contrato completo em OpenAPI, as rotas adicionadas recentemente são:
 | `POST` | `/api/v1/events/acknowledge-all` | Autenticado | Marca todos os eventos pendentes como lidos. |
 | `GET` | `/api/v1/settings/push` | Autenticado | Informa apenas se o FCM está configurado. |
 | `PUT` | `/api/v1/settings/push` | Administrador | Recebe `{ "serviceAccountBase64": "..." }`, valida e cifra a conta de serviço no SQLite. |
-| `GET · POST · PUT · DELETE` | `/api/v1/remotes` | Autenticado / Admin ao alterar | Lista, cadastra, edita e remove controles remotos (Samsung TV). |
+| `GET · POST · PUT · DELETE` | `/api/v1/remotes` | Autenticado / Admin ao alterar | Lista, cadastra, edita e remove controles remotos de TV. |
 | `POST` | `/api/v1/remotes/{id}/pair` | Administrador | Pareia com a TV; aceite o aviso exibido nela. |
 | `POST` | `/api/v1/remotes/{id}/keys` | Autenticado | Envia uma tecla ao dispositivo pareado. |
+| `GET · POST` | `/api/v1/cameras/{id}/ptz/presets` | Autenticado | Lista e salva posições PTZ na câmera. |
+| `POST` | `/api/v1/cameras/{id}/ptz/presets/{token}/goto` | Autenticado | Move a câmera para uma posição salva. |
+| `DELETE` | `/api/v1/cameras/{id}/ptz/presets/{token}` | Autenticado | Remove uma posição salva. |
+| `PUT` | `/api/v1/cameras/{id}/ptz/startup` | Autenticado | Define a posição aplicada quando a câmera inicia. |
 
 Respostas JSON seguem um envelope consistente:
 

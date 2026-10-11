@@ -62,10 +62,13 @@ import com.composables.icons.lucide.ChevronUp
 import com.composables.icons.lucide.Check
 import com.composables.icons.lucide.Lucide
 import com.composables.icons.lucide.Maximize2
+import com.composables.icons.lucide.MapPin
 import com.composables.icons.lucide.Minus
 import com.composables.icons.lucide.Move
+import com.composables.icons.lucide.Pin
 import com.composables.icons.lucide.Pencil
 import com.composables.icons.lucide.Plus
+import com.composables.icons.lucide.Save
 import com.composables.icons.lucide.Trash2
 import com.composables.icons.lucide.Video
 import com.composables.icons.lucide.VideoOff
@@ -482,6 +485,10 @@ private fun ReadyCameraContent(camera: Camera, vm: CameraLiveViewModel) {
         } else {
             Surface(Modifier.fillMaxWidth(),RoundedCornerShape(18.dp),MaterialTheme.colorScheme.surfaceVariant) { Text(stringResource(R.string.fixed_camera),Modifier.padding(16.dp),style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant) }
         }
+        if (camera.capabilities.ptz) {
+            LaunchedEffect(camera.id) { vm.loadPresets() }
+            PresetsSection(camera, vm)
+        }
         CameraRulesSection(camera.id)
         Spacer(Modifier.height(18.dp))
     }
@@ -592,4 +599,72 @@ private data class CameraActionItem(val icon:ImageVector,val label:String,val on
         modifier.size(48.dp).graphicsLayer{scaleX=scale;scaleY=scale}.pointerInput(Unit){detectTapGestures(onPress={pressed=true;onPress();try{tryAwaitRelease()}finally{onRelease();pressed=false}})},
         shape=CircleShape,color=color,shadowElevation=if(pressed)0.dp else 3.dp,
     ){Box(contentAlignment=Alignment.Center){Icon(icon,label,Modifier.size(22.dp),tint=if(pressed)MaterialTheme.colorScheme.secondary else LocalContentColor.current)}}
+}
+
+@Composable
+private fun PresetsSection(camera: Camera, vm: CameraLiveViewModel) {
+    val presets by vm.presets.collectAsStateWithLifecycle()
+    val busy by vm.presetsBusy.collectAsStateWithLifecycle()
+    val defaultName = stringResource(R.string.camera_position_default)
+    var naming by remember { mutableStateOf(false) }
+    Surface(
+        Modifier.fillMaxWidth(),
+        RoundedCornerShape(24.dp),
+        MaterialTheme.colorScheme.surface,
+        border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+        shadowElevation = 5.dp,
+    ) {
+        Column(Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                Column(Modifier.weight(1f)) {
+                    Text(stringResource(R.string.camera_positions), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+                    Text(stringResource(R.string.camera_positions_hint), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+                Button(onClick = { naming = true }, enabled = !busy) {
+                    if (busy) CircularProgressIndicator(Modifier.size(18.dp), strokeWidth = 2.dp, color = MaterialTheme.colorScheme.onPrimary)
+                    else { Icon(Lucide.Save, null, Modifier.size(18.dp)); Spacer(Modifier.width(6.dp)) }
+                    Text(stringResource(R.string.camera_position_save))
+                }
+            }
+            if (presets.isEmpty()) {
+                Text(stringResource(R.string.camera_positions_empty), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+            presets.forEach { preset ->
+                val pinned = camera.startupPresetToken == preset.token
+                Surface(
+                    onClick = { vm.gotoPreset(preset.token) },
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(15.dp),
+                    color = if (pinned) MaterialTheme.colorScheme.secondaryContainer else MaterialTheme.colorScheme.surfaceVariant,
+                    border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+                ) {
+                    Row(Modifier.padding(start = 14.dp, end = 4.dp, top = 6.dp, bottom = 6.dp), verticalAlignment = Alignment.CenterVertically) {
+                        Icon(Lucide.MapPin, null, Modifier.size(20.dp), tint = MaterialTheme.colorScheme.secondary)
+                        Spacer(Modifier.width(12.dp))
+                        Text(preset.name, Modifier.weight(1f), fontWeight = FontWeight.Medium)
+                        IconButton(onClick = { vm.pinStartupPreset(if (pinned) "" else preset.token) }) {
+                            Icon(
+                                Lucide.Pin,
+                                stringResource(if (pinned) R.string.camera_position_unpin else R.string.camera_position_pin),
+                                tint = if (pinned) MaterialTheme.colorScheme.secondary else MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
+                        IconButton(onClick = { vm.removePreset(preset.token) }) {
+                            Icon(Lucide.Trash2, stringResource(R.string.remove), tint = MaterialTheme.colorScheme.error)
+                        }
+                    }
+                }
+            }
+        }
+    }
+    if (naming) {
+        var label by remember { mutableStateOf("") }
+        AlertDialog(
+            onDismissRequest = { naming = false },
+            title = { Text(stringResource(R.string.camera_position_save)) },
+            text = { OutlinedTextField(label, { label = it }, label = { Text(stringResource(R.string.camera_position_name)) }, singleLine = true) },
+            dismissButton = { TextButton(onClick = { naming = false }) { Text(stringResource(R.string.cancel)) } },
+            confirmButton = { Button(onClick = { vm.savePreset(label.trim().ifBlank { defaultName }); naming = false }) { Text(stringResource(R.string.save)) } },
+        )
+    }
 }

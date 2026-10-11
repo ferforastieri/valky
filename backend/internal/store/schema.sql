@@ -22,6 +22,7 @@ CREATE TABLE IF NOT EXISTS cameras (
   media_xaddr TEXT NOT NULL DEFAULT '',
   events_xaddr TEXT NOT NULL DEFAULT '',
   ptz_xaddr TEXT NOT NULL DEFAULT '',
+  startup_preset_token TEXT NOT NULL DEFAULT '',
   setup_status TEXT NOT NULL DEFAULT 'ready',
   setup_step TEXT NOT NULL DEFAULT '',
   setup_error TEXT NOT NULL DEFAULT '',
@@ -50,12 +51,12 @@ CREATE TABLE IF NOT EXISTS lights (
 );
 CREATE INDEX IF NOT EXISTS idx_lights_name ON lights(name COLLATE NOCASE);
 
--- Remote controls (Samsung Tizen smart TVs today). token_enc holds the access
--- token the TV issues after the on-screen authorization prompt.
+-- Remote controls (smart TVs today). token_enc holds the access token the TV
+-- issues after the on-screen authorization prompt.
 CREATE TABLE IF NOT EXISTS remotes (
   id TEXT PRIMARY KEY,
   name TEXT NOT NULL,
-  kind TEXT NOT NULL DEFAULT 'samsung',
+  kind TEXT NOT NULL DEFAULT 'smart_tv',
   host TEXT NOT NULL,
   port INTEGER NOT NULL DEFAULT 8002,
   token_enc BLOB,

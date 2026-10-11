@@ -1,24 +1,31 @@
-# Controle remoto (Samsung Smart TV)
+# Controle remoto de TVs
 
 A seção **Dispositivos** do aplicativo reúne câmeras, iluminação e controles
 remotos. As câmeras continuam sendo a página inicial; o controle remoto é uma
-nova aba ao lado da iluminação.
+aba ao lado da iluminação, com seletor apenas por ícones e troca por deslize
+lateral.
 
 O backend é a ponte entre o celular e a TV: o app nunca fala diretamente com a
 TV, então o controle funciona pela mesma sessão autenticada, pela LAN ou por
 VPN. O token que a TV emite fica cifrado no SQLite (AES-256-GCM) e nunca é
 devolvido pela API.
 
+O domínio é **agnóstico de marca**. O primeiro driver implementa o canal
+WebSocket usado por TVs com Tizen; outros protocolos podem ser adicionados como
+novos drivers sem mudar a API nem o app. O controle **apenas envia teclas**:
+ele não altera nenhuma configuração da TV.
+
 ## Como a TV é controlada
 
-As TVs Samsung com Tizen (2016+) expõem um canal WebSocket de controle remoto:
+As TVs com Tizen (2016+) expõem um canal WebSocket de controle remoto:
 
 ```text
 wss://TV:8002/api/v2/channels/samsung.remote.control?name=<base64 do app>&token=<token>
 ```
 
 - `name` é o nome do controlador, codificado em base64; a TV o mostra no aviso
-  de autorização.
+  de autorização. O caminho do canal é um identificador fixo do protocolo e é
+  usado exatamente como a TV espera.
 - A porta `8002` usa TLS. Como a TV apresenta um certificado autoassinado, o
   backend valida a alcançabilidade, mas não a cadeia de certificados.
 - Modelos mais antigos expõem o canal sem TLS na porta `8001`. O backend tenta
@@ -37,35 +44,27 @@ wss://TV:8002/api/v2/channels/samsung.remote.control?name=<base64 do app>&token=
 }
 ```
 
-## Pareamento
+## Descoberta e pareamento
 
-Na primeira conexão a TV mostra um aviso do tipo *"Permitir que Valkyris
-acesse este dispositivo?"*. Ao aceitar, a TV devolve um token que o backend
-guarda cifrado. Depois disso os comandos não pedem mais autorização.
+Ao abrir a aba de controle remoto, o app **já procura TVs sozinho** na rede do
+celular (SSDP/UPnP, com varredura da sub-rede local nas portas de controle das
+principais plataformas de TV como alternativa quando o roteador bloqueia
+multicast). As TVs encontradas aparecem em **Encontradas na rede**; tocar em uma
+delas cadastra o controle e inicia o pareamento.
 
-O aplicativo consegue **encontrar as TVs sozinho**: em **Dispositivos →
-Controle remoto → + → Encontrar TVs na rede**, ele usa SSDP (UPnP) para achar
-as TVs Samsung na mesma rede do celular e, se o multicast estiver bloqueado
-pelo roteador, varre rapidamente a sub-rede local na porta REST da TV. Tocar em
-uma TV encontrada já cadastra o controle e inicia o pareamento — basta aceitar
-o aviso na tela da TV.
+Na primeira conexão a TV mostra um aviso do tipo *"Permitir que Valkyris acesse
+este dispositivo?"*. Ao aceitar, a TV devolve um token que o backend guarda
+cifrado. Depois disso os comandos não pedem mais autorização.
 
-Opcionalmente dá para informar o endereço à mão:
-
-1. No app, abra **Dispositivos → Controle remoto → +**.
-2. Informe o nome e o endereço IP da TV (ex.: `192.168.0.10`). A porta padrão
-   é `8002`.
-3. Toque no controle criado e em **Parear com a TV**.
-4. Aceite o aviso na tela da TV. O estado passa de *Não pareado* para
-   *Pareado*.
+Também é possível cadastrar manualmente (nome e IP da TV, porta padrão `8002`).
 
 Se a TV trocar o token (por exemplo, ao remover o controlador nas configurações
 dela), basta parear de novo.
 
 ## Comandos disponíveis
 
-O backend aceita apenas uma lista fixa de teclas Samsung; nada além disso é
-repassado à TV. A API rejeita qualquer comando fora dessa lista.
+O backend aceita apenas uma lista fixa de teclas; nada além disso é repassado à
+TV. A API rejeita qualquer comando fora dessa lista.
 
 `KEY_POWER`, `KEY_UP`, `KEY_DOWN`, `KEY_LEFT`, `KEY_RIGHT`, `KEY_ENTER`,
 `KEY_RETURN`, `KEY_HOME`, `KEY_MENU`, `KEY_EXIT`, `KEY_VOLUP`, `KEY_VOLDOWN`,
@@ -79,9 +78,11 @@ repassado à TV. A API rejeita qualquer comando fora dessa lista.
 - A TV precisa estar ligada e acessível a partir do servidor. Ligar uma TV
   totalmente desligada exige Wake-on-LAN e não é suportado; o botão de energia
   desliga.
-- Não há cadastro público nem nuvem: o controle é apenas para a sua instalação.
-- O backend não faz descoberta automática de TVs; informe o IP (reserve-o no
-  roteador para ele não mudar).
+- A descoberta depende da rede: isolar clientes (Wi-Fi de convidados, VLANs) ou
+  bloquear multicast impede achar a TV automaticamente — nesse caso use o
+  cadastro manual.
+- O controle não altera configurações da TV; apenas envia teclas.
+- Reserve o IP da TV no roteador para ele não mudar.
 
 ## API
 

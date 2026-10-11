@@ -9,6 +9,7 @@ import com.ferforastieri.valkyris.core.model.Camera
 import com.ferforastieri.valkyris.core.action.MobileActionGate
 import com.ferforastieri.valkyris.core.model.CreateCameraRequest
 import com.ferforastieri.valkyris.core.model.PTZCommand
+import com.ferforastieri.valkyris.core.model.PTZPreset
 import com.ferforastieri.valkyris.core.media.DeviceMediaStore
 import com.ferforastieri.valkyris.core.network.ValkyrisApi
 import com.ferforastieri.valkyris.core.network.ValkyrisRepository
@@ -166,6 +167,10 @@ class CameraLiveViewModel @Inject constructor(
     val recordingLoading = _recordingLoading.asStateFlow()
     private val _preview = MutableStateFlow<Bitmap?>(null)
     val preview = _preview.asStateFlow()
+    private val _presets = MutableStateFlow<List<PTZPreset>>(emptyList())
+    val presets = _presets.asStateFlow()
+    private val _presetsBusy = MutableStateFlow(false)
+    val presetsBusy = _presetsBusy.asStateFlow()
     private val ptzMutex = Mutex()
     private var realtime: okhttp3.WebSocket? = null
 
@@ -206,6 +211,40 @@ class CameraLiveViewModel @Inject constructor(
 
     fun stop() {
         viewModelScope.launch { ptzMutex.withLock { runCatching { api.ptz(id, PTZCommand("stop")) } } }
+    }
+
+    fun loadPresets() {
+        viewModelScope.launch {
+            runCatching { api.ptzPresets(id) }.onSuccess { _presets.value = it }
+        }
+    }
+
+    fun savePreset(name: String) {
+        if (_presetsBusy.value) return
+        _presetsBusy.value = true
+        viewModelScope.launch {
+            try {
+                runCatching { api.savePTZPreset(id, name) }.onSuccess { loadPresets() }
+            } finally {
+                _presetsBusy.value = false
+            }
+        }
+    }
+
+    fun gotoPreset(token: String) {
+        viewModelScope.launch { runCatching { api.gotoPTZPreset(id, token) } }
+    }
+
+    fun removePreset(token: String) {
+        viewModelScope.launch {
+            runCatching { api.deletePTZPreset(id, token) }.onSuccess { loadPresets() }
+        }
+    }
+
+    fun pinStartupPreset(token: String) {
+        viewModelScope.launch {
+            runCatching { api.setStartupPreset(id, token) }.onSuccess { _camera.value = it }
+        }
     }
 
     fun captureSnapshot() {
