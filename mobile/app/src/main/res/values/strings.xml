@@ -330,4 +330,10 @@
     <string name="remote_left">Esquerda</string>
     <string name="remote_right">Direita</string>
     <string name="remote_ok">OK</string>
+    <string name="remote_discover">Encontrar TVs na rede</string>
+    <string name="remote_discover_hint">Procuramos TVs Samsung na mesma rede do celular.</string>
+    <string name="remote_discover_action">Buscar</string>
+    <string name="remote_discovering">Buscando…</string>
+    <string name="remote_discover_empty">Nenhuma TV encontrada. Confirme que a TV está ligada e na mesma rede Wi-Fi.</string>
+    <string name="remote_discover_connect">Toque em uma TV para parear e aceite o aviso na tela dela.</string>
 </resources>

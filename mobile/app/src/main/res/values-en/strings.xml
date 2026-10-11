@@ -330,4 +330,10 @@
     <string name="remote_left">Left</string>
     <string name="remote_right">Right</string>
     <string name="remote_ok">OK</string>
+    <string name="remote_discover">Find TVs on the network</string>
+    <string name="remote_discover_hint">We look for Samsung TVs on the same network as the phone.</string>
+    <string name="remote_discover_action">Search</string>
+    <string name="remote_discovering">Searching…</string>
+    <string name="remote_discover_empty">No TV found. Make sure the TV is on and on the same Wi-Fi network.</string>
+    <string name="remote_discover_connect">Tap a TV to pair and accept the prompt on its screen.</string>
 </resources>

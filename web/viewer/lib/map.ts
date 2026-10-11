@@ -15,7 +15,9 @@ export function familyMap(
   L.tileLayer("https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png", {
     maxZoom: 20,
     subdomains: "abcd",
-    detectRetina: true,
+    // Do not enable detectRetina: Leaflet would halve the tile size and shift
+    // the zoom, misaligning the CARTO tiles into a grid. The {r} placeholder
+    // already requests @2x tiles on retina screens.
     attribution:
       '© <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noreferrer">OpenStreetMap</a> © <a href="https://carto.com/attributions" target="_blank" rel="noreferrer">CARTO</a>',
   }).addTo(map);
@@ -84,7 +86,6 @@ export function historyMap(
   L.tileLayer("https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png", {
     maxZoom: 20,
     subdomains: "abcd",
-    detectRetina: true,
     attribution: '© <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noreferrer">OpenStreetMap</a> © <a href="https://carto.com/attributions" target="_blank" rel="noreferrer">CARTO</a>',
   }).addTo(map);
   const layer = L.layerGroup().addTo(map);

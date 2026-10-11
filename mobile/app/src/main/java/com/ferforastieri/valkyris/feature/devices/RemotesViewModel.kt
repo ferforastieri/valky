@@ -19,6 +19,8 @@ data class RemotesState(
     val busy: Set<String> = emptySet(),
     val pairing: Set<String> = emptySet(),
     val remotes: List<RemoteDevice> = emptyList(),
+    val discovering: Boolean = false,
+    val discovered: List<DiscoveredTv> = emptyList(),
     val error: String? = null,
 )
 
@@ -48,6 +50,36 @@ class RemotesViewModel @Inject constructor(
                     .onFailure { error -> _state.update { it.copy(error = error.message) } }
             } finally {
                 actionGate.release()
+            }
+        }
+    }
+
+    /** Registers a TV found on the network and starts pairing right away. */
+    fun addAndPair(input: RemoteInput) {
+        if (!actionGate.tryAcquire()) return
+        viewModelScope.launch {
+            try {
+                runCatching { api.createRemote(input) }
+                    .onSuccess { created ->
+                        _state.update { it.copy(remotes = (it.remotes + created).distinctBy(RemoteDevice::id), discovered = emptyList(), error = null) }
+                        pair(created.id)
+                    }
+                    .onFailure { error -> _state.update { it.copy(error = error.message) } }
+            } finally {
+                actionGate.release()
+            }
+        }
+    }
+
+    fun discover(context: android.content.Context) {
+        if (_state.value.discovering) return
+        _state.update { it.copy(discovering = true, discovered = emptyList(), error = null) }
+        viewModelScope.launch {
+            try {
+                val found = TvDiscovery.discover(context)
+                _state.update { it.copy(discovering = false, discovered = found) }
+            } catch (error: Exception) {
+                _state.update { it.copy(discovering = false, error = error.message) }
             }
         }
     }

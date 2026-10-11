@@ -9,7 +9,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Immutable
 import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.graphics.toArgb
-import org.osmdroid.tileprovider.tilesource.ITileSource
 import org.osmdroid.tileprovider.tilesource.XYTileSource
 import org.osmdroid.views.MapView
 
@@ -45,9 +44,11 @@ fun MapView.applyValkyrisMapStyle(style: MapVisualStyle) {
  * matching dark variant. CARTO's basemaps are free for low-volume use, need no
  * API key and are derived from OpenStreetMap data, so the attribution is kept.
  */
-fun valkyrisTileSource(style: MapVisualStyle): ITileSource {
+fun valkyrisTileSource(style: MapVisualStyle): XYTileSource {
     val dark = style.dark
-    val baseUrl = if (dark) "https://basemaps.cartocdn.com/dark_all" else "https://basemaps.cartocdn.com/rastertiles/voyager"
+    // osmdroid concatenates the base URL with the zoom level directly, so the
+    // base must end with a slash.
+    val baseUrl = if (dark) "https://basemaps.cartocdn.com/dark_all/" else "https://basemaps.cartocdn.com/rastertiles/voyager/"
     val copyright = "© OpenStreetMap contributors © CARTO"
     return XYTileSource(
         if (dark) "valkyris-carto-dark" else "valkyris-carto-voyager",

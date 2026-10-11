@@ -25,6 +25,7 @@ import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.FloatingActionButton
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
@@ -63,6 +64,7 @@ import com.composables.icons.lucide.Pencil
 import com.composables.icons.lucide.Play
 import com.composables.icons.lucide.Plus
 import com.composables.icons.lucide.Power
+import com.composables.icons.lucide.Radar
 import com.composables.icons.lucide.SkipBack
 import com.composables.icons.lucide.SkipForward
 import com.composables.icons.lucide.Trash2
@@ -121,8 +123,16 @@ fun RemotesScreen(admin: Boolean, vm: RemotesViewModel = hiltViewModel()) {
         ) { Icon(Lucide.Plus, stringResource(R.string.add_remote)) }
     }
 
+    val context = androidx.compose.ui.platform.LocalContext.current
     if (showAdd) RemoteEditorSheet(
         saving = false,
+        discovering = state.discovering,
+        discovered = state.discovered,
+        onDiscover = { vm.discover(context) },
+        onPick = { tv ->
+            showAdd = false
+            vm.addAndPair(com.ferforastieri.valkyris.core.model.RemoteInput(name = tv.name, host = tv.host, port = 8002))
+        },
         onDismiss = { showAdd = false },
         onSave = { input -> vm.add(input) { if (it) showAdd = false } },
     )
@@ -225,6 +235,10 @@ private fun RemoteCard(
 private fun RemoteEditorSheet(
     initial: RemoteDevice? = null,
     saving: Boolean,
+    discovering: Boolean = false,
+    discovered: List<DiscoveredTv> = emptyList(),
+    onDiscover: () -> Unit = {},
+    onPick: (DiscoveredTv) -> Unit = {},
     onDismiss: () -> Unit,
     onSave: (RemoteInput) -> Unit,
 ) {
@@ -246,7 +260,48 @@ private fun RemoteEditorSheet(
             }
         },
     ) {
-        Column(Modifier.fillMaxWidth().heightIn(max = 520.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        Column(Modifier.fillMaxWidth().heightIn(max = 560.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            if (initial == null) {
+                Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                    Column(Modifier.weight(1f)) {
+                        Text(stringResource(R.string.remote_discover), fontWeight = FontWeight.SemiBold)
+                        Text(stringResource(R.string.remote_discover_hint), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                    Button(onClick = onDiscover, enabled = !discovering) {
+                        if (discovering) CircularProgressIndicator(Modifier.size(16.dp), strokeWidth = 2.dp, color = MaterialTheme.colorScheme.onPrimary)
+                        else Icon(Lucide.Radar, null, Modifier.size(18.dp))
+                        Spacer(Modifier.width(6.dp))
+                        Text(stringResource(if (discovering) R.string.remote_discovering else R.string.remote_discover_action))
+                    }
+                }
+                when {
+                    discovering -> LinearProgressIndicator(Modifier.fillMaxWidth())
+                    discovered.isNotEmpty() -> Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        discovered.forEach { tv ->
+                            Surface(
+                                onClick = { onPick(tv) },
+                                modifier = Modifier.fillMaxWidth(),
+                                shape = MaterialTheme.shapes.medium,
+                                color = MaterialTheme.colorScheme.surfaceVariant,
+                                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+                            ) {
+                                Row(Modifier.padding(14.dp), verticalAlignment = Alignment.CenterVertically) {
+                                    Icon(Lucide.Tv, null, Modifier.size(22.dp), tint = MaterialTheme.colorScheme.secondary)
+                                    Spacer(Modifier.width(12.dp))
+                                    Column(Modifier.weight(1f)) {
+                                        Text(tv.name, fontWeight = FontWeight.SemiBold)
+                                        Text(tv.host, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                    }
+                                    Icon(Lucide.Link, null, Modifier.size(18.dp), tint = MaterialTheme.colorScheme.secondary)
+                                }
+                            }
+                        }
+                        Text(stringResource(R.string.remote_discover_connect), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                    else -> Text(stringResource(R.string.remote_discover_empty), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+                HorizontalDivider()
+            }
             OutlinedTextField(name, { name = it }, Modifier.fillMaxWidth(), label = { Text(stringResource(R.string.remote_name)) }, singleLine = true)
             OutlinedTextField(host, { host = it }, Modifier.fillMaxWidth(), label = { Text(stringResource(R.string.remote_host)) }, supportingText = { Text(stringResource(R.string.remote_host_hint)) }, singleLine = true)
             OutlinedTextField(port, { port = it.filter(Char::isDigit) }, Modifier.fillMaxWidth(), label = { Text(stringResource(R.string.remote_port)) }, singleLine = true)

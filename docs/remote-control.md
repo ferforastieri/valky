@@ -43,6 +43,15 @@ Na primeira conexão a TV mostra um aviso do tipo *"Permitir que Valkyris
 acesse este dispositivo?"*. Ao aceitar, a TV devolve um token que o backend
 guarda cifrado. Depois disso os comandos não pedem mais autorização.
 
+O aplicativo consegue **encontrar as TVs sozinho**: em **Dispositivos →
+Controle remoto → + → Encontrar TVs na rede**, ele usa SSDP (UPnP) para achar
+as TVs Samsung na mesma rede do celular e, se o multicast estiver bloqueado
+pelo roteador, varre rapidamente a sub-rede local na porta REST da TV. Tocar em
+uma TV encontrada já cadastra o controle e inicia o pareamento — basta aceitar
+o aviso na tela da TV.
+
+Opcionalmente dá para informar o endereço à mão:
+
 1. No app, abra **Dispositivos → Controle remoto → +**.
 2. Informe o nome e o endereço IP da TV (ex.: `192.168.0.10`). A porta padrão
    é `8002`.
