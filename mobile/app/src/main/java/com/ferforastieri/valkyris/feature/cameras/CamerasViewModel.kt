@@ -271,6 +271,9 @@ class CameraLiveViewModel @Inject constructor(
         }
     }
 
+    suspend fun intervalEvents(bucket: com.ferforastieri.valkyris.core.model.ActivityBucket, offset: Int) =
+        api.intervalEvents(bucket, offset, id)
+
     fun captureSnapshot() {
         if (!actionGate.tryAcquire()) return
         _snapshotLoading.value = true

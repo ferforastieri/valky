@@ -44,7 +44,7 @@ func TestActivityCountsAndIntervalPagination(t *testing.T) {
 	}
 	seen := map[string]bool{}
 	for offset, want := range map[int]int{0: 100, 100: 100, 200: 51, 300: 0} {
-		page, err := s.ListInterval(ctx, now.Add(-time.Hour), now, offset)
+		page, err := s.ListInterval(ctx, "", now.Add(-time.Hour), now, offset)
 		if err != nil || len(page) != want {
 			t.Fatalf("page %d: len=%d err=%v", offset, len(page), err)
 		}
@@ -89,7 +89,7 @@ func TestActivityHalfOpenBoundaries(t *testing.T) {
 			if i == 1 || i == 11 {
 				want = 1
 			}
-			events, err := s.ListInterval(ctx, b.Start, b.End, 0)
+			events, err := s.ListInterval(ctx, "", b.Start, b.End, 0)
 			if err != nil || b.Count != want || len(events) != want {
 				t.Fatalf("%dh bucket %d count=%d details=%d want=%d err=%v", hours, i, b.Count, len(events), want, err)
 			}

@@ -77,8 +77,8 @@ func (s *Service) List(ctx context.Context, cameraID string, limit int) ([]Event
 	return s.list(ctx, cameraID, limit, 0, time.Time{}, time.Time{})
 }
 
-func (s *Service) ListInterval(ctx context.Context, from, to time.Time, offset int) ([]Event, error) {
-	return s.list(ctx, "", 100, offset, from, to)
+func (s *Service) ListInterval(ctx context.Context, cameraID string, from, to time.Time, offset int) ([]Event, error) {
+	return s.list(ctx, cameraID, 100, offset, from, to)
 }
 
 func (s *Service) list(ctx context.Context, cameraID string, limit, offset int, from, to time.Time) ([]Event, error) {

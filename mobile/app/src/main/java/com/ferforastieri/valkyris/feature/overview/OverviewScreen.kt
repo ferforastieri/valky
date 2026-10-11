@@ -197,6 +197,46 @@ fun OverviewContent(
                 FavoriteCard(favorite, onCamera = onCamera, onLight = onLight, onFavorite = onFavorite)
             }
         }
+        item { SectionLabel(stringResource(R.string.recent_activity)) }
+        if (events.isEmpty()) {
+            item {
+                Surface(Modifier.fillMaxWidth(), RoundedCornerShape(18.dp), color = MaterialTheme.colorScheme.surface) {
+                    Text(stringResource(R.string.no_events_body), Modifier.padding(18.dp), color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+            }
+        } else {
+            items(events.take(3), key = { "event-${it.id}" }) { event -> RecentEventCard(event, onEvent) }
+        }
+    }
+}
+
+@Composable
+private fun RecentEventCard(event: com.ferforastieri.valkyris.core.model.ValkyrisEvent, onEvent: (String) -> Unit) {
+    Card(
+        onClick = { onEvent(event.id) },
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+    ) {
+        Row(Modifier.fillMaxWidth().padding(14.dp), verticalAlignment = Alignment.CenterVertically) {
+            Surface(
+                modifier = Modifier.size(36.dp),
+                shape = RoundedCornerShape(11.dp),
+                color = if (event.acknowledgedAt == null) MaterialTheme.colorScheme.error.copy(alpha = .12f) else MaterialTheme.colorScheme.secondary.copy(alpha = .15f),
+            ) {
+                Icon(
+                    overviewEventIcon(event.type),
+                    null,
+                    Modifier.padding(8.dp),
+                    tint = if (event.acknowledgedAt == null) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.secondary,
+                )
+            }
+            Spacer(Modifier.width(12.dp))
+            Column(Modifier.weight(1f)) {
+                Text(com.ferforastieri.valkyris.feature.events.eventTitle(event), fontWeight = FontWeight.Medium, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                Text(overviewTime(event.occurredAt), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+            Text("${(event.confidence * 100).toInt()}%", style = MaterialTheme.typography.labelMedium)
+        }
     }
 }
 
@@ -287,3 +327,9 @@ private fun SectionLabel(text: String, icon: androidx.compose.ui.graphics.vector
 private fun overviewTime(value: String) = runCatching {
     DateTimeFormatter.ofPattern("dd MMM · HH:mm").withZone(ZoneId.systemDefault()).format(Instant.parse(value))
 }.getOrDefault(value)
+
+private fun overviewEventIcon(type: String) = when {
+    type.contains("mov", ignoreCase = true) || type.contains("motion", ignoreCase = true) -> Lucide.Video
+    type.contains("camp", ignoreCase = true) || type.contains("door", ignoreCase = true) -> Lucide.Bell
+    else -> Lucide.Mic
+}

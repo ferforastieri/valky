@@ -48,12 +48,12 @@ class RemoteControlViewModel @Inject constructor(
     }
 
     fun send(key: String) {
-        // Keys are fire-and-forget so a tap never waits for the previous one:
-        // the backend keeps a warm channel to the TV, so latency stays low.
+        // Keys are fire-and-forget so a tap never waits for the previous one, and
+        // the device state is not rewritten on every key (the backend keeps a
+        // warm channel to the TV), which keeps the remote responsive.
         _state.update { it.copy(error = null) }
         viewModelScope.launch {
             runCatching { api.sendRemoteKey(id, key) }
-                .onSuccess { updated -> _state.update { it.copy(remote = updated) } }
                 .onFailure { error -> _state.update { it.copy(error = error.message) } }
         }
     }

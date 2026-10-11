@@ -166,12 +166,15 @@ func (s *Service) Send(ctx context.Context, id, key string) (Device, error) {
 		}
 		return Device{}, err
 	}
-	_ = s.repo.SetStatus(ctx, id, "ready", "", true)
-	updated, err := s.Get(ctx, id)
-	if err == nil {
-		s.broadcast("remote.updated", updated)
+	// Key presses are high frequency, so the success path stays free of database
+	// writes and broadcasts; the status is only persisted when it actually
+	// changes, which keeps the remote responsive.
+	if item.SetupStatus != "ready" || item.SetupError != "" {
+		_ = s.repo.SetStatus(ctx, id, "ready", "", true)
+		item.SetupStatus = "ready"
+		item.SetupError = ""
 	}
-	return updated, err
+	return item, nil
 }
 
 // Apps lists the applications installed on the TV.

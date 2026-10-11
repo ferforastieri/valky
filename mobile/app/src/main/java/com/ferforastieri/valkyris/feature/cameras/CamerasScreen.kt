@@ -58,6 +58,8 @@ import com.ferforastieri.valkyris.core.model.Camera
 import com.ferforastieri.valkyris.core.model.CameraStats
 import com.ferforastieri.valkyris.core.model.CreateCameraRequest
 import com.ferforastieri.valkyris.core.model.DayCount
+import com.ferforastieri.valkyris.core.model.ActivityBucket
+import com.ferforastieri.valkyris.core.model.ValkyrisEvent
 import com.ferforastieri.valkyris.core.model.detectorLabelRes
 import com.ferforastieri.valkyris.feature.rules.CameraRulesSection
 import com.composables.icons.lucide.Aperture
@@ -343,7 +345,7 @@ private val cameraIconOptions = listOf(
 @Composable private fun EmptyCameras(){Box(Modifier.fillMaxSize()){Column(Modifier.align(Alignment.Center),horizontalAlignment=Alignment.CenterHorizontally){Icon(Lucide.VideoOff,null,Modifier.size(42.dp),tint=MaterialTheme.colorScheme.onSurfaceVariant);Spacer(Modifier.height(12.dp));Text(stringResource(R.string.no_cameras),fontWeight=FontWeight.SemiBold);Text(stringResource(R.string.add_camera_hint),color=MaterialTheme.colorScheme.onSurfaceVariant)}}}
 
 @Composable
-fun CameraLiveScreen(cameraId:String,vm:CameraLiveViewModel=hiltViewModel()) {
+fun CameraLiveScreen(cameraId:String,onEvent:(String)->Unit={},vm:CameraLiveViewModel=hiltViewModel()) {
     val camera by vm.camera.collectAsStateWithLifecycle()
     val context = androidx.compose.ui.platform.LocalContext.current
     val activity = remember(context) { context.findActivity() }
@@ -367,7 +369,7 @@ fun CameraLiveScreen(cameraId:String,vm:CameraLiveViewModel=hiltViewModel()) {
             }
         }
         when (camera?.setupStatus) {
-            "ready" -> ReadyCameraContent(requireNotNull(camera), vm)
+            "ready" -> ReadyCameraContent(requireNotNull(camera), vm, onEvent)
             "failed" -> CameraSetupContent(requireNotNull(camera), failed = true)
             null -> Box(Modifier.fillMaxSize()) { CircularProgressIndicator(Modifier.align(Alignment.Center)) }
             else -> CameraSetupContent(requireNotNull(camera), failed = false)
@@ -395,7 +397,7 @@ private fun CameraSetupContent(camera: Camera, failed: Boolean) {
 }
 
 @Composable
-private fun ReadyCameraContent(camera: Camera, vm: CameraLiveViewModel) {
+private fun ReadyCameraContent(camera: Camera, vm: CameraLiveViewModel, onEvent: (String) -> Unit = {}) {
     val context = androidx.compose.ui.platform.LocalContext.current
     val snapshotLoading by vm.snapshotLoading.collectAsStateWithLifecycle()
     val recordingLoading by vm.recordingLoading.collectAsStateWithLifecycle()
@@ -507,7 +509,7 @@ private fun ReadyCameraContent(camera: Camera, vm: CameraLiveViewModel) {
         val stats by vm.stats.collectAsStateWithLifecycle()
         val statsLoading by vm.statsLoading.collectAsStateWithLifecycle()
         LaunchedEffect(Unit) { vm.loadStats() }
-        CameraStatsSheet(stats, statsLoading, onDismiss = { showStats = false })
+        CameraStatsSheet(stats, statsLoading, load = { bucket, offset -> vm.intervalEvents(bucket, offset) }, onEvent = onEvent, onDismiss = { showStats = false })
     }
 }
 
@@ -685,7 +687,14 @@ private fun PresetsSection(camera: Camera, vm: CameraLiveViewModel) {
 }
 
 @Composable
-private fun CameraStatsSheet(stats: CameraStats?, loading: Boolean, onDismiss: () -> Unit) {
+private fun CameraStatsSheet(
+    stats: CameraStats?,
+    loading: Boolean,
+    load: suspend (ActivityBucket, Int) -> List<ValkyrisEvent>,
+    onEvent: (String) -> Unit,
+    onDismiss: () -> Unit,
+) {
+    var selected by remember { mutableStateOf<ActivityBucket?>(null) }
     ValkyrisBottomSheet(title = stringResource(R.string.camera_stats), onDismiss = onDismiss) {
         when {
             stats == null && loading -> Box(Modifier.fillMaxWidth().padding(28.dp), contentAlignment = Alignment.Center) { CircularProgressIndicator() }
@@ -709,13 +718,16 @@ private fun CameraStatsSheet(stats: CameraStats?, loading: Boolean, onDismiss: (
                         }
                     }
                 }
-                if (stats.byHour.isNotEmpty()) {
-                    Text(stringResource(R.string.camera_stats_by_hour), style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
-                    HourChart(stats.byHour)
-                }
                 if (stats.byDay.isNotEmpty()) {
                     Text(stringResource(R.string.camera_stats_by_day), style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
-                    DayChart(stats.byDay)
+                    DayChart(stats.byDay, onSelect = { selected = dayBucket(it) })
+                }
+                if (stats.byHour.isNotEmpty()) {
+                    Text(stringResource(R.string.camera_stats_by_hour), style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
+                    HourChart(stats.byHour, onSelect = { hour -> selected = hourBucket(hour, stats.byHour.getOrElse(hour) { 0 }) })
+                }
+                if (stats.byDay.isNotEmpty() || stats.byHour.isNotEmpty()) {
+                    Text(stringResource(R.string.activity_chart_hint), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
                 if (stats.lastEventAt.isNotBlank()) {
                     Text(
@@ -727,6 +739,14 @@ private fun CameraStatsSheet(stats: CameraStats?, loading: Boolean, onDismiss: (
                 Spacer(Modifier.height(8.dp))
             }
         }
+    }
+    selected?.let { bucket ->
+        com.ferforastieri.valkyris.feature.overview.ActivitySheet(
+            bucket,
+            load = { offset -> load(bucket, offset) },
+            onDismiss = { selected = null },
+            onEvent = { selected = null; onEvent(it) },
+        )
     }
 }
 
@@ -741,38 +761,74 @@ private fun StatChip(label: String, value: String, modifier: Modifier) {
 }
 
 @Composable
-private fun HourChart(hours: List<Int>) {
+private fun HourChart(hours: List<Int>, onSelect: (Int) -> Unit) {
     val max = (hours.maxOrNull() ?: 0).coerceAtLeast(1)
-    Row(Modifier.fillMaxWidth().height(64.dp), horizontalArrangement = Arrangement.spacedBy(2.dp), verticalAlignment = Alignment.Bottom) {
-        hours.forEach { count ->
-            Box(
-                Modifier
-                    .weight(1f)
-                    .fillMaxHeight(count.toFloat() / max)
-                    .background(MaterialTheme.colorScheme.secondary, RoundedCornerShape(topStart = 2.dp, topEnd = 2.dp)),
-            )
+    Row(
+        Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
+        horizontalArrangement = Arrangement.spacedBy(3.dp),
+        verticalAlignment = Alignment.Bottom,
+    ) {
+        hours.forEachIndexed { hour, count ->
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(4.dp),
+                modifier = Modifier.clickable { onSelect(hour) }.padding(vertical = 2.dp),
+            ) {
+                Box(Modifier.width(20.dp).height(56.dp), contentAlignment = Alignment.BottomCenter) {
+                    Box(
+                        Modifier
+                            .fillMaxWidth()
+                            .fillMaxHeight(count.toFloat() / max)
+                            .background(MaterialTheme.colorScheme.secondary, RoundedCornerShape(topStart = 3.dp, topEnd = 3.dp)),
+                    )
+                }
+                Text(hour.toString().padStart(2, '0'), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
         }
     }
 }
 
 @Composable
-private fun DayChart(days: List<DayCount>) {
+private fun DayChart(days: List<DayCount>, onSelect: (DayCount) -> Unit) {
     val max = (days.maxOfOrNull { it.count } ?: 0).coerceAtLeast(1)
     Row(
-        Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).height(64.dp),
-        horizontalArrangement = Arrangement.spacedBy(3.dp),
+        Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
+        horizontalArrangement = Arrangement.spacedBy(4.dp),
         verticalAlignment = Alignment.Bottom,
     ) {
         days.forEach { day ->
-            Box(
-                Modifier
-                    .width(12.dp)
-                    .fillMaxHeight(day.count.toFloat() / max)
-                    .background(MaterialTheme.colorScheme.secondary, RoundedCornerShape(topStart = 2.dp, topEnd = 2.dp)),
-            )
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(4.dp),
+                modifier = Modifier.clickable { onSelect(day) }.padding(vertical = 2.dp),
+            ) {
+                Box(Modifier.width(30.dp).height(64.dp), contentAlignment = Alignment.BottomCenter) {
+                    Box(
+                        Modifier
+                            .fillMaxWidth()
+                            .fillMaxHeight(day.count.toFloat() / max)
+                            .background(MaterialTheme.colorScheme.secondary, RoundedCornerShape(topStart = 3.dp, topEnd = 3.dp)),
+                    )
+                }
+                Text(dayLabel(day.date), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
         }
     }
 }
+
+private fun dayBucket(day: DayCount): com.ferforastieri.valkyris.core.model.ActivityBucket {
+    val start = runCatching { java.time.LocalDate.parse(day.date) }.getOrNull() ?: java.time.LocalDate.now(java.time.ZoneOffset.UTC)
+    return com.ferforastieri.valkyris.core.model.ActivityBucket(start.toString() + "T00:00:00Z", start.plusDays(1).toString() + "T00:00:00Z", day.count)
+}
+
+private fun hourBucket(hour: Int, count: Int): com.ferforastieri.valkyris.core.model.ActivityBucket {
+    val start = java.time.ZonedDateTime.of(java.time.LocalDate.now(java.time.ZoneOffset.UTC), java.time.LocalTime.of(hour, 0), java.time.ZoneOffset.UTC)
+    return com.ferforastieri.valkyris.core.model.ActivityBucket(start.toInstant().toString(), start.plusHours(1).toInstant().toString(), count)
+}
+
+private fun dayLabel(value: String) = runCatching {
+    java.time.LocalDate.parse(value).format(java.time.format.DateTimeFormatter.ofPattern("dd/MM"))
+}.getOrDefault(value)
 
 private fun statsTime(value: String) = runCatching {
     java.time.format.DateTimeFormatter.ofPattern("dd/MM/yyyy · HH:mm")

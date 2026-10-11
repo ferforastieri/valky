@@ -198,7 +198,7 @@ private fun ConnectedValkyrisApp(main: MainViewModel) {
             composable("lights") { LightsScreen(admin = admin) }
             composable("devices") { DevicesScreen(admin = admin, onCamera = { nav.navigate("camera/$it") }, onRemote = { nav.navigate("remote/$it") }) }
             composable("cameras") { DevicesScreen(admin = admin, onCamera = { nav.navigate("camera/$it") }, onRemote = { nav.navigate("remote/$it") }, initialPage = 0) }
-            composable("camera/{id}") { CameraLiveScreen(cameraId = it.arguments?.getString("id").orEmpty()) }
+            composable("camera/{id}") { CameraLiveScreen(cameraId = it.arguments?.getString("id").orEmpty(), onEvent = { id -> nav.navigate("event/$id") }) }
             composable("remote/{id}") { RemoteControlScreen(onBack = { nav.popBackStack() }) }
             composable("events") {
                 EventsScreen(

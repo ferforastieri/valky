@@ -30,6 +30,6 @@ func (s *Server) eventInterval(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, fmt.Errorf("invalid event interval or offset"))
 		return
 	}
-	out, err := s.events.ListInterval(r.Context(), from, to, offset)
+	out, err := s.events.ListInterval(r.Context(), q.Get("cameraId"), from, to, offset)
 	respondWithMessage(w, out, err, "Events loaded successfully")
 }

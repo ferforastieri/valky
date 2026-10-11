@@ -10,6 +10,7 @@ import (
 	"log/slog"
 	"net"
 	"net/http"
+	"sort"
 	"strconv"
 	"strings"
 	"sync"
@@ -297,36 +298,73 @@ func devicePort(device Device) int {
 	return device.Port
 }
 
-// Apps asks the TV for its installed applications. Newer firmware answers on
-// the plain /api/v2 app-control channel instead, so both are tried before
-// giving up. A dedicated connection is used because the kept-alive channel is
-// drained in the background.
+// Apps lists the applications installed on the TV. Two strategies are raced:
+// the WebSocket installed-app event (older firmwares answer with the full list)
+// and a per-ID lookup against the TV REST API (newer firmwares dropped the
+// event, so we ask the TV which known apps it actually has). The WebSocket
+// result wins when it arrives because it is complete.
 func (d *SmartTVDriver) Apps(ctx context.Context, device Device, token string) ([]App, error) {
-	conn, err := d.connectReady(ctx, device, token)
-	if err == nil {
-		apps, requestErr := d.requestApps(ctx, conn)
+	type result struct {
+		apps []App
+		err  error
+	}
+	wsCtx, wsCancel := context.WithCancel(ctx)
+	defer wsCancel()
+	wsCh := make(chan result, 1)
+	go func() {
+		conn, err := d.connectReady(wsCtx, device, token)
+		if err != nil {
+			wsCh <- result{nil, err}
+			return
+		}
+		apps, requestErr := d.requestApps(wsCtx, conn)
 		conn.Close(websocket.StatusNormalClosure, "")
-		if requestErr == nil {
-			if len(apps) > 0 {
-				return apps, nil
-			}
-			// The TV answered but exposed nothing: try the app-control channel
-			// as a last resort, while still treating the empty answer as valid.
-			if fallback, fallbackErr := d.appsViaControlChannel(ctx, device); fallbackErr == nil && len(fallback) > 0 {
-				return fallback, nil
-			}
-			return []App{}, nil
-		}
-		if fallback, fallbackErr := d.appsViaControlChannel(ctx, device); fallbackErr == nil && len(fallback) > 0 {
-			return fallback, nil
-		}
-		return nil, requestErr
+		wsCh <- result{apps, requestErr}
+	}()
+	restCh := make(chan result, 1)
+	go func() {
+		apps, err := d.appsViaRest(ctx, device)
+		restCh <- result{apps, err}
+	}()
+
+	var ws result
+	select {
+	case ws = <-wsCh:
+	case <-time.After(3 * time.Second):
+		// This firmware does not answer the installed-app event; stop waiting.
 	}
-	// The primary channel failed: try the app-control channel before giving up.
-	if fallback, fallbackErr := d.appsViaControlChannel(ctx, device); fallbackErr == nil && len(fallback) > 0 {
-		return fallback, nil
+	wsCancel()
+	rest := <-restCh
+	merged := mergeApps(ws.apps, rest.apps)
+	if len(merged) > 0 {
+		return merged, nil
 	}
-	return nil, err
+	if ws.err != nil {
+		return nil, ws.err
+	}
+	return []App{}, nil
+}
+
+// mergeApps unions app lists, dropping duplicates by name, and returns a stable
+// alphabetical order.
+func mergeApps(groups ...[]App) []App {
+	out := make([]App, 0)
+	seen := map[string]struct{}{}
+	for _, group := range groups {
+		for _, app := range group {
+			key := strings.ToLower(strings.TrimSpace(app.Name))
+			if key == "" {
+				continue
+			}
+			if _, ok := seen[key]; ok {
+				continue
+			}
+			seen[key] = struct{}{}
+			out = append(out, app)
+		}
+	}
+	sort.Slice(out, func(i, j int) bool { return strings.ToLower(out[i].Name) < strings.ToLower(out[j].Name) })
+	return out
 }
 
 func (d *SmartTVDriver) requestApps(ctx context.Context, conn *websocket.Conn) ([]App, error) {
@@ -337,7 +375,7 @@ func (d *SmartTVDriver) requestApps(ctx context.Context, conn *websocket.Conn) (
 	if err := conn.Write(ctx, websocket.MessageText, payload); err != nil {
 		return nil, fmt.Errorf("não foi possível pedir a lista de apps: %w", err)
 	}
-	deadline, cancel := context.WithTimeout(ctx, 10*time.Second)
+	deadline, cancel := context.WithTimeout(ctx, 6*time.Second)
 	defer cancel()
 	for {
 		_, data, err := conn.Read(deadline)
@@ -355,30 +393,72 @@ func (d *SmartTVDriver) requestApps(ctx context.Context, conn *websocket.Conn) (
 	}
 }
 
-func (d *SmartTVDriver) appsViaControlChannel(ctx context.Context, device Device) ([]App, error) {
-	port := devicePort(device)
-	address := net.JoinHostPort(device.Host, strconv.Itoa(port))
-	var lastErr error
-	for _, scheme := range []string{"wss", "ws"} {
-		url := fmt.Sprintf("%s://%s%s", scheme, address, appControlPath)
-		conn, err := d.dialURL(ctx, url)
-		if err != nil {
-			lastErr = err
+// appsViaRest asks the TV, per known application ID, whether the app is
+// installed. The REST endpoint returns the application name only for apps the
+// TV actually has (404 otherwise), so the result lists real installed apps.
+func (d *SmartTVDriver) appsViaRest(ctx context.Context, device Device) ([]App, error) {
+	base := fmt.Sprintf("http://%s/api/v2/applications/", net.JoinHostPort(device.Host, strconv.Itoa(LegacyPort)))
+	probeCtx, cancel := context.WithTimeout(ctx, 8*time.Second)
+	defer cancel()
+	results := make(chan App, len(knownAppIDs))
+	sem := make(chan struct{}, 16)
+	var wg sync.WaitGroup
+	for _, id := range knownAppIDs {
+		wg.Add(1)
+		go func(id string) {
+			defer wg.Done()
+			select {
+			case sem <- struct{}{}:
+			case <-probeCtx.Done():
+				return
+			}
+			defer func() { <-sem }()
+			reqCtx, reqCancel := context.WithTimeout(probeCtx, 2500*time.Millisecond)
+			defer reqCancel()
+			req, err := http.NewRequestWithContext(reqCtx, http.MethodGet, base+id, nil)
+			if err != nil {
+				return
+			}
+			req.Header.Set("Accept", "application/json")
+			resp, err := d.client.Do(req)
+			if err != nil {
+				return
+			}
+			defer resp.Body.Close()
+			if resp.StatusCode/100 != 2 {
+				return
+			}
+			var info struct {
+				ID   string `json:"id"`
+				Name string `json:"name"`
+			}
+			if json.NewDecoder(io.LimitReader(resp.Body, 1<<20)).Decode(&info) != nil || info.Name == "" {
+				return
+			}
+			resolved := info.ID
+			if resolved == "" {
+				resolved = id
+			}
+			results <- App{ID: resolved, Name: info.Name}
+		}(id)
+	}
+	wg.Wait()
+	close(results)
+	out := make([]App, 0, len(knownAppIDs))
+	seen := map[string]struct{}{}
+	for app := range results {
+		key := strings.ToLower(strings.TrimSpace(app.Name))
+		if key == "" {
 			continue
 		}
-		apps, requestErr := d.requestApps(ctx, conn)
-		conn.Close(websocket.StatusNormalClosure, "")
-		if requestErr == nil && len(apps) > 0 {
-			return apps, nil
+		if _, ok := seen[key]; ok {
+			continue
 		}
-		if requestErr != nil {
-			lastErr = requestErr
-		}
+		seen[key] = struct{}{}
+		out = append(out, app)
 	}
-	if lastErr == nil {
-		lastErr = fmt.Errorf("a TV não retornou a lista de apps")
-	}
-	return nil, lastErr
+	sort.Slice(out, func(i, j int) bool { return strings.ToLower(out[i].Name) < strings.ToLower(out[j].Name) })
+	return out, nil
 }
 
 func parseApps(raw json.RawMessage) []App {
@@ -496,7 +576,6 @@ func (d *SmartTVDriver) DeviceMAC(ctx context.Context, device Device) (string, e
 }
 
 const controlChannelPath = "/api/v2/channels/samsung.remote.control"
-const appControlPath = "/api/v2"
 
 // channelURL builds a channel URL. The application name travels base64 encoded
 // exactly as the TV expects it in the query string.
