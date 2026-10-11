@@ -16,10 +16,8 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
@@ -54,11 +52,11 @@ import com.composables.icons.lucide.House
 import com.composables.icons.lucide.Link
 import com.composables.icons.lucide.Lucide
 import com.composables.icons.lucide.Menu
-import com.composables.icons.lucide.Play
 import com.composables.icons.lucide.Power
 import com.composables.icons.lucide.Tv
 import com.composables.icons.lucide.Volume1
 import com.composables.icons.lucide.Volume2
+import com.composables.icons.lucide.VolumeX
 import com.ferforastieri.valkyris.R
 import com.ferforastieri.valkyris.core.model.RemoteApp
 import kotlinx.coroutines.Job
@@ -66,15 +64,17 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
 /**
- * Full-screen remote laid out like a real TV remote: the installed-apps bar sits
- * on top and every key lives below it. Keys repeat while held (like a physical
- * remote) and the whole screen stays free of chrome buttons — the system back
- * gesture leaves the screen.
+ * Full-screen remote laid out like a TV remote: the installed apps sit on top
+ * and the main controls — D-pad, volume, channel, home/back/menu and mute —
+ * stay within thumb reach at the bottom, without scrolling. Keys repeat while
+ * held, and the numeric keypad is a toggle so it never pushes the controls off
+ * screen. The system back gesture leaves the screen.
  */
 @Composable
 fun RemoteControlScreen(onBack: () -> Unit, vm: RemoteControlViewModel = hiltViewModel()) {
     val state by vm.state.collectAsStateWithLifecycle()
     val remote = state.remote
+    var keypad by remember { mutableStateOf(false) }
     Column(Modifier.fillMaxSize().padding(horizontal = 18.dp)) {
         Row(Modifier.fillMaxWidth().padding(vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
             Column(Modifier.weight(1f)) {
@@ -92,6 +92,8 @@ fun RemoteControlScreen(onBack: () -> Unit, vm: RemoteControlViewModel = hiltVie
                 )
             }
             if (remote?.tokenConfigured == true) {
+                KeypadToggle(active = keypad, onToggle = { keypad = !keypad })
+                Spacer(Modifier.width(8.dp))
                 PowerButton(powering = state.powering, onPower = vm::power)
             }
         }
@@ -101,7 +103,21 @@ fun RemoteControlScreen(onBack: () -> Unit, vm: RemoteControlViewModel = hiltVie
         when {
             remote == null -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { CircularProgressIndicator() }
             !remote.tokenConfigured -> PairingPanel(pairing = state.pairing, onPair = vm::pair)
-            else -> ConnectedRemote(state, vm)
+            else -> ConnectedRemote(state, vm, keypad)
+        }
+    }
+}
+
+@Composable
+private fun KeypadToggle(active: Boolean, onToggle: () -> Unit) {
+    Surface(
+        onClick = onToggle,
+        shape = CircleShape,
+        color = if (active) MaterialTheme.colorScheme.secondaryContainer else MaterialTheme.colorScheme.surfaceVariant,
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+    ) {
+        Box(Modifier.size(46.dp), contentAlignment = Alignment.Center) {
+            Text("123", style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.secondary)
         }
     }
 }
@@ -126,17 +142,19 @@ private fun PowerButton(powering: Boolean, onPower: () -> Unit) {
 }
 
 @Composable
-private fun ConnectedRemote(state: RemoteControlState, vm: RemoteControlViewModel) {
+private fun ConnectedRemote(state: RemoteControlState, vm: RemoteControlViewModel, keypad: Boolean) {
     val enabled = !state.powering
-    Column(
-        Modifier.fillMaxSize().verticalScroll(rememberScrollState()),
-        verticalArrangement = Arrangement.spacedBy(14.dp),
-    ) {
+    Column(Modifier.fillMaxSize()) {
         AppsRow(state, vm)
+        Spacer(Modifier.weight(1f))
         NavigationPad(enabled, vm::send)
-        NumberPad(enabled, vm::send)
+        Spacer(Modifier.height(14.dp))
         BottomRow(enabled, vm::send)
-        Spacer(Modifier.height(22.dp))
+        if (keypad) {
+            Spacer(Modifier.height(12.dp))
+            NumberPad(enabled, vm::send)
+        }
+        Spacer(Modifier.height(10.dp))
     }
 }
 
@@ -243,7 +261,7 @@ private fun NumberPad(enabled: Boolean, onSend: (String) -> Unit) {
                     } else {
                         KeyButton(
                             enabled,
-                            Modifier.weight(1f).height(54.dp),
+                            Modifier.weight(1f).height(52.dp),
                             RoundedCornerShape(16.dp),
                             onSend,
                             KeySpec(Lucide.Tv, digit, "KEY_$digit"),
@@ -262,7 +280,7 @@ private fun BottomRow(enabled: Boolean, onSend: (String) -> Unit) {
         KeyButton(enabled, Modifier.weight(1f).height(58.dp), RoundedCornerShape(16.dp), onSend, KeySpec(Lucide.House, stringResource(R.string.remote_home), "KEY_HOME"))
         KeyButton(enabled, Modifier.weight(1f).height(58.dp), RoundedCornerShape(16.dp), onSend, KeySpec(Lucide.ArrowLeft, stringResource(R.string.remote_back), "KEY_RETURN"))
         KeyButton(enabled, Modifier.weight(1f).height(58.dp), RoundedCornerShape(16.dp), onSend, KeySpec(Lucide.Menu, stringResource(R.string.remote_menu), "KEY_MENU"))
-        KeyButton(enabled, Modifier.weight(1f).height(58.dp), RoundedCornerShape(16.dp), onSend, KeySpec(Lucide.Play, stringResource(R.string.remote_play), "KEY_PLAY"))
+        KeyButton(enabled, Modifier.weight(1f).height(58.dp), RoundedCornerShape(16.dp), onSend, KeySpec(Lucide.VolumeX, stringResource(R.string.remote_mute), "KEY_MUTE"))
     }
 }
 
