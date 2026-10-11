@@ -148,3 +148,20 @@ func (s *Server) wakeRemote(w http.ResponseWriter, r *http.Request) {
 	}
 	writeSuccess(w, http.StatusOK, "Wake-on-LAN sent", item)
 }
+
+func (s *Server) powerRemote(w http.ResponseWriter, r *http.Request) {
+	item, turnedOn, err := s.remotes.Power(r.Context(), r.PathValue("id"))
+	if errors.Is(err, sql.ErrNoRows) {
+		writeError(w, http.StatusNotFound, err)
+		return
+	}
+	if err != nil {
+		writeError(w, http.StatusBadGateway, err)
+		return
+	}
+	message := "TV powered off"
+	if turnedOn {
+		message = "TV powered on"
+	}
+	writeSuccess(w, http.StatusOK, message, item)
+}

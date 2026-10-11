@@ -211,13 +211,13 @@ class ValkyrisApi(
     suspend fun cameras(): List<Camera> = get("/cameras")
 
     suspend fun createCamera(camera: CreateCameraRequest): Camera {
-        val started: CameraOperation = post("/cameras", camera, announceBackend = false)
+        val started: CameraOperation = post("/cameras", camera, announceBackend = true)
         return requireNotNull(started.camera) { "The server did not return the saved camera" }
     }
 
     suspend fun deleteCamera(id: String) {
         val current = requireNotNull(session())
-        executeUnit(current.fingerprint, announceBackend = false) {
+        executeUnit(current.fingerprint, announceBackend = true) {
             it.delete(base() + "/cameras/$id") {
                 bearerAuth(current.token)
                 header(HttpHeaders.AcceptLanguage, Locale.getDefault().toLanguageTag())
@@ -228,14 +228,14 @@ class ValkyrisApi(
     suspend fun updateCamera(id: String, camera: CreateCameraRequest): Camera = put(
         "/cameras/$id",
         camera,
-        announceBackend = false,
+        announceBackend = true,
     )
 
     suspend fun lights(): List<LightDevice> = get("/lights")
     suspend fun controlLight(id: String, patch: LightStatePatch): LightDevice = put("/lights/$id/state", patch)
     suspend fun deleteLight(id: String) {
         val current = requireNotNull(session())
-        executeUnit(current.fingerprint, announceBackend = false) {
+        executeUnit(current.fingerprint, announceBackend = true) {
             it.delete(base() + "/lights/$id") {
                 bearerAuth(current.token)
                 header(HttpHeaders.AcceptLanguage, Locale.getDefault().toLanguageTag())
@@ -244,9 +244,9 @@ class ValkyrisApi(
     }
 
     suspend fun remotes(): List<RemoteDevice> = get("/remotes")
-    suspend fun createRemote(input: RemoteInput): RemoteDevice = post("/remotes", input, announceBackend = false)
-    suspend fun updateRemote(id: String, input: RemoteUpdate): RemoteDevice = put("/remotes/$id", input, announceBackend = false)
-    suspend fun pairRemote(id: String): RemoteDevice = post("/remotes/$id/pair", emptyMap<String, String>(), announceBackend = false)
+    suspend fun createRemote(input: RemoteInput): RemoteDevice = post("/remotes", input, announceBackend = true)
+    suspend fun updateRemote(id: String, input: RemoteUpdate): RemoteDevice = put("/remotes/$id", input, announceBackend = true)
+    suspend fun pairRemote(id: String): RemoteDevice = post("/remotes/$id/pair", emptyMap<String, String>(), announceBackend = true)
     suspend fun sendRemoteKey(id: String, key: String): RemoteDevice = post("/remotes/$id/keys", RemoteKeyInput(key))
     suspend fun remoteApps(id: String): List<RemoteApp> = get("/remotes/$id/apps")
     suspend fun launchRemoteApp(id: String, appId: String) {
@@ -259,6 +259,7 @@ class ValkyrisApi(
         }
     }
     suspend fun wakeRemote(id: String): RemoteDevice = post("/remotes/$id/wake", emptyMap<String, String>())
+    suspend fun powerRemote(id: String): RemoteDevice = post("/remotes/$id/power", emptyMap<String, String>(), announceBackend = true)
 
     suspend fun setFavorite(type: String, id: String, favorite: Boolean) {
         val current = requireNotNull(session())
@@ -275,7 +276,7 @@ class ValkyrisApi(
     suspend fun cameraStats(cameraId: String, days: Int = 30): CameraStats = get("/cameras/$cameraId/stats?days=$days")
     suspend fun deleteRemote(id: String) {
         val current = requireNotNull(session())
-        executeUnit(current.fingerprint, announceBackend = false) {
+        executeUnit(current.fingerprint, announceBackend = true) {
             it.delete(base() + "/remotes/$id") {
                 bearerAuth(current.token)
                 header(HttpHeaders.AcceptLanguage, Locale.getDefault().toLanguageTag())
@@ -288,41 +289,41 @@ class ValkyrisApi(
 
     suspend fun retention(): RetentionSettings = get("/settings/retention")
 
-    suspend fun updateRetention(settings: RetentionSettings): RetentionSettings = put("/settings/retention", settings, announceBackend = false)
+    suspend fun updateRetention(settings: RetentionSettings): RetentionSettings = put("/settings/retention", settings, announceBackend = true)
 
     suspend fun sessionPermissions(): SessionPermissions = get<SessionPermissions>("/viewer-session").also { _permissions.value = it; _permissionsLoaded.value = true }
     suspend fun saveCredentials(username: String, password: String, currentPassword: String = ""): Map<String, Boolean> = post("/me/credentials", mapOf("username" to username, "newPassword" to password, "currentPassword" to currentPassword))
     suspend fun managedUsers(): List<ManagedUser> = get("/admin/users")
-    suspend fun manageUser(user: ManagedUser): ManagedUser = put("/admin/users/${user.id}", user, announceBackend = false)
+    suspend fun manageUser(user: ManagedUser): ManagedUser = put("/admin/users/${user.id}", user, announceBackend = true)
     suspend fun removeUser(id: String) {
         val current = requireNotNull(session())
-        executeUnit(current.fingerprint, announceBackend = false) {
+        executeUnit(current.fingerprint, announceBackend = true) {
             it.delete(base() + "/admin/users/$id") { bearerAuth(current.token) }
         }
     }
     suspend fun users(): List<TrackedPerson> = get("/users")
     suspend fun me(): TrackedPerson = get("/me")
-    suspend fun updateMe(user: TrackedPerson): TrackedPerson = put("/me", user, announceBackend = false)
+    suspend fun updateMe(user: TrackedPerson): TrackedPerson = put("/me", user, announceBackend = true)
     suspend fun changeHomePassword(currentPassword: String, newPassword: String): Map<String, Boolean> = post(
         "/me/password",
         ChangePasswordRequest(currentPassword, newPassword),
-        announceBackend = false,
+        announceBackend = true,
     )
-    suspend fun updateUser(id: String, user: TrackedPerson): TrackedPerson = put("/users/$id", user, announceBackend = false)
+    suspend fun updateUser(id: String, user: TrackedPerson): TrackedPerson = put("/users/$id", user, announceBackend = true)
     suspend fun places(): List<TrackedPlace> = get("/places")
     suspend fun createPlace(place: TrackedPlace): TrackedPlace = post(
         "/places",
         PlaceUpsertRequest(place.name, place.latitude, place.longitude, place.radiusMeters, place.enabled),
-        announceBackend = false,
+        announceBackend = true,
     )
     suspend fun updatePlace(id: String, place: TrackedPlace): TrackedPlace = put(
         "/places/$id",
         PlaceUpsertRequest(place.name, place.latitude, place.longitude, place.radiusMeters, place.enabled),
-        announceBackend = false,
+        announceBackend = true,
     )
     suspend fun deletePlace(id: String) {
         val current = requireNotNull(session())
-        executeUnit(current.fingerprint, announceBackend = false) {
+        executeUnit(current.fingerprint, announceBackend = true) {
             it.delete(base() + "/places/$id") {
                 bearerAuth(current.token)
                 header(HttpHeaders.AcceptLanguage, Locale.getDefault().toLanguageTag())
@@ -340,7 +341,7 @@ class ValkyrisApi(
     suspend fun event(id: String): ValkyrisEvent = get("/events/$id")
     suspend fun rules(): List<Rule> = get("/rules")
     suspend fun detectors(): List<DetectorKind> = get("/detectors")
-    suspend fun createRule(rule: Rule, announce: Boolean = false): Rule = post(
+    suspend fun createRule(rule: Rule, announce: Boolean = true): Rule = post(
         "/rules",
         rule.toUpsertRequest(),
         announceBackend = announce,
@@ -349,12 +350,12 @@ class ValkyrisApi(
     suspend fun updateRule(id: String, rule: Rule): Rule = put(
         "/rules/$id",
         rule.toUpsertRequest(),
-        announceBackend = false,
+        announceBackend = true,
     )
 
     suspend fun deleteRule(id: String) {
         val current = requireNotNull(session())
-        executeUnit(current.fingerprint, announceBackend = false) {
+        executeUnit(current.fingerprint, announceBackend = true) {
             it.delete(base() + "/rules/$id") {
                 bearerAuth(current.token)
                 header(HttpHeaders.AcceptLanguage, Locale.getDefault().toLanguageTag())
@@ -362,7 +363,7 @@ class ValkyrisApi(
         }
     }
 
-    suspend fun acknowledge(id: String, announce: Boolean = false) {
+    suspend fun acknowledge(id: String, announce: Boolean = true) {
         val current = requireNotNull(session())
         executeUnit(
             current.fingerprint,
@@ -375,7 +376,7 @@ class ValkyrisApi(
         }
     }
 
-    suspend fun acknowledgeAll(announce: Boolean = false) {
+    suspend fun acknowledgeAll(announce: Boolean = true) {
         val current = requireNotNull(session())
         executeUnit(
             current.fingerprint,
@@ -427,7 +428,7 @@ class ValkyrisApi(
     suspend fun setStartupPreset(cameraId: String, token: String): Camera = put(
         "/cameras/$cameraId/ptz/startup",
         StartupPresetInput(token),
-        announceBackend = false,
+        announceBackend = true,
     )
 
     suspend fun registerPush(registration: PushRegistration) {
@@ -447,7 +448,7 @@ class ValkyrisApi(
     suspend fun saveFirebaseServiceAccount(data: ByteArray): PushConfiguration = put(
         "/settings/push",
         FirebaseServiceAccountUpload(Base64.encodeToString(data, Base64.NO_WRAP)),
-        announceBackend = false,
+        announceBackend = true,
     )
 
     fun snapshotUrl(cameraId: String) = base() + "/cameras/$cameraId/snapshot"

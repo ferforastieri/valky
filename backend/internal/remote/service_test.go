@@ -35,11 +35,11 @@ func TestNormalizeAddress(t *testing.T) {
 }
 
 func TestRemoteURLIncludesToken(t *testing.T) {
-	without := remoteURL("wss", "192.168.0.10:8002", "Valkyris", "")
+	without := channelURL("wss", "192.168.0.10:8002", controlChannelPath, "Valkyris", "")
 	if without != "wss://192.168.0.10:8002/api/v2/channels/samsung.remote.control?name=VmFsa3lyaXM=" {
 		t.Fatalf("unexpected url without token: %s", without)
 	}
-	with := remoteURL("wss", "192.168.0.10:8002", "Valkyris", "abc123")
+	with := channelURL("wss", "192.168.0.10:8002", controlChannelPath, "Valkyris", "abc123")
 	if with != "wss://192.168.0.10:8002/api/v2/channels/samsung.remote.control?name=VmFsa3lyaXM=&token=abc123" {
 		t.Fatalf("unexpected url with token: %s", with)
 	}

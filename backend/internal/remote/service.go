@@ -224,6 +224,44 @@ func (s *Service) Wake(ctx context.Context, id string) (Device, error) {
 	if err != nil {
 		return Device{}, err
 	}
+	return s.wakeLocked(ctx, item)
+}
+
+// Power toggles the TV with a single action: a reachable TV is powered off and
+// a standby TV is woken over the network. The returned flag reports whether the
+// TV was turned on (true) or off (false).
+func (s *Service) Power(ctx context.Context, id string) (Device, bool, error) {
+	unlock := s.lock(id)
+	defer unlock()
+	item, credentials, err := s.repo.Get(ctx, id)
+	if err != nil {
+		return Device{}, false, err
+	}
+	if !s.Available() {
+		return Device{}, false, ErrNoRemoteAdapter
+	}
+	if credentials.Token != "" && s.driver.Reachable(ctx, item) {
+		sendCtx, cancel := context.WithTimeout(ctx, 12*time.Second)
+		defer cancel()
+		if err := s.driver.Send(sendCtx, item, credentials.Token, "KEY_POWER"); err != nil {
+			_ = s.repo.SetStatus(ctx, id, "failed", err.Error(), false)
+			return Device{}, false, err
+		}
+		_ = s.repo.SetStatus(ctx, id, "ready", "", true)
+		updated, getErr := s.Get(ctx, id)
+		if getErr == nil {
+			s.broadcast("remote.updated", updated)
+		}
+		return updated, false, getErr
+	}
+	updated, err := s.wakeLocked(ctx, item)
+	if err != nil {
+		return Device{}, false, err
+	}
+	return updated, true, nil
+}
+
+func (s *Service) wakeLocked(ctx context.Context, item Device) (Device, error) {
 	mac := strings.TrimSpace(item.MAC)
 	if mac == "" {
 		macCtx, cancel := context.WithTimeout(ctx, 8*time.Second)
@@ -233,15 +271,15 @@ func (s *Service) Wake(ctx context.Context, id string) (Device, error) {
 		cancel()
 	}
 	if mac == "" {
-		return Device{}, fmt.Errorf("não foi possível descobrir o MAC da TV; informe-o no controle")
+		return Device{}, fmt.Errorf("não foi possível ligar a TV: verifique se ela está na tomada e conectada à rede")
 	}
 	if err := sendMagicPacket(mac, item.Host); err != nil {
 		return Device{}, err
 	}
 	if mac != item.MAC {
-		_ = s.repo.SetMAC(ctx, id, mac)
+		_ = s.repo.SetMAC(ctx, item.ID, mac)
 	}
-	updated, err := s.Get(ctx, id)
+	updated, err := s.Get(ctx, item.ID)
 	if err == nil {
 		s.broadcast("remote.updated", updated)
 	}

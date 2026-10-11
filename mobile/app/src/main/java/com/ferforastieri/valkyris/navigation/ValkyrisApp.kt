@@ -40,6 +40,7 @@ import com.ferforastieri.valkyris.feature.settings.SettingsScreen
 import com.ferforastieri.valkyris.feature.settings.StartupAlertPermissions
 import com.ferforastieri.valkyris.feature.settings.UpdateAvailableSheet
 import com.ferforastieri.valkyris.core.design.FloatingDock
+import com.ferforastieri.valkyris.core.design.ToastMessageHost
 import com.ferforastieri.valkyris.core.design.ValkyrisTopBar
 import com.ferforastieri.valkyris.feature.overview.OverviewScreen
 import com.composables.icons.lucide.House
@@ -71,6 +72,10 @@ fun ValkyrisApp(main: MainViewModel) {
             } else {
                 ConnectedValkyrisApp(main)
             }
+            ToastMessageHost(
+                notices = main.notices,
+                modifier = Modifier.align(androidx.compose.ui.Alignment.TopCenter).padding(14.dp),
+            )
             if (actionBusy) {
                 Box(
                     Modifier
@@ -103,7 +108,7 @@ private fun ConnectedValkyrisApp(main: MainViewModel) {
         UpdateAvailableSheet(
             version = info.latestVersion,
             updating = updating,
-            onUpdate = main::startUpdate,
+            onUpdate = { updateDismissed = true; main.startUpdate() },
             onDismiss = { updateDismissed = true },
         )
     }

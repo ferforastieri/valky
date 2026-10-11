@@ -158,6 +158,7 @@ func (s *Server) Handler() http.Handler {
 	protected.HandleFunc("GET /remotes/{id}/apps", s.listRemoteApps)
 	protected.HandleFunc("POST /remotes/{id}/apps/{app}/launch", s.launchRemoteApp)
 	protected.HandleFunc("POST /remotes/{id}/wake", s.wakeRemote)
+	protected.HandleFunc("POST /remotes/{id}/power", s.powerRemote)
 	protected.HandleFunc("GET /cameras/{id}/snapshot", s.snapshot)
 	protected.HandleFunc("GET /cameras/{id}/recording", s.recentRecording)
 	protected.HandleFunc("POST /cameras/{id}/live/webrtc/whep", s.liveWebRTC)

@@ -21,6 +21,8 @@ type Driver interface {
 	Launch(context.Context, Device, string, string) error
 	// DeviceMAC reads the device network address used for Wake-on-LAN.
 	DeviceMAC(context.Context, Device) (string, error)
+	// Reachable reports whether the device is powered on and answering.
+	Reachable(context.Context, Device) bool
 }
 
 var ErrNoRemoteAdapter = errors.New("no remote control adapter is installed")
@@ -51,3 +53,5 @@ func (*UnavailableDriver) Launch(context.Context, Device, string, string) error 
 func (*UnavailableDriver) DeviceMAC(context.Context, Device) (string, error) {
 	return "", ErrNoRemoteAdapter
 }
+
+func (*UnavailableDriver) Reachable(context.Context, Device) bool { return false }

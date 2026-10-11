@@ -77,7 +77,7 @@ func main() {
 	lightRepo := light.NewRepository(db, vault)
 	lightService := light.NewService(lightRepo, light.NewUnavailableDriver(), hub, logger)
 	remoteRepo := remote.NewRepository(db, vault)
-	remoteService := remote.NewService(remoteRepo, remote.NewSmartTVDriver(), hub, logger)
+	remoteService := remote.NewService(remoteRepo, remote.NewSmartTVDriver(logger), hub, logger)
 	application := &app.Service{Rules: rulesService, Events: eventService, Media: mediaManager, Notify: notifyService, Hub: hub, DataDir: cfg.DataDir, Logger: logger, Preferences: preferencesService}
 	apiServer := api.NewServer(authManager, cameraRepo, onvif, mediaManager, rulesService, eventService, notifyService, hub, logger)
 	apiServer.SetViewerDirectory(cfg.ViewerDir)

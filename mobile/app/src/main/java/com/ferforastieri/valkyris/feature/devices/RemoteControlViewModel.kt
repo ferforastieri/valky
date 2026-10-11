@@ -19,7 +19,7 @@ data class RemoteControlState(
     val appsLoading: Boolean = false,
     val busy: Boolean = false,
     val pairing: Boolean = false,
-    val waking: Boolean = false,
+    val powering: Boolean = false,
     val error: String? = null,
 )
 
@@ -48,16 +48,13 @@ class RemoteControlViewModel @Inject constructor(
     }
 
     fun send(key: String) {
-        if (_state.value.busy) return
-        _state.update { it.copy(busy = true, error = null) }
+        // Keys are fire-and-forget so a tap never waits for the previous one:
+        // the backend keeps a warm channel to the TV, so latency stays low.
+        _state.update { it.copy(error = null) }
         viewModelScope.launch {
-            try {
-                runCatching { api.sendRemoteKey(id, key) }
-                    .onSuccess { updated -> _state.update { it.copy(remote = updated) } }
-                    .onFailure { error -> _state.update { it.copy(error = error.message) } }
-            } finally {
-                _state.update { it.copy(busy = false) }
-            }
+            runCatching { api.sendRemoteKey(id, key) }
+                .onSuccess { updated -> _state.update { it.copy(remote = updated) } }
+                .onFailure { error -> _state.update { it.copy(error = error.message) } }
         }
     }
 
@@ -80,10 +77,12 @@ class RemoteControlViewModel @Inject constructor(
 
     fun loadApps() {
         if (_state.value.appsLoading) return
-        _state.update { it.copy(appsLoading = true) }
+        _state.update { it.copy(appsLoading = true, error = null) }
         viewModelScope.launch {
             try {
-                runCatching { api.remoteApps(id) }.onSuccess { apps -> _state.update { it.copy(apps = apps) } }
+                runCatching { api.remoteApps(id) }
+                    .onSuccess { apps -> _state.update { it.copy(apps = apps) } }
+                    .onFailure { error -> _state.update { it.copy(error = error.message) } }
             } finally {
                 _state.update { it.copy(appsLoading = false) }
             }
@@ -98,16 +97,16 @@ class RemoteControlViewModel @Inject constructor(
         }
     }
 
-    fun wake() {
-        if (_state.value.waking) return
-        _state.update { it.copy(waking = true, error = null) }
+    fun power() {
+        if (_state.value.powering) return
+        _state.update { it.copy(powering = true, error = null) }
         viewModelScope.launch {
             try {
-                runCatching { api.wakeRemote(id) }
+                runCatching { api.powerRemote(id) }
                     .onSuccess { updated -> _state.update { it.copy(remote = updated) } }
                     .onFailure { error -> _state.update { it.copy(error = error.message) } }
             } finally {
-                _state.update { it.copy(waking = false) }
+                _state.update { it.copy(powering = false) }
             }
         }
     }

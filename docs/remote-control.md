@@ -77,21 +77,26 @@ TV. A API rejeita qualquer comando fora dessa lista.
 
 Quando o controle está pareado, o app lista os aplicativos instalados na TV
 (evento `ed.installedApp.get` no canal de controle) e abre qualquer um deles
-(`ed.apps.launch`). A barra de aplicativos aparece no topo do controle; se a TV
-não responder, há um botão para tentar de novo. A disponibilidade depende do
-modelo — em algumas TVs a lista não é exposta.
+(`ed.apps.launch`). A barra de aplicativos fica na parte de baixo do controle,
+como os atalhos fixos de um controle de TV, mas carrega **todos** os apps
+instalados. Se a TV não responder, há um botão para tentar de novo.
 
-## Wake-on-LAN (ligar a TV em standby)
+A lista é um documento JSON grande; o canal é lido com um limite maior para não
+truncá-lo (era o motivo de a barra voltar vazia). Em modelos que só respondem no
+canal de controle de aplicativos (`/api/v2`), o backend tenta esse canal como
+alternativa.
 
-O botão **Ligar (Wake-on-LAN)** envia um magic packet (UDP porta 9) para acordar
-a TV. O `KEY_POWER` continua apenas desligando.
+## Ligar e desligar a TV
+
+O botão de energia faz as duas coisas com um toque: se a TV estiver **ligada**
+(e acessível), envia `KEY_POWER` para desligá-la; se estiver em **standby**, envia
+um magic packet (Wake-on-LAN, UDP porta 9) para ligá-la. Não é preciso informar o
+MAC — ele é capturado automaticamente ao parear.
 
 **Na TV (uma vez):**
 1. Configurações → Geral → Rede → Configurações especialistas → **Power On with
    Mobile** → **Ligar**.
 2. Deixe a TV em **standby** (desligada pelo controle), não fora da tomada.
-3. O MAC da TV (Configurações → Geral → Rede → Status da rede) é capturado
-   automaticamente ao parear; se necessário, informe-o no controle.
 
 **No servidor:** como o backend roda em Docker, o firewall do CT precisa
 permitir `UDP 9` para o broadcast da LAN (ex.: `192.0.2.0/24`).
@@ -99,11 +104,18 @@ permitir `UDP 9` para o broadcast da LAN (ex.: `192.0.2.0/24`).
 **Limites:** Wi‑Fi (WoWLAN) é bem menos confiável que cabo Ethernet — pode
 precisar de 2–3 tentativas e alguns modelos/roteadores não acordam por Wi‑Fi.
 
+## Latência
+
+As teclas reutilizam uma **conexão WebSocket mantida aberta** por TV, em vez de
+abrir (e refazer o handshake) a cada toque. O app também não bloqueia um toque
+esperando o anterior: o backend serializa os comandos por aparelho, então os
+toques saem em ordem e quase instantâneos. Se a TV fechar a conexão (standby,
+reinício), o backend reconecta sozinho na próxima tecla.
+
 ## Limites
 
-- A TV precisa estar ligada e acessível a partir do servidor. Ligar uma TV
-  totalmente desligada exige Wake-on-LAN e não é suportado; o botão de energia
-  desliga.
+- A TV precisa estar ligada e acessível a partir do servidor para receber teclas.
+  Em standby, use o botão de energia (Wake-on-LAN).
 - A descoberta depende da rede: isolar clientes (Wi-Fi de convidados, VLANs) ou
   bloquear multicast impede achar a TV automaticamente — nesse caso use o
   cadastro manual.
@@ -120,3 +132,7 @@ precisar de 2–3 tentativas e alguns modelos/roteadores não acordam por Wi‑F
 | `DELETE` | `/api/v1/remotes/{id}` | Administrador | Remove o controle. |
 | `POST` | `/api/v1/remotes/{id}/pair` | Administrador | Pareia com a TV (aceite o aviso nela). |
 | `POST` | `/api/v1/remotes/{id}/keys` | Autenticado | Envia uma tecla (`{ "key": "KEY_HOME" }`). |
+| `GET` | `/api/v1/remotes/{id}/apps` | Autenticado | Lista os aplicativos instalados na TV. |
+| `POST` | `/api/v1/remotes/{id}/apps/{app}/launch` | Autenticado | Abre um aplicativo na TV. |
+| `POST` | `/api/v1/remotes/{id}/wake` | Autenticado | Envia o Wake-on-LAN (liga a TV). |
+| `POST` | `/api/v1/remotes/{id}/power` | Autenticado | Liga ou desliga a TV conforme o estado atual. |

@@ -7,10 +7,12 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"log/slog"
 	"net"
 	"net/http"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/coder/websocket"
@@ -26,12 +28,30 @@ import (
 // The channel path is a fixed protocol identifier and is kept verbatim; the
 // domain and API stay brand-agnostic so other TV protocols can be added as
 // separate drivers.
+//
+// Key presses reuse a single kept-alive connection per device instead of
+// dialing (and re-doing the handshake) for every tap, which is what made the
+// remote feel laggy. A failed write drops the connection and retries once on a
+// fresh one, so a TV that went to standby is recovered transparently.
 type SmartTVDriver struct {
 	applicationName string
 	client          *http.Client
+	logger          *slog.Logger
+
+	mu    sync.Mutex
+	conns map[string]*tvConn
 }
 
-func NewSmartTVDriver() *SmartTVDriver {
+type tvConn struct {
+	conn   *websocket.Conn
+	device Device
+	token  string
+}
+
+func NewSmartTVDriver(logger *slog.Logger) *SmartTVDriver {
+	if logger == nil {
+		logger = slog.Default()
+	}
 	// These TVs present a self-signed certificate on the secure channel, so the
 	// client validates reachability but not the certificate chain.
 	transport := &http.Transport{
@@ -42,12 +62,16 @@ func NewSmartTVDriver() *SmartTVDriver {
 	return &SmartTVDriver{
 		applicationName: "Valkyris",
 		client:          &http.Client{Transport: transport},
+		logger:          logger,
+		conns:           map[string]*tvConn{},
 	}
 }
 
 func (*SmartTVDriver) Available() bool { return true }
 
 func (d *SmartTVDriver) Pair(ctx context.Context, device Device) (string, error) {
+	// A new pairing invalidates any cached channel for this device.
+	d.dropDevice(device)
 	conn, err := d.dial(ctx, device, "")
 	if err != nil {
 		return "", err
@@ -72,20 +96,28 @@ func (d *SmartTVDriver) Pair(ctx context.Context, device Device) (string, error)
 }
 
 func (d *SmartTVDriver) Send(ctx context.Context, device Device, token, key string) error {
-	conn, err := d.dial(ctx, device, token)
+	item, err := d.ready(ctx, device, token)
 	if err != nil {
 		return err
 	}
-	defer conn.Close(websocket.StatusNormalClosure, "")
-	handshake, cancel := context.WithTimeout(ctx, 6*time.Second)
-	event, _, readErr := readEvent(handshake, conn)
-	cancel()
-	if event == "ms.channel.unauthorized" {
-		return fmt.Errorf("a TV revogou o token; pareie novamente")
+	if err = d.writeKey(ctx, item, key); err == nil {
+		return nil
 	}
-	if readErr != nil {
-		return fmt.Errorf("a TV não concluiu a conexão: %w", readErr)
+	// The kept-alive channel may have been closed by the TV (standby, reboot):
+	// drop it and retry once on a fresh connection before surfacing an error.
+	d.drop(item)
+	retry, dialErr := d.ready(ctx, device, token)
+	if dialErr != nil {
+		return err
 	}
+	if retryErr := d.writeKey(ctx, retry, key); retryErr != nil {
+		d.drop(retry)
+		return retryErr
+	}
+	return nil
+}
+
+func (d *SmartTVDriver) writeKey(ctx context.Context, item *tvConn, key string) error {
 	payload, _ := json.Marshal(map[string]any{
 		"method": "ms.remote.control",
 		"params": map[string]any{
@@ -95,15 +127,10 @@ func (d *SmartTVDriver) Send(ctx context.Context, device Device, token, key stri
 			"TypeOfRemote": "SendRemoteKey",
 		},
 	})
-	if err := conn.Write(ctx, websocket.MessageText, payload); err != nil {
+	writeCtx, cancel := context.WithTimeout(ctx, 4*time.Second)
+	defer cancel()
+	if err := item.conn.Write(writeCtx, websocket.MessageText, payload); err != nil {
 		return fmt.Errorf("não foi possível enviar o comando: %w", err)
-	}
-	// Surface a protocol error when the TV rejects the key, without blocking
-	// the caller for long when it accepts the command silently.
-	ack, ackCancel := context.WithTimeout(ctx, 900*time.Millisecond)
-	defer ackCancel()
-	if event, _, err := readEvent(ack, conn); err == nil && (event == "ms.error" || event == "ms.channel.unauthorized") {
-		return fmt.Errorf("a TV recusou o comando %s", key)
 	}
 	return nil
 }
@@ -132,8 +159,8 @@ func (d *SmartTVDriver) dial(ctx context.Context, device Device, token string) (
 			continue
 		}
 		seen[key] = struct{}{}
-		url := remoteURL(attempt.scheme, attempt.addr, d.applicationName, token)
-		conn, _, err := websocket.Dial(ctx, url, &websocket.DialOptions{HTTPClient: d.client})
+		url := channelURL(attempt.scheme, attempt.addr, controlChannelPath, d.applicationName, token)
+		conn, err := d.dialURL(ctx, url)
 		if err == nil {
 			return conn, nil
 		}
@@ -145,6 +172,17 @@ func (d *SmartTVDriver) dial(ctx context.Context, device Device, token string) (
 	return nil, fmt.Errorf("não foi possível alcançar a TV em %s: %w", device.Host, lastErr)
 }
 
+func (d *SmartTVDriver) dialURL(ctx context.Context, url string) (*websocket.Conn, error) {
+	conn, _, err := websocket.Dial(ctx, url, &websocket.DialOptions{HTTPClient: d.client})
+	if err != nil {
+		return nil, err
+	}
+	// The installed-app list is a large JSON document; the default 32 KiB read
+	// limit truncates it and made the apps bar come back empty.
+	conn.SetReadLimit(4 << 20)
+	return conn, nil
+}
+
 // connectReady dials the control channel and consumes the connect handshake,
 // returning a connection ready to exchange messages.
 func (d *SmartTVDriver) connectReady(ctx context.Context, device Device, token string) (*websocket.Conn, error) {
@@ -152,27 +190,146 @@ func (d *SmartTVDriver) connectReady(ctx context.Context, device Device, token s
 	if err != nil {
 		return nil, err
 	}
-	handshake, cancel := context.WithTimeout(ctx, 6*time.Second)
-	event, _, readErr := readEvent(handshake, conn)
-	cancel()
-	if event == "ms.channel.unauthorized" {
+	if err := d.handshake(ctx, conn); err != nil {
 		conn.Close(websocket.StatusNormalClosure, "")
-		return nil, fmt.Errorf("a TV revogou o token; pareie novamente")
-	}
-	if readErr != nil {
-		conn.Close(websocket.StatusNormalClosure, "")
-		return nil, fmt.Errorf("a TV não concluiu a conexão: %w", readErr)
+		return nil, err
 	}
 	return conn, nil
 }
 
-// Apps asks the TV for its installed applications over the control channel.
-func (d *SmartTVDriver) Apps(ctx context.Context, device Device, token string) ([]App, error) {
+func (d *SmartTVDriver) handshake(ctx context.Context, conn *websocket.Conn) error {
+	handshake, cancel := context.WithTimeout(ctx, 6*time.Second)
+	event, _, readErr := readEvent(handshake, conn)
+	cancel()
+	if event == "ms.channel.unauthorized" {
+		return fmt.Errorf("a TV revogou o token; pareie novamente")
+	}
+	if readErr != nil {
+		return fmt.Errorf("a TV não concluiu a conexão: %w", readErr)
+	}
+	return nil
+}
+
+// ready returns a kept-alive connection for the device, dialing one when none
+// is cached yet.
+func (d *SmartTVDriver) ready(ctx context.Context, device Device, token string) (*tvConn, error) {
+	if item := d.cached(device, token); item != nil {
+		return item, nil
+	}
 	conn, err := d.connectReady(ctx, device, token)
 	if err != nil {
 		return nil, err
 	}
-	defer conn.Close(websocket.StatusNormalClosure, "")
+	return d.store(device, token, conn), nil
+}
+
+func connectionKey(device Device, token string) string {
+	port := device.Port
+	if port == 0 {
+		port = DefaultPort
+	}
+	return net.JoinHostPort(device.Host, strconv.Itoa(port)) + "|" + token
+}
+
+func (d *SmartTVDriver) cached(device Device, token string) *tvConn {
+	d.mu.Lock()
+	defer d.mu.Unlock()
+	return d.conns[connectionKey(device, token)]
+}
+
+func (d *SmartTVDriver) store(device Device, token string, conn *websocket.Conn) *tvConn {
+	d.mu.Lock()
+	key := connectionKey(device, token)
+	if existing := d.conns[key]; existing != nil && existing.conn != conn {
+		_ = existing.conn.Close(websocket.StatusNormalClosure, "")
+	}
+	item := &tvConn{conn: conn, device: device, token: token}
+	d.conns[key] = item
+	d.mu.Unlock()
+	// Keep the channel healthy: reading lets the library answer the TV's
+	// control frames, and a read error means the channel is gone.
+	go d.drain(item)
+	return item
+}
+
+func (d *SmartTVDriver) drain(item *tvConn) {
+	for {
+		if _, _, err := item.conn.Read(context.Background()); err != nil {
+			d.drop(item)
+			return
+		}
+	}
+}
+
+func (d *SmartTVDriver) drop(item *tvConn) {
+	if item == nil {
+		return
+	}
+	d.mu.Lock()
+	key := connectionKey(item.device, item.token)
+	if d.conns[key] == item {
+		delete(d.conns, key)
+	}
+	d.mu.Unlock()
+	_ = item.conn.Close(websocket.StatusNormalClosure, "")
+}
+
+func (d *SmartTVDriver) dropDevice(device Device) {
+	d.mu.Lock()
+	prefix := net.JoinHostPort(device.Host, strconv.Itoa(devicePort(device))) + "|"
+	var victims []*tvConn
+	for key, item := range d.conns {
+		if strings.HasPrefix(key, prefix) {
+			victims = append(victims, item)
+			delete(d.conns, key)
+		}
+	}
+	d.mu.Unlock()
+	for _, item := range victims {
+		_ = item.conn.Close(websocket.StatusNormalClosure, "")
+	}
+}
+
+func devicePort(device Device) int {
+	if device.Port == 0 {
+		return DefaultPort
+	}
+	return device.Port
+}
+
+// Apps asks the TV for its installed applications. Newer firmware answers on
+// the plain /api/v2 app-control channel instead, so both are tried before
+// giving up. A dedicated connection is used because the kept-alive channel is
+// drained in the background.
+func (d *SmartTVDriver) Apps(ctx context.Context, device Device, token string) ([]App, error) {
+	conn, err := d.connectReady(ctx, device, token)
+	if err == nil {
+		apps, requestErr := d.requestApps(ctx, conn)
+		conn.Close(websocket.StatusNormalClosure, "")
+		if requestErr == nil {
+			if len(apps) > 0 {
+				return apps, nil
+			}
+			// The TV answered but exposed nothing: try the app-control channel
+			// as a last resort, while still treating the empty answer as valid.
+			if fallback, fallbackErr := d.appsViaControlChannel(ctx, device); fallbackErr == nil && len(fallback) > 0 {
+				return fallback, nil
+			}
+			return []App{}, nil
+		}
+		if fallback, fallbackErr := d.appsViaControlChannel(ctx, device); fallbackErr == nil && len(fallback) > 0 {
+			return fallback, nil
+		}
+		return nil, requestErr
+	}
+	// The primary channel failed: try the app-control channel before giving up.
+	if fallback, fallbackErr := d.appsViaControlChannel(ctx, device); fallbackErr == nil && len(fallback) > 0 {
+		return fallback, nil
+	}
+	return nil, err
+}
+
+func (d *SmartTVDriver) requestApps(ctx context.Context, conn *websocket.Conn) ([]App, error) {
 	payload, _ := json.Marshal(map[string]any{
 		"method": "ms.channel.emit",
 		"params": map[string]any{"event": "ed.installedApp.get", "to": "host"},
@@ -180,7 +337,7 @@ func (d *SmartTVDriver) Apps(ctx context.Context, device Device, token string) (
 	if err := conn.Write(ctx, websocket.MessageText, payload); err != nil {
 		return nil, fmt.Errorf("não foi possível pedir a lista de apps: %w", err)
 	}
-	deadline, cancel := context.WithTimeout(ctx, 8*time.Second)
+	deadline, cancel := context.WithTimeout(ctx, 10*time.Second)
 	defer cancel()
 	for {
 		_, data, err := conn.Read(deadline)
@@ -196,6 +353,32 @@ func (d *SmartTVDriver) Apps(ctx context.Context, device Device, token string) (
 		}
 		return parseApps(envelope.Data), nil
 	}
+}
+
+func (d *SmartTVDriver) appsViaControlChannel(ctx context.Context, device Device) ([]App, error) {
+	port := devicePort(device)
+	address := net.JoinHostPort(device.Host, strconv.Itoa(port))
+	var lastErr error
+	for _, scheme := range []string{"wss", "ws"} {
+		url := fmt.Sprintf("%s://%s%s", scheme, address, appControlPath)
+		conn, err := d.dialURL(ctx, url)
+		if err != nil {
+			lastErr = err
+			continue
+		}
+		apps, requestErr := d.requestApps(ctx, conn)
+		conn.Close(websocket.StatusNormalClosure, "")
+		if requestErr == nil && len(apps) > 0 {
+			return apps, nil
+		}
+		if requestErr != nil {
+			lastErr = requestErr
+		}
+	}
+	if lastErr == nil {
+		lastErr = fmt.Errorf("a TV não retornou a lista de apps")
+	}
+	return nil, lastErr
 }
 
 func parseApps(raw json.RawMessage) []App {
@@ -216,6 +399,7 @@ func parseApps(raw json.RawMessage) []App {
 		}
 	}
 	out := make([]App, 0, len(items))
+	seen := map[string]struct{}{}
 	for _, item := range items {
 		id := item.AppID
 		if id == "" {
@@ -224,6 +408,10 @@ func parseApps(raw json.RawMessage) []App {
 		if id == "" {
 			continue
 		}
+		if _, ok := seen[id]; ok {
+			continue
+		}
+		seen[id] = struct{}{}
 		name := item.Name
 		if name == "" {
 			name = id
@@ -233,13 +421,12 @@ func parseApps(raw json.RawMessage) []App {
 	return out
 }
 
-// Launch starts an installed application on the TV.
+// Launch starts an installed application on the TV using the kept-alive channel.
 func (d *SmartTVDriver) Launch(ctx context.Context, device Device, token, appID string) error {
-	conn, err := d.connectReady(ctx, device, token)
+	item, err := d.ready(ctx, device, token)
 	if err != nil {
 		return err
 	}
-	defer conn.Close(websocket.StatusNormalClosure, "")
 	payload, _ := json.Marshal(map[string]any{
 		"method": "ms.channel.emit",
 		"params": map[string]any{
@@ -248,10 +435,28 @@ func (d *SmartTVDriver) Launch(ctx context.Context, device Device, token, appID 
 			"data":  map[string]any{"appId": appID, "action_type": "NATIVE_LAUNCH"},
 		},
 	})
-	if err := conn.Write(ctx, websocket.MessageText, payload); err != nil {
+	writeCtx, cancel := context.WithTimeout(ctx, 4*time.Second)
+	defer cancel()
+	if err := item.conn.Write(writeCtx, websocket.MessageText, payload); err != nil {
+		d.drop(item)
 		return fmt.Errorf("não foi possível abrir o app: %w", err)
 	}
 	return nil
+}
+
+// Reachable reports whether the TV is powered on and answering on its control
+// port. It is used to decide between powering the TV off (it is on) and sending
+// a Wake-on-LAN packet (it is in standby).
+func (d *SmartTVDriver) Reachable(ctx context.Context, device Device) bool {
+	port := devicePort(device)
+	dialCtx, cancel := context.WithTimeout(ctx, 1500*time.Millisecond)
+	defer cancel()
+	conn, err := (&net.Dialer{}).DialContext(dialCtx, "tcp", net.JoinHostPort(device.Host, strconv.Itoa(port)))
+	if err != nil {
+		return false
+	}
+	_ = conn.Close()
+	return true
 }
 
 // DeviceMAC reads the TV network address (used for Wake-on-LAN) from its REST
@@ -290,11 +495,17 @@ func (d *SmartTVDriver) DeviceMAC(ctx context.Context, device Device) (string, e
 	return mac, nil
 }
 
-// remoteURL builds the channel URL. The application name travels base64
-// encoded exactly as the TV expects it in the query string.
-func remoteURL(scheme, address, applicationName, token string) string {
-	encoded := base64.StdEncoding.EncodeToString([]byte(applicationName))
-	url := fmt.Sprintf("%s://%s/api/v2/channels/samsung.remote.control?name=%s", scheme, address, encoded)
+const controlChannelPath = "/api/v2/channels/samsung.remote.control"
+const appControlPath = "/api/v2"
+
+// channelURL builds a channel URL. The application name travels base64 encoded
+// exactly as the TV expects it in the query string.
+func channelURL(scheme, address, path, applicationName, token string) string {
+	url := fmt.Sprintf("%s://%s%s", scheme, address, path)
+	if applicationName == "" {
+		return url
+	}
+	url += "?name=" + base64.StdEncoding.EncodeToString([]byte(applicationName))
 	if token != "" {
 		url += "&token=" + token
 	}

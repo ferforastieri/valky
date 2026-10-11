@@ -304,6 +304,13 @@ paths:
       responses:
         '200': {description: Magic packet sent}
         '502': {description: MAC unknown or network error}
+  /remotes/{id}/power:
+    post:
+      summary: Power the TV on (Wake-on-LAN) or off (KEY_POWER) based on reachability
+      parameters: [{$ref: '#/components/parameters/id'}]
+      responses:
+        '200': {description: Power command applied}
+        '502': {description: TV unreachable or network error}
   /detectors:
     get:
       summary: List normalized detector types

@@ -60,10 +60,11 @@ import com.ferforastieri.valkyris.R
 import com.ferforastieri.valkyris.core.model.RemoteApp
 
 /**
- * Full-screen remote control, in the shape of a smart-TV remote: an installed
- * apps bar, a central navigation pad flanked by volume and channel rockers, and
- * the playback / navigation keys. It replaces the old bottom sheet so sending a
- * key never reopens anything.
+ * Full-screen remote control laid out like a smart-TV remote: the power button
+ * sits on the top bar, the installed-apps bar runs underneath it, the central
+ * navigation pad is flanked by the volume and channel rockers, and the playback
+ * and navigation keys close the layout. It replaces the old bottom sheet so
+ * sending a key never reopens anything.
  */
 @Composable
 fun RemoteControlScreen(onBack: () -> Unit, vm: RemoteControlViewModel = hiltViewModel()) {
@@ -90,6 +91,7 @@ fun RemoteControlScreen(onBack: () -> Unit, vm: RemoteControlViewModel = hiltVie
                 IconButton(onClick = { vm.loadApps() }) {
                     Icon(Lucide.RefreshCw, stringResource(R.string.remote_refresh), tint = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
+                PowerButton(powering = state.powering, onPower = vm::power)
             }
         }
         state.error?.let {
@@ -104,19 +106,34 @@ fun RemoteControlScreen(onBack: () -> Unit, vm: RemoteControlViewModel = hiltVie
 }
 
 @Composable
+private fun PowerButton(powering: Boolean, onPower: () -> Unit) {
+    Surface(
+        onClick = onPower,
+        enabled = !powering,
+        shape = CircleShape,
+        color = MaterialTheme.colorScheme.errorContainer,
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.error.copy(alpha = .35f)),
+    ) {
+        Box(Modifier.size(46.dp), contentAlignment = Alignment.Center) {
+            if (powering) {
+                CircularProgressIndicator(Modifier.size(20.dp), strokeWidth = 2.dp, color = MaterialTheme.colorScheme.onErrorContainer)
+            } else {
+                Icon(Lucide.Power, stringResource(R.string.remote_power), Modifier.size(22.dp), tint = MaterialTheme.colorScheme.onErrorContainer)
+            }
+        }
+    }
+}
+
+@Composable
 private fun ConnectedRemote(state: RemoteControlState, vm: RemoteControlViewModel) {
     Column(
         Modifier.fillMaxSize().verticalScroll(rememberScrollState()),
         verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
+        RemoteBody(enabled = !state.powering, onSend = vm::send)
+        // Like a smart-TV remote, the app shortcuts live at the bottom; here the
+        // bar carries every installed app instead of a few fixed ones.
         AppsRow(state, vm)
-        RemoteBody(enabled = !state.busy && !state.waking, onSend = vm::send)
-        WakeRow(waking = state.waking, onWake = vm::wake)
-        Text(
-            stringResource(R.string.remote_power_hint),
-            style = MaterialTheme.typography.labelSmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
         Spacer(Modifier.height(24.dp))
     }
 }
@@ -130,11 +147,8 @@ private fun AppsRow(state: RemoteControlState, vm: RemoteControlViewModel) {
             Spacer(Modifier.width(6.dp))
             Text(stringResource(R.string.remote_apps_load))
         }
-        else -> Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-            Text(stringResource(R.string.remote_apps_title), style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
-            LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                items(state.apps, key = { it.id }) { app -> AppChip(app) { vm.launch(app.id) } }
-            }
+        else -> LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            items(state.apps, key = { it.id }) { app -> AppChip(app) { vm.launch(app.id) } }
         }
     }
 }
@@ -172,7 +186,6 @@ private fun RemoteBody(enabled: Boolean, onSend: (String) -> Unit) {
             )
         }
         RemoteRow {
-            RoundKey(Lucide.Power, stringResource(R.string.remote_power_off), enabled, Modifier.weight(1f), tint = MaterialTheme.colorScheme.error) { onSend("KEY_POWER") }
             RoundKey(Lucide.House, stringResource(R.string.remote_home), enabled, Modifier.weight(1f)) { onSend("KEY_HOME") }
             RoundKey(Lucide.ArrowLeft, stringResource(R.string.remote_back), enabled, Modifier.weight(1f)) { onSend("KEY_RETURN") }
             RoundKey(Lucide.Menu, stringResource(R.string.remote_menu), enabled, Modifier.weight(1f)) { onSend("KEY_MENU") }
@@ -280,27 +293,6 @@ private fun RoundKey(icon: ImageVector, label: String, enabled: Boolean, modifie
         Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
             Icon(icon, label, Modifier.size(20.dp), tint = tint ?: MaterialTheme.colorScheme.secondary)
         }
-    }
-}
-
-@Composable
-private fun WakeRow(waking: Boolean, onWake: () -> Unit) {
-    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-        Button(onClick = onWake, enabled = !waking, modifier = Modifier.fillMaxWidth()) {
-            if (waking) {
-                CircularProgressIndicator(Modifier.size(18.dp), strokeWidth = 2.dp, color = MaterialTheme.colorScheme.onPrimary)
-                Spacer(Modifier.width(8.dp))
-            } else {
-                Icon(Lucide.Power, null, Modifier.size(18.dp))
-                Spacer(Modifier.width(6.dp))
-            }
-            Text(stringResource(R.string.remote_wake))
-        }
-        Text(
-            stringResource(R.string.remote_wake_hint),
-            style = MaterialTheme.typography.labelSmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
     }
 }
 
