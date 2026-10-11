@@ -23,6 +23,7 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -61,6 +62,7 @@ import com.composables.icons.lucide.Menu
 import com.composables.icons.lucide.Pause
 import com.composables.icons.lucide.Pencil
 import com.composables.icons.lucide.Play
+import com.composables.icons.lucide.Plus
 import com.composables.icons.lucide.Power
 import com.composables.icons.lucide.Radar
 import com.composables.icons.lucide.SkipBack
@@ -92,6 +94,7 @@ fun RemotesScreen(admin: Boolean, vm: RemotesViewModel = hiltViewModel()) {
     val open = state.remotes.firstOrNull { it.id == openId }
     val removing = state.remotes.firstOrNull { it.id == removingId }
 
+    Box(Modifier.fillMaxSize()) {
     Column(Modifier.fillMaxSize().padding(horizontal = 18.dp)) {
         state.error?.let {
             Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(top = 8.dp))
@@ -106,7 +109,7 @@ fun RemotesScreen(admin: Boolean, vm: RemotesViewModel = hiltViewModel()) {
         }
         LazyColumn(
             verticalArrangement = Arrangement.spacedBy(12.dp),
-            contentPadding = PaddingValues(top = 12.dp, bottom = 24.dp),
+            contentPadding = PaddingValues(top = 12.dp, bottom = 96.dp),
         ) {
             if (admin && state.discovered.isNotEmpty()) {
                 item { Text(stringResource(R.string.remote_discovered_title), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold) }
@@ -133,16 +136,14 @@ fun RemotesScreen(admin: Boolean, vm: RemotesViewModel = hiltViewModel()) {
             if (!state.loading && state.remotes.isEmpty() && (state.discovered.isEmpty() || !admin)) {
                 item { EmptyRemotes() }
             }
-            if (admin) {
-                item {
-                    TextButton(onClick = { manualAdd = true }, modifier = Modifier.fillMaxWidth()) {
-                        Icon(Lucide.Pencil, null, Modifier.size(18.dp))
-                        Spacer(Modifier.width(6.dp))
-                        Text(stringResource(R.string.remote_manual_add))
-                    }
-                }
-            }
         }
+    }
+        if (admin) FloatingActionButton(
+            onClick = { manualAdd = true },
+            modifier = Modifier.align(Alignment.BottomEnd).padding(end = 20.dp, bottom = 18.dp),
+            containerColor = MaterialTheme.colorScheme.secondary,
+            contentColor = MaterialTheme.colorScheme.onSecondary,
+        ) { Icon(Lucide.Plus, stringResource(R.string.add_remote)) }
     }
 
     if (manualAdd) RemoteEditorSheet(

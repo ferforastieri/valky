@@ -68,7 +68,6 @@ import com.composables.icons.lucide.Move
 import com.composables.icons.lucide.Pin
 import com.composables.icons.lucide.Pencil
 import com.composables.icons.lucide.Plus
-import com.composables.icons.lucide.Save
 import com.composables.icons.lucide.Trash2
 import com.composables.icons.lucide.Video
 import com.composables.icons.lucide.VideoOff
@@ -607,22 +606,21 @@ private fun PresetsSection(camera: Camera, vm: CameraLiveViewModel) {
     val busy by vm.presetsBusy.collectAsStateWithLifecycle()
     val defaultName = stringResource(R.string.camera_position_default)
     var naming by remember { mutableStateOf(false) }
-    Surface(
-        Modifier.fillMaxWidth(),
-        RoundedCornerShape(24.dp),
-        MaterialTheme.colorScheme.surface,
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
         border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
-        shadowElevation = 5.dp,
     ) {
-        Column(Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                 Column(Modifier.weight(1f)) {
                     Text(stringResource(R.string.camera_positions), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
                     Text(stringResource(R.string.camera_positions_hint), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
-                Button(onClick = { naming = true }, enabled = !busy) {
-                    if (busy) CircularProgressIndicator(Modifier.size(18.dp), strokeWidth = 2.dp, color = MaterialTheme.colorScheme.onPrimary)
-                    else { Icon(Lucide.Save, null, Modifier.size(18.dp)); Spacer(Modifier.width(6.dp)) }
+                TextButton(onClick = { naming = true }, enabled = !busy) {
+                    if (busy) CircularProgressIndicator(Modifier.size(16.dp), strokeWidth = 2.dp)
+                    else Icon(Lucide.Plus, null, Modifier.size(17.dp))
+                    Spacer(Modifier.width(4.dp))
                     Text(stringResource(R.string.camera_position_save))
                 }
             }

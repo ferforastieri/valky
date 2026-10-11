@@ -314,7 +314,6 @@
     <string name="remote_found_count">%1$d TV(s) encontrada(s) na rede</string>
     <string name="remote_discovered_title">Encontradas na rede</string>
     <string name="remote_my_controls">Meus controles</string>
-    <string name="remote_manual_add">Adicionar manualmente</string>
     <string name="remote_paired">Pareado</string>
     <string name="remote_not_paired">Não pareado</string>
     <string name="remote_pairing">Aguardando autorização na TV…</string>
