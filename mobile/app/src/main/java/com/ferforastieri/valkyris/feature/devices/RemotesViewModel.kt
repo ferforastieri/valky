@@ -149,4 +149,12 @@ class RemotesViewModel @Inject constructor(
     }
 
     fun clearError() = _state.update { it.copy(error = null) }
+
+    fun toggleFavorite(id: String, favorite: Boolean) {
+        viewModelScope.launch {
+            runCatching { api.setFavorite("remote", id, favorite) }
+                .onSuccess { refresh() }
+                .onFailure { error -> _state.update { it.copy(error = error.message) } }
+        }
+    }
 }

@@ -18,6 +18,7 @@ import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.gestures.detectTransformGestures
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -39,6 +40,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.compose.ui.window.Dialog
@@ -50,11 +52,16 @@ import com.ferforastieri.valkyris.R
 import com.ferforastieri.valkyris.core.design.SignalLine
 import com.ferforastieri.valkyris.core.design.ColorTokens
 import com.ferforastieri.valkyris.core.design.cameraIcon
+import com.ferforastieri.valkyris.core.design.ValkyrisBottomSheet
 import com.ferforastieri.valkyris.core.media.WhepLiveController
 import com.ferforastieri.valkyris.core.model.Camera
+import com.ferforastieri.valkyris.core.model.CameraStats
 import com.ferforastieri.valkyris.core.model.CreateCameraRequest
+import com.ferforastieri.valkyris.core.model.DayCount
+import com.ferforastieri.valkyris.core.model.detectorLabelRes
 import com.ferforastieri.valkyris.feature.rules.CameraRulesSection
 import com.composables.icons.lucide.Aperture
+import com.composables.icons.lucide.ChartColumn
 import com.composables.icons.lucide.ChevronDown
 import com.composables.icons.lucide.ChevronLeft
 import com.composables.icons.lucide.ChevronRight
@@ -68,6 +75,7 @@ import com.composables.icons.lucide.Move
 import com.composables.icons.lucide.Pin
 import com.composables.icons.lucide.Pencil
 import com.composables.icons.lucide.Plus
+import com.composables.icons.lucide.Star
 import com.composables.icons.lucide.Trash2
 import com.composables.icons.lucide.Video
 import com.composables.icons.lucide.VideoOff
@@ -95,7 +103,7 @@ internal data class CameraListStream(
     CamerasContent(state, stream = CameraListStream(vm::whepUrl, vm::token, vm.httpClient()), onCamera={id->
         val camera=state.cameras.firstOrNull{it.id==id}
         if(camera?.setupStatus=="failed")failedCameraId=id else onCamera(id)
-    }, onEdit={if(canManage)editingCameraId=it}, onDelete={if(canManage)deletingCameraId=it}, onAdd = { if (canManage && !state.creating) showAdd = true }, canManage=canManage)
+    }, onEdit={if(canManage)editingCameraId=it}, onDelete={if(canManage)deletingCameraId=it}, onAdd = { if (canManage && !state.creating) showAdd = true }, onFavorite = { id, favorite -> vm.toggleFavorite(id, favorite) }, canManage=canManage)
     if(showAdd)CameraEditorDialog(onDismiss={showAdd=false},onSave={vm.add(it);showAdd=false})
     editingCamera?.let { camera ->
         CameraEditorDialog(
@@ -119,7 +127,7 @@ internal data class CameraListStream(
 }
 
 @Composable
-internal fun CamerasContent(state: CamerasState, stream: CameraListStream? = null, onCamera: (String) -> Unit = {}, onEdit: (String) -> Unit = {}, onDelete: (String) -> Unit = {}, onAdd: () -> Unit = {}, canManage:Boolean=true) {
+internal fun CamerasContent(state: CamerasState, stream: CameraListStream? = null, onCamera: (String) -> Unit = {}, onEdit: (String) -> Unit = {}, onDelete: (String) -> Unit = {}, onAdd: () -> Unit = {}, onFavorite: ((String, Boolean) -> Unit)? = null, canManage:Boolean=true) {
     Box(Modifier.fillMaxSize()){
         Column(Modifier.fillMaxSize().padding(horizontal=18.dp)){
             Spacer(Modifier.height(10.dp))
@@ -129,7 +137,7 @@ internal fun CamerasContent(state: CamerasState, stream: CameraListStream? = nul
             when{
                 state.loading->Box(Modifier.fillMaxSize()){CircularProgressIndicator(Modifier.align(Alignment.Center))}
                 state.cameras.isEmpty()->EmptyCameras()
-                else->LazyColumn(verticalArrangement=Arrangement.spacedBy(12.dp),contentPadding=PaddingValues(bottom=96.dp)){items(state.cameras,key={it.id}){camera->CameraCard(camera,stream,onClick={onCamera(camera.id)},onEdit=if(canManage){{onEdit(camera.id)}}else null,onDelete=if(canManage){{onDelete(camera.id)}}else null)}}
+                else->LazyColumn(verticalArrangement=Arrangement.spacedBy(12.dp),contentPadding=PaddingValues(bottom=96.dp)){items(state.cameras,key={it.id}){camera->CameraCard(camera,stream,onClick={onCamera(camera.id)},onEdit=if(canManage){{onEdit(camera.id)}}else null,onDelete=if(canManage){{onDelete(camera.id)}}else null,onFavorite=onFavorite?.let{cb->{cb(camera.id,!camera.favorite)}})}}
             }
         }
         if(canManage) FloatingActionButton(
@@ -204,7 +212,7 @@ fun CameraFailureSheet(camera:Camera,onDismiss:()->Unit,onEdit:(()->Unit)?=null,
 }
 
 @Composable
-private fun CameraCard(camera: Camera, stream: CameraListStream?, onClick: () -> Unit, onEdit: (() -> Unit)?, onDelete: (() -> Unit)?) {
+private fun CameraCard(camera: Camera, stream: CameraListStream?, onClick: () -> Unit, onEdit: (() -> Unit)?, onDelete: (() -> Unit)?, onFavorite: (() -> Unit)? = null) {
     val ready = camera.setupStatus == "ready"
     val failed = camera.setupStatus == "failed"
     Card(onClick = onClick, modifier = Modifier.fillMaxWidth(), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface), border = androidx.compose.foundation.BorderStroke(1.dp, if (failed) MaterialTheme.colorScheme.error.copy(alpha = .45f) else MaterialTheme.colorScheme.outlineVariant), elevation = CardDefaults.cardElevation(defaultElevation = 6.dp)) {
@@ -230,6 +238,7 @@ private fun CameraCard(camera: Camera, stream: CameraListStream?, onClick: () ->
                     Text(camera.name, fontWeight = FontWeight.SemiBold)
                     Text(if (ready) camera.host else setupDescription(camera), color = if (failed) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodySmall, maxLines = 2)
                 }
+                onFavorite?.let{IconButton(onClick=it){Icon(Lucide.Star,stringResource(if(camera.favorite)R.string.unfavorite else R.string.favorite),tint=if(camera.favorite)MaterialTheme.colorScheme.secondary else MaterialTheme.colorScheme.onSurfaceVariant)}}
                 onEdit?.let{IconButton(onClick=it){Icon(Lucide.Pencil,stringResource(R.string.edit_camera),tint=MaterialTheme.colorScheme.onSurfaceVariant)}}
                 onDelete?.let{IconButton(onClick=it){Icon(Lucide.Trash2,stringResource(R.string.remove_camera),tint=MaterialTheme.colorScheme.error)}}
             }
@@ -392,6 +401,7 @@ private fun ReadyCameraContent(camera: Camera, vm: CameraLiveViewModel) {
     val recordingLoading by vm.recordingLoading.collectAsStateWithLifecycle()
     val preview by vm.preview.collectAsStateWithLifecycle()
     var muted by remember { mutableStateOf(false) }
+    var showStats by remember { mutableStateOf(false) }
     var showFullscreen by rememberSaveable { mutableStateOf(false) }
     var streamForeground by remember { mutableStateOf(true) }
     var renderedFirstFrame by remember { mutableStateOf(false) }
@@ -459,6 +469,7 @@ private fun ReadyCameraContent(camera: Camera, vm: CameraLiveViewModel) {
         if(camera.capabilities.audio) actions += CameraActionItem(if(muted)Lucide.VolumeX else Lucide.Volume2,if(muted)stringResource(R.string.unmute) else stringResource(R.string.mute),{muted=!muted})
         actions += CameraActionItem(Lucide.Aperture,stringResource(R.string.snapshot),{runMediaAction(MediaAction.Snapshot)},snapshotLoading)
         actions += CameraActionItem(Lucide.Video,stringResource(R.string.record_recent),{runMediaAction(MediaAction.Recording)},recordingLoading)
+        actions += CameraActionItem(Lucide.ChartColumn,stringResource(R.string.camera_stats),{showStats=true})
         com.ferforastieri.valkyris.core.design.AdaptiveRow(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.spacedBy(8.dp)) {
             actions.forEach { action -> CameraAction(action.icon,action.label,action.onClick,Modifier.weight(1f),action.loading) }
         }
@@ -492,6 +503,12 @@ private fun ReadyCameraContent(camera: Camera, vm: CameraLiveViewModel) {
         Spacer(Modifier.height(18.dp))
     }
     if(streamForeground && showFullscreen) FullscreenLivePlayer(controller,preview,renderedFirstFrame,camera.name,onDismiss={showFullscreen=false})
+    if (showStats) {
+        val stats by vm.stats.collectAsStateWithLifecycle()
+        val statsLoading by vm.statsLoading.collectAsStateWithLifecycle()
+        LaunchedEffect(Unit) { vm.loadStats() }
+        CameraStatsSheet(stats, statsLoading, onDismiss = { showStats = false })
+    }
 }
 
 @Composable
@@ -666,3 +683,99 @@ private fun PresetsSection(camera: Camera, vm: CameraLiveViewModel) {
         )
     }
 }
+
+@Composable
+private fun CameraStatsSheet(stats: CameraStats?, loading: Boolean, onDismiss: () -> Unit) {
+    ValkyrisBottomSheet(title = stringResource(R.string.camera_stats), onDismiss = onDismiss) {
+        when {
+            stats == null && loading -> Box(Modifier.fillMaxWidth().padding(28.dp), contentAlignment = Alignment.Center) { CircularProgressIndicator() }
+            stats == null -> Text(stringResource(R.string.camera_stats_empty), color = MaterialTheme.colorScheme.onSurfaceVariant)
+            else -> Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(14.dp)) {
+                Text(stringResource(R.string.camera_stats_period, stats.days), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    StatChip(stringResource(R.string.camera_stats_total), stats.total.toString(), Modifier.weight(1f))
+                    StatChip(stringResource(R.string.camera_stats_unread), stats.unread.toString(), Modifier.weight(1f))
+                }
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    StatChip(stringResource(R.string.camera_stats_confidence), "${(stats.averageConfidence * 100).toInt()}%", Modifier.weight(1f))
+                    StatChip(stringResource(R.string.camera_stats_clips), stats.withClip.toString(), Modifier.weight(1f))
+                }
+                if (stats.byType.isNotEmpty()) {
+                    Text(stringResource(R.string.camera_stats_by_type), style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
+                    stats.byType.forEach { item ->
+                        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                            Text(stringResource(detectorLabelRes(item.type)), Modifier.weight(1f), style = MaterialTheme.typography.bodyMedium)
+                            Text(item.count.toString(), fontWeight = FontWeight.SemiBold)
+                        }
+                    }
+                }
+                if (stats.byHour.isNotEmpty()) {
+                    Text(stringResource(R.string.camera_stats_by_hour), style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
+                    HourChart(stats.byHour)
+                }
+                if (stats.byDay.isNotEmpty()) {
+                    Text(stringResource(R.string.camera_stats_by_day), style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
+                    DayChart(stats.byDay)
+                }
+                if (stats.lastEventAt.isNotBlank()) {
+                    Text(
+                        stringResource(R.string.camera_stats_last) + ": " + statsTime(stats.lastEventAt),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+                Spacer(Modifier.height(8.dp))
+            }
+        }
+    }
+}
+
+@Composable
+private fun StatChip(label: String, value: String, modifier: Modifier) {
+    Surface(modifier, RoundedCornerShape(14.dp), color = MaterialTheme.colorScheme.surfaceVariant) {
+        Column(Modifier.padding(12.dp)) {
+            Text(value, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold)
+            Text(label, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
+        }
+    }
+}
+
+@Composable
+private fun HourChart(hours: List<Int>) {
+    val max = (hours.maxOrNull() ?: 0).coerceAtLeast(1)
+    Row(Modifier.fillMaxWidth().height(64.dp), horizontalArrangement = Arrangement.spacedBy(2.dp), verticalAlignment = Alignment.Bottom) {
+        hours.forEach { count ->
+            Box(
+                Modifier
+                    .weight(1f)
+                    .fillMaxHeight(count.toFloat() / max)
+                    .background(MaterialTheme.colorScheme.secondary, RoundedCornerShape(topStart = 2.dp, topEnd = 2.dp)),
+            )
+        }
+    }
+}
+
+@Composable
+private fun DayChart(days: List<DayCount>) {
+    val max = (days.maxOfOrNull { it.count } ?: 0).coerceAtLeast(1)
+    Row(
+        Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).height(64.dp),
+        horizontalArrangement = Arrangement.spacedBy(3.dp),
+        verticalAlignment = Alignment.Bottom,
+    ) {
+        days.forEach { day ->
+            Box(
+                Modifier
+                    .width(12.dp)
+                    .fillMaxHeight(day.count.toFloat() / max)
+                    .background(MaterialTheme.colorScheme.secondary, RoundedCornerShape(topStart = 2.dp, topEnd = 2.dp)),
+            )
+        }
+    }
+}
+
+private fun statsTime(value: String) = runCatching {
+    java.time.format.DateTimeFormatter.ofPattern("dd/MM/yyyy · HH:mm")
+        .withZone(java.time.ZoneId.systemDefault())
+        .format(java.time.Instant.parse(value))
+}.getOrDefault(value)

@@ -259,6 +259,20 @@ class ValkyrisApi(
         }
     }
     suspend fun wakeRemote(id: String): RemoteDevice = post("/remotes/$id/wake", emptyMap<String, String>())
+
+    suspend fun setFavorite(type: String, id: String, favorite: Boolean) {
+        val current = requireNotNull(session())
+        executeUnit(current.fingerprint) {
+            it.put(base() + "/favorites/$type/$id") {
+                bearerAuth(current.token)
+                header(HttpHeaders.AcceptLanguage, Locale.getDefault().toLanguageTag())
+                contentType(ContentType.Application.Json)
+                setBody(FavoriteInput(favorite))
+            }
+        }
+    }
+
+    suspend fun cameraStats(cameraId: String, days: Int = 30): CameraStats = get("/cameras/$cameraId/stats?days=$days")
     suspend fun deleteRemote(id: String) {
         val current = requireNotNull(session())
         executeUnit(current.fingerprint, announceBackend = true) {

@@ -58,6 +58,18 @@ func (s *Service) Delete(ctx context.Context, id string) error {
 	return s.repo.Delete(ctx, id)
 }
 
+// SetFavorite pins or unpins the light on the overview.
+func (s *Service) SetFavorite(ctx context.Context, id string, favorite bool) error {
+	if err := s.repo.SetFavorite(ctx, id, favorite); err != nil {
+		return err
+	}
+	updated, err := s.Get(ctx, id)
+	if err == nil {
+		s.hub.Broadcast(map[string]any{"type": "light.updated", "light": updated})
+	}
+	return err
+}
+
 func (s *Service) Control(ctx context.Context, id string, patch StatePatch) (Light, error) {
 	unlock := s.lock(id)
 	defer unlock()

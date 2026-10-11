@@ -140,6 +140,8 @@ func (s *Server) Handler() http.Handler {
 	protected.HandleFunc("GET /cameras/{id}/ptz/presets", s.listPTZPresets)
 	protected.HandleFunc("POST /cameras/{id}/ptz/presets", s.createPTZPreset)
 	protected.HandleFunc("POST /cameras/{id}/ptz/presets/{token}/goto", s.gotoPTZPreset)
+	protected.HandleFunc("GET /cameras/{id}/stats", s.cameraStats)
+	protected.HandleFunc("PUT /favorites/{type}/{id}", s.setFavorite)
 	protected.HandleFunc("DELETE /cameras/{id}/ptz/presets/{token}", s.deletePTZPreset)
 	protected.HandleFunc("PUT /cameras/{id}/ptz/startup", s.setStartupPreset)
 	protected.HandleFunc("GET /lights", s.listLights)

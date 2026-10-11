@@ -60,6 +60,9 @@ func Open(path string) (*Store, error) {
 		{"events", "clip_status", `ALTER TABLE events ADD COLUMN clip_status TEXT NOT NULL DEFAULT 'not_requested'`, `UPDATE events SET clip_status=CASE WHEN clip_path IS NULL OR clip_path='' THEN 'not_requested' ELSE 'ready' END`},
 		{"events", "clip_error", `ALTER TABLE events ADD COLUMN clip_error TEXT`, ""},
 		{"remotes", "mac", `ALTER TABLE remotes ADD COLUMN mac TEXT NOT NULL DEFAULT ''`, ""},
+		{"cameras", "favorite", `ALTER TABLE cameras ADD COLUMN favorite INTEGER NOT NULL DEFAULT 0`, ""},
+		{"lights", "favorite", `ALTER TABLE lights ADD COLUMN favorite INTEGER NOT NULL DEFAULT 0`, ""},
+		{"remotes", "favorite", `ALTER TABLE remotes ADD COLUMN favorite INTEGER NOT NULL DEFAULT 0`, ""},
 	} {
 		exists, migrationErr := columnExists(ctx, db, migration.table, migration.column)
 		if migrationErr != nil {

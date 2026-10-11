@@ -94,6 +94,14 @@ class CamerasViewModel @Inject constructor(
         }
     }
 
+    fun toggleFavorite(id: String, favorite: Boolean) {
+        viewModelScope.launch {
+            runCatching { api.setFavorite("camera", id, favorite) }
+                .onSuccess { repository.refreshCameras() }
+                .onFailure { error -> _state.update { it.copy(error = error.message) } }
+        }
+    }
+
     fun add(input: CreateCameraRequest) {
         if (!actionGate.tryAcquire()) return
         _state.update { it.copy(creating = true, error = null) }
@@ -171,6 +179,10 @@ class CameraLiveViewModel @Inject constructor(
     val presets = _presets.asStateFlow()
     private val _presetsBusy = MutableStateFlow(false)
     val presetsBusy = _presetsBusy.asStateFlow()
+    private val _stats = MutableStateFlow<com.ferforastieri.valkyris.core.model.CameraStats?>(null)
+    val stats = _stats.asStateFlow()
+    private val _statsLoading = MutableStateFlow(false)
+    val statsLoading = _statsLoading.asStateFlow()
     private val ptzMutex = Mutex()
     private var realtime: okhttp3.WebSocket? = null
 
@@ -244,6 +256,18 @@ class CameraLiveViewModel @Inject constructor(
     fun pinStartupPreset(token: String) {
         viewModelScope.launch {
             runCatching { api.setStartupPreset(id, token) }.onSuccess { _camera.value = it }
+        }
+    }
+
+    fun loadStats() {
+        if (_statsLoading.value) return
+        _statsLoading.value = true
+        viewModelScope.launch {
+            try {
+                runCatching { api.cameraStats(id) }.onSuccess { _stats.value = it }
+            } finally {
+                _statsLoading.value = false
+            }
         }
     }
 

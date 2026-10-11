@@ -29,6 +29,7 @@ class LightsViewModel @Inject constructor(private val repository:ValkyrisReposit
     private fun connectRealtime(){realtime=repository.api.realtime({refresh()},{if(active)viewModelScope.launch{delay(5_000);if(active)connectRealtime()}},eventPrefix="light.")}
     fun refresh()=viewModelScope.launch{runCatching{repository.refreshLights()}.onFailure{error->_state.update{it.copy(loading=false,error=error.message)}}}
     fun control(id:String,patch:LightStatePatch)=guarded(id,false){repository.controlLight(id,patch)}
+    fun toggleFavorite(id:String,favorite:Boolean)=viewModelScope.launch{runCatching{repository.api.setFavorite("light",id,favorite)}.onSuccess{repository.refreshLights()}.onFailure{error->_state.update{it.copy(error=error.message)}}}
     fun delete(id:String,done:()->Unit={})=guarded(id){repository.deleteLight(id);done()}
     private fun guarded(id:String,useGlobalGate:Boolean=true,block:suspend()->Unit){if(id in _state.value.busy||(useGlobalGate&&!actionGate.tryAcquire()))return;_state.update{it.copy(busy=it.busy+id,error=null)};viewModelScope.launch{try{runCatching{block()}.onFailure{error->_state.update{it.copy(error=error.message)}}}finally{_state.update{it.copy(busy=it.busy-id)};if(useGlobalGate)actionGate.release()}}}
     override fun onCleared(){active=false;realtime?.close(1000,"lights screen closed");super.onCleared()}

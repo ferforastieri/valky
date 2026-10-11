@@ -182,6 +182,23 @@ paths:
       parameters: [{$ref: '#/components/parameters/id'}]
       requestBody: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/StartupPresetInput'}}}}
       responses: {'200': {description: Updated camera in APIResponse.data}}
+  /cameras/{id}/stats:
+    get:
+      summary: Aggregated event statistics for a camera
+      parameters:
+        - {$ref: '#/components/parameters/id'}
+        - {name: days, in: query, required: false, schema: {type: integer, default: 30, minimum: 1, maximum: 365}}
+      responses: {'200': {description: Statistics in APIResponse.data}}
+  /favorites/{type}/{id}:
+    put:
+      summary: Pin or unpin a camera, light or remote control on the overview
+      parameters:
+        - {name: type, in: path, required: true, schema: {type: string, enum: [camera, light, remote]}}
+        - {$ref: '#/components/parameters/id'}
+      requestBody:
+        required: true
+        content: {application/json: {schema: {type: object, required: [favorite], properties: {favorite: {type: boolean}}}}}
+      responses: {'200': {description: Updated}}
   /cameras/{id}/snapshot:
     get:
       summary: Get a current JPEG frame from the authenticated local stream
@@ -569,6 +586,7 @@ components:
         setupError: {type: string, description: Persisted diagnostic from the latest setup attempt}
         setupUpdatedAt: {type: string, format: date-time}
         startupPresetToken: {type: string, description: PTZ preset applied when the camera starts or restarts; empty disables it}
+        favorite: {type: boolean}
         enabled: {type: boolean}
     CameraInput:
       type: object
@@ -634,6 +652,7 @@ components:
         setupStatus: {type: string, enum: [pending, ready, failed]}
         setupError: {type: string}
         enabled: {type: boolean}
+        favorite: {type: boolean}
         lastSeenAt: {type: string, format: date-time}
         state: {$ref: '#/components/schemas/LightState'}
     Remote:
@@ -646,6 +665,7 @@ components:
         host: {type: string}
         port: {type: integer, default: 8002}
         mac: {type: string, description: Network address used for Wake-on-LAN}
+        favorite: {type: boolean}
         setupStatus: {type: string, enum: [pending, ready, failed]}
         setupError: {type: string}
         tokenConfigured: {type: boolean, description: Whether the TV already authorized this controller}

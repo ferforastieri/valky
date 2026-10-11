@@ -26,6 +26,7 @@ type Device struct {
 	SetupError      string     `json:"setupError,omitempty"`
 	TokenConfigured bool       `json:"tokenConfigured"`
 	Enabled         bool       `json:"enabled"`
+	Favorite        bool       `json:"favorite"`
 	LastSeenAt      *time.Time `json:"lastSeenAt,omitempty"`
 	CreatedAt       time.Time  `json:"createdAt"`
 	UpdatedAt       time.Time  `json:"updatedAt"`

@@ -32,6 +32,7 @@ type Camera struct {
 	SetupUpdatedAt time.Time         `json:"setupUpdatedAt"`
 	StartupPreset  string            `json:"startupPresetToken"`
 	Enabled        bool              `json:"enabled"`
+	Favorite       bool              `json:"favorite"`
 	CreatedAt      time.Time         `json:"createdAt"`
 	UpdatedAt      time.Time         `json:"updatedAt"`
 }

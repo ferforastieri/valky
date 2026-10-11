@@ -32,8 +32,10 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.ViewModel
@@ -42,25 +44,37 @@ import androidx.lifecycle.compose.LifecycleResumeEffect
 import androidx.lifecycle.viewModelScope
 import com.composables.icons.lucide.Bell
 import com.composables.icons.lucide.Camera
+import com.composables.icons.lucide.Lightbulb
 import com.composables.icons.lucide.Lucide
 import com.composables.icons.lucide.Mic
+import com.composables.icons.lucide.Star
+import com.composables.icons.lucide.Tv
 import com.composables.icons.lucide.UserRound
 import com.composables.icons.lucide.Video
 import com.ferforastieri.valkyris.R
 import com.ferforastieri.valkyris.core.design.cameraIcon
 import com.ferforastieri.valkyris.core.model.Camera as CameraModel
+import com.ferforastieri.valkyris.core.model.LightDevice
+import com.ferforastieri.valkyris.core.model.RemoteDevice
 import com.ferforastieri.valkyris.core.network.ValkyrisRepository
 import com.ferforastieri.valkyris.feature.cameras.CameraFailureSheet
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.launch
 import java.time.Instant
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import javax.inject.Inject
 
-data class OverviewState(val cameras: List<CameraModel> = emptyList(), val loading: Boolean = true)
+data class FavoriteItem(val type: String, val id: String, val name: String, val subtitle: String)
+
+data class OverviewState(
+    val cameras: List<CameraModel> = emptyList(),
+    val favorites: List<FavoriteItem> = emptyList(),
+    val loading: Boolean = true,
+)
 
 @HiltViewModel
 class OverviewViewModel @Inject constructor(private val repository: ValkyrisRepository) : ViewModel() {
@@ -72,16 +86,37 @@ class OverviewViewModel @Inject constructor(private val repository: ValkyrisRepo
 
     init {
         viewModelScope.launch {
-            repository.cameras.collect { _state.value = OverviewState(it, false) }
+            combine(repository.cameras, repository.lights, repository.remotes) { cameras, lights, remotes ->
+                OverviewState(cameras, favoritesOf(cameras, lights, remotes), false)
+            }.collect { _state.value = it }
         }
         viewModelScope.launch {
             runCatching { repository.refreshCameras() }
             runCatching { repository.refreshEvents() }
             runCatching { repository.refreshRules() }
+            runCatching { repository.refreshLights() }
+            runCatching { repository.refreshRemotes() }
         }
     }
 
-    fun refresh() { viewModelScope.launch { runCatching { repository.refreshCameras() };runCatching { repository.refreshEvents() };runCatching { repository.refreshRules() };runCatching { repository.refreshUsers() } } }
+    fun refresh() {
+        viewModelScope.launch {
+            runCatching { repository.refreshCameras() }
+            runCatching { repository.refreshEvents() }
+            runCatching { repository.refreshRules() }
+            runCatching { repository.refreshUsers() }
+            runCatching { repository.refreshLights() }
+            runCatching { repository.refreshRemotes() }
+        }
+    }
+
+    private fun favoritesOf(cameras: List<CameraModel>, lights: List<LightDevice>, remotes: List<RemoteDevice>): List<FavoriteItem> {
+        val items = mutableListOf<FavoriteItem>()
+        cameras.filter { it.favorite }.forEach { items += FavoriteItem("camera", it.id, it.name, it.host) }
+        lights.filter { it.favorite }.forEach { items += FavoriteItem("light", it.id, it.name, it.room.ifBlank { "Iluminação" }) }
+        remotes.filter { it.favorite }.forEach { items += FavoriteItem("remote", it.id, it.name, it.host) }
+        return items
+    }
 }
 
 @Composable
@@ -91,18 +126,33 @@ fun OverviewScreen(
     onCameras: () -> Unit,
     onPeople: () -> Unit,
     onEvents: () -> Unit,
+    onLight: () -> Unit,
+    onFavorite: (FavoriteItem) -> Unit,
     viewModel: OverviewViewModel = hiltViewModel(),
 ) {
-    LifecycleResumeEffect(Unit) { viewModel.refresh();onPauseOrDispose {} }
+    LifecycleResumeEffect(Unit) { viewModel.refresh(); onPauseOrDispose {} }
     val state = viewModel.state.collectAsStateWithLifecycle().value
     val events = viewModel.events.collectAsStateWithLifecycle().value
     val people = viewModel.people.collectAsStateWithLifecycle().value
     var failedCameraId by remember { mutableStateOf<String?>(null) }
     val failedCamera = state.cameras.firstOrNull { it.id == failedCameraId }
-    OverviewContent(state.cameras, people.count { it.enabled }, events, onCamera = { id ->
-        val camera = state.cameras.firstOrNull { it.id == id }
-        if (camera?.setupStatus == "failed") failedCameraId = id else onCamera(id)
-    }, onEvent = onEvent, onCameras = onCameras, onPeople = onPeople, onEvents = onEvents, activityChart = { OverviewActivityChart(onEvent = onEvent) })
+    OverviewContent(
+        state.cameras,
+        people.count { it.enabled },
+        events,
+        favorites = state.favorites,
+        onCamera = { id ->
+            val camera = state.cameras.firstOrNull { it.id == id }
+            if (camera?.setupStatus == "failed") failedCameraId = id else onCamera(id)
+        },
+        onEvent = onEvent,
+        onCameras = onCameras,
+        onPeople = onPeople,
+        onEvents = onEvents,
+        onLight = onLight,
+        onFavorite = onFavorite,
+        activityChart = { OverviewActivityChart(onEvent = onEvent) },
+    )
     failedCamera?.let { CameraFailureSheet(it, onDismiss = { failedCameraId = null }) }
 }
 
@@ -111,11 +161,14 @@ fun OverviewContent(
     cameras: List<CameraModel>,
     trackedPeople: Int,
     events: List<com.ferforastieri.valkyris.core.model.ValkyrisEvent>,
+    favorites: List<FavoriteItem> = emptyList(),
     onCamera: (String) -> Unit = {},
     onEvent: (String) -> Unit = {},
     onCameras: () -> Unit = {},
     onPeople: () -> Unit = {},
     onEvents: () -> Unit = {},
+    onLight: () -> Unit = {},
+    onFavorite: (FavoriteItem) -> Unit = {},
     activityChart: @Composable () -> Unit = {},
 ) {
     val pending = events.count { it.acknowledgedAt == null }
@@ -132,67 +185,57 @@ fun OverviewContent(
             }
         }
         item { activityChart() }
-        if (cameras.isNotEmpty()) {
-            item { SectionLabel(stringResource(R.string.cameras)) }
-            items(cameras.take(2), key = { "camera-${it.id}" }) { camera ->
-                Card(
-                    onClick = { onCamera(camera.id) },
-                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
-                    elevation = CardDefaults.cardElevation(4.dp),
-                ) {
-                    Row(Modifier.fillMaxWidth().padding(15.dp), verticalAlignment = Alignment.CenterVertically) {
-                        Surface(Modifier.size(42.dp), RoundedCornerShape(13.dp), color = com.ferforastieri.valkyris.core.design.ColorTokens.BrandTile) {
-                            Icon(cameraIcon(camera.icon), null, Modifier.padding(10.dp), tint = MaterialTheme.colorScheme.secondary)
-                        }
-                        Spacer(Modifier.width(12.dp))
-                        Column(Modifier.weight(1f)) {
-                            Text(camera.name, fontWeight = FontWeight.SemiBold)
-                            Text(camera.host, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                        }
-                        Box(Modifier.size(8.dp).background(MaterialTheme.colorScheme.secondary, CircleShape))
-                    }
-                }
-            }
-        }
-        item { SectionLabel(stringResource(R.string.recent_activity)) }
-        if (events.isEmpty()) {
+        item { SectionLabel(stringResource(R.string.overview_favorites)) }
+        if (favorites.isEmpty()) {
             item {
                 Surface(Modifier.fillMaxWidth(), RoundedCornerShape(18.dp), color = MaterialTheme.colorScheme.surface) {
-                    Text(stringResource(R.string.no_events_body), Modifier.padding(18.dp), color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text(stringResource(R.string.overview_no_favorites), Modifier.padding(18.dp), color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodySmall)
                 }
             }
         } else {
-            items(events.take(3), key = { "event-${it.id}" }) { event ->
-                Card(
-                    onClick = { onEvent(event.id) },
-                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
-                ) {
-                    Row(Modifier.fillMaxWidth().padding(14.dp), verticalAlignment = Alignment.CenterVertically) {
-                        Surface(
-                            modifier = Modifier.size(36.dp),
-                            shape = RoundedCornerShape(11.dp),
-                            color = if (event.acknowledgedAt == null) MaterialTheme.colorScheme.error.copy(alpha = .12f) else MaterialTheme.colorScheme.secondary.copy(alpha = .15f),
-                        ) {
-                            Icon(
-                                overviewEventIcon(event.type),
-                                null,
-                                Modifier.padding(8.dp),
-                                tint = if (event.acknowledgedAt == null) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.secondary,
-                            )
-                        }
-                        Spacer(Modifier.width(12.dp))
-                        Column(Modifier.weight(1f)) {
-                            Text(com.ferforastieri.valkyris.feature.events.eventTitle(event), fontWeight = FontWeight.Medium)
-                            Text(overviewTime(event.occurredAt), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                        }
-                        Text("${(event.confidence * 100).toInt()}%", style = MaterialTheme.typography.labelMedium)
-                    }
-                }
+            items(favorites, key = { "${it.type}-${it.id}" }) { favorite ->
+                FavoriteCard(favorite, onCamera = onCamera, onLight = onLight, onFavorite = onFavorite)
             }
         }
     }
+}
+
+@Composable
+private fun FavoriteCard(item: FavoriteItem, onCamera: (String) -> Unit, onLight: () -> Unit, onFavorite: (FavoriteItem) -> Unit) {
+    val tint = when (item.type) {
+        "camera" -> MaterialTheme.colorScheme.secondary
+        "light" -> MaterialTheme.colorScheme.secondary
+        else -> MaterialTheme.colorScheme.secondary
+    }
+    Card(
+        onClick = {
+            when (item.type) {
+                "camera" -> onCamera(item.id)
+                "light" -> onLight()
+                else -> onFavorite(item)
+            }
+        },
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+    ) {
+        Row(Modifier.fillMaxWidth().padding(15.dp), verticalAlignment = Alignment.CenterVertically) {
+            Surface(Modifier.size(40.dp), RoundedCornerShape(12.dp), color = com.ferforastieri.valkyris.core.design.ColorTokens.BrandTile) {
+                Icon(favoriteIcon(item.type), null, Modifier.padding(10.dp), tint = tint)
+            }
+            Spacer(Modifier.width(12.dp))
+            Column(Modifier.weight(1f)) {
+                Text(item.name, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                Text(item.subtitle, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            }
+            Icon(Lucide.Star, null, Modifier.size(16.dp), tint = MaterialTheme.colorScheme.secondary)
+        }
+    }
+}
+
+private fun favoriteIcon(type: String): ImageVector = when (type) {
+    "camera" -> Lucide.Video
+    "light" -> Lucide.Lightbulb
+    else -> Lucide.Tv
 }
 
 @Composable
@@ -202,12 +245,21 @@ private fun MetricCard(icon: androidx.compose.ui.graphics.vector.ImageVector, va
         accent -> MaterialTheme.colorScheme.secondary
         else -> MaterialTheme.colorScheme.onSurfaceVariant
     }
-    Card(onClick = onClick, modifier = modifier, shape = RoundedCornerShape(17.dp), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface), elevation = CardDefaults.cardElevation(defaultElevation = 3.dp)) {
+    Card(
+        onClick = onClick,
+        modifier = modifier,
+        shape = RoundedCornerShape(18.dp),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
+    ) {
         Column(
-            Modifier.fillMaxWidth().heightIn(min = 110.dp).padding(14.dp),
+            Modifier.fillMaxWidth().heightIn(min = 108.dp).padding(14.dp),
             verticalArrangement = Arrangement.SpaceBetween,
         ) {
-            Icon(icon, null, Modifier.size(20.dp), tint = tint)
+            Surface(shape = RoundedCornerShape(12.dp), color = tint.copy(alpha = .14f)) {
+                Icon(icon, null, Modifier.padding(8.dp).size(20.dp), tint = tint)
+            }
             Column {
                 Text(value, style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.SemiBold)
                 Text(
@@ -215,14 +267,15 @@ private fun MetricCard(icon: androidx.compose.ui.graphics.vector.ImageVector, va
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     maxLines = 1,
-                    overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
+                    overflow = TextOverflow.Ellipsis,
                 )
             }
         }
     }
 }
 
-@Composable private fun SectionLabel(text: String, icon: androidx.compose.ui.graphics.vector.ImageVector? = null) {
+@Composable
+private fun SectionLabel(text: String, icon: androidx.compose.ui.graphics.vector.ImageVector? = null) {
     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
         icon?.let { Icon(it, null, Modifier.size(19.dp), tint = MaterialTheme.colorScheme.secondary) }
         Text(text, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
@@ -232,9 +285,3 @@ private fun MetricCard(icon: androidx.compose.ui.graphics.vector.ImageVector, va
 private fun overviewTime(value: String) = runCatching {
     DateTimeFormatter.ofPattern("dd MMM · HH:mm").withZone(ZoneId.systemDefault()).format(Instant.parse(value))
 }.getOrDefault(value)
-
-private fun overviewEventIcon(type: String) = when {
-    type.contains("mov", ignoreCase = true) || type.contains("motion", ignoreCase = true) -> Lucide.Video
-    type.contains("camp", ignoreCase = true) || type.contains("door", ignoreCase = true) -> Lucide.Bell
-    else -> Lucide.Mic
-}

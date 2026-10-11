@@ -188,7 +188,7 @@ func (r *Repository) CompleteSetup(ctx context.Context, id string, caps Capabili
 }
 
 func (r *Repository) List(ctx context.Context) ([]Camera, error) {
-	rows, err := r.store.DB.QueryContext(ctx, `SELECT alerts_json,id,name,icon,host,port,profile_token,capabilities_json,media_xaddr,events_xaddr,ptz_xaddr,startup_preset_token,setup_status,setup_step,setup_error,setup_updated_at,enabled,created_at,updated_at FROM cameras ORDER BY name`)
+	rows, err := r.store.DB.QueryContext(ctx, `SELECT alerts_json,id,name,icon,host,port,profile_token,capabilities_json,media_xaddr,events_xaddr,ptz_xaddr,startup_preset_token,setup_status,setup_step,setup_error,setup_updated_at,enabled,created_at,updated_at,favorite FROM cameras ORDER BY name`)
 	if err != nil {
 		return nil, err
 	}
@@ -205,13 +205,13 @@ func (r *Repository) List(ctx context.Context) ([]Camera, error) {
 }
 
 func (r *Repository) Get(ctx context.Context, id string) (Camera, Credentials, error) {
-	row := r.store.DB.QueryRowContext(ctx, `SELECT alerts_json,id,name,icon,host,port,profile_token,capabilities_json,media_xaddr,events_xaddr,ptz_xaddr,startup_preset_token,setup_status,setup_step,setup_error,setup_updated_at,enabled,created_at,updated_at,username_enc,password_enc,rtsp_uri_enc FROM cameras WHERE id=?`, id)
+	row := r.store.DB.QueryRowContext(ctx, `SELECT alerts_json,id,name,icon,host,port,profile_token,capabilities_json,media_xaddr,events_xaddr,ptz_xaddr,startup_preset_token,setup_status,setup_step,setup_error,setup_updated_at,enabled,created_at,updated_at,username_enc,password_enc,rtsp_uri_enc,favorite FROM cameras WHERE id=?`, id)
 	var c Camera
 	var caps, alertsJSON string
-	var enabled int
+	var enabled, favorite int
 	var setupUpdated, created, updated string
 	var user, pass, rtsp []byte
-	err := row.Scan(&alertsJSON, &c.ID, &c.Name, &c.Icon, &c.Host, &c.Port, &c.ProfileToken, &caps, &c.Services.Media, &c.Services.Events, &c.Services.PTZ, &c.StartupPreset, &c.SetupStatus, &c.SetupStep, &c.SetupError, &setupUpdated, &enabled, &created, &updated, &user, &pass, &rtsp)
+	err := row.Scan(&alertsJSON, &c.ID, &c.Name, &c.Icon, &c.Host, &c.Port, &c.ProfileToken, &caps, &c.Services.Media, &c.Services.Events, &c.Services.PTZ, &c.StartupPreset, &c.SetupStatus, &c.SetupStep, &c.SetupError, &setupUpdated, &enabled, &created, &updated, &user, &pass, &rtsp, &favorite)
 	if err != nil {
 		return c, Credentials{}, err
 	}
@@ -221,6 +221,7 @@ func (r *Repository) Get(ctx context.Context, id string) (Camera, Credentials, e
 		return c, Credentials{}, err
 	}
 	c.Enabled = enabled == 1
+	c.Favorite = favorite == 1
 	c.CreatedAt, _ = time.Parse(time.RFC3339Nano, created)
 	c.UpdatedAt, _ = time.Parse(time.RFC3339Nano, updated)
 	c.SetupUpdatedAt, _ = time.Parse(time.RFC3339Nano, setupUpdated)
@@ -261,13 +262,32 @@ func (r *Repository) Delete(ctx context.Context, id string) error {
 	return nil
 }
 
+// SetFavorite pins or unpins the camera on the overview.
+func (r *Repository) SetFavorite(ctx context.Context, id string, favorite bool) error {
+	result, err := r.store.DB.ExecContext(ctx, `UPDATE cameras SET favorite=? WHERE id=?`, boolToInt(favorite), id)
+	if err != nil {
+		return err
+	}
+	if n, _ := result.RowsAffected(); n == 0 {
+		return sql.ErrNoRows
+	}
+	return nil
+}
+
+func boolToInt(value bool) int {
+	if value {
+		return 1
+	}
+	return 0
+}
+
 type scanner interface{ Scan(...any) error }
 
 func scanCamera(s scanner) (Camera, error) {
 	var c Camera
 	var alertsJSON, caps, setupUpdated, created, updated string
-	var enabled int
-	err := s.Scan(&alertsJSON, &c.ID, &c.Name, &c.Icon, &c.Host, &c.Port, &c.ProfileToken, &caps, &c.Services.Media, &c.Services.Events, &c.Services.PTZ, &c.StartupPreset, &c.SetupStatus, &c.SetupStep, &c.SetupError, &setupUpdated, &enabled, &created, &updated)
+	var enabled, favorite int
+	err := s.Scan(&alertsJSON, &c.ID, &c.Name, &c.Icon, &c.Host, &c.Port, &c.ProfileToken, &caps, &c.Services.Media, &c.Services.Events, &c.Services.PTZ, &c.StartupPreset, &c.SetupStatus, &c.SetupStep, &c.SetupError, &setupUpdated, &enabled, &created, &updated, &favorite)
 	if err != nil {
 		return c, err
 	}
@@ -277,6 +297,7 @@ func scanCamera(s scanner) (Camera, error) {
 		return c, err
 	}
 	c.Enabled = enabled == 1
+	c.Favorite = favorite == 1
 	c.CreatedAt, _ = time.Parse(time.RFC3339Nano, created)
 	c.UpdatedAt, _ = time.Parse(time.RFC3339Nano, updated)
 	c.SetupUpdatedAt, _ = time.Parse(time.RFC3339Nano, setupUpdated)

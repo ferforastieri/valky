@@ -24,6 +24,7 @@ Valkyris transforma um servidor doméstico em uma central privada de monitoramen
 - Live WebRTC autenticado, com uma única conexão RTSP por câmera e conversão apenas do áudio G.711 para Opus.
 - Movimento PTZ por pressionar e segurar e zoom quando anunciado pela câmera.
 - Posições PTZ salvas na própria câmera, com uma posição fixada para ela voltar sozinha ao iniciar ou reiniciar.
+- Dispositivos favoritos (câmeras, lâmpadas e controles) no topo da visão geral, além de estatísticas de eventos por câmera.
 - Cadastro assíncrono: a câmera aparece imediatamente e o progresso ou erro fica persistido.
 - [Detecção sonora contínua](docs/audio-detection.md), com janelas sobrepostas, confirmação temporal de choro de bebê e diagnóstico de pontuações por 24 horas.
 - Regras para movimento e sons residenciais; a confiança mínima é aplicada internamente por detector, sem ajuste manual, e as regras ficam sempre ativas.
@@ -226,6 +227,8 @@ Além do contrato completo em OpenAPI, as rotas adicionadas recentemente são:
 | `POST` | `/api/v1/cameras/{id}/ptz/presets/{token}/goto` | Autenticado | Move a câmera para uma posição salva. |
 | `DELETE` | `/api/v1/cameras/{id}/ptz/presets/{token}` | Autenticado | Remove uma posição salva. |
 | `PUT` | `/api/v1/cameras/{id}/ptz/startup` | Autenticado | Define a posição aplicada quando a câmera inicia. |
+| `GET` | `/api/v1/cameras/{id}/stats` | Autenticado | Estatísticas agregadas dos eventos da câmera. |
+| `PUT` | `/api/v1/favorites/{type}/{id}` | Autenticado | Marca/desmarca câmera, lâmpada ou controle como favorito. |
 
 Respostas JSON seguem um envelope consistente:
 

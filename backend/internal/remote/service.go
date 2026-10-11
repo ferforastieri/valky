@@ -248,6 +248,18 @@ func (s *Service) Wake(ctx context.Context, id string) (Device, error) {
 	return updated, err
 }
 
+// SetFavorite pins or unpins the device on the overview.
+func (s *Service) SetFavorite(ctx context.Context, id string, favorite bool) (Device, error) {
+	if err := s.repo.SetFavorite(ctx, id, favorite); err != nil {
+		return Device{}, err
+	}
+	updated, err := s.Get(ctx, id)
+	if err == nil {
+		s.broadcast("remote.updated", updated)
+	}
+	return updated, err
+}
+
 func (s *Service) broadcast(kind string, payload any) {
 	if s.hub != nil {
 		s.hub.Broadcast(map[string]any{"type": kind, "device": payload})

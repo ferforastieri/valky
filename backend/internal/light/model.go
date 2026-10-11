@@ -32,6 +32,7 @@ type Light struct {
 	SetupStatus  string       `json:"setupStatus"`
 	SetupError   string       `json:"setupError,omitempty"`
 	Enabled      bool         `json:"enabled"`
+	Favorite     bool         `json:"favorite"`
 	LastSeenAt   *time.Time   `json:"lastSeenAt,omitempty"`
 	State        State        `json:"state"`
 	CreatedAt    time.Time    `json:"createdAt"`

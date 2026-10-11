@@ -53,6 +53,7 @@ import com.composables.icons.lucide.Lucide
 import com.composables.icons.lucide.Pencil
 import com.composables.icons.lucide.Plus
 import com.composables.icons.lucide.Radar
+import com.composables.icons.lucide.Star
 import com.composables.icons.lucide.Trash2
 import com.composables.icons.lucide.Tv
 import com.ferforastieri.valkyris.R
@@ -73,6 +74,8 @@ fun RemotesScreen(admin: Boolean, onRemote: (String) -> Unit = {}, vm: RemotesVi
     var manualAdd by remember { mutableStateOf(false) }
     val editing = state.remotes.firstOrNull { it.id == editingId }
     val removing = state.remotes.firstOrNull { it.id == removingId }
+    // A TV already registered must not be offered for pairing again.
+    val discovered = state.discovered.filter { tv -> state.remotes.none { it.host == tv.host } }
 
     Box(Modifier.fillMaxSize()) {
         Column(Modifier.fillMaxSize().padding(horizontal = 18.dp)) {
@@ -91,9 +94,9 @@ fun RemotesScreen(admin: Boolean, onRemote: (String) -> Unit = {}, vm: RemotesVi
                 verticalArrangement = Arrangement.spacedBy(12.dp),
                 contentPadding = PaddingValues(top = 12.dp, bottom = 96.dp),
             ) {
-                if (admin && state.discovered.isNotEmpty()) {
+                if (admin && discovered.isNotEmpty()) {
                     item { Text(stringResource(R.string.remote_discovered_title), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold) }
-                    items(state.discovered, key = { "found-${it.host}" }) { tv ->
+                    items(discovered, key = { "found-${it.host}" }) { tv ->
                         DiscoveredTvCard(tv, onConnect = { vm.addAndPair(RemoteInput(name = tv.name, host = tv.host, port = 8002)) })
                     }
                     item { HorizontalDivider() }
@@ -108,12 +111,13 @@ fun RemotesScreen(admin: Boolean, onRemote: (String) -> Unit = {}, vm: RemotesVi
                             remote = remote,
                             busy = remote.id in state.busy || remote.id in state.pairing,
                             onOpen = { onRemote(remote.id) },
+                            onFavorite = { vm.toggleFavorite(remote.id, !remote.favorite) },
                             onEdit = if (admin) ({ editingId = remote.id }) else null,
                             onDelete = if (admin) ({ removingId = remote.id }) else null,
                         )
                     }
                 }
-                if (!state.loading && state.remotes.isEmpty() && (state.discovered.isEmpty() || !admin)) {
+                if (!state.loading && state.remotes.isEmpty() && (discovered.isEmpty() || !admin)) {
                     item { EmptyRemotes() }
                 }
             }
@@ -140,18 +144,19 @@ fun RemotesScreen(admin: Boolean, onRemote: (String) -> Unit = {}, vm: RemotesVi
         )
     }
     removing?.let { remote ->
-        AlertDialog(
-            onDismissRequest = { removingId = null },
-            title = { Text(stringResource(R.string.remote_remove_title)) },
-            text = { Text(stringResource(R.string.remote_remove_body, remote.name)) },
-            dismissButton = { TextButton(onClick = { removingId = null }) { Text(stringResource(R.string.cancel)) } },
-            confirmButton = {
+        ValkyrisBottomSheet(
+            title = stringResource(R.string.remote_remove_title),
+            onDismiss = { removingId = null },
+            actions = {
+                TextButton(onClick = { removingId = null }) { Text(stringResource(R.string.cancel)) }
                 Button(
                     onClick = { vm.remove(remote.id) { removingId = null } },
                     colors = androidx.compose.material3.ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error, contentColor = MaterialTheme.colorScheme.onError),
                 ) { Text(stringResource(R.string.remove)) }
             },
-        )
+        ) {
+            Text(stringResource(R.string.remote_remove_body, remote.name), color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
     }
 }
 
@@ -228,6 +233,7 @@ private fun RemoteCard(
     remote: RemoteDevice,
     busy: Boolean,
     onOpen: () -> Unit,
+    onFavorite: () -> Unit,
     onEdit: (() -> Unit)?,
     onDelete: (() -> Unit)?,
 ) {
@@ -256,6 +262,7 @@ private fun RemoteCard(
                     maxLines = 2,
                 )
             }
+            IconButton(onClick = onFavorite) { Icon(Lucide.Star, stringResource(if (remote.favorite) R.string.unfavorite else R.string.favorite), tint = if (remote.favorite) MaterialTheme.colorScheme.secondary else MaterialTheme.colorScheme.onSurfaceVariant) }
             onEdit?.let { IconButton(onClick = it) { Icon(Lucide.Pencil, stringResource(R.string.remote_edit), tint = MaterialTheme.colorScheme.onSurfaceVariant) } }
             onDelete?.let { IconButton(onClick = it) { Icon(Lucide.Trash2, stringResource(R.string.remove), tint = MaterialTheme.colorScheme.error) } }
         }

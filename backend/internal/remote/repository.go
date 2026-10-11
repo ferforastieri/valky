@@ -20,7 +20,7 @@ func NewRepository(s *store.Store, v *appcrypto.Vault) *Repository {
 }
 
 func (r *Repository) List(ctx context.Context) ([]Device, error) {
-	rows, err := r.store.DB.QueryContext(ctx, `SELECT id,name,kind,host,port,mac,token_enc,setup_status,setup_error,enabled,last_seen_at,created_at,updated_at FROM remotes ORDER BY name COLLATE NOCASE`)
+	rows, err := r.store.DB.QueryContext(ctx, `SELECT id,name,kind,host,port,mac,token_enc,setup_status,setup_error,enabled,last_seen_at,created_at,updated_at,favorite FROM remotes ORDER BY name COLLATE NOCASE`)
 	if err != nil {
 		return nil, err
 	}
@@ -37,7 +37,7 @@ func (r *Repository) List(ctx context.Context) ([]Device, error) {
 }
 
 func (r *Repository) Get(ctx context.Context, id string) (Device, Credentials, error) {
-	row := r.store.DB.QueryRowContext(ctx, `SELECT id,name,kind,host,port,mac,token_enc,setup_status,setup_error,enabled,last_seen_at,created_at,updated_at FROM remotes WHERE id=?`, id)
+	row := r.store.DB.QueryRowContext(ctx, `SELECT id,name,kind,host,port,mac,token_enc,setup_status,setup_error,enabled,last_seen_at,created_at,updated_at,favorite FROM remotes WHERE id=?`, id)
 	return scanDevice(row, r.vault)
 }
 
@@ -115,6 +115,18 @@ func (r *Repository) SetMAC(ctx context.Context, id, mac string) error {
 	return err
 }
 
+// SetFavorite pins or unpins the device on the overview.
+func (r *Repository) SetFavorite(ctx context.Context, id string, favorite bool) error {
+	result, err := r.store.DB.ExecContext(ctx, `UPDATE remotes SET favorite=? WHERE id=?`, boolToInt(favorite), id)
+	if err != nil {
+		return err
+	}
+	if n, _ := result.RowsAffected(); n == 0 {
+		return sql.ErrNoRows
+	}
+	return nil
+}
+
 func (r *Repository) SetStatus(ctx context.Context, id, status, setupError string, seen bool) error {
 	now := time.Now().UTC().Format(time.RFC3339Nano)
 	var seenAt any
@@ -137,13 +149,14 @@ type rowScanner interface{ Scan(...any) error }
 func scanDevice(s rowScanner, vault *appcrypto.Vault) (Device, Credentials, error) {
 	var item Device
 	var sealed []byte
-	var enabled int
+	var enabled, favorite int
 	var lastSeen sql.NullString
 	var created, updated string
-	if err := s.Scan(&item.ID, &item.Name, &item.Kind, &item.Host, &item.Port, &item.MAC, &sealed, &item.SetupStatus, &item.SetupError, &enabled, &lastSeen, &created, &updated); err != nil {
+	if err := s.Scan(&item.ID, &item.Name, &item.Kind, &item.Host, &item.Port, &item.MAC, &sealed, &item.SetupStatus, &item.SetupError, &enabled, &lastSeen, &created, &updated, &favorite); err != nil {
 		return item, Credentials{}, err
 	}
 	item.Enabled = enabled == 1
+	item.Favorite = favorite == 1
 	item.TokenConfigured = len(sealed) > 0
 	item.CreatedAt, _ = time.Parse(time.RFC3339Nano, created)
 	item.UpdatedAt, _ = time.Parse(time.RFC3339Nano, updated)

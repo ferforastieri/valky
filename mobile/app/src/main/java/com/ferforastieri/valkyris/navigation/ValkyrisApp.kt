@@ -30,6 +30,7 @@ import com.ferforastieri.valkyris.feature.cameras.CameraLiveScreen
 import com.ferforastieri.valkyris.feature.cameras.CamerasScreen
 import com.ferforastieri.valkyris.feature.devices.DevicesScreen
 import com.ferforastieri.valkyris.feature.devices.RemoteControlScreen
+import com.ferforastieri.valkyris.feature.lights.LightsScreen
 import com.ferforastieri.valkyris.feature.events.EventDetailScreen
 import com.ferforastieri.valkyris.feature.events.EventsScreen
 import com.ferforastieri.valkyris.feature.onboarding.OnboardingScreen
@@ -114,8 +115,8 @@ private fun ConnectedValkyrisApp(main: MainViewModel) {
     val entry by nav.currentBackStackEntryAsState()
     val currentRoute = entry?.destination?.route
     val selectedIndex = destinations.indexOfFirst { it.route == currentRoute }
-    val showBottomBar = selectedIndex >= 0 || currentRoute == "events" || currentRoute == "event/{id}" || currentRoute == "camera/{id}"
-    val showTopBar = selectedIndex >= 0 || currentRoute == "events" || currentRoute == "event/{id}"
+    val showBottomBar = selectedIndex >= 0 || currentRoute == "events" || currentRoute == "event/{id}" || currentRoute == "camera/{id}" || currentRoute == "lights"
+    val showTopBar = selectedIndex >= 0 || currentRoute == "events" || currentRoute == "event/{id}" || currentRoute == "lights"
     val pendingEvent by main.pendingEvent.collectAsStateWithLifecycle()
     val pendingCamera by main.pendingCamera.collectAsStateWithLifecycle()
     LaunchedEffect(pendingEvent) {
@@ -142,6 +143,7 @@ private fun ConnectedValkyrisApp(main: MainViewModel) {
                     "profile" -> stringResource(R.string.profile)
                     "settings" -> stringResource(R.string.settings)
                     "events", "event/{id}" -> stringResource(R.string.events)
+                    "lights" -> stringResource(R.string.lighting)
                     else -> stringResource(R.string.overview)
                 }
                 ValkyrisTopBar(
@@ -183,8 +185,17 @@ private fun ConnectedValkyrisApp(main: MainViewModel) {
                     onCameras = { nav.openTopLevel("devices") },
                     onPeople = { nav.openTopLevel("people") },
                     onEvents = { nav.navigate("events") { launchSingleTop = true } },
+                    onLight = { nav.navigate("lights") { launchSingleTop = true } },
+                    onFavorite = { favorite ->
+                        when (favorite.type) {
+                            "camera" -> nav.navigate("camera/${favorite.id}")
+                            "remote" -> nav.navigate("remote/${favorite.id}")
+                            else -> nav.navigate("lights") { launchSingleTop = true }
+                        }
+                    },
                 )
             }
+            composable("lights") { LightsScreen(admin = admin) }
             composable("devices") { DevicesScreen(admin = admin, onCamera = { nav.navigate("camera/$it") }, onRemote = { nav.navigate("remote/$it") }) }
             composable("cameras") { DevicesScreen(admin = admin, onCamera = { nav.navigate("camera/$it") }, onRemote = { nav.navigate("remote/$it") }, initialPage = 0) }
             composable("camera/{id}") { CameraLiveScreen(cameraId = it.arguments?.getString("id").orEmpty()) }

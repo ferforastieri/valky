@@ -34,6 +34,8 @@ class ValkyrisRepository @Inject constructor(
     val places = _places.asStateFlow()
     private val _lights = MutableStateFlow<List<LightDevice>>(emptyList())
     val lights = _lights.asStateFlow()
+    private val _remotes = MutableStateFlow<List<RemoteDevice>>(emptyList())
+    val remotes = _remotes.asStateFlow()
 
     suspend fun refreshCameras(): List<Camera> {
         return api.cameras().also { _cameras.value = it }
@@ -57,6 +59,7 @@ class ValkyrisRepository @Inject constructor(
     }
 
     suspend fun refreshLights() = api.lights().also { _lights.value = it }
+    suspend fun refreshRemotes() = api.remotes().also { _remotes.value = it }
     suspend fun controlLight(id: String, patch: LightStatePatch) = api.controlLight(id, patch).also { updated -> _lights.update { list -> list.map { if (it.id == id) updated else it } } }
     suspend fun deleteLight(id: String) { api.deleteLight(id); _lights.update { list -> list.filterNot { it.id == id } } }
 
