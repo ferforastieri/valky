@@ -283,20 +283,6 @@ paths:
       responses:
         '200': {description: Command accepted by the device}
         '502': {description: The device is unreachable or refused the command}
-  /remotes/{id}/apps:
-    get:
-      summary: List the applications installed on the TV
-      parameters: [{$ref: '#/components/parameters/id'}]
-      responses:
-        '200': {description: Apps in APIResponse.data}
-        '502': {description: TV unreachable or not paired}
-  /remotes/{id}/apps/{app}/launch:
-    post:
-      summary: Launch an installed application
-      parameters: [{$ref: '#/components/parameters/id'}, {$ref: '#/components/parameters/app'}]
-      responses:
-        '200': {description: Command accepted}
-        '502': {description: TV unreachable}
   /remotes/{id}/wake:
     post:
       summary: Send a Wake-on-LAN magic packet so a standby TV powers on
@@ -700,12 +686,6 @@ components:
       required: [key]
       properties:
         key: {type: string, description: Whitelisted remote key such as KEY_HOME, KEY_VOLUP or KEY_ENTER}
-    RemoteApp:
-      type: object
-      required: [id, name]
-      properties:
-        id: {type: string}
-        name: {type: string}
     UpdateInfo:
       type: object
       required: [currentVersion, latestVersion, available, serverUpdateAvailable, apkUpdateAvailable, releaseUrl, message]

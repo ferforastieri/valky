@@ -3,7 +3,6 @@ package com.ferforastieri.valkyris.feature.devices
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.ferforastieri.valkyris.core.model.RemoteApp
 import com.ferforastieri.valkyris.core.model.RemoteDevice
 import com.ferforastieri.valkyris.core.network.ValkyrisApi
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -15,8 +14,6 @@ import kotlinx.coroutines.launch
 
 data class RemoteControlState(
     val remote: RemoteDevice? = null,
-    val apps: List<RemoteApp> = emptyList(),
-    val appsLoading: Boolean = false,
     val busy: Boolean = false,
     val pairing: Boolean = false,
     val powering: Boolean = false,
@@ -41,7 +38,6 @@ class RemoteControlViewModel @Inject constructor(
             runCatching { api.remotes().firstOrNull { it.id == id } }
                 .onSuccess { remote ->
                     _state.update { it.copy(remote = remote) }
-                    if (remote?.tokenConfigured == true) loadApps()
                 }
                 .onFailure { error -> _state.update { it.copy(error = error.message) } }
         }
@@ -64,36 +60,11 @@ class RemoteControlViewModel @Inject constructor(
         viewModelScope.launch {
             try {
                 runCatching { api.pairRemote(id) }
-                    .onSuccess { updated ->
-                        _state.update { it.copy(remote = updated) }
-                        loadApps()
-                    }
+                    .onSuccess { updated -> _state.update { it.copy(remote = updated) } }
                     .onFailure { error -> _state.update { it.copy(error = error.message) } }
             } finally {
                 _state.update { it.copy(pairing = false) }
             }
-        }
-    }
-
-    fun loadApps() {
-        if (_state.value.appsLoading) return
-        _state.update { it.copy(appsLoading = true, error = null) }
-        viewModelScope.launch {
-            try {
-                runCatching { api.remoteApps(id) }
-                    .onSuccess { apps -> _state.update { it.copy(apps = apps) } }
-                    .onFailure { error -> _state.update { it.copy(error = error.message) } }
-            } finally {
-                _state.update { it.copy(appsLoading = false) }
-            }
-        }
-    }
-
-    fun launch(appId: String) {
-        _state.update { it.copy(error = null) }
-        viewModelScope.launch {
-            runCatching { api.launchRemoteApp(id, appId) }
-                .onFailure { error -> _state.update { it.copy(error = error.message) } }
         }
     }
 

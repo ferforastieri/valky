@@ -32,12 +32,6 @@ type Device struct {
 	UpdatedAt       time.Time  `json:"updatedAt"`
 }
 
-// App is an installed application on the TV.
-type App struct {
-	ID   string `json:"id"`
-	Name string `json:"name"`
-}
-
 // Credentials carries the decrypted token to the protocol driver.
 type Credentials struct {
 	Address string

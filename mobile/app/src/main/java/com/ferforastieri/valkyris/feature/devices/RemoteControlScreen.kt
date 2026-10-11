@@ -14,8 +14,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
-import androidx.compose.foundation.lazy.LazyRow
-import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
@@ -25,7 +23,6 @@ import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -58,7 +55,6 @@ import com.composables.icons.lucide.Volume1
 import com.composables.icons.lucide.Volume2
 import com.composables.icons.lucide.VolumeX
 import com.ferforastieri.valkyris.R
-import com.ferforastieri.valkyris.core.model.RemoteApp
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -145,7 +141,6 @@ private fun PowerButton(powering: Boolean, onPower: () -> Unit) {
 private fun ConnectedRemote(state: RemoteControlState, vm: RemoteControlViewModel, keypad: Boolean) {
     val enabled = !state.powering
     Column(Modifier.fillMaxSize()) {
-        AppsRow(state, vm)
         Spacer(Modifier.weight(1f))
         NavigationPad(enabled, vm::send)
         Spacer(Modifier.height(14.dp))
@@ -155,35 +150,6 @@ private fun ConnectedRemote(state: RemoteControlState, vm: RemoteControlViewMode
             NumberPad(enabled, vm::send)
         }
         Spacer(Modifier.height(10.dp))
-    }
-}
-
-@Composable
-private fun AppsRow(state: RemoteControlState, vm: RemoteControlViewModel) {
-    when {
-        state.appsLoading && state.apps.isEmpty() -> LinearProgressIndicator(Modifier.fillMaxWidth())
-        state.apps.isEmpty() -> TextButton(onClick = { vm.loadApps() }, modifier = Modifier.fillMaxWidth()) {
-            Text(stringResource(R.string.remote_apps_load))
-        }
-        else -> LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            items(state.apps, key = { it.id }) { app -> AppChip(app) { vm.launch(app.id) } }
-        }
-    }
-}
-
-@Composable
-private fun AppChip(app: RemoteApp, onClick: () -> Unit) {
-    Surface(
-        onClick = onClick,
-        shape = RoundedCornerShape(14.dp),
-        color = MaterialTheme.colorScheme.surfaceVariant,
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
-    ) {
-        Row(Modifier.padding(horizontal = 12.dp, vertical = 10.dp), verticalAlignment = Alignment.CenterVertically) {
-            Icon(Lucide.Tv, null, Modifier.size(18.dp), tint = MaterialTheme.colorScheme.secondary)
-            Spacer(Modifier.width(8.dp))
-            Text(app.name, style = MaterialTheme.typography.labelLarge, maxLines = 1)
-        }
     }
 }
 

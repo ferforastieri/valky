@@ -248,16 +248,6 @@ class ValkyrisApi(
     suspend fun updateRemote(id: String, input: RemoteUpdate): RemoteDevice = put("/remotes/$id", input, announceBackend = true)
     suspend fun pairRemote(id: String): RemoteDevice = post("/remotes/$id/pair", emptyMap<String, String>(), announceBackend = true)
     suspend fun sendRemoteKey(id: String, key: String): RemoteDevice = post("/remotes/$id/keys", RemoteKeyInput(key))
-    suspend fun remoteApps(id: String): List<RemoteApp> = get("/remotes/$id/apps")
-    suspend fun launchRemoteApp(id: String, appId: String) {
-        val current = requireNotNull(session())
-        executeUnit(current.fingerprint) {
-            it.post(base() + "/remotes/$id/apps/${Uri.encode(appId)}/launch") {
-                bearerAuth(current.token)
-                header(HttpHeaders.AcceptLanguage, Locale.getDefault().toLanguageTag())
-            }
-        }
-    }
     suspend fun wakeRemote(id: String): RemoteDevice = post("/remotes/$id/wake", emptyMap<String, String>())
     suspend fun powerRemote(id: String): RemoteDevice = post("/remotes/$id/power", emptyMap<String, String>(), announceBackend = true)
 

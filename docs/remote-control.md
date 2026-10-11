@@ -75,16 +75,9 @@ TV. A API rejeita qualquer comando fora dessa lista.
 
 ## Aplicativos instalados
 
-Quando o controle está pareado, o app lista os aplicativos instalados na TV
-(evento `ed.installedApp.get` no canal de controle) e abre qualquer um deles
-(`ed.apps.launch`). A barra de aplicativos fica na parte de baixo do controle,
-como os atalhos fixos de um controle de TV, mas carrega **todos** os apps
-instalados. Se a TV não responder, há um botão para tentar de novo.
-
-A lista é um documento JSON grande; o canal é lido com um limite maior para não
-truncá-lo (era o motivo de a barra voltar vazia). Em modelos que só respondem no
-canal de controle de aplicativos (`/api/v2`), o backend tenta esse canal como
-alternativa.
+A Samsung removeu, a partir do Tizen 5 (2020+), a API que listava os aplicativos
+instalados na TV. Por isso o controle do Valkyris **não exibe a barra de apps**:
+não existe chamada que devolva a lista completa nesta geração de firmware.
 
 ## Ligar e desligar a TV
 
@@ -132,7 +125,5 @@ reinício), o backend reconecta sozinho na próxima tecla.
 | `DELETE` | `/api/v1/remotes/{id}` | Administrador | Remove o controle. |
 | `POST` | `/api/v1/remotes/{id}/pair` | Administrador | Pareia com a TV (aceite o aviso nela). |
 | `POST` | `/api/v1/remotes/{id}/keys` | Autenticado | Envia uma tecla (`{ "key": "KEY_HOME" }`). |
-| `GET` | `/api/v1/remotes/{id}/apps` | Autenticado | Lista os aplicativos instalados na TV. |
-| `POST` | `/api/v1/remotes/{id}/apps/{app}/launch` | Autenticado | Abre um aplicativo na TV. |
 | `POST` | `/api/v1/remotes/{id}/wake` | Autenticado | Envia o Wake-on-LAN (liga a TV). |
 | `POST` | `/api/v1/remotes/{id}/power` | Autenticado | Liga ou desliga a TV conforme o estado atual. |

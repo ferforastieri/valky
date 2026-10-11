@@ -15,10 +15,6 @@ type Driver interface {
 	Pair(context.Context, Device) (string, error)
 	// Send forwards one remote key using a previously stored token.
 	Send(context.Context, Device, string, string) error
-	// Apps lists the applications installed on the TV.
-	Apps(context.Context, Device, string) ([]App, error)
-	// Launch starts an installed application.
-	Launch(context.Context, Device, string, string) error
 	// DeviceMAC reads the device network address used for Wake-on-LAN.
 	DeviceMAC(context.Context, Device) (string, error)
 	// Reachable reports whether the device is powered on and answering.
@@ -39,14 +35,6 @@ func (*UnavailableDriver) Pair(context.Context, Device) (string, error) {
 }
 
 func (*UnavailableDriver) Send(context.Context, Device, string, string) error {
-	return ErrNoRemoteAdapter
-}
-
-func (*UnavailableDriver) Apps(context.Context, Device, string) ([]App, error) {
-	return nil, ErrNoRemoteAdapter
-}
-
-func (*UnavailableDriver) Launch(context.Context, Device, string, string) error {
 	return ErrNoRemoteAdapter
 }
 

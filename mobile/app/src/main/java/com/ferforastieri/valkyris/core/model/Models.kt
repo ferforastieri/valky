@@ -16,7 +16,6 @@ import kotlinx.serialization.json.JsonElement
 @Serializable data class RemoteInput(val name:String,val kind:String="smart_tv",val host:String,val port:Int=8002)
 @Serializable data class RemoteUpdate(val name:String?=null,val host:String?=null,val port:Int?=null,val mac:String?=null,val enabled:Boolean?=null)
 @Serializable data class RemoteKeyInput(val key:String)
-@Serializable data class RemoteApp(val id:String,val name:String)
 @Serializable data class FavoriteInput(val favorite:Boolean)
 @Serializable data class TypeCount(val type:String,val count:Int)
 @Serializable data class DayCount(val date:String,val count:Int)

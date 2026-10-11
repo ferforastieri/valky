@@ -177,48 +177,6 @@ func (s *Service) Send(ctx context.Context, id, key string) (Device, error) {
 	return item, nil
 }
 
-// Apps lists the applications installed on the TV.
-func (s *Service) Apps(ctx context.Context, id string) ([]App, error) {
-	unlock := s.lock(id)
-	defer unlock()
-	item, credentials, err := s.repo.Get(ctx, id)
-	if err != nil {
-		return nil, err
-	}
-	if credentials.Token == "" {
-		return nil, fmt.Errorf("pareie o controle com a TV antes de listar os apps")
-	}
-	if !s.Available() {
-		return nil, ErrNoRemoteAdapter
-	}
-	callCtx, cancel := context.WithTimeout(ctx, 15*time.Second)
-	defer cancel()
-	return s.driver.Apps(callCtx, item, credentials.Token)
-}
-
-// Launch opens an installed application on the TV.
-func (s *Service) Launch(ctx context.Context, id, appID string) error {
-	appID = strings.TrimSpace(appID)
-	if appID == "" {
-		return fmt.Errorf("informe o aplicativo")
-	}
-	unlock := s.lock(id)
-	defer unlock()
-	item, credentials, err := s.repo.Get(ctx, id)
-	if err != nil {
-		return err
-	}
-	if credentials.Token == "" {
-		return fmt.Errorf("pareie o controle com a TV antes de abrir apps")
-	}
-	if !s.Available() {
-		return ErrNoRemoteAdapter
-	}
-	callCtx, cancel := context.WithTimeout(ctx, 12*time.Second)
-	defer cancel()
-	return s.driver.Launch(callCtx, item, credentials.Token, appID)
-}
-
 // Wake sends a Wake-on-LAN magic packet so a standby TV powers on.
 func (s *Service) Wake(ctx context.Context, id string) (Device, error) {
 	unlock := s.lock(id)
