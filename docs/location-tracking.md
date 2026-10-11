@@ -84,7 +84,6 @@ uma saída (`lastSeenAt`) e a próxima leitura permanecem separados.
 
 Os pontos do histórico usam círculos compactos (8 dp no Android e 8 px no web;
 12 quando selecionados), com contorno branco. A linha tracejada tem 2 dp/px e
-contorno branco para se separar das ruas. O mapa usa os tiles do CARTO Voyager
-(claros) no tema claro e a variante escura no tema escuro, ambos derivados do
-OpenStreetMap; as cores dos pontos permanecem legíveis sobre as duas bases. A
-área de toque permanece maior que o ponto visível.
+contorno branco para se separar das ruas. O mapa usa os tiles padrão do
+OpenStreetMap, gratuitos e sem chave de API; as cores dos pontos permanecem
+legíveis sobre essa base. A área de toque permanece maior que o ponto visível.

@@ -9,28 +9,24 @@ import org.osmdroid.util.MapTileIndex
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 
-// Guards the map tile URLs: a malformed base URL or a wrong tile size leaves the
-// Android map as an empty grid, which is hard to notice in unit tests otherwise.
+// Guards the map tile URLs: a malformed base URL (osmdroid needs a trailing
+// slash) leaves the Android map as an empty grid, and a keyed provider now
+// watermarks the tiles. OpenStreetMap is key-free.
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [35])
 class MapTileSourceTest {
     private fun style(dark: Boolean) = MapVisualStyle(accent = 0, surface = 0, foreground = 0, outline = 0, dark = dark)
 
     @Test
-    fun lightTilesUseCartoVoyager() {
-        val source = valkyrisTileSource(style(dark = false))
+    fun tilesUseOpenStreetMapWithoutApiKey() {
+        val index = MapTileIndex.getTileIndex(13, 3035, 4649)
         assertEquals(
-            "https://basemaps.cartocdn.com/rastertiles/voyager/13/3035/4649.png",
-            source.getTileURLString(MapTileIndex.getTileIndex(13, 3035, 4649)),
+            "https://tile.openstreetmap.org/13/3035/4649.png",
+            valkyrisTileSource(style(dark = false)).getTileURLString(index),
         )
-    }
-
-    @Test
-    fun darkTilesUseCartoDark() {
-        val source = valkyrisTileSource(style(dark = true))
         assertEquals(
-            "https://basemaps.cartocdn.com/dark_all/13/3035/4649.png",
-            source.getTileURLString(MapTileIndex.getTileIndex(13, 3035, 4649)),
+            "https://tile.openstreetmap.org/13/3035/4649.png",
+            valkyrisTileSource(style(dark = true)).getTileURLString(index),
         )
     }
 }

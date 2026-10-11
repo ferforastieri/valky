@@ -6,7 +6,7 @@ A interface usa Astro, TypeScript e as fontes/estilos da landing. O build separa
 
 O login envia usuário, senha e `browserAdmin: true` ao endpoint existente `/api/v1/login`. A credencial usa cookie __Host-valkyris-viewer com Secure, HttpOnly e SameSite=Strict, dura 30 dias de inatividade e é renovada durante o uso (no máximo uma vez por dia) e não cria usuários/dispositivos nem substitui tokens do mobile. O middleware permite consultas, negociação WHEP e as mutações expressamente autorizadas para a conta (gestão de usuários, convites e destinatários). Reconhecimento de eventos, PTZ e localização continuam bloqueados no navegador. Não há endpoint para executar atualizações do servidor. Sair revoga a sessão com `DELETE /api/v1/viewer-session`.
 
-Os endpoints e a transmissão WHEP são os mesmos do mobile. O vídeo depende da conectividade WebRTC do servidor de mídia; não há troca automática nem botão de substituição do vídeo por imagem. O mapa usa Leaflet e tiles do CARTO Voyager (base OpenStreetMap). Nenhuma permissão de localização, câmera ou microfone é solicitada ao navegador.
+Os endpoints e a transmissão WHEP são os mesmos do mobile. O vídeo depende da conectividade WebRTC do servidor de mídia; não há troca automática nem botão de substituição do vídeo por imagem. O mapa usa Leaflet e tiles padrão do OpenStreetMap (gratuitos, sem chave de API). Nenhuma permissão de localização, câmera ou microfone é solicitada ao navegador.
 
 Para desenvolvimento, execute `pnpm build:viewer` em `web` e inicie o backend com `VALKYRIS_WEB_DIR` apontando para o diretório absoluto de `web/dist-viewer`. Acesse o backend em `/app/`, mantendo a API na mesma origem.
 

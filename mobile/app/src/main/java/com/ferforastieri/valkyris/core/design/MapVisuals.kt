@@ -40,24 +40,24 @@ fun MapView.applyValkyrisMapStyle(style: MapVisualStyle) {
 }
 
 /**
- * Open-source raster tiles with a Google-Maps-like look (CARTO Voyager) and a
- * matching dark variant. CARTO's basemaps are free for low-volume use, need no
- * API key and are derived from OpenStreetMap data, so the attribution is kept.
+ * OpenStreetMap standard raster tiles: free, no API key and no watermark.
+ * CARTO (and most "Google-like" providers) started requiring an API key in
+ * late 2026 and now stamp unkeyed requests, so the community raster is used for
+ * both themes. The style parameter is reserved for a future dark provider.
  */
 fun valkyrisTileSource(style: MapVisualStyle): XYTileSource {
-    val dark = style.dark
+    @Suppress("UNUSED_EXPRESSION")
+    style
     // osmdroid concatenates the base URL with the zoom level directly, so the
     // base must end with a slash.
-    val baseUrl = if (dark) "https://basemaps.cartocdn.com/dark_all/" else "https://basemaps.cartocdn.com/rastertiles/voyager/"
-    val copyright = "© OpenStreetMap contributors © CARTO"
     return XYTileSource(
-        if (dark) "valkyris-carto-dark" else "valkyris-carto-voyager",
+        "valkyris-osm",
         0,
-        20,
+        19,
         256,
         ".png",
-        arrayOf(baseUrl),
-        copyright,
+        arrayOf("https://tile.openstreetmap.org/"),
+        "© OpenStreetMap contributors",
     )
 }
 
