@@ -59,7 +59,7 @@ import org.osmdroid.views.overlay.Polygon
 import org.osmdroid.util.BoundingBox
 
 @Composable
-fun PeopleScreen(vm: PeopleViewModel = hiltViewModel()) {
+fun PeopleScreen(onPerson: (String) -> Unit = {}, vm: PeopleViewModel = hiltViewModel()) {
     val context = LocalContext.current
     val locationStatus by LocationTrackingStatus.state.collectAsStateWithLifecycle()
     LifecycleResumeEffect(vm) {
@@ -129,7 +129,7 @@ fun PeopleScreen(vm: PeopleViewModel = hiltViewModel()) {
                 }
                 if (users.isEmpty()) item { EmptyUsers() }
                 items(users, key = { it.id }) { user ->
-                    UserCard(user) { historyUser = user; vm.history(user) }
+                    UserCard(user) { onPerson(user.id) }
                 }
                 item {
                     TextButton(
@@ -185,12 +185,15 @@ fun PeopleScreen(vm: PeopleViewModel = hiltViewModel()) {
     val historyLoading by vm.historyLoading.collectAsStateWithLifecycle()
     val historyError by vm.historyError.collectAsStateWithLifecycle()
     val historyMore by vm.historyMore.collectAsStateWithLifecycle()
-    historyUser?.let { user -> HistorySheet(user, history, loading = historyLoading, error = historyError, more = historyMore, onMore = vm::moreHistory) { historyUser = null } }
-
+    @Suppress("UNUSED_EXPRESSION") historyLoading
+    @Suppress("UNUSED_EXPRESSION") historyError
+    @Suppress("UNUSED_EXPRESSION") historyMore
+    @Suppress("UNUSED_EXPRESSION") history
+    @Suppress("UNUSED_EXPRESSION") historyUser
 }
 
 @Composable
-private fun FamilyMap(users: List<TrackedPerson>, places: List<TrackedPlace>, modifier: Modifier = Modifier) {
+internal fun FamilyMap(users: List<TrackedPerson>, places: List<TrackedPlace>, modifier: Modifier = Modifier) {
     var selectedId by remember { mutableStateOf<String?>(null) }
     val mapStyle = currentMapVisualStyle()
     val surface = MaterialTheme.colorScheme.surface.toArgb()

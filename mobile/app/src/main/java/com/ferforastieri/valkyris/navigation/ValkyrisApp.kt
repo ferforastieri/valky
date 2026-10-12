@@ -35,6 +35,7 @@ import com.ferforastieri.valkyris.feature.events.EventDetailScreen
 import com.ferforastieri.valkyris.feature.events.EventsScreen
 import com.ferforastieri.valkyris.feature.onboarding.OnboardingScreen
 import com.ferforastieri.valkyris.feature.people.PeopleScreen
+import com.ferforastieri.valkyris.feature.people.PersonDetailScreen
 import com.ferforastieri.valkyris.feature.profile.ProfileScreen
 import com.ferforastieri.valkyris.feature.settings.SettingsScreen
 import com.ferforastieri.valkyris.feature.settings.StartupAlertPermissions
@@ -115,7 +116,7 @@ private fun ConnectedValkyrisApp(main: MainViewModel) {
     val entry by nav.currentBackStackEntryAsState()
     val currentRoute = entry?.destination?.route
     val selectedIndex = destinations.indexOfFirst { it.route == currentRoute }
-    val showBottomBar = selectedIndex >= 0 || currentRoute == "events" || currentRoute == "event/{id}" || currentRoute == "camera/{id}" || currentRoute == "lights" || currentRoute == "remote/{id}"
+    val showBottomBar = selectedIndex >= 0 || currentRoute == "events" || currentRoute == "event/{id}" || currentRoute == "camera/{id}" || currentRoute == "lights" || currentRoute == "remote/{id}" || currentRoute == "person/{id}"
     val showTopBar = selectedIndex >= 0 || currentRoute == "events" || currentRoute == "event/{id}" || currentRoute == "lights"
     val pendingEvent by main.pendingEvent.collectAsStateWithLifecycle()
     val pendingCamera by main.pendingCamera.collectAsStateWithLifecycle()
@@ -209,7 +210,8 @@ private fun ConnectedValkyrisApp(main: MainViewModel) {
                 )
             }
             composable("event/{id}") { EventDetailScreen() }
-            composable("people") { PeopleScreen() }
+            composable("people") { PeopleScreen(onPerson = { nav.navigate("person/$it") }) }
+            composable("person/{id}") { PersonDetailScreen(onBack = { nav.popBackStack() }) }
             composable("profile") { ProfileScreen(admin = admin) }
             composable("settings") { SettingsScreen(main) }
         }
