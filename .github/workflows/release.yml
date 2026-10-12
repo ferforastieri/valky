@@ -14,9 +14,9 @@ permissions:
 
 env:
   IMAGE: ghcr.io/ferforastieri/valkyris
-  RELEASE_SERIES: '2.0'
-  # Run 56 starts 2.0.0; subsequent successful CI runs increment the patch.
-  RELEASE_PATCH_OFFSET: 56
+  RELEASE_SERIES: '3.0'
+  # Run 104 starts 3.0.0; subsequent successful CI runs increment the patch.
+  RELEASE_PATCH_OFFSET: 104
 
 jobs:
   prepare:

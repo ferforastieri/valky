@@ -75,17 +75,11 @@ fun RemoteControlScreen(onBack: () -> Unit, vm: RemoteControlViewModel = hiltVie
     val state by vm.state.collectAsStateWithLifecycle()
     val remote = state.remote
     Column(Modifier.fillMaxSize().padding(horizontal = 18.dp)) {
-        Spacer(Modifier.height(14.dp))
+        Spacer(Modifier.height(40.dp))
         if (remote?.tokenConfigured == true) {
             PowerButton(powering = state.powering, onPower = vm::power, modifier = Modifier.align(Alignment.CenterHorizontally))
         }
-        Text(
-            remote?.name ?: stringResource(R.string.remote_control),
-            style = MaterialTheme.typography.labelSmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.fillMaxWidth().padding(vertical = 10.dp),
-            textAlign = androidx.compose.ui.text.style.TextAlign.Center,
-        )
+        Spacer(Modifier.height(14.dp))
         state.error?.let { /* errors surface as a toast */ }
         when {
             remote == null -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { CircularProgressIndicator() }

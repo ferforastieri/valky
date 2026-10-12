@@ -11,8 +11,8 @@ if (providers.environmentVariable("VALKYRIS_FIREBASE_ENABLED").orNull == "true")
     apply(plugin = "com.google.gms.google-services")
 }
 
-val valkyrisVersionName = providers.environmentVariable("VALKYRIS_VERSION_NAME").orElse("2.0.0")
-val valkyrisVersionCode = providers.environmentVariable("VALKYRIS_VERSION_CODE").map(String::toInt).orElse(56)
+val valkyrisVersionName = providers.environmentVariable("VALKYRIS_VERSION_NAME").orElse("3.0.0")
+val valkyrisVersionCode = providers.environmentVariable("VALKYRIS_VERSION_CODE").map(String::toInt).orElse(104)
 
 android {
     namespace = "com.ferforastieri.valkyris"
