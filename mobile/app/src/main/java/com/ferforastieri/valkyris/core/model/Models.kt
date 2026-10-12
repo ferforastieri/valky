@@ -58,7 +58,7 @@ import kotlinx.serialization.json.JsonElement
 
 @Serializable data class LocationReport(val latitude: Double, val longitude: Double, val accuracy: Double, val occurredAt: String, val battery: Int = -1)
 
-@Serializable data class ManagedUser(val id:String="",val name:String,val enabled:Boolean=true,val admin:Boolean=false,val devices:Int=0,val username:String="",val credentialsConfigured:Boolean=false,val viewRules:Boolean=false,val editRules:Boolean=false,val notifyCamera:Boolean=true,val notifyLocation:Boolean=true,val password:String="")
+@Serializable data class ManagedUser(val id:String="",val name:String,val enabled:Boolean=true,val admin:Boolean=false,val devices:Int=0,val username:String="",val credentialsConfigured:Boolean=false,val viewRules:Boolean=false,val editRules:Boolean=false,val notifyCamera:Boolean=true,val notifyLocation:Boolean=true,val avatarData:String="",val password:String="")
 
 @Serializable data class SessionPermissions(val admin:Boolean=false,val readOnly:Boolean=false,val viewRules:Boolean=false,val editRules:Boolean=false,val username:String="",val credentialsConfigured:Boolean=false)
 

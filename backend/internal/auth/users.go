@@ -19,12 +19,13 @@ type ManagedUser struct {
 	Enabled               bool   `json:"enabled"`
 	Admin                 bool   `json:"admin"`
 	Devices               int    `json:"devices"`
+	AvatarData            string `json:"avatarData"`
 	NotifyCamera          bool   `json:"notifyCamera"`
 	NotifyLocation        bool   `json:"notifyLocation"`
 }
 
 func (m *Manager) Users(ctx context.Context) ([]ManagedUser, error) {
-	rows, err := m.store.DB.QueryContext(ctx, `SELECT u.id,u.name,u.enabled,u.is_admin,COUNT(d.id),COALESCE(u.username,''),u.password_hash<>'',u.view_rules,u.edit_rules,u.notify_camera,u.notify_location FROM users u LEFT JOIN devices d ON d.user_id=u.id GROUP BY u.id ORDER BY u.name COLLATE NOCASE`)
+	rows, err := m.store.DB.QueryContext(ctx, `SELECT u.id,u.name,u.enabled,u.is_admin,COUNT(d.id),COALESCE(u.username,''),u.password_hash<>'',u.view_rules,u.edit_rules,u.notify_camera,u.notify_location,u.avatar_data FROM users u LEFT JOIN devices d ON d.user_id=u.id GROUP BY u.id ORDER BY u.name COLLATE NOCASE`)
 	if err != nil {
 		return nil, err
 	}
@@ -32,7 +33,7 @@ func (m *Manager) Users(ctx context.Context) ([]ManagedUser, error) {
 	out := []ManagedUser{}
 	for rows.Next() {
 		var u ManagedUser
-		if err := rows.Scan(&u.ID, &u.Name, &u.Enabled, &u.Admin, &u.Devices, &u.Username, &u.CredentialsConfigured, &u.ViewRules, &u.EditRules, &u.NotifyCamera, &u.NotifyLocation); err != nil {
+		if err := rows.Scan(&u.ID, &u.Name, &u.Enabled, &u.Admin, &u.Devices, &u.Username, &u.CredentialsConfigured, &u.ViewRules, &u.EditRules, &u.NotifyCamera, &u.NotifyLocation, &u.AvatarData); err != nil {
 			return nil, err
 		}
 		out = append(out, u)
@@ -73,7 +74,7 @@ func (m *Manager) ManageUser(ctx context.Context, id string, in ManagedUser, rem
 		if name == "" || len(name) > 100 {
 			return fmt.Errorf("user name must contain 1 to 100 bytes")
 		}
-		_, err = tx.ExecContext(ctx, `UPDATE users SET name=?,enabled=?,is_admin=?,view_rules=?,edit_rules=?,notify_camera=?,notify_location=?,updated_at=? WHERE id=?`, name, in.Enabled, in.Admin, in.ViewRules || in.EditRules, in.EditRules, in.NotifyCamera, in.NotifyLocation, time.Now().UTC().Format(time.RFC3339Nano), id)
+		_, err = tx.ExecContext(ctx, `UPDATE users SET name=?,enabled=?,is_admin=?,view_rules=?,edit_rules=?,notify_camera=?,notify_location=?,avatar_data=?,updated_at=? WHERE id=?`, name, in.Enabled, in.Admin, in.ViewRules || in.EditRules, in.EditRules, in.NotifyCamera, in.NotifyLocation, strings.TrimSpace(in.AvatarData), time.Now().UTC().Format(time.RFC3339Nano), id)
 		if err == nil {
 			_, err = tx.ExecContext(ctx, `UPDATE devices SET is_admin=? WHERE user_id=?`, in.Admin, id)
 		}
