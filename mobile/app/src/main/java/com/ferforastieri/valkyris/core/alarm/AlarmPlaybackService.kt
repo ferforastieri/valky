@@ -27,7 +27,6 @@ import com.ferforastieri.valkyris.R
 class AlarmPlaybackService : Service() {
     private var player: MediaPlayer? = null
     private var focus: AudioFocusRequest? = null
-    private var alarmLevel = 1f
     private val handler = Handler(Looper.getMainLooper())
     private val timeout = Runnable { stopSelf() }
     private val attributes = AudioAttributes.Builder()
@@ -61,12 +60,8 @@ class AlarmPlaybackService : Service() {
         }
         val type = if (intent.getStringExtra("sound") == "ringtone") RingtoneManager.TYPE_RINGTONE else RingtoneManager.TYPE_ALARM
         val uri = RingtoneManager.getActualDefaultRingtoneUri(this, type)
-        // The per-device level chosen in Settings is applied to the player itself.
-        // The system alarm stream volume is deliberately left untouched: an app
-        // cannot reliably change it without Do Not Disturb access, and forcing it
-        // to the maximum was exactly what made the alert ignore the setting.
-        alarmLevel = AlarmVolume.read(this) / 100f
-        Log.i("ValkyrisAlarm", "Alarm playback starting at level $alarmLevel (setting ${AlarmVolume.read(this)}%)")
+        // The alert plays at the phone's own alarm volume: no per-app volume is
+        // applied, so it always matches the system alarm level.
         play(uri ?: fallbackUri(), fallback = uri == null)
         if (intent.getBooleanExtra("vibrate", true)) {
             getSystemService(Vibrator::class.java).vibrate(VibrationEffect.createWaveform(longArrayOf(0, 800, 400), 0), attributes)
@@ -82,10 +77,9 @@ class AlarmPlaybackService : Service() {
         runCatching {
             next.setAudioAttributes(attributes)
             next.setWakeMode(this, PowerManager.PARTIAL_WAKE_LOCK)
-            next.setVolume(alarmLevel, alarmLevel)
             next.setDataSource(this, uri)
             next.isLooping = true
-            next.setOnPreparedListener { mp -> mp.setVolume(alarmLevel, alarmLevel); mp.start() }
+            next.setOnPreparedListener { it.start() }
             next.setOnErrorListener { _, _, _ ->
                 next.release()
                 player = null

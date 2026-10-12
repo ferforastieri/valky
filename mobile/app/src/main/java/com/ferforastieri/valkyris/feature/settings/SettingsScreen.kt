@@ -35,7 +35,6 @@ import com.ferforastieri.valkyris.MainViewModel
 import com.ferforastieri.valkyris.R
 import com.ferforastieri.valkyris.BuildConfig
 import com.ferforastieri.valkyris.core.alarm.AlarmNotifier
-import com.ferforastieri.valkyris.core.alarm.AlarmVolume
 import com.ferforastieri.valkyris.core.design.ColorTokens
 import com.ferforastieri.valkyris.core.design.ValkyrisBottomSheet
 import com.ferforastieri.valkyris.core.model.RetentionSettings
@@ -75,8 +74,6 @@ fun SettingsScreen(main: MainViewModel, viewModel: SettingsViewModel = hiltViewM
     var showLanguage by remember { mutableStateOf(false) }
     var showTheme by remember { mutableStateOf(false) }
     var showRetention by remember { mutableStateOf(false) }
-    var showAlarmVolume by remember { mutableStateOf(false) }
-    var alarmVolume by remember { mutableIntStateOf(AlarmVolume.read(context)) }
     val notificationRequest = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) {
         permissionRefresh++
     }
@@ -119,14 +116,12 @@ fun SettingsScreen(main: MainViewModel, viewModel: SettingsViewModel = hiltViewM
         theme = theme,
         locationAllowed = locationAllowed,
         retention = retention.value,
-        alarmVolume = alarmVolume,
         onUsers = { showUsers = true; viewModel.refreshUsers() },
         onInvite = { showInvitation = true },
         onPermissions = { showPermissions = true },
         onLanguage = { showLanguage = true },
         onTheme = { showTheme = true },
         onRetention = { showRetention = true },
-        onAlarmVolume = { showAlarmVolume = true },
         onSignOut = main::signOut,
     )
     if (showUsers && admin) UserManagementSheet(managedUsers, usersError, usersBusy, { viewModel.saveUser(it) }, { viewModel.saveUser(it, true) }, { showUsers = false })
@@ -198,13 +193,6 @@ fun SettingsScreen(main: MainViewModel, viewModel: SettingsViewModel = hiltViewM
             onDismiss = { if (!retention.saving) showRetention = false },
         )
     }
-    if (showAlarmVolume) {
-        AlarmVolumeSheet(
-            current = alarmVolume,
-            onSave = { value -> AlarmVolume.write(context, value); alarmVolume = value; showAlarmVolume = false },
-            onDismiss = { showAlarmVolume = false },
-        )
-    }
 }
 
 @Composable
@@ -217,7 +205,6 @@ fun SettingsContent(
     theme: String,
     locationAllowed: Boolean = false,
     retention: RetentionSettings = RetentionSettings(),
-    alarmVolume: Int = 100,
     version: String = BuildConfig.VERSION_NAME,
     onUsers: () -> Unit = {},
     onInvite: () -> Unit = {},
@@ -225,7 +212,6 @@ fun SettingsContent(
     onLanguage: () -> Unit = {},
     onTheme: () -> Unit = {},
     onRetention: () -> Unit = {},
-    onAlarmVolume: () -> Unit = {},
     onSignOut: () -> Unit = {},
 ) {
     Column(
@@ -252,7 +238,6 @@ fun SettingsContent(
         ) { onPermissions() }
         SettingsCard(Lucide.Languages, stringResource(R.string.language), languageLabel(language), onClick = onLanguage)
         SettingsCard(Lucide.Moon, stringResource(R.string.theme), themeLabel(theme), onClick = onTheme)
-        SettingsCard(Lucide.AlarmClock, stringResource(R.string.alarm_volume), stringResource(R.string.alarm_volume_value, alarmVolume), onClick = onAlarmVolume)
         if (admin) {
             SettingsCard(
                 Lucide.Database,
@@ -486,26 +471,6 @@ fun ThemeSheet(current: String, onSelect: (String) -> Unit, onDismiss: () -> Uni
             ThemeOption("system", stringResource(R.string.system_default), Lucide.Smartphone, current, onSelect)
             ThemeOption("light", stringResource(R.string.light_theme), Lucide.Sun, current, onSelect)
             ThemeOption("dark", stringResource(R.string.dark_theme), Lucide.Moon, current, onSelect)
-        }
-    }
-}
-
-@Composable
-fun AlarmVolumeSheet(current: Int, onSave: (Int) -> Unit, onDismiss: () -> Unit) {
-    var value by remember(current) { mutableFloatStateOf(current.toFloat()) }
-    ValkyrisBottomSheet(
-        title = stringResource(R.string.alarm_volume),
-        onDismiss = onDismiss,
-        actions = {
-            TextButton(onClick = onDismiss) { Text(stringResource(R.string.cancel)) }
-            Button(onClick = { onSave(value.toInt()) }) { Text(stringResource(R.string.save)) }
-        },
-    ) {
-        Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-            Text(stringResource(R.string.alarm_volume_hint), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            Text(stringResource(R.string.alarm_volume_value, value.toInt()), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
-            Slider(value = value, onValueChange = { value = it }, valueRange = 0f..100f, steps = 19)
-            Text(stringResource(R.string.alarm_volume_device_hint), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
     }
 }
