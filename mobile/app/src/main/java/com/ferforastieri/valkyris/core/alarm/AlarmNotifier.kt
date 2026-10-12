@@ -24,7 +24,12 @@ import javax.inject.Singleton
 
 @Singleton
 class AlarmNotifier @Inject constructor(@param:ApplicationContext private val context: Context) {
+    private var channelsReady = false
     fun createChannels() {
+        // The manager is a singleton: rebuilding the channels (and re-reading the
+        // DND policy) on every alert was a wasted round trip.
+        if (channelsReady) return
+        channelsReady = true
         val manager = context.getSystemService(NotificationManager::class.java)
         // Remove the pre-versioned channels so users do not keep a stale,
         // possibly silenced, entry in the system settings.
