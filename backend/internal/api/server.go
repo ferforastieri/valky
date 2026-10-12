@@ -50,7 +50,6 @@ type Server struct {
 	events       *event.Service
 	notify       *notify.Service
 	hub          *Hub
-	submitter    DetectionSubmitter
 	logger       *slog.Logger
 	operationsMu sync.RWMutex
 	operations   map[string]CameraOperation
@@ -78,7 +77,6 @@ type changePasswordInput struct {
 func NewServer(a *auth.Manager, c *camera.Repository, o *camera.ONVIFClient, m *media.Manager, r *rules.Service, e *event.Service, n *notify.Service, h *Hub, logger *slog.Logger) *Server {
 	return &Server{auth: a, cameras: c, onvif: o, media: m, rules: r, events: e, notify: n, hub: h, logger: logger, operations: make(map[string]CameraOperation)}
 }
-func (s *Server) SetSubmitter(sub DetectionSubmitter)         { s.submitter = sub }
 func (s *Server) SetUpdates(service *updates.Service)         { s.updates = service }
 func (s *Server) SetPreferences(service *preferences.Service) { s.preferences = service }
 func (s *Server) SetTracking(service *tracking.Service)       { s.tracking = service }
@@ -134,7 +132,6 @@ func (s *Server) Handler() http.Handler {
 	protected.HandleFunc("GET /cameras", s.listCameras)
 	protected.Handle("POST /cameras", s.auth.RequireAdmin(http.HandlerFunc(s.createCamera)))
 	protected.Handle("PUT /cameras/{id}", s.auth.RequireAdmin(http.HandlerFunc(s.updateCamera)))
-	protected.HandleFunc("GET /camera-operations/{id}", s.cameraOperation)
 	protected.Handle("DELETE /cameras/{id}", s.auth.RequireAdmin(http.HandlerFunc(s.deleteCamera)))
 	protected.HandleFunc("POST /cameras/{id}/ptz", s.ptz)
 	protected.HandleFunc("GET /cameras/{id}/ptz/presets", s.listPTZPresets)
@@ -196,7 +193,6 @@ func (s *Server) Handler() http.Handler {
 	protected.Handle("PUT /settings/retention", s.auth.RequireAdmin(http.HandlerFunc(s.setRetention)))
 	protected.HandleFunc("GET /settings/location-alerts", s.getLocationAlerts)
 	protected.Handle("PUT /settings/location-alerts", s.auth.RequireAdmin(http.HandlerFunc(s.setLocationAlerts)))
-	protected.Handle("POST /detections", s.auth.RequireAdmin(http.HandlerFunc(s.submitDetection)))
 	protected.HandleFunc("GET /system/update", s.systemUpdate)
 	protected.Handle("/realtime", s.hub)
 	mux.Handle("/api/v1/", http.StripPrefix("/api/v1", s.auth.Middleware(protected)))
@@ -345,21 +341,6 @@ func (s *Server) updateCamera(w http.ResponseWriter, r *http.Request) {
 		s.hub.Broadcast(map[string]any{"type": "camera.updated", "cameraId": id})
 	}
 	writeSuccess(w, http.StatusOK, "Camera updated successfully", cam)
-}
-
-func (s *Server) cameraOperation(w http.ResponseWriter, r *http.Request) {
-	s.operationsMu.RLock()
-	operation, ok := s.operations[r.PathValue("id")]
-	s.operationsMu.RUnlock()
-	if !ok {
-		cam, _, err := s.cameras.Get(r.Context(), r.PathValue("id"))
-		if err != nil {
-			writeError(w, http.StatusNotFound, fmt.Errorf("camera operation not found"))
-			return
-		}
-		operation = operationFromCamera(cam)
-	}
-	writeSuccess(w, http.StatusOK, operation.Message, operation)
 }
 
 func (s *Server) completeCameraCreation(operationID string, in camera.CreateInput) {
@@ -1161,23 +1142,6 @@ func (s *Server) setLocationAlerts(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeSuccess(w, http.StatusOK, "Location alert settings saved successfully", result)
-}
-func (s *Server) submitDetection(w http.ResponseWriter, r *http.Request) {
-	if s.submitter == nil {
-		writeError(w, 503, fmt.Errorf("detection pipeline is not ready"))
-		return
-	}
-	var in struct {
-		CameraID   string         `json:"cameraId"`
-		Type       string         `json:"type"`
-		Confidence float64        `json:"confidence"`
-		Metadata   map[string]any `json:"metadata"`
-	}
-	if !decode(w, r, &in) {
-		return
-	}
-	out, err := s.submitter.Submit(r.Context(), rules.Detection{CameraID: in.CameraID, Type: in.Type, Confidence: in.Confidence, OccurredAt: time.Now().UTC(), Metadata: in.Metadata})
-	respondWithMessage(w, out, err, "Detection processed successfully")
 }
 
 func (s *Server) systemUpdate(w http.ResponseWriter, r *http.Request) {

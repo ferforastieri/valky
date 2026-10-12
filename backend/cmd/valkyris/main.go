@@ -81,7 +81,6 @@ func main() {
 	application := &app.Service{Rules: rulesService, Events: eventService, Media: mediaManager, Notify: notifyService, Hub: hub, DataDir: cfg.DataDir, Logger: logger, Preferences: preferencesService}
 	apiServer := api.NewServer(authManager, cameraRepo, onvif, mediaManager, rulesService, eventService, notifyService, hub, logger)
 	apiServer.SetViewerDirectory(cfg.ViewerDir)
-	apiServer.SetSubmitter(application)
 	apiServer.SetUpdates(updates.New(version, cfg.ReleaseAPI))
 	apiServer.SetPreferences(preferencesService)
 	trackingService := tracking.New(db)

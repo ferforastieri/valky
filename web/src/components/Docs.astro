@@ -39,7 +39,6 @@ const endpoints = pt ? [
   ['POST','/api/v1/pairing-sessions','Admin','Cria um convite temporário para outro celular.'],
   ['GET · POST','/api/v1/cameras','Autenticado','Lista câmeras ou inicia o cadastro assíncrono.'],
   ['PUT · DELETE','/api/v1/cameras/{id}','Autenticado','Edita ou remove uma câmera; uma mudança de conexão reinicia sua configuração.'],
-  ['GET','/api/v1/camera-operations/{id}','Autenticado','Acompanha a descoberta ONVIF e a configuração de mídia.'],
   ['POST','/api/v1/cameras/{id}/ptz','Autenticado','Move, para ou aplica zoom quando suportado.'],
   ['GET','/api/v1/lights','Autenticado','Lista a iluminação fornecida pelo adaptador local instalado.'],
   ['GET · DELETE','/api/v1/lights/{id}','Autenticado / Admin ao remover','Consulta ou remove uma iluminação.'],
@@ -67,7 +66,6 @@ const endpoints = pt ? [
   ['POST','/api/v1/devices/push','Autenticado','Registra o token FCM e o segredo do payload cifrado.'],
   ['GET · PUT','/api/v1/settings/push','Admin ao alterar','Consulta a configuração FCM ou envia a conta de serviço Base64, cifrada no SQLite.'],
   ['GET · PUT','/api/v1/settings/retention','Admin ao alterar','Lê ou altera os limites de retenção.'],
-  ['POST','/api/v1/detections','Autenticado','Recebe uma detecção normalizada de integração local.'],
   ['GET','/api/v1/system/update','Autenticado','Consulta a release e o link do APK, sem executar atualizações.'],
   ['GET','/api/v1/realtime','Autenticado','WebSocket para mudanças de câmeras, iluminação e eventos.'],
 ] : [
@@ -80,7 +78,6 @@ const endpoints = pt ? [
   ['POST','/api/v1/pairing-sessions','Admin','Creates a temporary invitation for another phone.'],
   ['GET · POST','/api/v1/cameras','Authenticated','Lists cameras or starts asynchronous setup.'],
   ['PUT · DELETE','/api/v1/cameras/{id}','Authenticated','Edits or deletes a camera; connection changes restart its setup.'],
-  ['GET','/api/v1/camera-operations/{id}','Authenticated','Tracks ONVIF discovery and media setup.'],
   ['POST','/api/v1/cameras/{id}/ptz','Authenticated','Moves, stops or zooms when supported.'],
   ['GET','/api/v1/lights','Authenticated','Lists lighting exposed by the installed local adapter.'],
   ['GET · DELETE','/api/v1/lights/{id}','Authenticated / Admin to remove','Reads or removes a light.'],
@@ -108,7 +105,6 @@ const endpoints = pt ? [
   ['POST','/api/v1/devices/push','Authenticated','Registers the FCM token and encrypted payload secret.'],
   ['GET · PUT','/api/v1/settings/push','Admin to change','Reads FCM setup or stores a Base64 service account encrypted in SQLite.'],
   ['GET · PUT','/api/v1/settings/retention','Admin to change','Reads or changes retention limits.'],
-  ['POST','/api/v1/detections','Authenticated','Accepts normalized detections from local integrations.'],
   ['GET','/api/v1/system/update','Authenticated','Checks release metadata and the APK link without executing updates.'],
   ['GET','/api/v1/realtime','Authenticated','WebSocket for camera, lighting and event changes.'],
 ];

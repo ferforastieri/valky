@@ -100,23 +100,16 @@ func TestCameraCreationContinuesAsynchronously(t *testing.T) {
 
 	deadline := time.Now().Add(3 * time.Second)
 	for time.Now().Before(deadline) {
-		status := performJSON(t, handler, http.MethodGet, "/api/v1/camera-operations/"+started.Data.ID, session.Token, nil)
-		var response struct {
-			Success bool            `json:"success"`
-			Message string          `json:"message"`
-			Data    CameraOperation `json:"data"`
+		// The setup progress is reported over the realtime channel; the persisted
+		// camera is the source of truth for the test.
+		cameras, listErr := repository.List(context.Background())
+		if listErr != nil {
+			t.Fatal(listErr)
 		}
-		if err = json.NewDecoder(status.Body).Decode(&response); err != nil {
-			t.Fatal(err)
+		if len(cameras) == 1 && cameras[0].SetupStatus == "failed" {
+			t.Fatalf("camera operation failed: %s", cameras[0].SetupError)
 		}
-		if response.Data.Status == "failed" {
-			t.Fatalf("camera operation failed: %s", response.Data.Message)
-		}
-		if response.Data.Status == "completed" {
-			cameras, listErr := repository.List(context.Background())
-			if listErr != nil || len(cameras) != 1 || response.Data.Camera == nil {
-				t.Fatalf("camera was not persisted: cameras=%+v operation=%+v err=%v", cameras, response.Data, listErr)
-			}
+		if len(cameras) == 1 && cameras[0].SetupStatus == "ready" {
 			return
 		}
 		time.Sleep(20 * time.Millisecond)
