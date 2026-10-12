@@ -34,7 +34,15 @@ Formas de obtê-la, da mais local para a menos:
 - **Observar o pareamento**: a chave é entregue à lâmpada no pareamento. Quem observa esse tráfego na rede Wi-Fi (por exemplo com o [tuya-cloudcutter](https://github.com/tuya-cloudcutter/tuya-cloudcutter)) obtém a chave sem conta nenhuma.
 - **Parear de novo**: refazer o pareamento descarta a chave antiga e cria uma nova, que precisa ser capturada no mesmo momento.
 
-Uma lâmpada que ainda não foi pareada aceita comandos com uma chave temporária até o primeiro pareamento; nesse caso o Valkyris pode assumir o controle sem nenhum aplicativo, desde que a lâmpada nunca tenha sido vinculada.
+### Pareamento do zero
+
+Uma lâmpada que nunca foi vinculada a nenhuma conta pode ser adotada sem passar pela nuvem: ela ainda aceita ser configurada pelos comandos locais de pareamento. Esse caminho precisa de um rádio Wi-Fi na mesma rede da lâmpada, porque a configuração é entregue no ar (modo EZ/smartconfig) ou pela rede que a própria lâmpada cria (modo AP). O servidor do Valkyris normalmente está no cabo, então o pareamento do zero pertence ao aplicativo Android, que já está no Wi-Fi:
+
+1. a lâmpada é resetada (ligar e desligar três vezes) e passa a piscar rápido;
+2. o aplicativo envia a configuração com uma chave local gerada por ele mesmo, sem conta nenhuma;
+3. quando a lâmpada aparece online, o aplicativo a cadastra no Valkyris com essa chave.
+
+O adaptador do backend já aceita esse cadastro: basta o identificador do dispositivo e a chave. Enquanto o fluxo de pareamento pelo aplicativo não estiver implementado e validado com uma lâmpada em modo de pareamento, use uma das formas acima para obter a chave uma única vez.
 
 Se a lâmpada for resetada ou pareada novamente, edite-a no Android e informe a nova chave.
 
