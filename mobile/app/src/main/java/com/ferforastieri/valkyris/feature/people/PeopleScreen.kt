@@ -32,6 +32,7 @@ import com.composables.icons.lucide.History
 import com.composables.icons.lucide.Lucide
 import com.composables.icons.lucide.MapPin
 import com.composables.icons.lucide.Pencil
+import com.composables.icons.lucide.Plus
 import com.composables.icons.lucide.Trash2
 import com.composables.icons.lucide.UserRound
 import com.ferforastieri.valkyris.core.design.ValkyrisBottomSheet
@@ -81,10 +82,12 @@ fun PeopleScreen(onPerson: (String) -> Unit = {}, vm: PeopleViewModel = hiltView
         Row(
             Modifier.fillMaxWidth().padding(top = 14.dp, bottom = 12.dp),
             verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.End,
         ) {
-            Column {
-                Text("Localização", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.SemiBold)
-                Text("Onde a família está agora", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            TextButton(onClick = { areasOpen = true }) {
+                Icon(Lucide.Plus, null, Modifier.size(18.dp))
+                Spacer(Modifier.width(6.dp))
+                Text("Registrar")
             }
         }
         when (locationStatus) {
@@ -130,16 +133,6 @@ fun PeopleScreen(onPerson: (String) -> Unit = {}, vm: PeopleViewModel = hiltView
                 if (users.isEmpty()) item { EmptyUsers() }
                 items(users, key = { it.id }) { user ->
                     UserCard(user) { onPerson(user.id) }
-                }
-                item {
-                    TextButton(
-                        onClick = { areasOpen = true },
-                        modifier = Modifier.fillMaxWidth(),
-                    ) {
-                        Icon(Lucide.MapPin, null, Modifier.size(18.dp))
-                        Spacer(Modifier.width(6.dp))
-                        Text(if (places.isEmpty()) "Áreas" else "Áreas (${places.size})")
-                    }
                 }
             }
         }

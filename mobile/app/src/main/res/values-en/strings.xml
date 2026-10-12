@@ -258,6 +258,7 @@
     <string name="notice_rule_updated">Rule updated.</string>
     <string name="notice_rule_deleted">Rule removed.</string>
     <string name="people">People</string>
+    <string name="location_screen">Location</string>
     <string name="profile">Profile</string>
     <string name="event_place_entered">Area arrival</string>
     <string name="event_battery_low">Low battery</string>

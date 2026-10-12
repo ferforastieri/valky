@@ -258,6 +258,7 @@
     <string name="notice_rule_updated">Regra atualizada.</string>
     <string name="notice_rule_deleted">Regra removida.</string>
     <string name="people">Pessoas</string>
+    <string name="location_screen">Localização</string>
     <string name="profile">Perfil</string>
     <string name="event_place_entered">Entrada na área</string>
     <string name="event_battery_low">Bateria fraca</string>

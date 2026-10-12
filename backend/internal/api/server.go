@@ -168,12 +168,6 @@ func (s *Server) Handler() http.Handler {
 	protected.Handle("POST /rules", s.auth.RequireRules(true, http.HandlerFunc(s.createRule)))
 	protected.Handle("PUT /rules/{id}", s.auth.RequireRules(true, http.HandlerFunc(s.updateRule)))
 	protected.Handle("DELETE /rules/{id}", s.auth.RequireRules(true, http.HandlerFunc(s.deleteRule)))
-	protected.HandleFunc("GET /people", s.listPeople)
-	protected.Handle("POST /people", s.auth.RequireAdmin(http.HandlerFunc(s.createPerson)))
-	protected.Handle("PUT /people/{id}", s.auth.RequireAdmin(http.HandlerFunc(s.updatePerson)))
-	protected.Handle("DELETE /people/{id}", s.auth.RequireAdmin(http.HandlerFunc(s.deletePerson)))
-	protected.HandleFunc("GET /people/{id}/history", s.personHistory)
-	protected.HandleFunc("POST /people/{id}/locations", s.reportLocation)
 	protected.HandleFunc("GET /users", s.listUsers)
 	protected.Handle("PUT /users/{id}", s.auth.RequireAdmin(http.HandlerFunc(s.updateUser)))
 	protected.HandleFunc("GET /users/{id}/history", s.userHistory)
@@ -847,13 +841,6 @@ func (s *Server) trackingUnavailable(w http.ResponseWriter) bool {
 	writeError(w, http.StatusServiceUnavailable, fmt.Errorf("people tracking is not configured"))
 	return true
 }
-func (s *Server) listPeople(w http.ResponseWriter, r *http.Request) {
-	if s.trackingUnavailable(w) {
-		return
-	}
-	out, err := s.tracking.ListPeople(r.Context())
-	respondWithMessage(w, out, err, "People loaded successfully")
-}
 func (s *Server) listUsers(w http.ResponseWriter, r *http.Request) {
 	if s.trackingUnavailable(w) {
 		return
@@ -977,50 +964,6 @@ func (s *Server) reportMyLocation(w http.ResponseWriter, r *http.Request) {
 	}
 	writeSuccess(w, http.StatusOK, "Location recorded successfully", map[string]int{"transitions": len(transitions), "pendingConfirmations": pending})
 }
-func (s *Server) createPerson(w http.ResponseWriter, r *http.Request) {
-	if s.trackingUnavailable(w) {
-		return
-	}
-	var in tracking.Person
-	if !decode(w, r, &in) {
-		return
-	}
-	out, err := s.tracking.CreatePerson(r.Context(), in, auth.DeviceID(r.Context()))
-	if err != nil {
-		writeError(w, http.StatusBadRequest, err)
-		return
-	}
-	writeSuccess(w, http.StatusCreated, "Person tracking created", out)
-}
-func (s *Server) updatePerson(w http.ResponseWriter, r *http.Request) {
-	if s.trackingUnavailable(w) {
-		return
-	}
-	var in tracking.Person
-	if !decode(w, r, &in) {
-		return
-	}
-	out, err := s.tracking.UpdatePerson(r.Context(), r.PathValue("id"), in)
-	if err != nil {
-		respond(w, nil, err)
-		return
-	}
-	writeSuccess(w, http.StatusOK, "Person updated successfully", out)
-}
-func (s *Server) deletePerson(w http.ResponseWriter, r *http.Request) {
-	if s.trackingUnavailable(w) {
-		return
-	}
-	respondWithMessage(w, nil, s.tracking.DeletePerson(r.Context(), r.PathValue("id")), "Person removed successfully")
-}
-func (s *Server) personHistory(w http.ResponseWriter, r *http.Request) {
-	if s.trackingUnavailable(w) {
-		return
-	}
-	limit, _ := strconv.Atoi(r.URL.Query().Get("limit"))
-	out, err := s.tracking.History(r.Context(), r.PathValue("id"), limit)
-	respondWithMessage(w, out, err, "Location history loaded successfully")
-}
 func (s *Server) listPlaces(w http.ResponseWriter, r *http.Request) {
 	if s.trackingUnavailable(w) {
 		return
@@ -1063,40 +1006,6 @@ func (s *Server) deletePlace(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	respondWithMessage(w, nil, s.tracking.DeletePlace(r.Context(), r.PathValue("id")), "Place removed successfully")
-}
-func (s *Server) reportLocation(w http.ResponseWriter, r *http.Request) {
-	if s.trackingUnavailable(w) {
-		return
-	}
-	var in tracking.Location
-	if !decode(w, r, &in) {
-		return
-	}
-	transitions, err := s.tracking.Report(r.Context(), r.PathValue("id"), auth.DeviceID(r.Context()), in)
-	if err != nil {
-		writeError(w, http.StatusBadRequest, err)
-		return
-	}
-	for _, transition := range transitions {
-		typeName := "place_exited"
-		action := "left"
-		if transition.Entered {
-			typeName = "place_entered"
-			action = "entered"
-		}
-		e, createErr := s.events.Create(r.Context(), event.Event{Source: "tracking", SubjectID: transition.Person.ID, Type: typeName, Confidence: 1, OccurredAt: transition.At, Metadata: map[string]any{"personName": transition.Person.Name, "placeName": transition.Place.Name, "action": action, "latitude": in.Latitude, "longitude": in.Longitude}})
-		if createErr != nil {
-			s.logger.Error("create tracking event", "error", createErr)
-			continue
-		}
-		s.hub.Broadcast(map[string]any{"type": "event.created", "event": e})
-		if s.notify != nil {
-			if enqueueErr := s.notify.Enqueue(r.Context(), e); enqueueErr != nil {
-				s.logger.Error("enqueue tracking notification", "event", e.ID, "error", enqueueErr)
-			}
-		}
-	}
-	writeSuccess(w, http.StatusOK, "Location recorded successfully", map[string]int{"transitions": len(transitions)})
 }
 func (s *Server) listEvents(w http.ResponseWriter, r *http.Request) {
 	limit, _ := strconv.Atoi(r.URL.Query().Get("limit"))

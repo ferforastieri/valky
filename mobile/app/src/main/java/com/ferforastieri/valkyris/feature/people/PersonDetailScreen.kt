@@ -89,7 +89,7 @@ class PersonDetailViewModel @Inject constructor(
         _error.value = null
         viewModelScope.launch {
             try {
-                _history.value = repository.api.personHistory(id)
+                _history.value = repository.api.userHistory(id, 0, "", 100)
             } catch (cancelled: CancellationException) {
                 throw cancelled
             } catch (error: Exception) {
@@ -114,7 +114,11 @@ fun PersonDetailScreen(onBack: () -> Unit, vm: PersonDetailViewModel = hiltViewM
     var day by remember { mutableStateOf<String?>(null) }
     @Suppress("UNUSED_EXPRESSION") error
 
-    val days = remember(history) { history.map { it.occurredAt.take(10) }.distinct().sortedDescending() }
+    val days = remember(history) {
+        val fromData = history.map { it.occurredAt.take(10) }
+        val recent = (0..13).map { java.time.LocalDate.now(java.time.ZoneOffset.UTC).minusDays(it.toLong()).toString() }
+        (fromData + recent).distinct().sortedDescending()
+    }
     val selectedDay = day
     val filtered = remember(history, selectedDay) { if (selectedDay == null) history else history.filter { it.occurredAt.startsWith(selectedDay) } }
     val stats = remember(filtered) { statsOf(filtered) }

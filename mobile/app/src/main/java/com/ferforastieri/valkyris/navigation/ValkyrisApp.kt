@@ -56,7 +56,7 @@ private data class Destination(val route: String, val label: Int, val icon: Imag
 
 private val destinations = listOf(
     Destination("overview", R.string.overview, Lucide.House),
-    Destination("people", R.string.people, Lucide.MapPin),
+    Destination("people", R.string.location_screen, Lucide.MapPin),
     Destination("devices", R.string.devices, Lucide.MonitorSmartphone),
     Destination("profile", R.string.profile, Lucide.UserRound),
     Destination("settings", R.string.settings, Lucide.Settings),
@@ -140,7 +140,7 @@ private fun ConnectedValkyrisApp(main: MainViewModel) {
             if (showTopBar) {
                 val title = when (currentRoute) {
                     "devices", "cameras" -> stringResource(R.string.devices)
-                    "people" -> stringResource(R.string.people)
+                    "people" -> stringResource(R.string.location_screen)
                     "profile" -> stringResource(R.string.profile)
                     "settings" -> stringResource(R.string.settings)
                     "events", "event/{id}" -> stringResource(R.string.events)

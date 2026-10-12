@@ -140,8 +140,9 @@ func (s *Service) Enqueue(ctx context.Context, e event.Event) error {
 		args = append(args, *e.RuleID)
 	}
 	if e.Source == "tracking" && e.SubjectID != "" {
-		query += ` AND COALESCE(user_id,'')<>? AND id NOT IN (SELECT device_id FROM people WHERE id=? AND device_id IS NOT NULL)`
-		args = append(args, e.SubjectID, e.SubjectID)
+		// The tracking subject is now a family user: skip that user's own devices.
+		query += ` AND COALESCE(user_id,'')<>?`
+		args = append(args, e.SubjectID)
 	}
 	rows, err := s.store.DB.QueryContext(ctx, query, args...)
 	if err != nil {
@@ -197,7 +198,7 @@ func (s *Service) deliverBatch(ctx context.Context) {
 	now := time.Now().UTC()
 	stamp := now.Format(time.RFC3339Nano)
 	cutoff := now.Add(-pushFreshnessWindow).Format(time.RFC3339Nano)
-	rows, err := s.store.DB.QueryContext(ctx, `SELECT p.id,p.attempts,d.push_endpoint_enc,d.push_secret_enc,e.id,COALESCE(e.camera_id,''),e.type,e.confidence,e.occurred_at,e.metadata_json,COALESCE((SELECT json_extract(actions_json,'$.alerts') FROM rules WHERE id=e.rule_id),'{}'),COALESCE((SELECT name FROM cameras WHERE id=e.camera_id),'') FROM push_deliveries p JOIN devices d ON d.id=p.device_id JOIN events e ON e.id=p.event_id WHERE d.enabled=1 AND EXISTS(SELECT 1 FROM users u WHERE u.id=d.user_id AND u.enabled=1) AND (e.rule_id IS NULL OR EXISTS(SELECT 1 FROM rules r WHERE r.id=e.rule_id AND (json_type(r.actions_json,'$.recipientUserIds') IS NULL OR json_type(r.actions_json,'$.recipientUserIds')='null' OR d.user_id IN (SELECT value FROM json_each(r.actions_json,'$.recipientUserIds'))))) AND NOT (e.source='tracking' AND e.subject_id<>'' AND (COALESCE(d.user_id,'')=e.subject_id OR EXISTS (SELECT 1 FROM people own WHERE own.id=e.subject_id AND own.device_id=d.id))) AND p.delivered_at IS NULL AND p.next_attempt_at<=? AND p.attempts<10 AND julianday(p.created_at)>julianday(?) AND julianday(e.occurred_at)>julianday(?) ORDER BY p.created_at LIMIT 20`, stamp, cutoff, cutoff)
+	rows, err := s.store.DB.QueryContext(ctx, `SELECT p.id,p.attempts,d.push_endpoint_enc,d.push_secret_enc,e.id,COALESCE(e.camera_id,''),e.type,e.confidence,e.occurred_at,e.metadata_json,COALESCE((SELECT json_extract(actions_json,'$.alerts') FROM rules WHERE id=e.rule_id),'{}'),COALESCE((SELECT name FROM cameras WHERE id=e.camera_id),'') FROM push_deliveries p JOIN devices d ON d.id=p.device_id JOIN events e ON e.id=p.event_id WHERE d.enabled=1 AND EXISTS(SELECT 1 FROM users u WHERE u.id=d.user_id AND u.enabled=1) AND (e.rule_id IS NULL OR EXISTS(SELECT 1 FROM rules r WHERE r.id=e.rule_id AND (json_type(r.actions_json,'$.recipientUserIds') IS NULL OR json_type(r.actions_json,'$.recipientUserIds')='null' OR d.user_id IN (SELECT value FROM json_each(r.actions_json,'$.recipientUserIds'))))) AND NOT (e.source='tracking' AND e.subject_id<>'' AND (COALESCE(d.user_id,'')=e.subject_id)) AND p.delivered_at IS NULL AND p.next_attempt_at<=? AND p.attempts<10 AND julianday(p.created_at)>julianday(?) AND julianday(e.occurred_at)>julianday(?) ORDER BY p.created_at LIMIT 20`, stamp, cutoff, cutoff)
 	if err != nil {
 		return
 	}

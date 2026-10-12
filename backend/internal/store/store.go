@@ -159,29 +159,8 @@ func migrateUsersFromDevices(ctx context.Context, db *sql.DB) error {
 	}
 	for _, device := range devices {
 		userID := "user-" + device.id
-		var legacyPersonID string
-		err := db.QueryRowContext(ctx, `SELECT id FROM people WHERE device_id=? ORDER BY created_at LIMIT 1`, device.id).Scan(&legacyPersonID)
-		switch {
-		case err == nil:
-			userID = legacyPersonID
-			if _, err := db.ExecContext(ctx, `INSERT OR IGNORE INTO users(id,name,color,enabled,last_latitude,last_longitude,last_accuracy,last_located_at,created_at,updated_at)
-				SELECT id,name,color,enabled,last_latitude,last_longitude,last_accuracy,last_located_at,created_at,updated_at FROM people WHERE id=?`, legacyPersonID); err != nil {
-				return fmt.Errorf("migrate legacy person: %w", err)
-			}
-			if _, err := db.ExecContext(ctx, `INSERT OR IGNORE INTO user_locations(id,user_id,latitude,longitude,accuracy,occurred_at,created_at)
-				SELECT id,person_id,latitude,longitude,accuracy,occurred_at,created_at FROM person_locations WHERE person_id=?`, legacyPersonID); err != nil {
-				return fmt.Errorf("migrate legacy locations: %w", err)
-			}
-			if _, err := db.ExecContext(ctx, `INSERT OR IGNORE INTO user_place_memberships(user_id,place_id,inside,updated_at)
-				SELECT person_id,place_id,inside,updated_at FROM place_memberships WHERE person_id=?`, legacyPersonID); err != nil {
-				return fmt.Errorf("migrate legacy place memberships: %w", err)
-			}
-		case err == sql.ErrNoRows:
-			if _, err := db.ExecContext(ctx, `INSERT OR IGNORE INTO users(id,name,color,enabled,created_at,updated_at) VALUES(?,?,?,1,?,?)`, userID, device.name, "#5B5BD6", device.createdAt, device.createdAt); err != nil {
-				return fmt.Errorf("create user for device: %w", err)
-			}
-		default:
-			return fmt.Errorf("find legacy person for device: %w", err)
+		if _, err := db.ExecContext(ctx, `INSERT OR IGNORE INTO users(id,name,color,enabled,created_at,updated_at) VALUES(?,?,?,1,?,?)`, userID, device.name, "#5B5BD6", device.createdAt, device.createdAt); err != nil {
+			return fmt.Errorf("create user for device: %w", err)
 		}
 		if _, err := db.ExecContext(ctx, `UPDATE devices SET user_id=? WHERE id=?`, userID, device.id); err != nil {
 			return fmt.Errorf("link device to user: %w", err)
@@ -189,7 +168,6 @@ func migrateUsersFromDevices(ctx context.Context, db *sql.DB) error {
 		if _, err := db.ExecContext(ctx, `UPDATE users SET is_admin=1 WHERE id=? AND EXISTS(SELECT 1 FROM devices WHERE user_id=? AND is_admin=1)`, userID, userID); err != nil {
 			return fmt.Errorf("migrate administrator account: %w", err)
 		}
-
 	}
 	return nil
 }

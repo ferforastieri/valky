@@ -74,12 +74,16 @@ fun RemoteControlScreen(onBack: () -> Unit, vm: RemoteControlViewModel = hiltVie
     val state by vm.state.collectAsStateWithLifecycle()
     val remote = state.remote
     Column(Modifier.fillMaxSize().padding(horizontal = 18.dp)) {
+        Spacer(Modifier.height(14.dp))
+        if (remote?.tokenConfigured == true) {
+            PowerButton(powering = state.powering, onPower = vm::power, modifier = Modifier.align(Alignment.CenterHorizontally))
+        }
         Text(
             (remote?.name ?: stringResource(R.string.remote_control)) +
                 " · " + if (remote?.tokenConfigured == true) stringResource(R.string.remote_paired) else stringResource(R.string.remote_not_paired),
             style = MaterialTheme.typography.labelSmall,
             color = if (remote?.tokenConfigured == true) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.error,
-            modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp),
+            modifier = Modifier.fillMaxWidth().padding(vertical = 10.dp),
             textAlign = androidx.compose.ui.text.style.TextAlign.Center,
         )
         state.error?.let { /* errors surface as a toast */ }
@@ -115,6 +119,7 @@ private fun PowerButton(powering: Boolean, onPower: () -> Unit, modifier: Modifi
 private fun ConnectedRemote(state: RemoteControlState, vm: RemoteControlViewModel) {
     val enabled = !state.powering
     Column(Modifier.fillMaxSize(), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        Spacer(Modifier.weight(1f))
         NumberPad(enabled, vm::send)
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
             Rocker(
@@ -130,7 +135,6 @@ private fun ConnectedRemote(state: RemoteControlState, vm: RemoteControlViewMode
                 enabled = enabled, onSend = vm::send,
             )
         }
-        Spacer(Modifier.weight(1f))
         Row(
             Modifier.fillMaxWidth().padding(vertical = 8.dp),
             horizontalArrangement = Arrangement.SpaceEvenly,
@@ -139,7 +143,6 @@ private fun ConnectedRemote(state: RemoteControlState, vm: RemoteControlViewMode
             HoldKey(KeySpec(Lucide.ArrowLeft, stringResource(R.string.remote_back), "KEY_RETURN"), enabled, Modifier.size(60.dp), CircleShape, vm::send)
             HoldKey(KeySpec(Lucide.House, stringResource(R.string.remote_home), "KEY_HOME"), enabled, Modifier.size(64.dp), CircleShape, vm::send)
             HoldKey(KeySpec(Lucide.Settings, stringResource(R.string.settings), "KEY_MENU"), enabled, Modifier.size(60.dp), CircleShape, vm::send)
-            PowerButton(powering = state.powering, onPower = vm::power)
         }
         Spacer(Modifier.height(10.dp))
     }
