@@ -1,5 +1,6 @@
 package com.ferforastieri.valkyris.feature.people
 
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -112,7 +113,9 @@ fun PersonDetailScreen(onBack: () -> Unit, vm: PersonDetailViewModel = hiltViewM
     val error by vm.error.collectAsStateWithLifecycle()
     val user = users.firstOrNull { it.id == vm.id }
     var day by remember { mutableStateOf<String?>(null) }
+    var selected by remember { mutableStateOf<String?>(null) }
     @Suppress("UNUSED_EXPRESSION") error
+    @Suppress("UNUSED_EXPRESSION") places
 
     val days = remember(history) {
         val fromData = history.map { it.occurredAt.take(10) }
@@ -136,16 +139,15 @@ fun PersonDetailScreen(onBack: () -> Unit, vm: PersonDetailViewModel = hiltViewM
             }
         }
         Surface(
-            modifier = Modifier.fillMaxWidth().height(230.dp),
+            modifier = Modifier.fillMaxWidth().height(240.dp),
             shape = MaterialTheme.shapes.extraLarge,
             color = MaterialTheme.colorScheme.surfaceVariant,
             tonalElevation = 1.dp,
         ) {
-            FamilyMap(
-                users = listOfNotNull(user),
-                places = places,
-                route = filtered,
-                modifier = Modifier.fillMaxSize().clip(MaterialTheme.shapes.extraLarge),
+            LocationHistoryMap(
+                history = filtered,
+                selected = selected,
+                onSelect = { selected = it },
             )
         }
         if (loading && history.isEmpty()) LinearProgressIndicator(Modifier.fillMaxWidth().padding(top = 10.dp))
@@ -178,10 +180,11 @@ fun PersonDetailScreen(onBack: () -> Unit, vm: PersonDetailViewModel = hiltViewM
                 item { Text(if (loading) "Carregando…" else "Nenhum registro neste período.", color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodySmall) }
             }
             items(filtered, key = { it.id }) { point ->
+                val isSelected = selected == point.id
                 Surface(
-                    Modifier.fillMaxWidth(),
+                    Modifier.fillMaxWidth().clickable { selected = point.id },
                     RoundedCornerShape(16.dp),
-                    color = MaterialTheme.colorScheme.surface,
+                    color = if (isSelected) MaterialTheme.colorScheme.secondaryContainer else MaterialTheme.colorScheme.surface,
                     border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
                 ) {
                     Row(Modifier.fillMaxWidth().padding(14.dp), verticalAlignment = Alignment.CenterVertically) {
