@@ -1,24 +1,66 @@
 # Iluminação local
 
-O Valkyris preserva um modelo comum de iluminação para ligar, desligar e, quando o dispositivo oferecer essas capacidades, alterar brilho, temperatura do branco e cor RGB.
+O Valkyris controla lâmpadas Wi-Fi compatíveis com Tuya (protocolos locais 3.1 a 3.5) diretamente na rede local. Depois do cadastro, é possível ligar, desligar e, quando o dispositivo oferecer essas capacidades, alterar brilho, temperatura do branco e cor RGB.
+
+Nenhuma conta, aplicativo ou serviço de fabricante participa da descoberta ou do controle: o backend fala com a lâmpada na porta TCP 6668 da própria casa. O único momento em que a nuvem do fabricante pode entrar é a obtenção da chave local, explicada abaixo, e ela não é usada depois.
 
 ## Arquitetura
 
-O domínio de iluminação não depende de conta ou protocolo de um fabricante. O backend expõe uma fronteira de driver local com três operações:
+O domínio de iluminação não depende de conta ou protocolo de um fabricante. O backend expõe uma fronteira de driver local com quatro operações:
 
 - descoberta do dispositivo na rede;
+- validação das credenciais e leitura das capacidades (pareamento);
 - leitura do estado atual;
 - aplicação de uma alteração de estado.
 
-Um adaptador concreto implementa essa fronteira e traduz suas capacidades para o modelo comum. Sem um adaptador instalado, o Valkyris não tenta descobrir dispositivos nem se conecta a uma nuvem.
+`internal/light/tuya` implementa essa fronteira para os protocolos Tuya LAN 3.1 a 3.5. O protocolo foi documentado pela comunidade em [tinytuya](https://github.com/jasonacox/tinytuya) e [tuyapi](https://github.com/codetheweb/tuyapi) (ambos MIT); a implementação do Valkyris é própria, cobre apenas descoberta e leitura/escrita de pontos de controle, e é verificada contra quadros de referência gravados, sem depender de bibliotecas de terceiros.
 
-## Interfaces preservadas
+## Como cadastrar
 
-- O Android mantém a área **Dispositivos → Iluminação** e os controles comuns.
-- O painel web continua preparado para consultar e controlar dispositivos publicados pelo backend.
-- A API mantém leitura, controle e remoção de registros, mas o cadastro pertence ao futuro fluxo do adaptador escolhido.
-- Registros criados por versões anteriores não são apagados automaticamente e podem ser removidos por um administrador.
+1. Abra **Dispositivos → Iluminação → Adicionar** no Android (apenas administradores).
+2. Toque em **Procurar na rede**. O backend envia o mesmo anúncio que o aplicativo do fabricante usa e lista o que responder na rede local.
+3. Selecione a lâmpada, informe um nome, o cômodo e a **chave local** de 16 caracteres.
+4. Salve. O Valkyris fala com a lâmpada na hora: descobre a versão de protocolo que funciona, quais pontos de controle ela expõe (brilho, branco, cor) e o estado atual. O resultado aparece na própria tela.
 
-## Requisitos para novos adaptadores
+Também é possível cadastrar sem a descoberta, informando o identificador do dispositivo (20 caracteres na maioria dos firmwares) e o endereço.
 
-Novos adaptadores devem operar localmente, declarar capacidades em vez de assumir recursos, manter credenciais somente no backend e não exigir que o aplicativo conheça detalhes do protocolo. O fluxo de cadastro deve ser orientado pelo próprio padrão e não por campos genéricos de chaves, IPs ou versões.
+### Chave local
+
+Cada lâmpada tem uma chave de 16 caracteres, criada quando ela é pareada. Ela é o único segredo necessário para controle local e **nunca** é devolvida pela API: fica cifrada com AES-256-GCM no SQLite, ao lado das credenciais das câmeras.
+
+Formas de obtê-la, da mais local para a menos:
+
+- **Reaproveitar o que já existe**: se a lâmpada já estava pareada em um aplicativo compatível, a chave está no projeto de nuvem do fabricante. O assistente do [TinyTuya](https://github.com/jasonacox/tinytuya) gera um `devices.json` a partir dele, de onde a chave pode ser copiada.
+- **Observar o pareamento**: a chave é entregue à lâmpada no pareamento. Quem observa esse tráfego na rede Wi-Fi (por exemplo com o [tuya-cloudcutter](https://github.com/tuya-cloudcutter/tuya-cloudcutter)) obtém a chave sem conta nenhuma.
+- **Parear de novo**: refazer o pareamento descarta a chave antiga e cria uma nova, que precisa ser capturada no mesmo momento.
+
+Uma lâmpada que ainda não foi pareada aceita comandos com uma chave temporária até o primeiro pareamento; nesse caso o Valkyris pode assumir o controle sem nenhum aplicativo, desde que a lâmpada nunca tenha sido vinculada.
+
+Se a lâmpada for resetada ou pareada novamente, edite-a no Android e informe a nova chave.
+
+## Descoberta de endereço
+
+O Valkyris guarda o último endereço funcional. Quando a lâmpada não responde, ele procura de novo pelo identificador do dispositivo nos anúncios da rede local. Redes com isolamento entre clientes, VLANs ou firewall precisam permitir que o container do Valkyris alcance a lâmpada na porta TCP 6668; a descoberta usa UDP 6666, 6667 e 7000.
+
+O endereço de uma lâmpada muda com o tempo por causa do DHCP, e o Valkyris não depende dele: o identificador é o que identifica o dispositivo.
+
+## Capacidades e pontos de controle
+
+A lâmpada informa quais pontos de controle expõe; o adaptador detecta o layout e o guarda por dispositivo:
+
+| Layout | Liga/desliga | Modo | Brilho | Branco | Cor |
+| --- | --- | --- | --- | --- | --- |
+| moderno | 20 | 21 | 22 (10–1000) | 23 (0–1000) | 24 (HSV em hexadecimal) |
+| legado | 1 | 2 | 3 (25–255) | 4 (0–255) | 5 (RGB em hexadecimal) |
+| branco | 1 | — | 2 (25–255) | 3 (0–255) | — |
+
+Brilho é guardado em porcentagem e temperatura em Kelvin: o valor bruto do firmware nunca chega ao aplicativo. A temperatura é mapeada linearmente entre 2700 K e 6500 K.
+
+## Segurança
+
+- A chave local é cifrada no SQLite com a chave mestra AES-256-GCM da instalação.
+- A API nunca devolve a chave para Android ou navegador.
+- Todos os comandos passam pelo backend autenticado; o navegador nunca acessa a lâmpada diretamente.
+- Somente administradores podem cadastrar, editar, testar ou remover. Qualquer usuário autenticado pode operar uma lâmpada já cadastrada.
+- A descoberta só envia tráfego para as sub-redes locais às quais o host está conectado, e jamais para a internet.
+- Cadastrar exige uma chave de 16 caracteres; o pareamento é validado contra o dispositivo antes de substituir uma configuração que já funcionava.

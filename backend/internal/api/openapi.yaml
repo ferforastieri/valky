@@ -229,11 +229,33 @@ paths:
     get:
       summary: List lights exposed by the installed local adapter and their latest state
       responses: {'200': {description: Lights in APIResponse.data}}
+    post:
+      summary: Register a light found on the local network (administrator only)
+      requestBody: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/LightInput'}}}}
+      responses:
+        '201': {description: Registered light in APIResponse.data}
+        '400': {description: Missing name, device id or a 16 character local key}
+  /lights/discovery:
+    post:
+      summary: Look for unregistered lights on the local network (administrator only)
+      description: Sends the same broadcast the vendor application uses and reports whatever answers. No cloud service is contacted and no credentials are needed.
+      requestBody: {required: false, content: {application/json: {schema: {$ref: '#/components/schemas/LightDiscoveryInput'}}}}
+      responses:
+        '200': {description: Candidates in APIResponse.data}
+        '502': {description: Discovery could not run}
   /lights/{id}:
     get:
       summary: Get a locally controlled light
       parameters: [{$ref: '#/components/parameters/id'}]
       responses: {'200': {description: Light in APIResponse.data}}
+    put:
+      summary: Rename a light or replace its local credentials (administrator only)
+      description: New credentials are validated against the device before they replace a working configuration.
+      parameters: [{$ref: '#/components/parameters/id'}]
+      requestBody: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/LightUpdate'}}}}
+      responses:
+        '200': {description: Updated light in APIResponse.data}
+        '400': {description: Invalid name or local key}
     delete:
       summary: Remove a light from Valkyris (administrator only)
       parameters: [{$ref: '#/components/parameters/id'}]
@@ -642,12 +664,55 @@ components:
         id: {type: string, format: uuid}
         name: {type: string}
         room: {type: string}
+        deviceId: {type: string, readOnly: true, description: Identifier the device announces on the local network}
+        protocolVersion: {type: number, description: Local protocol version detected while pairing}
+        lastAddress: {type: string, readOnly: true, description: Last address that answered on the local network}
+        capabilities: {$ref: '#/components/schemas/LightCapabilities'}
         setupStatus: {type: string, enum: [pending, ready, failed]}
         setupError: {type: string}
         enabled: {type: boolean}
         favorite: {type: boolean}
         lastSeenAt: {type: string, format: date-time}
         state: {$ref: '#/components/schemas/LightState'}
+    LightCapabilities:
+      type: object
+      description: What the device actually supports; derived from the data points it reports.
+      properties:
+        brightness: {type: boolean}
+        color: {type: boolean}
+        colorTemperature: {type: boolean}
+    LightInput:
+      type: object
+      required: [name, deviceId, localKey]
+      properties:
+        name: {type: string, maxLength: 60}
+        room: {type: string, maxLength: 60}
+        deviceId: {type: string, description: Identifier announced by the device (20 characters on most firmwares)}
+        localKey: {type: string, minLength: 16, maxLength: 16, writeOnly: true, description: Local key created when the device was paired. Stored sealed and never returned by the API.}
+        address: {type: string, description: Local address; discovered automatically when omitted}
+        protocolVersion: {type: number, description: Leave empty to detect while pairing}
+    LightUpdate:
+      type: object
+      properties:
+        name: {type: string}
+        room: {type: string}
+        localKey: {type: string, minLength: 16, maxLength: 16, writeOnly: true}
+        address: {type: string}
+        protocolVersion: {type: number}
+        enabled: {type: boolean}
+    LightDiscoveryInput:
+      type: object
+      properties:
+        duration: {type: integer, minimum: 1, maximum: 30, default: 8, description: Seconds spent listening for device announcements}
+        probe: {type: boolean, default: false, description: Also try the control port on every address of the local subnets}
+    LightCandidate:
+      type: object
+      properties:
+        address: {type: string}
+        deviceId: {type: string}
+        version: {type: number}
+        productKey: {type: string}
+        mac: {type: string}
     Remote:
       type: object
       required: [id, name, kind, host, port, setupStatus, tokenConfigured, enabled]

@@ -6,6 +6,7 @@ import (
 	"io"
 	"log/slog"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
@@ -34,25 +35,55 @@ func (f *fakeDriver) Apply(_ context.Context, _ Light, _ Credentials, patch Stat
 	return f.state, nil
 }
 
+// fakeScannerDriver also implements Scanner, the contract the pairing flow
+// needs. The failure switch makes it reject a wrong local key.
+type fakeScannerDriver struct {
+	fakeDriver
+	reject     bool
+	candidates []Candidate
+}
+
+func (f *fakeScannerDriver) Scan(context.Context, time.Duration, bool) ([]Candidate, error) {
+	return f.candidates, nil
+}
+
+func (f *fakeScannerDriver) Provision(context.Context, Light, Credentials) (ProvisionResult, error) {
+	if f.reject {
+		return ProvisionResult{}, errors.New("device rejected the key")
+	}
+	return ProvisionResult{
+		State:        State{Online: true, Power: true, Brightness: 80, Mode: "white"},
+		Capabilities: modernProfile.capabilities(),
+		Version:      3.3,
+		Mapping:      modernProfile.encode(),
+	}, nil
+}
+
 type fakeHub struct{ messages []any }
 
 func (h *fakeHub) Broadcast(value any) { h.messages = append(h.messages, value) }
 
-func TestServiceControlsALightThroughTheProviderNeutralDriver(t *testing.T) {
+func newTestService(t *testing.T, driver Driver) (*Service, *store.Store, *fakeHub) {
+	t.Helper()
 	dir := t.TempDir()
 	db, err := store.Open(filepath.Join(dir, "test.db"))
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer db.Close()
+	t.Cleanup(func() { db.Close() })
 	vault, err := appcrypto.LoadOrCreate(filepath.Join(dir, "master.key"))
 	if err != nil {
 		t.Fatal(err)
 	}
-	driver := &fakeDriver{state: State{Brightness: 70, TemperatureKelvin: 4000, Mode: "white"}}
 	hub := &fakeHub{}
 	service := NewService(NewRepository(db, vault), driver, hub, slog.New(slog.NewTextHandler(io.Discard, nil)))
-	secret, err := vault.EncryptString("adapter-secret")
+	return service, db, hub
+}
+
+func TestServiceControlsALightThroughTheProviderNeutralDriver(t *testing.T) {
+	driver := &fakeDriver{state: State{Brightness: 70, TemperatureKelvin: 4000, Mode: "white"}}
+	service, db, hub := newTestService(t, driver)
+	secret, err := service.repo.vault.EncryptString("adapter-secret")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -88,4 +119,128 @@ func TestUnavailableDriverDoesNotAttemptAProviderConnection(t *testing.T) {
 	if !errors.Is(err, ErrNoLightingAdapter) {
 		t.Fatalf("expected adapter error, got %v", err)
 	}
+	if service, _, _ := newTestService(t, driver); service.Available() {
+		t.Fatal("the unavailable driver reported itself as available")
+	}
 }
+
+func TestCreateValidatesTheLocalKeyBeforeStoring(t *testing.T) {
+	service, _, _ := newTestService(t, &fakeScannerDriver{})
+	_, err := service.Create(context.Background(), CreateInput{Name: "Sala", DeviceID: "device", LocalKey: "curta"})
+	if err == nil || !strings.Contains(err.Error(), "16 caracteres") {
+		t.Fatalf("a short key was accepted: %v", err)
+	}
+	if _, err := service.Create(context.Background(), CreateInput{DeviceID: "device", LocalKey: "0123456789abcdef"}); err == nil {
+		t.Fatal("a light without a name was accepted")
+	}
+	if _, err := service.Create(context.Background(), CreateInput{Name: "Sala", LocalKey: "0123456789abcdef"}); err == nil {
+		t.Fatal("a light without a device id was accepted")
+	}
+}
+
+func TestCreateDetectsCapabilitiesAndStoresTheDeviceLayout(t *testing.T) {
+	driver := &fakeScannerDriver{}
+	service, _, _ := newTestService(t, driver)
+	created, err := service.Create(context.Background(), CreateInput{
+		Name: "Pera da sala", Room: "Sala", DeviceID: "device-1", LocalKey: "0123456789abcdef", Address: "192.168.1.50",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	// Provisioning runs in the background: wait for the light to be ready.
+	deadline := time.Now().Add(3 * time.Second)
+	for time.Now().Before(deadline) && created.SetupStatus != "ready" {
+		time.Sleep(20 * time.Millisecond)
+		created, err = service.Get(context.Background(), created.ID)
+		if err != nil {
+			t.Fatal(err)
+		}
+	}
+	if created.SetupStatus != "ready" || created.SetupError != "" {
+		t.Fatalf("light did not become ready: %+v", created)
+	}
+	if !created.Capabilities.Brightness || !created.Capabilities.Color || !created.Capabilities.ColorTemperature {
+		t.Fatalf("capabilities were not detected: %+v", created.Capabilities)
+	}
+	if created.ProtocolVersion != 3.3 {
+		t.Fatalf("protocol version = %.1f", created.ProtocolVersion)
+	}
+	if _, ok := decodeProfile(created.DPMapping); !ok {
+		t.Fatalf("device layout was not stored: %q", created.DPMapping)
+	}
+	if !created.State.Online || !created.State.Power {
+		t.Fatalf("state was not captured while pairing: %+v", created.State)
+	}
+	// The local key never leaves the backend.
+	if strings.Contains(created.DPMapping, "0123456789abcdef") {
+		t.Fatal("the local key leaked into the stored layout")
+	}
+}
+
+func TestCreateReportsARejectedKey(t *testing.T) {
+	service, _, _ := newTestService(t, &fakeScannerDriver{reject: true})
+	created, err := service.Create(context.Background(), CreateInput{Name: "Sala", DeviceID: "device", LocalKey: "0123456789abcdef"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	deadline := time.Now().Add(3 * time.Second)
+	for time.Now().Before(deadline) && created.SetupStatus != "failed" {
+		time.Sleep(20 * time.Millisecond)
+		created, err = service.Get(context.Background(), created.ID)
+		if err != nil {
+			t.Fatal(err)
+		}
+	}
+	if created.SetupStatus != "failed" {
+		t.Fatalf("light stayed at %q after a rejected key", created.SetupStatus)
+	}
+	if created.SetupError == "" {
+		t.Fatal("a rejected key did not produce an explanation")
+	}
+}
+
+func TestScanListsCandidatesFromTheAdapter(t *testing.T) {
+	driver := &fakeScannerDriver{candidates: []Candidate{{Address: "192.168.1.50", DeviceID: "device-1", Version: 3.3}}}
+	service, _, _ := newTestService(t, driver)
+	candidates, err := service.Scan(context.Background(), DiscoveryInput{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(candidates) != 1 || candidates[0].DeviceID != "device-1" {
+		t.Fatalf("unexpected candidates: %+v", candidates)
+	}
+	// The scanner is an optional capability: the neutral driver keeps working.
+	plain, _, _ := newTestService(t, &fakeDriver{})
+	if _, ok := plain.Scanner(); ok {
+		t.Fatal("a driver without discovery reported a scanner")
+	}
+	if _, err := plain.Scan(context.Background(), DiscoveryInput{}); !errors.Is(err, ErrNoLightingAdapter) {
+		t.Fatalf("scan on a driver without discovery returned %v", err)
+	}
+}
+
+func TestUpdateReplacesTheLocalKeyAndRefreshesTheLayout(t *testing.T) {
+	driver := &fakeScannerDriver{}
+	service, _, _ := newTestService(t, driver)
+	created, err := service.Create(context.Background(), CreateInput{Name: "Sala", DeviceID: "device", LocalKey: "0123456789abcdef"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	name := "Luminária da sala"
+	room := "Escritório"
+	updated, err := service.Update(context.Background(), created.ID, UpdateInput{Name: &name, Room: &room})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if updated.Name != name || updated.Room != room {
+		t.Fatalf("update was not applied: %+v", updated)
+	}
+	if _, err := service.Update(context.Background(), created.ID, UpdateInput{LocalKey: strptr("curta")}); err == nil {
+		t.Fatal("a short key was accepted on update")
+	}
+	if _, err := service.Update(context.Background(), created.ID, UpdateInput{Name: strptr("  ")}); err == nil {
+		t.Fatal("an empty name was accepted")
+	}
+}
+
+func strptr(value string) *string { return &value }

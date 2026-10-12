@@ -75,7 +75,7 @@ func main() {
 	})
 	hub := api.NewHub()
 	lightRepo := light.NewRepository(db, vault)
-	lightService := light.NewService(lightRepo, light.NewUnavailableDriver(), hub, logger)
+	lightService := light.NewService(lightRepo, light.NewTuyaDriver(), hub, logger)
 	remoteRepo := remote.NewRepository(db, vault)
 	remoteService := remote.NewService(remoteRepo, remote.NewSmartTVDriver(logger), hub, logger)
 	application := &app.Service{Rules: rulesService, Events: eventService, Media: mediaManager, Notify: notifyService, Hub: hub, DataDir: cfg.DataDir, Logger: logger, Preferences: preferencesService}

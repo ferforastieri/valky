@@ -37,6 +37,19 @@ type Light struct {
 	State        State        `json:"state"`
 	CreatedAt    time.Time    `json:"createdAt"`
 	UpdatedAt    time.Time    `json:"updatedAt"`
+
+	// LastAddress is the address that worked for this light the last time it
+	// answered, used as the first candidate when the device hides itself from
+	// the discovery broadcast.
+	LastAddress string `json:"lastAddress,omitempty"`
+	// DeviceID is the identifier the device announces on the local network.
+	DeviceID string `json:"deviceId,omitempty"`
+	// ProtocolVersion is the local protocol version the device speaks. It is
+	// detected while pairing and can be corrected by the administrator.
+	ProtocolVersion float64 `json:"protocolVersion,omitempty"`
+	// DPMapping is the internal data point layout of the device. It is never
+	// sent to clients: they only see the capabilities it produces.
+	DPMapping string `json:"-"`
 }
 
 type Credentials struct {
@@ -50,4 +63,32 @@ type StatePatch struct {
 	Brightness        *int    `json:"brightness,omitempty"`
 	TemperatureKelvin *int    `json:"temperatureKelvin,omitempty"`
 	Color             *Color  `json:"color,omitempty"`
+}
+
+// CreateInput registers a light that is already reachable on the local network.
+type CreateInput struct {
+	Name            string  `json:"name"`
+	Room            string  `json:"room"`
+	DeviceID        string  `json:"deviceId"`
+	LocalKey        string  `json:"localKey"`
+	Address         string  `json:"address,omitempty"`
+	ProtocolVersion float64 `json:"protocolVersion,omitempty"`
+}
+
+// UpdateInput renames a light or replaces its local credentials.
+type UpdateInput struct {
+	Name            *string  `json:"name,omitempty"`
+	Room            *string  `json:"room,omitempty"`
+	LocalKey        *string  `json:"localKey,omitempty"`
+	Address         *string  `json:"address,omitempty"`
+	ProtocolVersion *float64 `json:"protocolVersion,omitempty"`
+	Enabled         *bool    `json:"enabled,omitempty"`
+}
+
+// DiscoveryInput configures a local network scan for new lights.
+type DiscoveryInput struct {
+	// Duration is how long to listen for device announcements, in seconds.
+	Duration int `json:"duration,omitempty"`
+	// Probe also tries the control port on every address of the local subnets.
+	Probe bool `json:"probe,omitempty"`
 }
