@@ -72,7 +72,7 @@ fun OverviewActivityChart(onEvent: (String) -> Unit, vm: ActivityViewModel = hil
 @Composable
 fun ActivityChart(hours: Int, buckets: List<ActivityBucket>?, failed: String? = null, onHours: (Int) -> Unit = {}, onBucket: (ActivityBucket) -> Unit = {}) {
     Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)) {
-        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Column(Modifier.padding(horizontal = 14.dp, vertical = 12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             var periodExpanded by remember { mutableStateOf(false) }
             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                 Text(stringResource(R.string.activity_chart_title), modifier = Modifier.weight(1f), style = MaterialTheme.typography.titleMedium)

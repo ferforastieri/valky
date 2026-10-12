@@ -115,7 +115,7 @@ private fun ConnectedValkyrisApp(main: MainViewModel) {
     val entry by nav.currentBackStackEntryAsState()
     val currentRoute = entry?.destination?.route
     val selectedIndex = destinations.indexOfFirst { it.route == currentRoute }
-    val showBottomBar = selectedIndex >= 0 || currentRoute == "events" || currentRoute == "event/{id}" || currentRoute == "camera/{id}" || currentRoute == "lights"
+    val showBottomBar = selectedIndex >= 0 || currentRoute == "events" || currentRoute == "event/{id}" || currentRoute == "camera/{id}" || currentRoute == "lights" || currentRoute == "remote/{id}"
     val showTopBar = selectedIndex >= 0 || currentRoute == "events" || currentRoute == "event/{id}" || currentRoute == "lights"
     val pendingEvent by main.pendingEvent.collectAsStateWithLifecycle()
     val pendingCamera by main.pendingCamera.collectAsStateWithLifecycle()
@@ -185,6 +185,7 @@ private fun ConnectedValkyrisApp(main: MainViewModel) {
                     onCameras = { nav.openTopLevel("devices") },
                     onPeople = { nav.openTopLevel("people") },
                     onEvents = { nav.navigate("events") { launchSingleTop = true } },
+                    onRemote = { nav.navigate("remote/$it") },
                     onLight = { nav.navigate("lights") { launchSingleTop = true } },
                     onFavorite = { favorite ->
                         when (favorite.type) {

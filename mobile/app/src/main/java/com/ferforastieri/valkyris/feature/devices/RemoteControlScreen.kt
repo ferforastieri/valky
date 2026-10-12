@@ -1,5 +1,7 @@
 package com.ferforastieri.valkyris.feature.devices
 
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
@@ -20,6 +22,7 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.LinearProgressIndicator
+import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -32,6 +35,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Shape
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.res.stringResource
@@ -48,8 +52,8 @@ import com.composables.icons.lucide.ChevronUp
 import com.composables.icons.lucide.House
 import com.composables.icons.lucide.Link
 import com.composables.icons.lucide.Lucide
-import com.composables.icons.lucide.Menu
 import com.composables.icons.lucide.Power
+import com.composables.icons.lucide.Settings
 import com.composables.icons.lucide.Tv
 import com.composables.icons.lucide.Volume1
 import com.composables.icons.lucide.Volume2
@@ -60,36 +64,30 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
 /**
- * Full-screen remote laid out like a TV remote: the installed apps sit on top
- * and the main controls — D-pad, volume, channel, home/back/menu and mute —
- * stay within thumb reach at the bottom, without scrolling. Keys repeat while
- * held, and the numeric keypad is a toggle so it never pushes the controls off
- * screen. The system back gesture leaves the screen.
+ * Full-screen remote shaped like a TV remote, laid out top to bottom: power
+ * (centred) with the settings key beside it, the numeric keypad, the navigation
+ * pad flanked by the volume and channel rockers — the volume rocker carries the
+ * mute key between + and − — and home/back underneath. Keys repeat while held.
  */
 @Composable
 fun RemoteControlScreen(onBack: () -> Unit, vm: RemoteControlViewModel = hiltViewModel()) {
     val state by vm.state.collectAsStateWithLifecycle()
     val remote = state.remote
     Column(Modifier.fillMaxSize().padding(horizontal = 18.dp)) {
-        Row(Modifier.fillMaxWidth().padding(vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
-            Column(Modifier.weight(1f)) {
-                Text(
-                    remote?.name ?: stringResource(R.string.remote_control),
-                    style = MaterialTheme.typography.titleLarge,
-                    fontWeight = FontWeight.SemiBold,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
-                Text(
-                    if (remote?.tokenConfigured == true) stringResource(R.string.remote_paired) else stringResource(R.string.remote_not_paired),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = if (remote?.tokenConfigured == true) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.error,
-                )
-            }
+        Box(Modifier.fillMaxWidth().padding(vertical = 6.dp)) {
             if (remote?.tokenConfigured == true) {
-                PowerButton(powering = state.powering, onPower = vm::power)
+                SettingsKey(Modifier.align(Alignment.CenterStart), vm::send)
+                PowerButton(powering = state.powering, onPower = vm::power, modifier = Modifier.align(Alignment.Center))
             }
         }
+        Text(
+            (remote?.name ?: stringResource(R.string.remote_control)) +
+                " · " + if (remote?.tokenConfigured == true) stringResource(R.string.remote_paired) else stringResource(R.string.remote_not_paired),
+            style = MaterialTheme.typography.labelSmall,
+            color = if (remote?.tokenConfigured == true) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.error,
+            modifier = Modifier.fillMaxWidth().padding(bottom = 6.dp),
+            textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+        )
         state.error?.let {
             Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(bottom = 6.dp))
         }
@@ -102,19 +100,35 @@ fun RemoteControlScreen(onBack: () -> Unit, vm: RemoteControlViewModel = hiltVie
 }
 
 @Composable
-private fun PowerButton(powering: Boolean, onPower: () -> Unit) {
+private fun SettingsKey(modifier: Modifier, onSend: (String) -> Unit) {
+    Surface(
+        onClick = { onSend("KEY_MENU") },
+        modifier = modifier.size(46.dp),
+        shape = CircleShape,
+        color = MaterialTheme.colorScheme.surfaceVariant,
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+    ) {
+        Box(contentAlignment = Alignment.Center) {
+            Icon(Lucide.Settings, stringResource(R.string.settings), Modifier.size(22.dp), tint = MaterialTheme.colorScheme.secondary)
+        }
+    }
+}
+
+@Composable
+private fun PowerButton(powering: Boolean, onPower: () -> Unit, modifier: Modifier = Modifier) {
     Surface(
         onClick = onPower,
         enabled = !powering,
+        modifier = modifier.size(56.dp),
         shape = CircleShape,
         color = MaterialTheme.colorScheme.errorContainer,
         border = BorderStroke(1.dp, MaterialTheme.colorScheme.error.copy(alpha = .35f)),
     ) {
-        Box(Modifier.size(46.dp), contentAlignment = Alignment.Center) {
+        Box(contentAlignment = Alignment.Center) {
             if (powering) {
-                CircularProgressIndicator(Modifier.size(20.dp), strokeWidth = 2.dp, color = MaterialTheme.colorScheme.onErrorContainer)
+                CircularProgressIndicator(Modifier.size(22.dp), strokeWidth = 2.dp, color = MaterialTheme.colorScheme.onErrorContainer)
             } else {
-                Icon(Lucide.Power, stringResource(R.string.remote_power), Modifier.size(22.dp), tint = MaterialTheme.colorScheme.onErrorContainer)
+                Icon(Lucide.Power, stringResource(R.string.remote_power), Modifier.size(26.dp), tint = MaterialTheme.colorScheme.onErrorContainer)
             }
         }
     }
@@ -123,15 +137,24 @@ private fun PowerButton(powering: Boolean, onPower: () -> Unit) {
 @Composable
 private fun ConnectedRemote(state: RemoteControlState, vm: RemoteControlViewModel) {
     val enabled = !state.powering
-    Column(Modifier.fillMaxSize()) {
-        // The navigation pad grows to fill the space so the remote has no dead
-        // area at the top and the main controls stay within thumb reach.
-        Box(Modifier.fillMaxWidth().weight(1f), contentAlignment = Alignment.Center) {
-            NavigationPad(enabled, vm::send)
-        }
+    Column(Modifier.fillMaxSize(), verticalArrangement = Arrangement.spacedBy(12.dp)) {
         NumberPad(enabled, vm::send)
-        Spacer(Modifier.height(12.dp))
-        BottomRow(enabled, vm::send)
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+            Rocker(
+                up = KeySpec(Lucide.Volume2, stringResource(R.string.remote_volume_up), "KEY_VOLUP"),
+                down = KeySpec(Lucide.Volume1, stringResource(R.string.remote_volume_down), "KEY_VOLDOWN"),
+                middle = KeySpec(Lucide.VolumeX, stringResource(R.string.remote_mute), "KEY_MUTE"),
+                enabled = enabled, onSend = vm::send,
+            )
+            RemoteDPad(enabled, vm::send)
+            Rocker(
+                up = KeySpec(Lucide.ChevronUp, stringResource(R.string.remote_channel_up), "KEY_CHUP"),
+                down = KeySpec(Lucide.ChevronDown, stringResource(R.string.remote_channel_down), "KEY_CHDOWN"),
+                enabled = enabled, onSend = vm::send,
+            )
+        }
+        Spacer(Modifier.weight(1f))
+        HomeBackRow(enabled, vm::send)
         Spacer(Modifier.height(10.dp))
     }
 }
@@ -139,54 +162,34 @@ private fun ConnectedRemote(state: RemoteControlState, vm: RemoteControlViewMode
 private data class KeySpec(val icon: ImageVector, val label: String, val key: String)
 
 @Composable
-private fun NavigationPad(enabled: Boolean, onSend: (String) -> Unit) {
-    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-        Rocker(
-            top = KeySpec(Lucide.Volume2, stringResource(R.string.remote_volume_up), "KEY_VOLUP"),
-            bottom = KeySpec(Lucide.Volume1, stringResource(R.string.remote_volume_down), "KEY_VOLDOWN"),
-            enabled = enabled, onSend = onSend,
-        )
-        DPad(enabled, onSend)
-        Rocker(
-            top = KeySpec(Lucide.ChevronUp, stringResource(R.string.remote_channel_up), "KEY_CHUP"),
-            bottom = KeySpec(Lucide.ChevronDown, stringResource(R.string.remote_channel_down), "KEY_CHDOWN"),
-            enabled = enabled, onSend = onSend,
-        )
-    }
-}
-
-@Composable
-private fun Rocker(top: KeySpec, bottom: KeySpec, enabled: Boolean, onSend: (String) -> Unit) {
+private fun Rocker(up: KeySpec, down: KeySpec, enabled: Boolean, onSend: (String) -> Unit, middle: KeySpec? = null) {
     Surface(
-        shape = RoundedCornerShape(28.dp),
+        shape = RoundedCornerShape(30.dp),
         color = MaterialTheme.colorScheme.surfaceVariant,
         border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
     ) {
         Column(Modifier.padding(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-            KeyButton(enabled, Modifier.size(54.dp), CircleShape, onSend, top)
-            KeyButton(enabled, Modifier.size(54.dp), CircleShape, onSend, bottom)
+            HoldKey(up, enabled, Modifier.size(54.dp), CircleShape, onSend)
+            middle?.let { HoldKey(it, enabled, Modifier.size(54.dp), CircleShape, onSend) }
+            HoldKey(down, enabled, Modifier.size(54.dp), CircleShape, onSend)
         }
     }
 }
 
 @Composable
-private fun DPad(enabled: Boolean, onSend: (String) -> Unit) {
+private fun RemoteDPad(enabled: Boolean, onSend: (String) -> Unit) {
     Surface(
-        Modifier.size(196.dp),
+        Modifier.size(190.dp),
         shape = CircleShape,
         color = MaterialTheme.colorScheme.surfaceVariant,
         border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
         tonalElevation = 1.dp,
     ) {
-        Box(Modifier.fillMaxSize().padding(8.dp)) {
-            KeyButton(enabled, Modifier.align(Alignment.TopCenter).size(52.dp), CircleShape, onSend, KeySpec(Lucide.ChevronUp, stringResource(R.string.remote_up), "KEY_UP"))
-            KeyButton(enabled, Modifier.align(Alignment.BottomCenter).size(52.dp), CircleShape, onSend, KeySpec(Lucide.ChevronDown, stringResource(R.string.remote_down), "KEY_DOWN"))
-            KeyButton(enabled, Modifier.align(Alignment.CenterStart).size(52.dp), CircleShape, onSend, KeySpec(Lucide.ChevronLeft, stringResource(R.string.remote_left), "KEY_LEFT"))
-            KeyButton(enabled, Modifier.align(Alignment.CenterEnd).size(52.dp), CircleShape, onSend, KeySpec(Lucide.ChevronRight, stringResource(R.string.remote_right), "KEY_RIGHT"))
+        Box(Modifier.fillMaxSize().padding(10.dp)) {
             Surface(
                 onClick = { onSend("KEY_ENTER") },
                 enabled = enabled,
-                modifier = Modifier.align(Alignment.Center).size(84.dp),
+                modifier = Modifier.size(72.dp).align(Alignment.Center),
                 shape = CircleShape,
                 color = MaterialTheme.colorScheme.surface,
                 border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
@@ -195,8 +198,17 @@ private fun DPad(enabled: Boolean, onSend: (String) -> Unit) {
                     Text(stringResource(R.string.remote_ok), fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.secondary)
                 }
             }
+            PadArrow(Lucide.ChevronUp, stringResource(R.string.remote_up), "KEY_UP", enabled, Modifier.align(Alignment.TopCenter), onSend)
+            PadArrow(Lucide.ChevronLeft, stringResource(R.string.remote_left), "KEY_LEFT", enabled, Modifier.align(Alignment.CenterStart), onSend)
+            PadArrow(Lucide.ChevronRight, stringResource(R.string.remote_right), "KEY_RIGHT", enabled, Modifier.align(Alignment.CenterEnd), onSend)
+            PadArrow(Lucide.ChevronDown, stringResource(R.string.remote_down), "KEY_DOWN", enabled, Modifier.align(Alignment.BottomCenter), onSend)
         }
     }
+}
+
+@Composable
+private fun PadArrow(icon: ImageVector, label: String, key: String, enabled: Boolean, modifier: Modifier, onSend: (String) -> Unit) {
+    HoldKey(KeySpec(icon, label, key), enabled, modifier.size(48.dp), CircleShape, onSend)
 }
 
 @Composable
@@ -208,14 +220,7 @@ private fun NumberPad(enabled: Boolean, onSend: (String) -> Unit) {
                     if (digit.isEmpty()) {
                         Spacer(Modifier.weight(1f))
                     } else {
-                        KeyButton(
-                            enabled,
-                            Modifier.weight(1f).height(52.dp),
-                            RoundedCornerShape(16.dp),
-                            onSend,
-                            KeySpec(Lucide.Tv, digit, "KEY_$digit"),
-                            text = digit,
-                        )
+                        HoldKey(KeySpec(Lucide.Tv, digit, "KEY_$digit"), enabled, Modifier.weight(1f).height(50.dp), RoundedCornerShape(15.dp), onSend, text = digit)
                     }
                 }
             }
@@ -224,36 +229,33 @@ private fun NumberPad(enabled: Boolean, onSend: (String) -> Unit) {
 }
 
 @Composable
-private fun BottomRow(enabled: Boolean, onSend: (String) -> Unit) {
-    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-        KeyButton(enabled, Modifier.weight(1f).height(58.dp), RoundedCornerShape(16.dp), onSend, KeySpec(Lucide.House, stringResource(R.string.remote_home), "KEY_HOME"))
-        KeyButton(enabled, Modifier.weight(1f).height(58.dp), RoundedCornerShape(16.dp), onSend, KeySpec(Lucide.ArrowLeft, stringResource(R.string.remote_back), "KEY_RETURN"))
-        KeyButton(enabled, Modifier.weight(1f).height(58.dp), RoundedCornerShape(16.dp), onSend, KeySpec(Lucide.Menu, stringResource(R.string.remote_menu), "KEY_MENU"))
-        KeyButton(enabled, Modifier.weight(1f).height(58.dp), RoundedCornerShape(16.dp), onSend, KeySpec(Lucide.VolumeX, stringResource(R.string.remote_mute), "KEY_MUTE"))
+private fun HomeBackRow(enabled: Boolean, onSend: (String) -> Unit) {
+    Box(Modifier.fillMaxWidth().height(60.dp)) {
+        HoldKey(KeySpec(Lucide.ArrowLeft, stringResource(R.string.remote_back), "KEY_RETURN"), enabled, Modifier.align(Alignment.CenterStart).size(60.dp), CircleShape, onSend)
+        HoldKey(KeySpec(Lucide.House, stringResource(R.string.remote_home), "KEY_HOME"), enabled, Modifier.align(Alignment.Center).size(64.dp), CircleShape, onSend)
     }
 }
 
 @Composable
-private fun KeyButton(
-    enabled: Boolean,
-    modifier: Modifier,
-    shape: Shape,
-    onSend: (String) -> Unit,
-    spec: KeySpec,
-    text: String? = null,
-) {
+private fun HoldKey(spec: KeySpec, enabled: Boolean, modifier: Modifier, shape: Shape, onSend: (String) -> Unit, text: String? = null) {
+    var pressed by remember { mutableStateOf(false) }
+    val scale by animateFloatAsState(if (pressed) .9f else 1f, label = "key-scale")
+    val color by animateColorAsState(
+        if (pressed) MaterialTheme.colorScheme.secondaryContainer else MaterialTheme.colorScheme.surface,
+        label = "key-color",
+    )
     Surface(
-        modifier = modifier.then(holdModifier(enabled) { onSend(spec.key) }),
+        modifier = modifier.graphicsLayer { scaleX = scale; scaleY = scale }.holdGesture(enabled, spec.key, onSend) { pressed = it },
         shape = shape,
-        color = MaterialTheme.colorScheme.surface,
+        color = color,
         border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
-        shadowElevation = 2.dp,
+        shadowElevation = if (pressed) 0.dp else 2.dp,
     ) {
         Box(contentAlignment = Alignment.Center) {
             if (text != null) {
                 Text(text, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.secondary)
             } else {
-                Icon(spec.icon, spec.label, Modifier.size(22.dp), tint = MaterialTheme.colorScheme.secondary)
+                Icon(spec.icon, spec.label, Modifier.size(22.dp), tint = if (pressed) MaterialTheme.colorScheme.secondary else LocalContentColor.current)
             }
         }
     }
@@ -264,24 +266,29 @@ private fun KeyButton(
  * matching the way a physical remote ramps volume, channel and navigation.
  */
 @Composable
-private fun holdModifier(enabled: Boolean, onKey: () -> Unit): Modifier {
-    if (!enabled) return Modifier
+private fun Modifier.holdGesture(enabled: Boolean, key: String, onSend: (String) -> Unit, onPressed: (Boolean) -> Unit): Modifier {
+    if (!enabled) return this
     val scope = rememberCoroutineScope()
     var repeatJob by remember { mutableStateOf<Job?>(null) }
-    return Modifier.pointerInput(Unit) {
+    return pointerInput(Unit) {
         detectTapGestures(
             onPress = {
-                onKey()
+                onPressed(true)
+                onSend(key)
                 repeatJob?.cancel()
                 repeatJob = scope.launch {
                     delay(420)
                     while (true) {
-                        onKey()
+                        onSend(key)
                         delay(140)
                     }
                 }
-                tryAwaitRelease()
-                repeatJob?.cancel()
+                try {
+                    tryAwaitRelease()
+                } finally {
+                    repeatJob?.cancel()
+                    onPressed(false)
+                }
             },
         )
     }

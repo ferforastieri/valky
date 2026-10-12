@@ -72,6 +72,7 @@ data class FavoriteItem(val type: String, val id: String, val name: String, val 
 
 data class OverviewState(
     val cameras: List<CameraModel> = emptyList(),
+    val remotes: List<RemoteDevice> = emptyList(),
     val favorites: List<FavoriteItem> = emptyList(),
     val loading: Boolean = true,
 )
@@ -87,7 +88,7 @@ class OverviewViewModel @Inject constructor(private val repository: ValkyrisRepo
     init {
         viewModelScope.launch {
             combine(repository.cameras, repository.lights, repository.remotes) { cameras, lights, remotes ->
-                OverviewState(cameras, favoritesOf(cameras, lights, remotes), false)
+                OverviewState(cameras, remotes, favoritesOf(cameras, lights, remotes), false)
             }.collect { _state.value = it }
         }
         viewModelScope.launch {
@@ -126,6 +127,7 @@ fun OverviewScreen(
     onCameras: () -> Unit,
     onPeople: () -> Unit,
     onEvents: () -> Unit,
+    onRemote: (String) -> Unit,
     onLight: () -> Unit,
     onFavorite: (FavoriteItem) -> Unit,
     viewModel: OverviewViewModel = hiltViewModel(),
@@ -140,6 +142,7 @@ fun OverviewScreen(
         state.cameras,
         people.count { it.enabled },
         events,
+        remotes = state.remotes,
         favorites = state.favorites,
         onCamera = { id ->
             val camera = state.cameras.firstOrNull { it.id == id }
@@ -148,7 +151,7 @@ fun OverviewScreen(
         onEvent = onEvent,
         onCameras = onCameras,
         onPeople = onPeople,
-        onEvents = onEvents,
+        onTv = { state.remotes.firstOrNull()?.let { remote -> onRemote(remote.id) } ?: onCameras() },
         onLight = onLight,
         onFavorite = onFavorite,
         activityChart = { OverviewActivityChart(onEvent = onEvent) },
@@ -161,17 +164,18 @@ fun OverviewContent(
     cameras: List<CameraModel>,
     trackedPeople: Int,
     events: List<com.ferforastieri.valkyris.core.model.ValkyrisEvent>,
+    remotes: List<RemoteDevice> = emptyList(),
     favorites: List<FavoriteItem> = emptyList(),
     onCamera: (String) -> Unit = {},
     onEvent: (String) -> Unit = {},
     onCameras: () -> Unit = {},
     onPeople: () -> Unit = {},
     onEvents: () -> Unit = {},
+    onTv: () -> Unit = {},
     onLight: () -> Unit = {},
     onFavorite: (FavoriteItem) -> Unit = {},
     activityChart: @Composable () -> Unit = {},
 ) {
-    val pending = events.count { it.acknowledgedAt == null }
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
         contentPadding = PaddingValues(start = 18.dp, end = 18.dp, top = 10.dp, bottom = 24.dp),
@@ -181,7 +185,7 @@ fun OverviewContent(
             com.ferforastieri.valkyris.core.design.AdaptiveRow(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                 MetricCard(Lucide.Camera, cameras.size.toString(), stringResource(R.string.cameras), Modifier.weight(1f), onClick = onCameras, accent = true)
                 MetricCard(Lucide.UserRound, trackedPeople.toString(), stringResource(R.string.people), Modifier.weight(1f), onClick = onPeople)
-                MetricCard(Lucide.Bell, pending.toString(), stringResource(R.string.pending_alerts), Modifier.weight(1f), onClick = onEvents, alarm = pending > 0)
+                MetricCard(Lucide.Tv, remotes.size.toString(), stringResource(R.string.tv), Modifier.weight(1f), onClick = onTv)
             }
         }
         item { activityChart() }

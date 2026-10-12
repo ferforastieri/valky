@@ -26,6 +26,7 @@
     <string name="generate_again">Generate another</string>
     <string name="close">Close</string>
     <string name="cameras">Cameras</string>
+    <string name="tv">TV</string>
     <string name="devices">Devices</string>
     <string name="lighting">Lighting</string>
     <string name="no_lights">Local lighting</string>
