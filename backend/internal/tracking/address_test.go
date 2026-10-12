@@ -32,7 +32,7 @@ func TestAddressesResolveOffReportPathAndReuseCache(t *testing.T) {
 	if err := s.resolveNextAddress(ctx, provider.Client(), provider.URL); err != nil {
 		t.Fatal(err)
 	}
-	history, err := s.UserHistory(ctx, "u", 20)
+	history, err := s.UserHistoryPage(ctx, "u", 20, 0)
 	if err != nil || history[0].Address != "Rua Central, Cidade" {
 		t.Fatal(history, err)
 	}
@@ -50,7 +50,7 @@ func TestAddressesResolveOffReportPathAndReuseCache(t *testing.T) {
 	if calls != 1 {
 		t.Fatalf("cache made %d requests", calls)
 	}
-	history, err = s.UserHistory(ctx, "u", 20)
+	history, err = s.UserHistoryPage(ctx, "u", 20, 0)
 	if err != nil || history[0].Address != "Rua Central, Cidade" {
 		t.Fatal(history, err)
 	}
@@ -86,7 +86,7 @@ func TestAddressFailureBackoffAndNamedArea(t *testing.T) {
 	if calls != 1 {
 		t.Fatal("backoff ignored")
 	}
-	history, err := s.UserHistory(ctx, "u", 20)
+	history, err := s.UserHistoryPage(ctx, "u", 20, 0)
 	if err != nil || len(history) != 2 || history[1].Address != "Home" {
 		t.Fatal(history, err)
 	}

@@ -1213,9 +1213,6 @@ func respondWithMessage(w http.ResponseWriter, value any, err error, message str
 	}
 	writeError(w, 500, err)
 }
-func writeJSON(w http.ResponseWriter, status int, value any) {
-	writeSuccess(w, status, defaultSuccessMessage(status), value)
-}
 func writeSuccess(w http.ResponseWriter, status int, message string, value any) {
 	w.Header().Set("Content-Type", "application/json")
 	setOutcomeHeaders(w, status, message)

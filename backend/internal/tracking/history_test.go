@@ -63,7 +63,7 @@ func TestNearbyConfirmationsExtendHistoryWithoutDuplicate(t *testing.T) {
 	if count != 1 {
 		t.Fatalf("stored %d nearby points", count)
 	}
-	history, err := s.UserHistory(ctx, "u", 20)
+	history, err := s.UserHistoryPage(ctx, "u", 20, 0)
 	if err != nil || len(history) != 1 || history[0].Address != "" || !history[0].LastSeenAt.Equal(start.Add(3*time.Minute)) {
 		t.Fatal(history, err)
 	}

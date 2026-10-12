@@ -9,10 +9,6 @@ import (
 const historyAccuracy = 50.0
 const historyDistance = 200.0
 
-func (s *Service) UserHistory(ctx context.Context, userID string, limit int) ([]UserLocation, error) {
-	return s.UserHistoryPage(ctx, userID, limit, 0)
-}
-
 // Consolidate before pagination, including records written by older versions.
 // Only consecutive nearby observations merge: returning after a journey stays visible.
 func (s *Service) UserHistoryPage(ctx context.Context, userID string, limit, offset int) ([]UserLocation, error) {

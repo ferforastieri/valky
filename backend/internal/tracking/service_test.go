@@ -28,7 +28,7 @@ func TestReportMyLocationIgnoresClientAddress(t *testing.T) {
 	}); err != nil {
 		t.Fatal(err)
 	}
-	history, err := service.UserHistory(context.Background(), "user-1", 10)
+	history, err := service.UserHistoryPage(context.Background(), "user-1", 10, 0)
 	if err != nil || len(history) != 1 {
 		t.Fatalf("history=%d err=%v", len(history), err)
 	}
