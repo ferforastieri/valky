@@ -48,6 +48,50 @@ const (
 // a token valid for ten minutes; five is plenty for a lamp on the same desk.
 const PairingWindow = 5 * time.Minute
 
+// A lampa guarda o token que recebeu pelo ar. Ele é reaproveitado entre janelas
+// por meia hora e rotacionado depois de cada lâmpada configurada, para uma
+// lâmpada que já entrou na rede continuar sendo aceita sem novo pareamento.
+const (
+	pairingTokenKey  = "light_pairing_token"
+	pairingSecretKey = "light_pairing_secret"
+	pairingRegion    = "AY"
+	pairingTokenTTL  = 30 * time.Minute
+)
+
+// pendingToken returns the token a lamp may have stored, creating one when there
+// is none or when it is too old.
+func (s *Service) pendingToken(ctx context.Context) (token, secret string, err error) {
+	read := func(key string) string {
+		var value string
+		_ = s.repo.store.DB.QueryRowContext(ctx, `SELECT value FROM settings WHERE key=?`, key).Scan(&value)
+		return value
+	}
+	token, secret = read(pairingTokenKey), read(pairingSecretKey)
+	var stamp string
+	_ = s.repo.store.DB.QueryRowContext(ctx, `SELECT value FROM settings WHERE key=?`, pairingTokenKey+"_at").Scan(&stamp)
+	created, parseErr := time.Parse(time.RFC3339Nano, stamp)
+	if len(token) == 16 && len(secret) == 4 && parseErr == nil && time.Since(created) < pairingTokenTTL {
+		return token, secret, nil
+	}
+	return s.rotatePendingToken(ctx)
+}
+
+// rotatePendingToken generates the values the next lamp will store.
+func (s *Service) rotatePendingToken(ctx context.Context) (string, string, error) {
+	token, secret := randomToken(16), randomToken(4)
+	now := time.Now().UTC().Format(time.RFC3339Nano)
+	for key, value := range map[string]string{
+		pairingTokenKey:         token,
+		pairingSecretKey:        secret,
+		pairingTokenKey + "_at": now,
+	} {
+		if _, err := s.repo.store.DB.ExecContext(ctx, `INSERT INTO settings(key,value,updated_at) VALUES(?,?,?) ON CONFLICT(key) DO UPDATE SET value=excluded.value,updated_at=excluded.updated_at`, key, value, now); err != nil {
+			return "", "", err
+		}
+	}
+	return token, secret, nil
+}
+
 var ErrPairingInProgress = errors.New("já existe um pareamento em andamento")
 
 // StartPairing opens a pairing window and returns the one-time values the phone
@@ -67,11 +111,15 @@ func (s *Service) StartPairing(ctx context.Context) (PairingSession, error) {
 	if window <= 0 {
 		window = PairingWindow
 	}
+	token, secret, err := s.pendingToken(ctx)
+	if err != nil {
+		return PairingSession{}, err
+	}
 	session := &PairingSession{
 		ID:        uuid.NewString(),
-		Token:     randomToken(16),
-		Secret:    randomToken(4),
-		Region:    "AY",
+		Token:     token,
+		Secret:    secret,
+		Region:    pairingRegion,
 		Status:    PairingWaiting,
 		Message:   "Envie os dados do Wi-Fi para a lâmpada pelo aplicativo.",
 		StartedAt: time.Now(),
@@ -269,6 +317,8 @@ func (s *Service) registerPairedLight(ctx context.Context, candidate Candidate, 
 		registered = created
 	}
 	s.broadcast("light.created", registered)
+	// A próxima lâmpada recebe valores novos: cada uma guarda a própria chave.
+	_, _, _ = s.rotatePendingToken(ctx)
 	s.logger.Info("lamp paired locally", "light", registered.ID, "device", deviceFingerprint(candidate))
 	return registered, nil
 }
@@ -321,6 +371,18 @@ func knownDevice(registered []Light, candidate Candidate) bool {
 		}
 	}
 	return false
+}
+
+func (s *Service) lastPairingProbe() time.Time {
+	s.pairingMu.Lock()
+	defer s.pairingMu.Unlock()
+	return s.pairingProbed
+}
+
+func (s *Service) markPairingProbe() {
+	s.pairingMu.Lock()
+	defer s.pairingMu.Unlock()
+	s.pairingProbed = time.Now()
 }
 
 func (s *Service) pairingTriedAddress(address string) bool {

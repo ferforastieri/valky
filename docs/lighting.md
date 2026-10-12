@@ -19,17 +19,18 @@ O pareamento é conduzido por dois lados: o **aplicativo Android** tem o rádio 
 
 ## Como configurar uma lâmpada
 
-1. Deixe a lâmpada **piscando rápido**: ligue e desligue três vezes até ela entrar em modo de pareamento.
-2. No Android, abra **Dispositivos → Iluminação → +** (apenas administradores).
-3. Confira a rede de 2,4 GHz e informe a senha do Wi-Fi. Toque em **Configurar**.
-4. O aplicativo envia os dados pelo ar e mostra o progresso: lâmpada encontrada, controle local testado, configurada.
-5. Dê um nome e escolha o cômodo. A lâmpada já responde na visão geral e nos widgets.
+A tela de iluminação já procura uma lâmpada em modo de pareamento enquanto está aberta: não existe botão de adicionar nem formulário de cadastro.
+
+1. Abra **Dispositivos → Iluminação** no Android (apenas administradores).
+2. Deixe a lâmpada **piscando rápido**: ligue e desligue três vezes até ela entrar em modo de pareamento.
+3. Na primeira vez o aplicativo pede a senha do Wi-Fi, porque o Android não permite ler a senha salva do sistema para nenhum aplicativo. Depois disso ela fica cifrada no próprio aparelho e os próximos pareamentos são automáticos.
+4. A lâmpada aparece na lista sozinha, já respondendo na rede local. Dê um nome e escolha o cômodo.
 
 O fluxo inteiro leva menos de um minuto e não pede identificador, endereço nem chave: tudo isso é descoberto e gerado automaticamente.
 
 ## O que o pareamento faz
 
-O aplicativo envia, no formato que a própria lâmpada espera (documentado pela comunidade em [tuya-convert](https://github.com/ct-Open-Source/tuya-convert), MIT), o nome da rede, a senha e três valores de uso único que o backend gerou (`region`, `token` e `secret`). A lâmpada conecta-se à rede e passa a responder aos anúncios locais. O backend escuta esses anúncios durante a janela de pareamento e, para cada lâmpada nova, tenta as chaves que o dispositivo pode ter guardado, começando pelo valor gerado nesta sessão. A primeira que responder a uma leitura de estado vira a chave local da lâmpada — ela fica cifrada no SQLite e nunca é devolvida pela API.
+O aplicativo envia, no formato que a própria lâmpada espera (documentado pela comunidade em [tuya-convert](https://github.com/ct-Open-Source/tuya-convert), MIT), o nome da rede, a senha e três valores que o backend gerou (`region`, `token` e `secret`). Os valores ficam guardados no servidor por meia hora e são renovados a cada lâmpada configurada, então uma lâmpada que já recebeu o payload continua sendo aceita mesmo se a janela for reaberta. A lâmpada conecta-se à rede e passa a responder aos anúncios locais. O backend escuta esses anúncios durante a janela de pareamento e, para cada lâmpada nova, tenta as chaves que o dispositivo pode ter guardado, começando pelo valor gerado nesta sessão. A primeira que responder a uma leitura de estado vira a chave local da lâmpada — ela fica cifrada no SQLite e nunca é devolvida pela API.
 
 Depois disso, o controle é 100% local: o Valkyris não usa nuvem para ligar, desligar, mudar cor, descobrir endereço nem ler o estado.
 

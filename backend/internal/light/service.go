@@ -27,6 +27,7 @@ type Service struct {
 	pairing       *PairingSession
 	pairingTried  map[string]bool
 	pairingWindow time.Duration
+	pairingProbed time.Time
 }
 
 func NewService(repo *Repository, driver Driver, hub Broadcaster, logger *slog.Logger) *Service {

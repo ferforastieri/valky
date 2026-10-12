@@ -163,11 +163,16 @@ internal object TuyaSmartConfig {
 internal class LocalPairingSender(context: Context) {
     private val wifi = context.applicationContext.getSystemService(Context.WIFI_SERVICE) as? WifiManager
 
+    /**
+     * @param durationMillis por quanto tempo insistir; zero significa até o
+     *   chamador cancelar, que é como a tela mantém o envio durante toda a
+     *   janela de pareamento.
+     */
     suspend fun send(
         ssid: String,
         password: String,
         tokenGroup: String,
-        durationMillis: Long = 45_000,
+        durationMillis: Long = 0,
         onRound: (Int) -> Unit = {},
     ) = withContext(Dispatchers.IO) {
         val multicastLock = wifi?.createMulticastLock("valkyris-pairing")?.apply { setReferenceCounted(false); acquire() }
@@ -179,7 +184,7 @@ internal class LocalPairingSender(context: Context) {
             val broadcastBody = TuyaSmartConfig.broadcastBody(password, ssid, tokenGroup)
             val multicastHead = TuyaSmartConfig.multicastHead().map(InetAddress::getByName)
             val multicastBody = TuyaSmartConfig.multicastBody(password, ssid, tokenGroup).map(InetAddress::getByName)
-            val deadline = System.currentTimeMillis() + durationMillis
+            val deadline = if (durationMillis > 0) System.currentTimeMillis() + durationMillis else Long.MAX_VALUE
             var round = 0
             while (System.currentTimeMillis() < deadline) {
                 round += 1

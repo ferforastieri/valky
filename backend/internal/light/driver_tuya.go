@@ -317,7 +317,13 @@ func (d *TuyaDriver) Available() bool { return true }
 // answers with its identity; a provisioned one answers with its address only,
 // because the firmware stops revealing the device ID on the plain broadcast.
 func (d *TuyaDriver) Scan(ctx context.Context, duration time.Duration, probePorts bool) ([]Candidate, error) {
-	devices, err := tuya.Discover(ctx, tuya.ScanOptions{Duration: duration, TCPProbe: probePorts, Timeout: 3 * time.Second})
+	// A sondagem de porta roda em todas as sub-redes locais: com um tempo curto
+	// ela cabe no ciclo do pareamento sem segurar a próxima tentativa.
+	timeout := 3 * time.Second
+	if probePorts {
+		timeout = 250 * time.Millisecond
+	}
+	devices, err := tuya.Discover(ctx, tuya.ScanOptions{Duration: duration, TCPProbe: probePorts, Timeout: timeout})
 	if err != nil {
 		return nil, err
 	}

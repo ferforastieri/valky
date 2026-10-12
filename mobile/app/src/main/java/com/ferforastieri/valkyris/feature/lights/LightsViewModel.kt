@@ -13,6 +13,7 @@ import com.ferforastieri.valkyris.core.model.LightDevice
 import com.ferforastieri.valkyris.core.model.LightStatePatch
 import com.ferforastieri.valkyris.core.model.LightUpdate
 import com.ferforastieri.valkyris.core.network.ValkyrisRepository
+import com.ferforastieri.valkyris.core.security.WifiSecretStore
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
 import javax.inject.Inject
@@ -39,12 +40,17 @@ data class LightsState(
     val lights: List<LightDevice> = emptyList(),
     val error: String? = null,
     val pairing: PairingProgress? = null,
+    /** Rede usada no pareamento; vem da última vez ou do Wi-Fi atual. */
+    val network: String = "",
+    /** Quando falso, a tela precisa da senha do Wi-Fi uma única vez. */
+    val hasCredentials: Boolean = false,
 )
 
 @HiltViewModel
 class LightsViewModel @Inject constructor(
     private val repository: ValkyrisRepository,
     private val actionGate: MobileActionGate,
+    private val wifiSecrets: WifiSecretStore,
     @ApplicationContext private val context: Context,
 ) : ViewModel() {
     private val _state = MutableStateFlow(LightsState())
@@ -59,6 +65,12 @@ class LightsViewModel @Inject constructor(
         viewModelScope.launch { repository.lights.collect { value -> _state.update { it.copy(lights = value, loading = false) } } }
         refresh(); connectRealtime()
         viewModelScope.launch { while (isActive) { delay(20_000); runCatching { repository.refreshLights() } } }
+        _state.update {
+            it.copy(
+                network = wifiSecrets.credentials()?.ssid ?: currentSsid(context).orEmpty(),
+                hasCredentials = wifiSecrets.credentials() != null,
+            )
+        }
     }
 
     private fun connectRealtime() {
@@ -69,6 +81,7 @@ class LightsViewModel @Inject constructor(
     fun control(id: String, patch: LightStatePatch) = guarded(id, false) { repository.controlLight(id, patch) }
     fun toggleFavorite(id: String, favorite: Boolean) = viewModelScope.launch { runCatching { repository.api.setFavorite("light", id, favorite) }.onSuccess { repository.refreshLights() }.onFailure { error -> _state.update { it.copy(error = error.message) } } }
     fun delete(id: String, done: () -> Unit = {}) = guarded(id) { repository.deleteLight(id); done() }
+
     fun rename(id: String, name: String, room: String, done: (Boolean) -> Unit = {}) {
         if (!actionGate.tryAcquire()) return
         viewModelScope.launch {
@@ -83,20 +96,40 @@ class LightsViewModel @Inject constructor(
     }
 
     /** Nome da rede atual, quando o sistema permite ler (precisa de localização). */
-    fun suggestedSsid(): String = savedSsid ?: currentSsid(context).also { savedSsid = it }.orEmpty()
+    fun suggestedSsid(): String = _state.value.network.ifBlank { savedSsid ?: currentSsid(context).also { savedSsid = it }.orEmpty() }
 
     /**
-     * Configura uma lâmpada em modo de pareamento: o backend abre a janela com os
-     * valores de uso único, o celular envia o Wi-Fi pelo ar e a janela acompanha o
-     * que aparecer na rede.
+     * A tela chama isto ao aparecer: se a rede já foi informada alguma vez, a
+     * busca e o envio começam sozinhos e a lâmpada aparece na lista sem nenhum
+     * toque. Sem a senha guardada, a tela pede uma única vez.
      */
-    fun pair(ssid: String, password: String) {
+    fun watch() {
+        if (pairingJob?.isActive == true) return
+        val credentials = wifiSecrets.credentials()
+        if (credentials == null) {
+            _state.update { it.copy(pairing = null, hasCredentials = false, network = it.network.ifBlank { currentSsid(context).orEmpty() }) }
+            return
+        }
+        configure(credentials.ssid, credentials.password, remember = false)
+    }
+
+    /**
+     * Configura uma lâmpada em modo de pareamento: o backend abre a janela, o
+     * celular envia o Wi-Fi pelo ar e a janela acompanha o que aparecer na rede.
+     * A senha fica guardada no aparelho para os próximos pareamentos.
+     */
+    fun configure(ssid: String, password: String, remember: Boolean = true) {
         if (pairingJob?.isActive == true) return
         val network = ssid.trim()
         if (network.isEmpty()) {
             _state.update { it.copy(error = "Informe o nome da rede Wi-Fi.") }
             return
         }
+        if (password.isBlank()) {
+            _state.update { it.copy(error = "Informe a senha do Wi-Fi.") }
+            return
+        }
+        if (remember) wifiSecrets.save(network, password)
         pairingJob = viewModelScope.launch {
             val session = runCatching { repository.startLightPairing() }
                 .getOrElse { error ->
@@ -104,9 +137,11 @@ class LightsViewModel @Inject constructor(
                     return@launch
                 }
             pairingSessionId = session.id
-            _state.update { it.copy(pairing = PairingProgress("sending", "Enviando os dados do Wi-Fi para a lâmpada…")) }
+            _state.update { it.copy(network = network, hasCredentials = true, pairing = PairingProgress("sending", "Enviando os dados do Wi-Fi para a lâmpada…")) }
             val tokenGroup = TuyaSmartConfig.tokenGroup(session.region, session.token, session.secret)
             val sender = LocalPairingSender(context)
+            // O envio acompanha a janela inteira: a lâmpada pode ser resetada
+            // alguns minutos depois de a tela abrir.
             val send = launch {
                 runCatching { sender.send(network, password, tokenGroup) }
                     .onFailure { error -> _state.update { it.copy(error = error.message) } }
@@ -127,14 +162,17 @@ class LightsViewModel @Inject constructor(
         }
     }
 
-    /** Fecha a folha e encerra a janela que ainda estiver aberta no servidor. */
-    fun dismissPairing() {
+    /** Para de enviar e encerra a janela do servidor ao sair da tela. */
+    fun stopWatching() {
         val sessionId = pairingSessionId
         pairingSessionId = null
         pairingJob?.cancel()
         pairingJob = null
-        _state.update { it.copy(pairing = null) }
         if (sessionId != null) viewModelScope.launch { runCatching { repository.cancelLightPairing(sessionId) } }
+    }
+
+    fun dismissPairingResult() {
+        _state.update { it.copy(pairing = null) }
     }
 
     private fun guarded(id: String, useGlobalGate: Boolean = true, block: suspend () -> Unit) {
