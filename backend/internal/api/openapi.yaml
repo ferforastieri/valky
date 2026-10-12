@@ -229,16 +229,34 @@ paths:
     get:
       summary: List lights exposed by the installed local adapter and their latest state
       responses: {'200': {description: Lights in APIResponse.data}}
+  /lights/pairing-sessions:
     post:
-      summary: Register a light found on the local network (administrator only)
-      requestBody: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/LightInput'}}}}
+      summary: Open a local pairing window (administrator only)
+      description: |
+        Returns the one-time values the phone sends over the air to a lamp that is
+        blinking fast. The Wi-Fi credentials never reach the backend. While the
+        window is open the backend watches the local network and registers the
+        first lamp that accepts the generated key.
       responses:
-        '201': {description: Registered light in APIResponse.data}
-        '400': {description: Missing name, device id or a 16 character local key}
+        '201': {description: Pairing session in APIResponse.data}
+        '200': {description: An open session was reused instead of starting another one}
+  /lights/pairing-sessions/{id}:
+    get:
+      summary: Follow a pairing window (administrator only)
+      parameters: [{$ref: '#/components/parameters/id'}]
+      responses:
+        '200': {description: Pairing session in APIResponse.data}
+        '404': {description: Unknown session}
+    delete:
+      summary: Cancel a pairing window (administrator only)
+      parameters: [{$ref: '#/components/parameters/id'}]
+      responses:
+        '200': {description: Cancelled}
+        '404': {description: Unknown session}
   /lights/discovery:
     post:
-      summary: Look for unregistered lights on the local network (administrator only)
-      description: Sends the same broadcast the vendor application uses and reports whatever answers. No cloud service is contacted and no credentials are needed.
+      summary: Look for lights on the local network (administrator only, diagnostics)
+      description: Sends the local announcement and reports whatever answers. Useful to check reachability; pairing itself runs through a pairing window.
       requestBody: {required: false, content: {application/json: {schema: {$ref: '#/components/schemas/LightDiscoveryInput'}}}}
       responses:
         '200': {description: Candidates in APIResponse.data}
@@ -681,25 +699,32 @@ components:
         brightness: {type: boolean}
         color: {type: boolean}
         colorTemperature: {type: boolean}
-    LightInput:
-      type: object
-      required: [name, deviceId, localKey]
-      properties:
-        name: {type: string, maxLength: 60}
-        room: {type: string, maxLength: 60}
-        deviceId: {type: string, description: Identifier announced by the device (20 characters on most firmwares)}
-        localKey: {type: string, minLength: 16, maxLength: 16, writeOnly: true, description: Local key created when the device was paired. Stored sealed and never returned by the API.}
-        address: {type: string, description: Local address; discovered automatically when omitted}
-        protocolVersion: {type: number, description: Leave empty to detect while pairing}
     LightUpdate:
       type: object
+      description: Changes the name, the room or whether Valkyris keeps polling the lamp.
       properties:
         name: {type: string}
         room: {type: string}
-        localKey: {type: string, minLength: 16, maxLength: 16, writeOnly: true}
-        address: {type: string}
-        protocolVersion: {type: number}
         enabled: {type: boolean}
+    LightPairingSession:
+      type: object
+      description: |
+        One local pairing window. Token, secret and region are the values the phone
+        must send over the air; they are single use and expire with the window.
+        The local key that ends up stored is never returned.
+      properties:
+        id: {type: string, format: uuid}
+        token: {type: string, maxLength: 16, description: One-time value the lamp stores}
+        secret: {type: string, maxLength: 4}
+        region: {type: string}
+        status: {type: string, enum: [waiting, found, paired, failed]}
+        message: {type: string, description: Human readable progress or the reason a lamp was refused}
+        deviceId: {type: string, description: Identifier of the lamp that answered}
+        address: {type: string, description: Address of the lamp that answered}
+        light: {$ref: '#/components/schemas/Light'}
+        startedAt: {type: string, format: date-time}
+        expiresAt: {type: string, format: date-time}
+        endedAt: {type: string, format: date-time}
     LightDiscoveryInput:
       type: object
       properties:

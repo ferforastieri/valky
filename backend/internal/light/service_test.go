@@ -6,7 +6,6 @@ import (
 	"io"
 	"log/slog"
 	"path/filepath"
-	"strings"
 	"testing"
 	"time"
 
@@ -124,81 +123,6 @@ func TestUnavailableDriverDoesNotAttemptAProviderConnection(t *testing.T) {
 	}
 }
 
-func TestCreateValidatesTheLocalKeyBeforeStoring(t *testing.T) {
-	service, _, _ := newTestService(t, &fakeScannerDriver{})
-	_, err := service.Create(context.Background(), CreateInput{Name: "Sala", DeviceID: "device", LocalKey: "curta"})
-	if err == nil || !strings.Contains(err.Error(), "16 caracteres") {
-		t.Fatalf("a short key was accepted: %v", err)
-	}
-	if _, err := service.Create(context.Background(), CreateInput{DeviceID: "device", LocalKey: "0123456789abcdef"}); err == nil {
-		t.Fatal("a light without a name was accepted")
-	}
-	if _, err := service.Create(context.Background(), CreateInput{Name: "Sala", LocalKey: "0123456789abcdef"}); err == nil {
-		t.Fatal("a light without a device id was accepted")
-	}
-}
-
-func TestCreateDetectsCapabilitiesAndStoresTheDeviceLayout(t *testing.T) {
-	driver := &fakeScannerDriver{}
-	service, _, _ := newTestService(t, driver)
-	created, err := service.Create(context.Background(), CreateInput{
-		Name: "Pera da sala", Room: "Sala", DeviceID: "device-1", LocalKey: "0123456789abcdef", Address: "192.168.1.50",
-	})
-	if err != nil {
-		t.Fatal(err)
-	}
-	// Provisioning runs in the background: wait for the light to be ready.
-	deadline := time.Now().Add(3 * time.Second)
-	for time.Now().Before(deadline) && created.SetupStatus != "ready" {
-		time.Sleep(20 * time.Millisecond)
-		created, err = service.Get(context.Background(), created.ID)
-		if err != nil {
-			t.Fatal(err)
-		}
-	}
-	if created.SetupStatus != "ready" || created.SetupError != "" {
-		t.Fatalf("light did not become ready: %+v", created)
-	}
-	if !created.Capabilities.Brightness || !created.Capabilities.Color || !created.Capabilities.ColorTemperature {
-		t.Fatalf("capabilities were not detected: %+v", created.Capabilities)
-	}
-	if created.ProtocolVersion != 3.3 {
-		t.Fatalf("protocol version = %.1f", created.ProtocolVersion)
-	}
-	if _, ok := decodeProfile(created.DPMapping); !ok {
-		t.Fatalf("device layout was not stored: %q", created.DPMapping)
-	}
-	if !created.State.Online || !created.State.Power {
-		t.Fatalf("state was not captured while pairing: %+v", created.State)
-	}
-	// The local key never leaves the backend.
-	if strings.Contains(created.DPMapping, "0123456789abcdef") {
-		t.Fatal("the local key leaked into the stored layout")
-	}
-}
-
-func TestCreateReportsARejectedKey(t *testing.T) {
-	service, _, _ := newTestService(t, &fakeScannerDriver{reject: true})
-	created, err := service.Create(context.Background(), CreateInput{Name: "Sala", DeviceID: "device", LocalKey: "0123456789abcdef"})
-	if err != nil {
-		t.Fatal(err)
-	}
-	deadline := time.Now().Add(3 * time.Second)
-	for time.Now().Before(deadline) && created.SetupStatus != "failed" {
-		time.Sleep(20 * time.Millisecond)
-		created, err = service.Get(context.Background(), created.ID)
-		if err != nil {
-			t.Fatal(err)
-		}
-	}
-	if created.SetupStatus != "failed" {
-		t.Fatalf("light stayed at %q after a rejected key", created.SetupStatus)
-	}
-	if created.SetupError == "" {
-		t.Fatal("a rejected key did not produce an explanation")
-	}
-}
-
 func TestScanListsCandidatesFromTheAdapter(t *testing.T) {
 	driver := &fakeScannerDriver{candidates: []Candidate{{Address: "192.168.1.50", DeviceID: "device-1", Version: 3.3}}}
 	service, _, _ := newTestService(t, driver)
@@ -216,30 +140,6 @@ func TestScanListsCandidatesFromTheAdapter(t *testing.T) {
 	}
 	if _, err := plain.Scan(context.Background(), DiscoveryInput{}); !errors.Is(err, ErrNoLightingAdapter) {
 		t.Fatalf("scan on a driver without discovery returned %v", err)
-	}
-}
-
-func TestUpdateReplacesTheLocalKeyAndRefreshesTheLayout(t *testing.T) {
-	driver := &fakeScannerDriver{}
-	service, _, _ := newTestService(t, driver)
-	created, err := service.Create(context.Background(), CreateInput{Name: "Sala", DeviceID: "device", LocalKey: "0123456789abcdef"})
-	if err != nil {
-		t.Fatal(err)
-	}
-	name := "Luminária da sala"
-	room := "Escritório"
-	updated, err := service.Update(context.Background(), created.ID, UpdateInput{Name: &name, Room: &room})
-	if err != nil {
-		t.Fatal(err)
-	}
-	if updated.Name != name || updated.Room != room {
-		t.Fatalf("update was not applied: %+v", updated)
-	}
-	if _, err := service.Update(context.Background(), created.ID, UpdateInput{LocalKey: strptr("curta")}); err == nil {
-		t.Fatal("a short key was accepted on update")
-	}
-	if _, err := service.Update(context.Background(), created.ID, UpdateInput{Name: strptr("  ")}); err == nil {
-		t.Fatal("an empty name was accepted")
 	}
 }
 

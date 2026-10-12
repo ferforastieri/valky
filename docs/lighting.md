@@ -1,8 +1,8 @@
 # Iluminação local
 
-O Valkyris controla lâmpadas Wi-Fi compatíveis com Tuya (protocolos locais 3.1 a 3.5) diretamente na rede local. Depois do cadastro, é possível ligar, desligar e, quando o dispositivo oferecer essas capacidades, alterar brilho, temperatura do branco e cor RGB.
+O Valkyris controla lâmpadas Wi-Fi compatíveis com Tuya (protocolos locais 3.1 a 3.5) diretamente na rede local, e configura uma lâmpada nova **sem nenhum aplicativo ou conta de fabricante**. Depois de configurada, é possível ligar, desligar e, quando o dispositivo oferecer essas capacidades, alterar brilho, temperatura do branco e cor RGB.
 
-Nenhuma conta, aplicativo ou serviço de fabricante participa da descoberta ou do controle: o backend fala com a lâmpada na porta TCP 6668 da própria casa. O único momento em que a nuvem do fabricante pode entrar é a obtenção da chave local, explicada abaixo, e ela não é usada depois.
+Nada aqui conversa com a internet: a descoberta, a configuração da lâmpada e o controle acontecem na rede de casa, com o backend falando direto com a lâmpada na porta TCP 6668.
 
 ## Arquitetura
 
@@ -13,57 +13,33 @@ O domínio de iluminação não depende de conta ou protocolo de um fabricante. 
 - leitura do estado atual;
 - aplicação de uma alteração de estado.
 
-`internal/light/tuya` implementa essa fronteira para os protocolos Tuya LAN 3.1 a 3.5. O protocolo foi documentado pela comunidade em [tinytuya](https://github.com/jasonacox/tinytuya) e [tuyapi](https://github.com/codetheweb/tuyapi) (ambos MIT); a implementação do Valkyris é própria, cobre apenas descoberta e leitura/escrita de pontos de controle, e é verificada contra quadros de referência gravados, sem depender de bibliotecas de terceiros.
+`internal/light/tuya` implementa essa fronteira para os protocolos Tuya LAN 3.1 a 3.5. O formato dos quadros e da descoberta foi documentado pela comunidade em [tinytuya](https://github.com/jasonacox/tinytuya) e [tuyapi](https://github.com/codetheweb/tuyapi) (ambos MIT); a implementação do Valkyris é própria, cobre apenas descoberta e leitura/escrita de pontos de controle, e é verificada contra quadros de referência gravados, sem depender de bibliotecas de terceiros.
 
-## Como cadastrar
+O pareamento é conduzido por dois lados: o **aplicativo Android** tem o rádio Wi-Fi e envia as credenciais da rede para a lâmpada; o **backend** gera os valores de uso único, acompanha a rede e registra o dispositivo. A senha do Wi-Fi nunca chega ao servidor.
 
-1. Abra **Dispositivos → Iluminação → Adicionar** no Android (apenas administradores).
-2. Toque em **Procurar na rede**. O backend envia o mesmo anúncio que o aplicativo do fabricante usa e lista o que responder na rede local.
-3. Selecione a lâmpada, informe um nome, o cômodo e a **chave local** de 16 caracteres.
-4. Salve. O Valkyris fala com a lâmpada na hora: descobre a versão de protocolo que funciona, quais pontos de controle ela expõe (brilho, branco, cor) e o estado atual. O resultado aparece na própria tela.
+## Como configurar uma lâmpada
 
-Também é possível cadastrar sem a descoberta, informando o identificador do dispositivo (20 caracteres na maioria dos firmwares) e o endereço.
+1. Deixe a lâmpada **piscando rápido**: ligue e desligue três vezes até ela entrar em modo de pareamento.
+2. No Android, abra **Dispositivos → Iluminação → +** (apenas administradores).
+3. Confira a rede de 2,4 GHz e informe a senha do Wi-Fi. Toque em **Configurar**.
+4. O aplicativo envia os dados pelo ar e mostra o progresso: lâmpada encontrada, controle local testado, configurada.
+5. Dê um nome e escolha o cômodo. A lâmpada já responde na visão geral e nos widgets.
 
-### Chave local
+O fluxo inteiro leva menos de um minuto e não pede identificador, endereço nem chave: tudo isso é descoberto e gerado automaticamente.
 
-Cada lâmpada tem uma chave de 16 caracteres, criada quando ela é pareada. Ela é o único segredo necessário para controle local e **nunca** é devolvida pela API: fica cifrada com AES-256-GCM no SQLite, ao lado das credenciais das câmeras.
+## O que o pareamento faz
 
-Formas de obtê-la, da mais local para a menos:
+O aplicativo envia, no formato que a própria lâmpada espera (documentado pela comunidade em [tuya-convert](https://github.com/ct-Open-Source/tuya-convert), MIT), o nome da rede, a senha e três valores de uso único que o backend gerou (`region`, `token` e `secret`). A lâmpada conecta-se à rede e passa a responder aos anúncios locais. O backend escuta esses anúncios durante a janela de pareamento e, para cada lâmpada nova, tenta as chaves que o dispositivo pode ter guardado, começando pelo valor gerado nesta sessão. A primeira que responder a uma leitura de estado vira a chave local da lâmpada — ela fica cifrada no SQLite e nunca é devolvida pela API.
 
-- **Reaproveitar o que já existe**: se a lâmpada já estava pareada em um aplicativo compatível, a chave está no projeto de nuvem do fabricante. O assistente do [TinyTuya](https://github.com/jasonacox/tinytuya) gera um `devices.json` a partir dele, de onde a chave pode ser copiada.
-- **Observar o pareamento**: a chave é entregue à lâmpada no pareamento. Quem observa esse tráfego na rede Wi-Fi (por exemplo com o [tuya-cloudcutter](https://github.com/tuya-cloudcutter/tuya-cloudcutter)) obtém a chave sem conta nenhuma.
-- **Parear de novo**: refazer o pareamento descarta a chave antiga e cria uma nova, que precisa ser capturada no mesmo momento.
+Depois disso, o controle é 100% local: o Valkyris não usa nuvem para ligar, desligar, mudar cor, descobrir endereço nem ler o estado.
 
-### Pareamento do zero
+### Firmwares que exigem ativação
 
-Uma lâmpada que nunca foi vinculada a nenhuma conta pode ser adotada sem passar pela nuvem: ela ainda aceita ser configurada pelos comandos locais de pareamento. Esse caminho precisa de um rádio Wi-Fi na mesma rede da lâmpada, porque a configuração é entregue no ar (modo EZ/smartconfig) ou pela rede que a própria lâmpada cria (modo AP). O servidor do Valkyris normalmente está no cabo, então o pareamento do zero pertence ao aplicativo Android, que já está no Wi-Fi:
-
-1. a lâmpada é resetada (ligar e desligar três vezes) e passa a piscar rápido;
-2. o aplicativo envia a configuração com uma chave local gerada por ele mesmo, sem conta nenhuma;
-3. quando a lâmpada aparece online, o aplicativo a cadastra no Valkyris com essa chave.
-
-O adaptador do backend já aceita esse cadastro: basta o identificador do dispositivo e a chave. Enquanto o fluxo de pareamento pelo aplicativo não estiver implementado e validado com uma lâmpada em modo de pareamento, use uma das formas acima para obter a chave uma única vez.
-
-Se a lâmpada for resetada ou pareada novamente, edite-a no Android e informe a nova chave.
-
-## Verificação pelo servidor
-
-O passo de pareamento também pode ser conferido sem o aplicativo, direto no servidor:
-
-```bash
-cd backend
-go run ./cmd/lightscan                      # lista o que responde na rede local
-go run ./cmd/lightscan -probe               # também testa a porta de controle de cada endereço
-go run ./cmd/lightscan -id <dispositivo> -key <chave> -address 192.168.1.60
-```
-
-O utilitário usa exatamente o mesmo caminho do backend: sem conta, sem nuvem e sem enviar nada para fora da rede local.
+Algumas lâmpadas só aceitam controle local depois de uma ativação única no serviço do fabricante — é uma característica do firmware, não do Valkyris. Quando é esse o caso, o fluxo informa exatamente isso: a lâmpada aparece na rede, mas recusa a chave local, e a tela mostra a mensagem. O Valkyris **não** oferece caminho de ativação em nuvem: se a sua lâmpada estiver nesse grupo, o pareamento dirá o motivo em vez de prometer algo que não acontece.
 
 ## Descoberta de endereço
 
 O Valkyris guarda o último endereço funcional. Quando a lâmpada não responde, ele procura de novo pelo identificador do dispositivo nos anúncios da rede local. Redes com isolamento entre clientes, VLANs ou firewall precisam permitir que o container do Valkyris alcance a lâmpada na porta TCP 6668; a descoberta usa UDP 6666, 6667 e 7000.
-
-O endereço de uma lâmpada muda com o tempo por causa do DHCP, e o Valkyris não depende dele: o identificador é o que identifica o dispositivo.
 
 ## Capacidades e pontos de controle
 
@@ -77,11 +53,23 @@ A lâmpada informa quais pontos de controle expõe; o adaptador detecta o layout
 
 Brilho é guardado em porcentagem e temperatura em Kelvin: o valor bruto do firmware nunca chega ao aplicativo. A temperatura é mapeada linearmente entre 2700 K e 6500 K.
 
+## Verificação pelo servidor
+
+A descoberta também pode ser conferida no servidor, sem o aplicativo:
+
+```bash
+cd backend
+go run ./cmd/lightscan            # lista o que responde na rede local
+go run ./cmd/lightscan -probe     # também testa a porta de controle de cada endereço
+```
+
+Uma lâmpada ainda em modo de pareamento não aparece nessa lista: ela só entra na rede depois de receber as credenciais.
+
 ## Segurança
 
 - A chave local é cifrada no SQLite com a chave mestra AES-256-GCM da instalação.
 - A API nunca devolve a chave para Android ou navegador.
+- A senha do Wi-Fi sai do celular direto para a lâmpada; o backend não a recebe.
 - Todos os comandos passam pelo backend autenticado; o navegador nunca acessa a lâmpada diretamente.
-- Somente administradores podem cadastrar, editar, testar ou remover. Qualquer usuário autenticado pode operar uma lâmpada já cadastrada.
+- Somente administradores podem configurar, renomear, remover ou disparar um pareamento. Qualquer usuário autenticado pode operar uma lâmpada já cadastrada.
 - A descoberta só envia tráfego para as sub-redes locais às quais o host está conectado, e jamais para a internet.
-- Cadastrar exige uma chave de 16 caracteres; o pareamento é validado contra o dispositivo antes de substituir uma configuração que já funcionava.

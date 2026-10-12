@@ -65,24 +65,13 @@ type StatePatch struct {
 	Color             *Color  `json:"color,omitempty"`
 }
 
-// CreateInput registers a light that is already reachable on the local network.
-type CreateInput struct {
-	Name            string  `json:"name"`
-	Room            string  `json:"room"`
-	DeviceID        string  `json:"deviceId"`
-	LocalKey        string  `json:"localKey"`
-	Address         string  `json:"address,omitempty"`
-	ProtocolVersion float64 `json:"protocolVersion,omitempty"`
-}
-
-// UpdateInput renames a light or replaces its local credentials.
+// UpdateInput changes what an administrator can edit after pairing: the name,
+// the room and whether Valkyris keeps polling the lamp. The local credentials
+// belong to the pairing flow and are never edited by hand.
 type UpdateInput struct {
-	Name            *string  `json:"name,omitempty"`
-	Room            *string  `json:"room,omitempty"`
-	LocalKey        *string  `json:"localKey,omitempty"`
-	Address         *string  `json:"address,omitempty"`
-	ProtocolVersion *float64 `json:"protocolVersion,omitempty"`
-	Enabled         *bool    `json:"enabled,omitempty"`
+	Name    *string `json:"name,omitempty"`
+	Room    *string `json:"room,omitempty"`
+	Enabled *bool   `json:"enabled,omitempty"`
 }
 
 // DiscoveryInput configures a local network scan for new lights.

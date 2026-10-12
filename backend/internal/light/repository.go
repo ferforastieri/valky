@@ -65,9 +65,9 @@ func (r *Repository) Create(ctx context.Context, item Light, credentials Credent
 }
 
 // Update patches the mutable fields of a light. A nil field keeps its current
-// value; a new key is sealed before it touches the database.
-func (r *Repository) Update(ctx context.Context, id string, in UpdateInput, credentials *Credentials) (Light, error) {
-	item, current, err := r.Get(ctx, id)
+// value; the local credentials stay untouched.
+func (r *Repository) Update(ctx context.Context, id string, in UpdateInput) (Light, error) {
+	item, _, err := r.Get(ctx, id)
 	if err != nil {
 		return Light{}, err
 	}
@@ -80,30 +80,21 @@ func (r *Repository) Update(ctx context.Context, id string, in UpdateInput, cred
 	if in.Enabled != nil {
 		item.Enabled = *in.Enabled
 	}
-	if in.ProtocolVersion != nil {
-		item.ProtocolVersion = *in.ProtocolVersion
-	}
-	if in.Address != nil {
-		current.Address = *in.Address
-	}
-	if in.LocalKey != nil {
-		current.Secret = *in.LocalKey
-	}
-	sealed, err := r.vault.EncryptString(current.Secret)
-	if err != nil {
-		return Light{}, err
-	}
 	now := time.Now().UTC().Format(time.RFC3339Nano)
-	_, err = r.store.DB.ExecContext(ctx, `UPDATE lights SET name=?,room=?,protocol_version=?,last_ip=?,local_key_enc=?,enabled=?,updated_at=? WHERE id=?`,
-		item.Name, item.Room, item.ProtocolVersion, current.Address, sealed, boolToInt(item.Enabled), now, id)
+	_, err = r.store.DB.ExecContext(ctx, `UPDATE lights SET name=?,room=?,enabled=?,updated_at=? WHERE id=?`,
+		item.Name, item.Room, boolToInt(item.Enabled), now, id)
 	if err != nil {
 		return Light{}, err
-	}
-	if credentials != nil {
-		*credentials = current
 	}
 	updated, _, err := r.Get(ctx, id)
 	return updated, err
+}
+
+// SetProtocolVersion stores the protocol version detected while pairing.
+func (r *Repository) SetProtocolVersion(ctx context.Context, id string, version float64) error {
+	now := time.Now().UTC().Format(time.RFC3339Nano)
+	_, err := r.store.DB.ExecContext(ctx, `UPDATE lights SET protocol_version=?,updated_at=? WHERE id=?`, version, now, id)
+	return err
 }
 
 // SetSetupStatus stores the pairing outcome so the app can show progress or the

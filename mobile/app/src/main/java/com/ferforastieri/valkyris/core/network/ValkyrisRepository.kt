@@ -63,14 +63,12 @@ class ValkyrisRepository @Inject constructor(
     suspend fun controlLight(id: String, patch: LightStatePatch) = api.controlLight(id, patch).also { updated -> _lights.update { list -> list.map { if (it.id == id) updated else it } } }
     suspend fun deleteLight(id: String) { api.deleteLight(id); _lights.update { list -> list.filterNot { it.id == id } } }
 
-    /** Looks for unregistered bulbs on the local network, through the backend. */
-    suspend fun discoverLights(): List<LightCandidate> = api.discoverLights()
+    /** Opens a local pairing window: the phone sends the credentials over the air. */
+    suspend fun startLightPairing(): LightPairingSession = api.startLightPairing()
 
-    suspend fun createLight(input: LightInput): LightDevice {
-        return api.createLight(input).also { created ->
-            _lights.update { current -> (current + created).distinctBy(LightDevice::id) }
-        }
-    }
+    suspend fun lightPairingStatus(id: String): LightPairingSession = api.lightPairingStatus(id)
+
+    suspend fun cancelLightPairing(id: String) = api.cancelLightPairing(id)
 
     suspend fun updateLight(id: String, input: LightUpdate): LightDevice {
         return api.updateLight(id, input).also { updated ->

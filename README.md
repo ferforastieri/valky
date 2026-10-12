@@ -36,7 +36,7 @@ Valkyris transforma um servidor doméstico em uma central privada de monitoramen
 - Credenciais de câmera cifradas com AES-256-GCM e tokens persistidos somente como hash.
 - Avisos de nova versão por sheet obrigatório no app e download manual do APK assinado.
 - Painel web em /app/, servido pelo próprio backend, para consultar câmeras, eventos, família e configurações.
-- [Base de iluminação local](docs/lighting.md) independente de fabricante, com descoberta na rede, controle de energia, brilho, branco ajustável e RGB, e cadastro pelo próprio app.
+- [Base de iluminação local](docs/lighting.md) independente de fabricante, com configuração da lâmpada pelo próprio app (sem app nem conta de terceiros), descoberta na rede e controle de energia, brilho, branco ajustável e RGB.
 - [Controle remoto de TVs](docs/remote-control.md) pelo backend, com descoberta na rede, pareamento autorizado na TV e token cifrado.
 - Interface em PT-BR e inglês, temas claro/escuro e suporte a LAN ou VPN.
 

@@ -9,8 +9,6 @@ import (
 	"strings"
 	"sync"
 	"time"
-
-	"github.com/google/uuid"
 )
 
 type Broadcaster interface{ Broadcast(any) }
@@ -23,10 +21,21 @@ type Service struct {
 	mu     sync.RWMutex
 	states map[string]State
 	locks  sync.Map
+
+	// Local pairing keeps one short lived window at a time.
+	pairingMu     sync.Mutex
+	pairing       *PairingSession
+	pairingTried  map[string]bool
+	pairingWindow time.Duration
 }
 
 func NewService(repo *Repository, driver Driver, hub Broadcaster, logger *slog.Logger) *Service {
-	return &Service{repo: repo, driver: driver, hub: hub, logger: logger, states: map[string]State{}}
+	return &Service{
+		repo: repo, driver: driver, hub: hub, logger: logger,
+		states:        map[string]State{},
+		pairingTried:  map[string]bool{},
+		pairingWindow: PairingWindow,
+	}
 }
 
 // Available reports whether a local adapter is installed.
@@ -53,57 +62,11 @@ func (s *Service) Scan(ctx context.Context, in DiscoveryInput) ([]Candidate, err
 	return scanner.Scan(ctx, duration, in.Probe)
 }
 
-// Create registers a light and immediately validates that the credentials work,
-// so a wrong local key is reported while the user is still on the pairing
-// screen instead of failing silently later.
-func (s *Service) Create(ctx context.Context, in CreateInput) (Light, error) {
-	name := strings.TrimSpace(in.Name)
-	if name == "" {
-		return Light{}, errors.New("informe um nome para a lâmpada")
-	}
-	deviceID := strings.TrimSpace(in.DeviceID)
-	if deviceID == "" {
-		return Light{}, errors.New("selecione uma lâmpada encontrada na rede ou informe o identificador do dispositivo")
-	}
-	key := strings.TrimSpace(in.LocalKey)
-	if len(key) != 16 {
-		return Light{}, errors.New("a chave local tem 16 caracteres")
-	}
-	if in.ProtocolVersion == 0 {
-		in.ProtocolVersion = 3.3
-	}
-	item := Light{
-		ID:              uuid.NewString(),
-		Name:            name,
-		Room:            strings.TrimSpace(in.Room),
-		DeviceID:        deviceID,
-		ProtocolVersion: in.ProtocolVersion,
-		SetupStatus:     "pending",
-		Enabled:         true,
-		CreatedAt:       time.Now().UTC(),
-		UpdatedAt:       time.Now().UTC(),
-	}
-	created, err := s.repo.Create(ctx, item, Credentials{Secret: key, Address: strings.TrimSpace(in.Address)})
-	if err != nil {
-		return Light{}, err
-	}
-	s.mu.Lock()
-	s.states[created.ID] = State{Online: false}
-	s.mu.Unlock()
-	s.broadcast("light.created", created)
-	s.provision(created.ID)
-	return s.Get(ctx, created.ID)
-}
-
-// Update renames a light or replaces its credentials, validating new
-// credentials before they replace a working configuration.
+// Update renames a light, moves it to another room or stops polling it. The
+// local credentials are owned by the pairing flow.
 func (s *Service) Update(ctx context.Context, id string, in UpdateInput) (Light, error) {
 	unlock := s.lock(id)
 	defer unlock()
-	_, credentials, err := s.repo.Get(ctx, id)
-	if err != nil {
-		return Light{}, err
-	}
 	if in.Name != nil {
 		name := strings.TrimSpace(*in.Name)
 		if name == "" {
@@ -115,23 +78,12 @@ func (s *Service) Update(ctx context.Context, id string, in UpdateInput) (Light,
 		room := strings.TrimSpace(*in.Room)
 		in.Room = &room
 	}
-	if in.LocalKey != nil {
-		key := strings.TrimSpace(*in.LocalKey)
-		if len(key) != 16 {
-			return Light{}, errors.New("a chave local tem 16 caracteres")
-		}
-		in.LocalKey = &key
-	}
-	updated, err := s.repo.Update(ctx, id, in, &credentials)
+	updated, err := s.repo.Update(ctx, id, in)
 	if err != nil {
 		return Light{}, err
 	}
 	s.broadcast("light.updated", updated)
-	if in.LocalKey != nil || in.Address != nil || in.ProtocolVersion != nil {
-		s.provision(id)
-		return s.Get(ctx, id)
-	}
-	return updated, nil
+	return s.Get(ctx, id)
 }
 
 // EnsureProvisioned validates a light in the background and stores what the
@@ -163,8 +115,7 @@ func (s *Service) provision(id string) {
 		}
 		_ = s.repo.SetCapabilities(ctx, id, result.Capabilities, result.Mapping)
 		if result.Version > 0 && result.Version != item.ProtocolVersion {
-			patched := result.Version
-			_, _ = s.repo.Update(ctx, id, UpdateInput{ProtocolVersion: &patched}, nil)
+			_ = s.repo.SetProtocolVersion(ctx, id, result.Version)
 		}
 		s.storeState(id, result.State)
 		_ = s.repo.SetConnection(ctx, id, credentials.Address, "ready", "", true)

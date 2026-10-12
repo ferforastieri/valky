@@ -7,6 +7,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -15,6 +16,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
@@ -28,119 +30,48 @@ import com.ferforastieri.valkyris.core.model.*
 @Composable fun LightsScreen(admin:Boolean,vm:LightsViewModel=hiltViewModel()){
     LifecycleResumeEffect(Unit){vm.refresh();onPauseOrDispose{}}
     val state by vm.state.collectAsStateWithLifecycle()
-    // Entering an empty lighting screen already looks for bulbs on the network.
-    LaunchedEffect(admin,state.loading,state.lights.size){if(admin&&!state.loading&&state.lights.isEmpty())vm.discover()}
     var selected by remember{mutableStateOf<LightDevice?>(null)}
     var removing by remember{mutableStateOf<LightDevice?>(null)}
-    var editing by remember{mutableStateOf<LightDevice?>(null)}
-    var adding by remember{mutableStateOf(false)}
-    var candidate by remember{mutableStateOf<LightCandidate?>(null)}
-    val registered=state.lights
-    val discovered=unregisteredCandidates(state.discovered,registered)
+    var renaming by remember{mutableStateOf<LightDevice?>(null)}
+    var pairing by remember{mutableStateOf(false)}
     Box(Modifier.fillMaxSize()){
         Column(Modifier.fillMaxSize().padding(horizontal=18.dp)){
             state.error?.let{ /* errors surface as a toast */ }
-            if(admin)LightDiscoveryHeader(
-                discovering=state.discovering,
-                found=discovered.size,
-                onSearch={vm.discover()},
-                modifier=Modifier.padding(top=10.dp),
-            )
             when{
                 state.loading->Box(Modifier.fillMaxSize(),contentAlignment=Alignment.Center){CircularProgressIndicator()}
-                state.lights.isEmpty()&&discovered.isEmpty()&&!state.discovering->EmptyLighting(admin)
-                else->LazyColumn(verticalArrangement=Arrangement.spacedBy(12.dp),contentPadding=PaddingValues(start=0.dp,top=12.dp,end=0.dp,bottom=96.dp)){
-                    if(discovered.isNotEmpty()){
-                        item{Text(stringResource(R.string.light_discovered_title),style=MaterialTheme.typography.titleMedium,fontWeight=FontWeight.SemiBold)}
-                        items(discovered,key={"found-${it.address}"}){found->DiscoveredLightCard(found,onAdd={candidate=found;adding=true})}
-                        item{HorizontalDivider()}
-                    }
-                    if(state.lights.isNotEmpty())item{Text(stringResource(R.string.light_my_lights),style=MaterialTheme.typography.titleMedium,fontWeight=FontWeight.SemiBold)}
-                    items(state.lights,key={it.id}){light->LightCard(light,light.id in state.busy,{vm.control(light.id,LightStatePatch(power=!light.state.power))},{selected=light},if(admin){{removing=light}}else null,{vm.toggleFavorite(light.id,!light.favorite)},if(admin){{editing=light}}else null)}
+                state.lights.isEmpty()->EmptyLighting(admin,{pairing=true})
+                else->LazyColumn(verticalArrangement=Arrangement.spacedBy(12.dp),contentPadding=PaddingValues(top=12.dp,bottom=96.dp)){
+                    items(state.lights,key={it.id}){light->LightCard(light,light.id in state.busy,{vm.control(light.id,LightStatePatch(power=!light.state.power))},{selected=light},if(admin){{removing=light}}else null,{vm.toggleFavorite(light.id,!light.favorite)},if(admin){{renaming=light}}else null)}
                 }
             }
         }
         if(admin)FloatingActionButton(
-            onClick={candidate=null;adding=true},
+            onClick={pairing=true},
             modifier=Modifier.align(Alignment.BottomEnd).padding(end=20.dp,bottom=18.dp),
             containerColor=MaterialTheme.colorScheme.secondary,
             contentColor=MaterialTheme.colorScheme.onSecondary,
         ){Icon(Lucide.Plus,stringResource(R.string.add_light))}
     }
     selected?.let{light->LightControls(light,light.id in state.busy,{selected=null}){vm.control(light.id,it)}}
-    if(adding)LightEditorSheet(
-        candidate=candidate,
-        saving=state.saving,
-        allowManual=!state.discovering,
-        onDiscover={vm.discover()},
-        onDismiss={adding=false;candidate=null},
-        onSave={input->vm.add(input){saved->if(saved){adding=false;candidate=null}}},
+    if(pairing)LightPairingSheet(
+        progress=state.pairing,
+        suggestedSsid=remember{vm.suggestedSsid()},
+        onPair={ssid,password->vm.pair(ssid,password)},
+        onDismiss={pairing=false;vm.dismissPairing()},
+        onRename={id,name,room,done->vm.rename(id,name,room,done)},
     )
-    editing?.let{light->LightEditorSheet(
-        initial=light,
-        saving=state.saving,
-        allowManual=true,
-        onDiscover={vm.discover()},
-        onDismiss={editing=null},
-        onSave={input->vm.update(light.id,LightUpdate(name=input.name,room=input.room,localKey=input.localKey.takeIf{it.isNotBlank()},address=input.address.takeIf{it.isNotBlank()})){saved->if(saved)editing=null}},
-    )}
+    renaming?.let{light->LightNameSheet(light,{renaming=null}){name,room->vm.rename(light.id,name,room){renaming=null}}}
     removing?.let{light->AlertDialog(onDismissRequest={removing=null},title={Text(stringResource(R.string.remove_light_title))},text={Text(stringResource(R.string.remove_light_body,light.name))},dismissButton={TextButton(onClick={removing=null}){Text(stringResource(R.string.cancel))}},confirmButton={Button(onClick={vm.delete(light.id){removing=null}},colors=ButtonDefaults.buttonColors(containerColor=MaterialTheme.colorScheme.error)){Text(stringResource(R.string.remove))}})}
 }
 
-@Composable private fun LightDiscoveryHeader(discovering:Boolean,found:Int,onSearch:()->Unit,modifier:Modifier=Modifier){
-    Column(modifier.fillMaxWidth(),verticalArrangement=Arrangement.spacedBy(6.dp)){
-        Row(verticalAlignment=Alignment.CenterVertically){
-            Surface(shape=CircleShape,color=MaterialTheme.colorScheme.secondaryContainer){Icon(Lucide.Radar,null,Modifier.padding(9.dp).size(18.dp),tint=MaterialTheme.colorScheme.onSecondaryContainer)}
-            Spacer(Modifier.width(10.dp))
-            Text(
-                when{
-                    discovering->stringResource(R.string.light_searching)
-                    found>0->stringResource(R.string.light_found_count,found)
-                    else->stringResource(R.string.light_discover_empty)
-                },
-                Modifier.weight(1f),style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-            TextButton(onClick=onSearch,enabled=!discovering){Text(stringResource(R.string.light_discover_action))}
-        }
-        if(discovering)LinearProgressIndicator(Modifier.fillMaxWidth())
-    }
-}
-
-@Composable private fun DiscoveredLightCard(candidate:LightCandidate,onAdd:()->Unit){
-    Surface(
-        onClick=onAdd,
-        modifier=Modifier.fillMaxWidth(),
-        shape=MaterialTheme.shapes.large,
-        color=MaterialTheme.colorScheme.secondaryContainer,
-        border=BorderStroke(1.dp,MaterialTheme.colorScheme.secondary.copy(alpha=.35f)),
-        shadowElevation=2.dp,
-    ){
-        Row(Modifier.padding(16.dp),verticalAlignment=Alignment.CenterVertically){
-            Surface(shape=CircleShape,color=MaterialTheme.colorScheme.secondary){Icon(Lucide.Lightbulb,null,Modifier.padding(10.dp).size(22.dp),tint=MaterialTheme.colorScheme.onSecondary)}
-            Spacer(Modifier.width(13.dp))
-            Column(Modifier.weight(1f)){
-                Text(candidate.deviceId.ifBlank{stringResource(R.string.light_unknown_device)},fontWeight=FontWeight.SemiBold,color=MaterialTheme.colorScheme.onSecondaryContainer)
-                Text(
-                    listOfNotNull(
-                        candidate.address,
-                        candidate.version.takeIf{it>0}?.let{"v%.1f".format(it)},
-                        candidate.mac.takeIf(String::isNotBlank),
-                    ).joinToString(" · "),
-                    style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSecondaryContainer,
-                )
-            }
-            Icon(Lucide.Link,stringResource(R.string.light_add),Modifier.size(20.dp),tint=MaterialTheme.colorScheme.onSecondaryContainer)
-        }
-    }
-}
-
-@Composable private fun EmptyLighting(admin:Boolean){
+@Composable private fun EmptyLighting(admin:Boolean,onAdd:()->Unit){
     Box(Modifier.fillMaxSize(),contentAlignment=Alignment.Center){
         Surface(shape=MaterialTheme.shapes.large,color=MaterialTheme.colorScheme.surface,border=BorderStroke(1.dp,MaterialTheme.colorScheme.outlineVariant),shadowElevation=3.dp){
             Column(Modifier.padding(horizontal=26.dp,vertical=24.dp).widthIn(max=340.dp),horizontalAlignment=Alignment.CenterHorizontally,verticalArrangement=Arrangement.spacedBy(10.dp)){
                 Surface(shape=CircleShape,color=MaterialTheme.colorScheme.secondaryContainer){Icon(Lucide.Lightbulb,null,Modifier.padding(13.dp).size(28.dp),tint=MaterialTheme.colorScheme.onSecondaryContainer)}
                 Text(stringResource(R.string.no_lights),fontWeight=FontWeight.SemiBold,style=MaterialTheme.typography.titleMedium)
-                Text(stringResource(if(admin)R.string.no_lights_body_admin else R.string.no_lights_body),color=MaterialTheme.colorScheme.onSurfaceVariant,style=MaterialTheme.typography.bodyMedium)
+                Text(stringResource(if(admin)R.string.no_lights_body_admin else R.string.no_lights_body),color=MaterialTheme.colorScheme.onSurfaceVariant,style=MaterialTheme.typography.bodyMedium,textAlign=androidx.compose.ui.text.style.TextAlign.Center)
+                if(admin)Button(onClick=onAdd){Icon(Lucide.Plus,null,Modifier.size(18.dp));Spacer(Modifier.width(8.dp));Text(stringResource(R.string.add_light))}
             }
         }
     }
@@ -195,52 +126,88 @@ import com.ferforastieri.valkyris.core.model.*
     }}
 }
 
-@Composable private fun LightEditorSheet(
-    candidate:LightCandidate?=null,
-    initial:LightDevice?=null,
-    saving:Boolean,
-    allowManual:Boolean,
-    onDiscover:()->Unit,
+/**
+ * Configura uma lâmpada que está piscando rápido. O aplicativo envia o nome e a
+ * senha da rede pelo ar (nada disso sai do celular) e acompanha o pareamento que
+ * o backend conduz na rede local.
+ */
+@Composable private fun LightPairingSheet(
+    progress:PairingProgress?,
+    suggestedSsid:String,
+    onPair:(String,String)->Unit,
     onDismiss:()->Unit,
-    onSave:(LightInput)->Unit,
+    onRename:(String,String,String,(Boolean)->Unit)->Unit,
 ){
-    var name by remember(initial?.id){mutableStateOf(initial?.name.orEmpty())}
-    var room by remember(initial?.id){mutableStateOf(initial?.room.orEmpty())}
-    var deviceId by remember(initial?.id,candidate?.deviceId){mutableStateOf(initial?.deviceId.orEmpty().ifBlank{candidate?.deviceId.orEmpty()})}
-    var address by remember(initial?.id,candidate?.address){mutableStateOf(initial?.lastAddress.orEmpty().ifBlank{candidate?.address.orEmpty()})}
-    var key by remember(initial?.id){mutableStateOf("")}
-    val keyValid=key.isBlank()||lightKeyValid(key)
-    val canSave=name.isNotBlank()&&deviceId.trim().isNotBlank()&&keyValid&&(initial!=null||lightKeyValid(key))
+    var ssid by remember{mutableStateOf(suggestedSsid)}
+    var password by remember{mutableStateOf("")}
+    var name by remember(progress?.light?.id){mutableStateOf(progress?.light?.name.orEmpty())}
+    val running=progress!=null&&progress.phase!="failed"&&progress.phase!="paired"
+    val paired=progress?.light
     ValkyrisBottomSheet(
-        title=stringResource(if(initial==null)R.string.add_light else R.string.light_edit),
+        title=stringResource(R.string.add_light),
         onDismiss=onDismiss,
-        dismissEnabled=!saving,
+        dismissEnabled=true,
         actions={
-            TextButton(onClick=onDismiss,enabled=!saving){Text(stringResource(R.string.cancel))}
-            Button(
-                onClick={onSave(LightInput(name=name.trim(),room=room.trim(),deviceId=deviceId.trim(),localKey=key.trim(),address=address.trim(),protocolVersion=initial?.protocolVersion?:candidate?.version?:0.0))},
-                enabled=!saving&&canSave,
-            ){if(saving)CircularProgressIndicator(Modifier.size(18.dp),strokeWidth=2.dp,color=MaterialTheme.colorScheme.onPrimary)else Text(stringResource(R.string.save))}
+            when{
+                paired!=null->Button(onClick={onRename(paired.id,name.ifBlank{paired.name},paired.room){onDismiss()}}){Text(stringResource(R.string.save))}
+                running->TextButton(onClick=onDismiss){Text(stringResource(R.string.cancel))}
+                else->{
+                    TextButton(onClick=onDismiss){Text(stringResource(R.string.cancel))}
+                    Button(onClick={onPair(ssid,password)},enabled=ssid.isNotBlank()){Icon(Lucide.Zap,null,Modifier.size(18.dp));Spacer(Modifier.width(8.dp));Text(stringResource(R.string.light_pair_action))}
+                }
+            }
         },
     ){
-        Column(Modifier.fillMaxWidth().heightIn(max=560.dp).verticalScroll(rememberScrollState()),verticalArrangement=Arrangement.spacedBy(10.dp)){
-            if(initial==null)Text(stringResource(R.string.light_add_hint),style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant)
+        Column(Modifier.fillMaxWidth().heightIn(max=560.dp).verticalScroll(rememberScrollState()),verticalArrangement=Arrangement.spacedBy(12.dp)){
+            when{
+                paired!=null->Column(verticalArrangement=Arrangement.spacedBy(10.dp)){
+                    Row(verticalAlignment=Alignment.CenterVertically){
+                        Surface(shape=CircleShape,color=MaterialTheme.colorScheme.secondaryContainer){Icon(Lucide.Lightbulb,null,Modifier.padding(10.dp).size(22.dp),tint=MaterialTheme.colorScheme.onSecondaryContainer)}
+                        Spacer(Modifier.width(12.dp))
+                        Column(Modifier.weight(1f)){
+                            Text(stringResource(R.string.light_pair_done),fontWeight=FontWeight.SemiBold)
+                            Text(listOfNotNull(progress?.deviceAddress?.takeIf(String::isNotBlank),progress?.light?.protocolVersion?.takeIf{it>0}?.let{"v%.1f".format(it)}).joinToString(" · "),style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant)
+                        }
+                    }
+                    OutlinedTextField(name,{name=it},Modifier.fillMaxWidth(),label={Text(stringResource(R.string.light_name))},singleLine=true)
+                    Text(stringResource(R.string.light_pair_done_hint),style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+                running->Column(verticalArrangement=Arrangement.spacedBy(10.dp)){
+                    Row(verticalAlignment=Alignment.CenterVertically){
+                        CircularProgressIndicator(Modifier.size(22.dp),strokeWidth=2.dp)
+                        Spacer(Modifier.width(12.dp))
+                        Text(progress?.message.orEmpty().ifBlank{stringResource(R.string.light_pair_sending)},Modifier.weight(1f),style=MaterialTheme.typography.bodyMedium)
+                    }
+                    Text(stringResource(R.string.light_pair_keep_open),style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+                else->Column(verticalArrangement=Arrangement.spacedBy(12.dp)){
+                    Text(stringResource(R.string.light_pair_steps),style=MaterialTheme.typography.bodyMedium)
+                    progress?.message?.takeIf{it.isNotBlank()}?.let{Text(it,color=MaterialTheme.colorScheme.error,style=MaterialTheme.typography.bodySmall)}
+                    OutlinedTextField(ssid,{ssid=it},Modifier.fillMaxWidth(),label={Text(stringResource(R.string.light_pair_network))},supportingText={Text(stringResource(R.string.light_pair_network_hint))},singleLine=true)
+                    OutlinedTextField(
+                        password,{password=it},Modifier.fillMaxWidth(),
+                        label={Text(stringResource(R.string.light_pair_password))},
+                        visualTransformation=PasswordVisualTransformation(),
+                        keyboardOptions=KeyboardOptions(keyboardType=KeyboardType.Password),
+                        singleLine=true,
+                    )
+                    Text(stringResource(R.string.light_pair_stays_local),style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+            }
+        }
+    }
+}
+
+@Composable private fun LightNameSheet(light:LightDevice,onDismiss:()->Unit,onSave:(String,String)->Unit){
+    var name by remember(light.id){mutableStateOf(light.name)}
+    var room by remember(light.id){mutableStateOf(light.room)}
+    ValkyrisBottomSheet(title=stringResource(R.string.light_edit),onDismiss=onDismiss,actions={
+        TextButton(onClick=onDismiss){Text(stringResource(R.string.cancel))}
+        Button(onClick={onSave(name.trim(),room.trim())},enabled=name.isNotBlank()){Text(stringResource(R.string.save))}
+    }){
+        Column(Modifier.fillMaxWidth(),verticalArrangement=Arrangement.spacedBy(10.dp)){
             OutlinedTextField(name,{name=it},Modifier.fillMaxWidth(),label={Text(stringResource(R.string.light_name))},singleLine=true)
             OutlinedTextField(room,{room=it},Modifier.fillMaxWidth(),label={Text(stringResource(R.string.light_room))},singleLine=true)
-            OutlinedTextField(deviceId,{deviceId=it},Modifier.fillMaxWidth(),label={Text(stringResource(R.string.light_device_id))},supportingText={Text(stringResource(R.string.light_device_id_hint))},singleLine=true)
-            OutlinedTextField(address,{address=it},Modifier.fillMaxWidth(),label={Text(stringResource(R.string.light_address))},supportingText={Text(stringResource(R.string.light_address_hint))},singleLine=true)
-            OutlinedTextField(
-                key,{key=it.trim()},Modifier.fillMaxWidth(),
-                label={Text(stringResource(if(initial==null)R.string.light_local_key else R.string.light_local_key_replace))},
-                supportingText={Text(stringResource(if(keyValid)R.string.light_local_key_hint else R.string.light_local_key_invalid))},
-                isError=!keyValid,
-                visualTransformation=PasswordVisualTransformation(),
-                singleLine=true,
-            )
-            Row(verticalAlignment=Alignment.CenterVertically){
-                TextButton(onClick=onDiscover,enabled=allowManual&&!saving){Icon(Lucide.Radar,null,Modifier.size(18.dp));Spacer(Modifier.width(8.dp));Text(stringResource(R.string.light_search_again))}
-            }
-            Text(stringResource(R.string.light_security_hint),style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant)
         }
     }
 }

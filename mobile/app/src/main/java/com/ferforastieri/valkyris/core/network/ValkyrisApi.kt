@@ -237,8 +237,18 @@ class ValkyrisApi(
     )
 
     suspend fun lights(): List<LightDevice> = get("/lights")
-    suspend fun discoverLights(input: LightDiscoveryInput = LightDiscoveryInput()): List<LightCandidate> = post("/lights/discovery", input, announceBackend = true)
-    suspend fun createLight(input: LightInput): LightDevice = post("/lights", input, announceBackend = true)
+    /** Abre uma janela de pareamento local; o celular envia os dados pelo ar. */
+    suspend fun startLightPairing(): LightPairingSession = post("/lights/pairing-sessions", emptyMap<String, String>(), announceBackend = true)
+    suspend fun lightPairingStatus(id: String): LightPairingSession = get("/lights/pairing-sessions/$id")
+    suspend fun cancelLightPairing(id: String) {
+        val current = requireNotNull(session())
+        executeUnit(current.fingerprint) {
+            it.delete(base() + "/lights/pairing-sessions/$id") {
+                bearerAuth(current.token)
+                header(HttpHeaders.AcceptLanguage, Locale.getDefault().toLanguageTag())
+            }
+        }
+    }
     suspend fun updateLight(id: String, input: LightUpdate): LightDevice = put("/lights/$id", input, announceBackend = true)
     suspend fun controlLight(id: String, patch: LightStatePatch): LightDevice = put("/lights/$id/state", patch)
     suspend fun deleteLight(id: String) {
