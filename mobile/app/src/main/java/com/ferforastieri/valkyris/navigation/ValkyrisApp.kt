@@ -120,6 +120,7 @@ private fun ConnectedValkyrisApp(main: MainViewModel) {
     val showTopBar = selectedIndex >= 0 || currentRoute == "events" || currentRoute == "event/{id}" || currentRoute == "lights"
     val pendingEvent by main.pendingEvent.collectAsStateWithLifecycle()
     val pendingCamera by main.pendingCamera.collectAsStateWithLifecycle()
+    val pendingSection by main.pendingSection.collectAsStateWithLifecycle()
     LaunchedEffect(pendingEvent) {
         pendingEvent?.let {
             nav.navigate("event/$it") { launchSingleTop = true }
@@ -130,6 +131,17 @@ private fun ConnectedValkyrisApp(main: MainViewModel) {
         pendingCamera?.let {
             nav.navigate("camera/$it") { launchSingleTop = true }
             main.cameraOpened()
+        }
+    }
+    // A home screen widget can send the user straight to lights or to a remote.
+    LaunchedEffect(pendingSection) {
+        pendingSection?.let { section ->
+            when {
+                section == "lights" -> nav.navigate("lights") { launchSingleTop = true }
+                section.startsWith("remote:") -> nav.navigate("remote/${section.substringAfter("remote:")}") { launchSingleTop = true }
+                section == "devices" -> nav.openTopLevel("devices")
+            }
+            main.sectionOpened()
         }
     }
     Scaffold(

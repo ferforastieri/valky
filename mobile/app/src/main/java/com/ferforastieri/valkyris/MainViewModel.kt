@@ -53,6 +53,9 @@ class MainViewModel @Inject constructor(
     val pendingEvent = _pendingEvent.asStateFlow()
     private val _pendingCamera = MutableStateFlow<String?>(null)
     val pendingCamera = _pendingCamera.asStateFlow()
+    // Home screen widgets can ask the app to open a specific screen.
+    private val _pendingSection = MutableStateFlow<String?>(null)
+    val pendingSection = _pendingSection.asStateFlow()
     private val _updateInfo = MutableStateFlow<UpdateInfo?>(null)
     val updateInfo = _updateInfo.asStateFlow()
     private val _updating = MutableStateFlow(false)
@@ -77,16 +80,20 @@ class MainViewModel @Inject constructor(
         val uri = _pairingLink.value ?: return
         pair(uri.getQueryParameter("url").orEmpty(), uri.getQueryParameter("code").orEmpty(), uri.getQueryParameter("fingerprint").orEmpty(), name, username, password)
     }
-    fun acceptLaunch(uri: Uri?, eventId: String?, cameraId: String? = null) {
+    fun acceptLaunch(uri: Uri?, eventId: String?, cameraId: String? = null, section: String? = null) {
         acceptPairingLink(uri)
         val deepLinkId = if (uri?.scheme == "valkyris" && uri.host == "event") uri.lastPathSegment else null
         val deepCameraId = if (uri?.scheme == "valkyris" && uri.host == "camera") uri.lastPathSegment else null
-        _pendingCamera.value = cameraId?.takeIf(String::isNotBlank) ?: deepCameraId?.takeIf(String::isNotBlank)
+        val sectionCameraId = section?.takeIf { it.startsWith("camera:") }?.substringAfter("camera:")
+        val sectionRoute = section?.takeIf { !it.startsWith("camera:") }
+        _pendingCamera.value = cameraId?.takeIf(String::isNotBlank) ?: sectionCameraId?.takeIf(String::isNotBlank) ?: deepCameraId?.takeIf(String::isNotBlank)
         _pendingEvent.value = if (_pendingCamera.value == null) eventId?.takeIf(String::isNotBlank) ?: deepLinkId?.takeIf(String::isNotBlank) else null
+        _pendingSection.value = if (_pendingCamera.value == null) sectionRoute?.takeIf(String::isNotBlank) else null
     }
 
     fun eventOpened() { _pendingEvent.value = null }
     fun cameraOpened() { _pendingCamera.value = null }
+    fun sectionOpened() { _pendingSection.value = null }
     fun resetAuthStatus() { _authInitialized.value = null; _error.value = null }
 
     fun inspectServer(url: String) {

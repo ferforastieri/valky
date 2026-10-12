@@ -1,4 +1,10 @@
 <resources>
     <color name="valkyris_canvas">#E8E9E5</color>
     <color name="valkyris_surface">#F9FAF7</color>
+    <color name="widget_surface">#CC1A1F1A</color>
+    <color name="widget_surface_solid">#FF1A1F1A</color>
+    <color name="widget_ink">#FFF1F4EF</color>
+    <color name="widget_muted">#FFA6AFA5</color>
+    <color name="widget_signal">#FF8AE07D</color>
+    <color name="widget_alarm">#FFFF766E</color>
 </resources>

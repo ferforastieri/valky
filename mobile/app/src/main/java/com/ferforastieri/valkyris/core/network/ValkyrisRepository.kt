@@ -63,6 +63,21 @@ class ValkyrisRepository @Inject constructor(
     suspend fun controlLight(id: String, patch: LightStatePatch) = api.controlLight(id, patch).also { updated -> _lights.update { list -> list.map { if (it.id == id) updated else it } } }
     suspend fun deleteLight(id: String) { api.deleteLight(id); _lights.update { list -> list.filterNot { it.id == id } } }
 
+    /** Looks for unregistered bulbs on the local network, through the backend. */
+    suspend fun discoverLights(): List<LightCandidate> = api.discoverLights()
+
+    suspend fun createLight(input: LightInput): LightDevice {
+        return api.createLight(input).also { created ->
+            _lights.update { current -> (current + created).distinctBy(LightDevice::id) }
+        }
+    }
+
+    suspend fun updateLight(id: String, input: LightUpdate): LightDevice {
+        return api.updateLight(id, input).also { updated ->
+            _lights.update { current -> current.map { if (it.id == id) updated else it } }
+        }
+    }
+
     suspend fun refreshEvents(): List<ValkyrisEvent> {
         return api.events().also { _events.value = it }
     }

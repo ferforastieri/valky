@@ -24,7 +24,8 @@ Valkyris transforma um servidor doméstico em uma central privada de monitoramen
 - Live WebRTC autenticado, com uma única conexão RTSP por câmera e conversão apenas do áudio G.711 para Opus.
 - Movimento PTZ por pressionar e segurar e zoom quando anunciado pela câmera.
 - Posições PTZ salvas na própria câmera, com uma posição fixada para ela voltar sozinha ao iniciar ou reiniciar.
-- Dispositivos favoritos (câmeras, lâmpadas e controles) no topo da visão geral, além de estatísticas de eventos por câmera.
+- Dispositivos favoritos (câmeras, lâmpadas e controles) na visão geral, agrupados por seção e com energia das lâmpadas ali mesmo, além de estatísticas de eventos por câmera.
+- Widgets de tela inicial para câmera (última imagem), luzes (ligar e desligar) e controle remoto da TV.
 - Cadastro assíncrono: a câmera aparece imediatamente e o progresso ou erro fica persistido.
 - [Detecção sonora contínua](docs/audio-detection.md), com janelas sobrepostas, confirmação temporal de choro de bebê e diagnóstico de pontuações por 24 horas.
 - Regras para movimento e sons residenciais; a confiança mínima é aplicada internamente por detector, sem ajuste manual, e as regras ficam sempre ativas.
@@ -35,7 +36,7 @@ Valkyris transforma um servidor doméstico em uma central privada de monitoramen
 - Credenciais de câmera cifradas com AES-256-GCM e tokens persistidos somente como hash.
 - Avisos de nova versão por sheet obrigatório no app e download manual do APK assinado.
 - Painel web em /app/, servido pelo próprio backend, para consultar câmeras, eventos, família e configurações.
-- [Base de iluminação local](docs/lighting.md) independente de fabricante, com energia, brilho, branco ajustável e RGB.
+- [Base de iluminação local](docs/lighting.md) independente de fabricante, com descoberta na rede, controle de energia, brilho, branco ajustável e RGB, e cadastro pelo próprio app.
 - [Controle remoto de TVs](docs/remote-control.md) pelo backend, com descoberta na rede, pareamento autorizado na TV e token cifrado.
 - Interface em PT-BR e inglês, temas claro/escuro e suporte a LAN ou VPN.
 

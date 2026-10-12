@@ -1,0 +1,198 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Controle remoto da TV: energia, volume e navegação. -->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:id="@+id/widget_remote_root"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@drawable/widget_background"
+    android:orientation="vertical"
+    android:padding="12dp">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:gravity="center_vertical"
+        android:orientation="horizontal">
+
+        <ImageView
+            android:layout_width="18dp"
+            android:layout_height="18dp"
+            android:contentDescription="@null"
+            android:src="@drawable/widget_play"
+            android:tint="@color/widget_signal"
+            tools:ignore="UseAppTint" />
+
+        <TextView
+            android:id="@+id/widget_remote_name"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="8dp"
+            android:layout_weight="1"
+            android:maxLines="1"
+            android:ellipsize="end"
+            android:text="@string/widget_remote_title"
+            android:textColor="@color/widget_ink"
+            android:textSize="14sp"
+            android:textStyle="bold" />
+
+        <ImageView
+            android:id="@+id/widget_remote_power"
+            android:layout_width="38dp"
+            android:layout_height="38dp"
+            android:background="@drawable/widget_pill"
+            android:contentDescription="@string/widget_remote_power"
+            android:padding="9dp"
+            android:src="@drawable/widget_power"
+            android:tint="@color/widget_alarm"
+            tools:ignore="UseAppTint" />
+    </LinearLayout>
+
+    <TextView
+        android:id="@+id/widget_remote_empty"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="8dp"
+        android:text="@string/widget_remote_empty"
+        android:textColor="@color/widget_muted"
+        android:textSize="12sp"
+        android:visibility="gone" />
+
+    <LinearLayout
+        android:id="@+id/widget_remote_body"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="8dp"
+        android:orientation="horizontal">
+
+        <LinearLayout
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:gravity="center"
+            android:orientation="vertical">
+
+            <LinearLayout
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:gravity="center"
+                android:orientation="horizontal">
+
+                <ImageView
+                    android:id="@+id/widget_remote_up"
+                    android:layout_width="40dp"
+                    android:layout_height="40dp"
+                    android:background="@drawable/widget_pill"
+                    android:contentDescription="@string/widget_remote_up"
+                    android:padding="9dp"
+                    android:src="@drawable/widget_arrow_up"
+                    android:tint="@color/widget_ink"
+            tools:ignore="UseAppTint" />
+            </LinearLayout>
+
+            <LinearLayout
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="4dp"
+                android:gravity="center"
+                android:orientation="horizontal">
+
+                <ImageView
+                    android:id="@+id/widget_remote_left"
+                    android:layout_width="40dp"
+                    android:layout_height="40dp"
+                    android:background="@drawable/widget_pill"
+                    android:contentDescription="@string/widget_remote_left"
+                    android:padding="9dp"
+                    android:src="@drawable/widget_arrow_left"
+                    android:tint="@color/widget_ink"
+            tools:ignore="UseAppTint" />
+
+                <ImageView
+                    android:id="@+id/widget_remote_enter"
+                    android:layout_width="44dp"
+                    android:layout_height="44dp"
+                    android:layout_marginStart="6dp"
+                    android:layout_marginEnd="6dp"
+                    android:background="@drawable/widget_pill_active"
+                    android:contentDescription="@string/widget_remote_enter"
+                    android:padding="9dp"
+                    android:src="@drawable/widget_enter"
+                    android:tint="@color/widget_ink"
+            tools:ignore="UseAppTint" />
+
+                <ImageView
+                    android:id="@+id/widget_remote_right"
+                    android:layout_width="40dp"
+                    android:layout_height="40dp"
+                    android:background="@drawable/widget_pill"
+                    android:contentDescription="@string/widget_remote_right"
+                    android:padding="9dp"
+                    android:src="@drawable/widget_arrow_right"
+                    android:tint="@color/widget_ink"
+            tools:ignore="UseAppTint" />
+            </LinearLayout>
+
+            <LinearLayout
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="4dp"
+                android:gravity="center"
+                android:orientation="horizontal">
+
+                <ImageView
+                    android:id="@+id/widget_remote_down"
+                    android:layout_width="40dp"
+                    android:layout_height="40dp"
+                    android:background="@drawable/widget_pill"
+                    android:contentDescription="@string/widget_remote_down"
+                    android:padding="9dp"
+                    android:src="@drawable/widget_arrow_down"
+                    android:tint="@color/widget_ink"
+            tools:ignore="UseAppTint" />
+            </LinearLayout>
+        </LinearLayout>
+
+        <LinearLayout
+            android:layout_width="wrap_content"
+            android:layout_height="match_parent"
+            android:gravity="center"
+            android:orientation="vertical">
+
+            <ImageView
+                android:id="@+id/widget_remote_volume_up"
+                android:layout_width="40dp"
+                android:layout_height="40dp"
+                android:background="@drawable/widget_pill"
+                android:contentDescription="@string/widget_remote_volume_up"
+                android:padding="9dp"
+                android:src="@drawable/widget_volume_up"
+                android:tint="@color/widget_ink"
+            tools:ignore="UseAppTint" />
+
+            <ImageView
+                android:id="@+id/widget_remote_volume_down"
+                android:layout_width="40dp"
+                android:layout_height="40dp"
+                android:layout_marginTop="6dp"
+                android:background="@drawable/widget_pill"
+                android:contentDescription="@string/widget_remote_volume_down"
+                android:padding="9dp"
+                android:src="@drawable/widget_volume_down"
+                android:tint="@color/widget_ink"
+            tools:ignore="UseAppTint" />
+
+            <ImageView
+                android:id="@+id/widget_remote_mute"
+                android:layout_width="40dp"
+                android:layout_height="40dp"
+                android:layout_marginTop="6dp"
+                android:background="@drawable/widget_pill"
+                android:contentDescription="@string/widget_remote_mute"
+                android:padding="9dp"
+                android:src="@drawable/widget_mute"
+                android:tint="@color/widget_ink"
+            tools:ignore="UseAppTint" />
+        </LinearLayout>
+    </LinearLayout>
+</LinearLayout>

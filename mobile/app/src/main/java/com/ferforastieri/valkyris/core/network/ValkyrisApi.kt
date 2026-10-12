@@ -237,6 +237,9 @@ class ValkyrisApi(
     )
 
     suspend fun lights(): List<LightDevice> = get("/lights")
+    suspend fun discoverLights(input: LightDiscoveryInput = LightDiscoveryInput()): List<LightCandidate> = post("/lights/discovery", input, announceBackend = true)
+    suspend fun createLight(input: LightInput): LightDevice = post("/lights", input, announceBackend = true)
+    suspend fun updateLight(id: String, input: LightUpdate): LightDevice = put("/lights/$id", input, announceBackend = true)
     suspend fun controlLight(id: String, patch: LightStatePatch): LightDevice = put("/lights/$id/state", patch)
     suspend fun deleteLight(id: String) {
         val current = requireNotNull(session())

@@ -23,6 +23,7 @@ import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -68,7 +69,14 @@ import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import javax.inject.Inject
 
-data class FavoriteItem(val type: String, val id: String, val name: String, val subtitle: String)
+data class FavoriteItem(
+    val type: String,
+    val id: String,
+    val name: String,
+    val subtitle: String,
+    val online: Boolean = false,
+    val power: Boolean = false,
+)
 
 data class OverviewState(
     val cameras: List<CameraModel> = emptyList(),
@@ -114,9 +122,18 @@ class OverviewViewModel @Inject constructor(private val repository: ValkyrisRepo
     private fun favoritesOf(cameras: List<CameraModel>, lights: List<LightDevice>, remotes: List<RemoteDevice>): List<FavoriteItem> {
         val items = mutableListOf<FavoriteItem>()
         cameras.filter { it.favorite }.forEach { items += FavoriteItem("camera", it.id, it.name, it.host) }
-        lights.filter { it.favorite }.forEach { items += FavoriteItem("light", it.id, it.name, it.room.ifBlank { "Iluminação" }) }
+        lights.filter { it.favorite }.forEach {
+            items += FavoriteItem("light", it.id, it.name, it.room.ifBlank { "Iluminação" }, it.state.online, it.state.power)
+        }
         remotes.filter { it.favorite }.forEach { items += FavoriteItem("remote", it.id, it.name, it.host) }
         return items
+    }
+
+    /** Turns a favorite bulb on or off without leaving the overview. */
+    fun toggleLight(id: String, power: Boolean) {
+        viewModelScope.launch {
+            runCatching { repository.controlLight(id, com.ferforastieri.valkyris.core.model.LightStatePatch(power = power)) }
+        }
     }
 }
 
@@ -154,6 +171,7 @@ fun OverviewScreen(
         onTv = { state.remotes.firstOrNull()?.let { remote -> onRemote(remote.id) } ?: onCameras() },
         onLight = onLight,
         onFavorite = onFavorite,
+        onToggleLight = { favorite -> viewModel.toggleLight(favorite.id, !favorite.power) },
         activityChart = { OverviewActivityChart(onEvent = onEvent) },
     )
     failedCamera?.let { CameraFailureSheet(it, onDismiss = { failedCameraId = null }) }
@@ -174,6 +192,7 @@ fun OverviewContent(
     onTv: () -> Unit = {},
     onLight: () -> Unit = {},
     onFavorite: (FavoriteItem) -> Unit = {},
+    onToggleLight: (FavoriteItem) -> Unit = {},
     activityChart: @Composable () -> Unit = {},
 ) {
     LazyColumn(
@@ -188,21 +207,30 @@ fun OverviewContent(
                 }
             }
         } else {
-            item {
-                // Favorites replace the old metric cards: icon + name only.
-                com.ferforastieri.valkyris.core.design.AdaptiveRow(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                    favorites.forEach { favorite ->
-                        FavoriteCard(
-                            item = favorite,
-                            modifier = Modifier.weight(1f),
-                            onClick = {
-                                when (favorite.type) {
-                                    "camera" -> onCamera(favorite.id)
-                                    "light" -> onLight()
-                                    else -> onFavorite(favorite)
-                                }
-                            },
-                        )
+            // Favorites replace the old metric cards and stay grouped by section,
+            // so a bulb can be switched from the overview without opening it.
+            favoriteSections.forEach { section ->
+                val items = favorites.filter { it.type == section.type }
+                if (items.isEmpty()) return@forEach
+                item(key = "favorites-${section.type}") {
+                    SectionLabel(stringResource(section.label), section.icon)
+                }
+                item(key = "favorites-${section.type}-row") {
+                    com.ferforastieri.valkyris.core.design.AdaptiveRow(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                        items.forEach { favorite ->
+                            FavoriteCard(
+                                item = favorite,
+                                modifier = Modifier.weight(1f),
+                                onClick = {
+                                    when (favorite.type) {
+                                        "camera" -> onCamera(favorite.id)
+                                        "light" -> onLight()
+                                        else -> onFavorite(favorite)
+                                    }
+                                },
+                                onTogglePower = if (favorite.type == "light") ({ onToggleLight(favorite) }) else null,
+                            )
+                        }
                     }
                 }
             }
@@ -296,8 +324,16 @@ private fun MetricCard(icon: androidx.compose.ui.graphics.vector.ImageVector, va
     }
 }
 
+private data class FavoriteSection(val type: String, val label: Int, val icon: ImageVector)
+
+private val favoriteSections = listOf(
+    FavoriteSection("camera", R.string.favorite_section_cameras, Lucide.Video),
+    FavoriteSection("light", R.string.favorite_section_lights, Lucide.Lightbulb),
+    FavoriteSection("remote", R.string.favorite_section_remotes, Lucide.Tv),
+)
+
 @Composable
-private fun FavoriteCard(item: FavoriteItem, modifier: Modifier, onClick: () -> Unit) {
+private fun FavoriteCard(item: FavoriteItem, modifier: Modifier, onClick: () -> Unit, onTogglePower: (() -> Unit)? = null) {
     Card(
         onClick = onClick,
         modifier = modifier,
@@ -307,20 +343,33 @@ private fun FavoriteCard(item: FavoriteItem, modifier: Modifier, onClick: () -> 
         elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
     ) {
         Row(
-            Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 12.dp),
+            Modifier.fillMaxWidth().padding(start = 12.dp, end = 6.dp, top = 12.dp, bottom = 12.dp),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(10.dp),
         ) {
             Surface(shape = RoundedCornerShape(12.dp), color = MaterialTheme.colorScheme.secondary.copy(alpha = .14f)) {
                 Icon(favoriteIcon(item.type), null, Modifier.padding(8.dp).size(18.dp), tint = MaterialTheme.colorScheme.secondary)
             }
-            Text(
-                item.name,
-                style = MaterialTheme.typography.bodyMedium,
-                fontWeight = FontWeight.Medium,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-            )
+            Column(Modifier.weight(1f)) {
+                Text(
+                    item.name,
+                    style = MaterialTheme.typography.bodyMedium,
+                    fontWeight = FontWeight.Medium,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                if (item.type == "light") {
+                    Text(
+                        if (item.online) stringResource(if (item.power) R.string.favorite_light_on else R.string.favorite_light_off) else stringResource(R.string.unavailable),
+                        style = MaterialTheme.typography.labelSmall,
+                        color = if (item.online) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.error,
+                        maxLines = 1,
+                    )
+                }
+            }
+            onTogglePower?.let { toggle ->
+                Switch(checked = item.power, onCheckedChange = { toggle() }, enabled = item.online)
+            }
         }
     }
 }

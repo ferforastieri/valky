@@ -3,8 +3,11 @@ package com.ferforastieri.valkyris.feature.lights
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.ferforastieri.valkyris.core.action.MobileActionGate
+import com.ferforastieri.valkyris.core.model.LightCandidate
 import com.ferforastieri.valkyris.core.model.LightDevice
+import com.ferforastieri.valkyris.core.model.LightInput
 import com.ferforastieri.valkyris.core.model.LightStatePatch
+import com.ferforastieri.valkyris.core.model.LightUpdate
 import com.ferforastieri.valkyris.core.network.ValkyrisRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
@@ -15,7 +18,7 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 
-data class LightsState(val loading:Boolean=true,val busy:Set<String> = emptySet(),val lights:List<LightDevice> = emptyList(),val error:String?=null)
+data class LightsState(val loading:Boolean=true,val busy:Set<String> = emptySet(),val lights:List<LightDevice> = emptyList(),val error:String?=null,val discovering:Boolean=false,val discovered:List<LightCandidate> = emptyList(),val saving:Boolean=false)
 
 @HiltViewModel
 class LightsViewModel @Inject constructor(private val repository:ValkyrisRepository,private val actionGate:MobileActionGate):ViewModel(){
@@ -31,6 +34,29 @@ class LightsViewModel @Inject constructor(private val repository:ValkyrisReposit
     fun control(id:String,patch:LightStatePatch)=guarded(id,false){repository.controlLight(id,patch)}
     fun toggleFavorite(id:String,favorite:Boolean)=viewModelScope.launch{runCatching{repository.api.setFavorite("light",id,favorite)}.onSuccess{repository.refreshLights()}.onFailure{error->_state.update{it.copy(error=error.message)}}}
     fun delete(id:String,done:()->Unit={})=guarded(id){repository.deleteLight(id);done()}
+
+    /** Asks the backend to look for bulbs on the local network. */
+    fun discover(){
+        if(_state.value.discovering)return
+        _state.update{it.copy(discovering=true,error=null)}
+        viewModelScope.launch{
+            try{
+                runCatching{repository.discoverLights()}
+                    .onSuccess{candidates->_state.update{it.copy(discovered=unregisteredCandidates(candidates,repository.lights.value))}}
+                    .onFailure{error->_state.update{it.copy(error=error.message)}}
+            }finally{_state.update{it.copy(discovering=false)}}
+        }
+    }
+
+    /** Registers a bulb and refreshes once the backend finished pairing with it. */
+    fun add(input:LightInput,done:(Boolean)->Unit={}){if(!actionGate.tryAcquire())return;_state.update{it.copy(saving=true)};viewModelScope.launch{try{runCatching{repository.createLight(input)}.onSuccess{created->_state.update{it.copy(discovered=unregisteredCandidates(it.discovered,listOf(created)))};done(true);awaitPairing()}.onFailure{error->_state.update{it.copy(error=error.message)}};refresh()}finally{_state.update{it.copy(saving=false)};actionGate.release()}}}
+
+    fun update(id:String,input:LightUpdate,done:(Boolean)->Unit={}){if(!actionGate.tryAcquire())return;_state.update{it.copy(saving=true)};viewModelScope.launch{try{runCatching{repository.updateLight(id,input)}.onSuccess{done(true)}.onFailure{error->_state.update{it.copy(error=error.message)}};refresh()}finally{_state.update{it.copy(saving=false)};actionGate.release()}}}
+
+    // The backend pairs asynchronously; a couple of refreshes surface the result
+    // without keeping the sheet open.
+    private suspend fun awaitPairing(){repeat(3){delay(900);runCatching{repository.refreshLights()}}}
+
     private fun guarded(id:String,useGlobalGate:Boolean=true,block:suspend()->Unit){if(id in _state.value.busy||(useGlobalGate&&!actionGate.tryAcquire()))return;_state.update{it.copy(busy=it.busy+id,error=null)};viewModelScope.launch{try{runCatching{block()}.onFailure{error->_state.update{it.copy(error=error.message)}}}finally{_state.update{it.copy(busy=it.busy-id)};if(useGlobalGate)actionGate.release()}}}
     override fun onCleared(){active=false;realtime?.close(1000,"lights screen closed");super.onCleared()}
 }
