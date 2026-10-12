@@ -78,9 +78,10 @@ fun RemoteControlScreen(onBack: () -> Unit, vm: RemoteControlViewModel = hiltVie
     Column(Modifier.fillMaxSize().padding(horizontal = 18.dp)) {
         Spacer(Modifier.height(40.dp))
         if (remote?.tokenConfigured == true) {
-            Box(Modifier.fillMaxWidth()) {
-                PowerButton(powering = state.powering, onPower = vm::power, modifier = Modifier.align(Alignment.Center))
-                KeypadModeToggle(qwerty = qwerty, onToggle = { qwerty = !qwerty }, modifier = Modifier.align(Alignment.CenterEnd))
+            Column(Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
+                PowerButton(powering = state.powering, onPower = vm::power)
+                Spacer(Modifier.height(10.dp))
+                KeypadModeToggle(qwerty = qwerty, onToggle = { qwerty = !qwerty })
             }
         }
         Spacer(Modifier.height(14.dp))

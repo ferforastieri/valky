@@ -154,6 +154,7 @@ fun OverviewScreen(
         onTv = { state.remotes.firstOrNull()?.let { remote -> onRemote(remote.id) } ?: onCameras() },
         onLight = onLight,
         onFavorite = onFavorite,
+        activityChart = { OverviewActivityChart(onEvent = onEvent) },
     )
     failedCamera?.let { CameraFailureSheet(it, onDismiss = { failedCameraId = null }) }
 }
@@ -173,6 +174,7 @@ fun OverviewContent(
     onTv: () -> Unit = {},
     onLight: () -> Unit = {},
     onFavorite: (FavoriteItem) -> Unit = {},
+    activityChart: @Composable () -> Unit = {},
 ) {
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
@@ -187,13 +189,11 @@ fun OverviewContent(
             }
         } else {
             item {
-                // Favorites replace the old metric cards and keep their visual.
+                // Favorites replace the old metric cards: icon + name only.
                 com.ferforastieri.valkyris.core.design.AdaptiveRow(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                     favorites.forEach { favorite ->
-                        MetricCard(
-                            icon = favoriteIcon(favorite.type),
-                            value = favorite.name,
-                            label = favorite.subtitle,
+                        FavoriteCard(
+                            item = favorite,
                             modifier = Modifier.weight(1f),
                             onClick = {
                                 when (favorite.type) {
@@ -202,12 +202,12 @@ fun OverviewContent(
                                     else -> onFavorite(favorite)
                                 }
                             },
-                            accent = true,
                         )
                     }
                 }
             }
         }
+        item { activityChart() }
         item { SectionLabel(stringResource(R.string.recent_activity)) }
         if (events.isEmpty()) {
             item {
@@ -251,37 +251,6 @@ private fun RecentEventCard(event: com.ferforastieri.valkyris.core.model.Valkyri
     }
 }
 
-@Composable
-private fun FavoriteCard(item: FavoriteItem, onCamera: (String) -> Unit, onLight: () -> Unit, onFavorite: (FavoriteItem) -> Unit) {
-    val tint = when (item.type) {
-        "camera" -> MaterialTheme.colorScheme.secondary
-        "light" -> MaterialTheme.colorScheme.secondary
-        else -> MaterialTheme.colorScheme.secondary
-    }
-    Card(
-        onClick = {
-            when (item.type) {
-                "camera" -> onCamera(item.id)
-                "light" -> onLight()
-                else -> onFavorite(item)
-            }
-        },
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
-    ) {
-        Row(Modifier.fillMaxWidth().padding(15.dp), verticalAlignment = Alignment.CenterVertically) {
-            Surface(Modifier.size(40.dp), RoundedCornerShape(12.dp), color = com.ferforastieri.valkyris.core.design.ColorTokens.BrandTile) {
-                Icon(favoriteIcon(item.type), null, Modifier.padding(10.dp), tint = tint)
-            }
-            Spacer(Modifier.width(12.dp))
-            Column(Modifier.weight(1f)) {
-                Text(item.name, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                Text(item.subtitle, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
-            }
-            Icon(Lucide.Star, null, Modifier.size(16.dp), tint = MaterialTheme.colorScheme.secondary)
-        }
-    }
-}
 
 private fun favoriteIcon(type: String): ImageVector = when (type) {
     "camera" -> Lucide.Video
@@ -323,6 +292,35 @@ private fun MetricCard(icon: androidx.compose.ui.graphics.vector.ImageVector, va
                     textAlign = TextAlign.Center,
                 )
             }
+        }
+    }
+}
+
+@Composable
+private fun FavoriteCard(item: FavoriteItem, modifier: Modifier, onClick: () -> Unit) {
+    Card(
+        onClick = onClick,
+        modifier = modifier,
+        shape = RoundedCornerShape(18.dp),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
+    ) {
+        Row(
+            Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(10.dp),
+        ) {
+            Surface(shape = RoundedCornerShape(12.dp), color = MaterialTheme.colorScheme.secondary.copy(alpha = .14f)) {
+                Icon(favoriteIcon(item.type), null, Modifier.padding(8.dp).size(18.dp), tint = MaterialTheme.colorScheme.secondary)
+            }
+            Text(
+                item.name,
+                style = MaterialTheme.typography.bodyMedium,
+                fontWeight = FontWeight.Medium,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
         }
     }
 }
