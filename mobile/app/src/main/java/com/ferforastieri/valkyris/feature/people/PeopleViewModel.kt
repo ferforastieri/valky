@@ -40,14 +40,25 @@ class PeopleViewModel @Inject constructor(
     private val _busy = MutableStateFlow(false)
     val busy = _busy.asStateFlow()
 
-    fun observe() = viewModelScope.launch {
-        while (isActive) { refresh().join(); delay(15_000) }
+    fun observe() = viewModelScope.launch {        while (isActive) { refresh().join(); delay(15_000) }
     }
     fun refresh() = viewModelScope.launch {
         runCatching { repository.refreshUsers() }
         runCatching { repository.refreshMe() }
         runCatching { repository.refreshPlaces() }
     }
+    suspend fun locationAlerts(): com.ferforastieri.valkyris.core.model.AlertPresentation = repository.api.locationAlerts()
+
+    fun saveLocationAlerts(value: com.ferforastieri.valkyris.core.model.AlertPresentation, done: (Boolean) -> Unit) {
+        _busy.value = true
+        viewModelScope.launch {
+            runCatching { repository.api.saveLocationAlerts(value) }
+                .onSuccess { done(true) }
+                .onFailure { done(false) }
+            _busy.value = false
+        }
+    }
+
     fun history(person: TrackedPerson) {
         historyGeneration++
         historyUntil = ""

@@ -284,6 +284,10 @@ class ValkyrisApi(
 
     suspend fun retention(): RetentionSettings = get("/settings/retention")
 
+    suspend fun locationAlerts(): AlertPresentation = get("/settings/location-alerts")
+
+    suspend fun saveLocationAlerts(value: AlertPresentation): AlertPresentation = put("/settings/location-alerts", value, announceBackend = false)
+
     suspend fun updateRetention(settings: RetentionSettings): RetentionSettings = put("/settings/retention", settings, announceBackend = true)
 
     suspend fun sessionPermissions(): SessionPermissions = get<SessionPermissions>("/viewer-session").also { _permissions.value = it; _permissionsLoaded.value = true }
@@ -516,7 +520,6 @@ class ValkyrisApi(
             record = actions.record,
             notify = actions.notify,
             alarm = actions.alarm,
-            recipientUserIds = actions.recipientUserIds,
             alerts = actions.alerts,
         ),
     )

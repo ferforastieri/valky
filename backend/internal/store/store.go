@@ -58,6 +58,8 @@ func Open(path string) (*Store, error) {
 		{"users", "battery", `ALTER TABLE users ADD COLUMN battery INTEGER NOT NULL DEFAULT -1`, ""},
 		{"users", "battery_at", `ALTER TABLE users ADD COLUMN battery_at TEXT NOT NULL DEFAULT ''`, ""},
 		{"users", "battery_notified_at", `ALTER TABLE users ADD COLUMN battery_notified_at TEXT NOT NULL DEFAULT ''`, ""},
+		{"users", "notify_camera", `ALTER TABLE users ADD COLUMN notify_camera INTEGER NOT NULL DEFAULT 1`, ""},
+		{"users", "notify_location", `ALTER TABLE users ADD COLUMN notify_location INTEGER NOT NULL DEFAULT 1`, ""},
 		{"user_locations", "last_seen_at", `ALTER TABLE user_locations ADD COLUMN last_seen_at TEXT NOT NULL DEFAULT ''`, ""},
 		{"user_locations", "address", `ALTER TABLE user_locations ADD COLUMN address TEXT NOT NULL DEFAULT ''`, ""},
 		{"events", "clip_status", `ALTER TABLE events ADD COLUMN clip_status TEXT NOT NULL DEFAULT 'not_requested'`, `UPDATE events SET clip_status=CASE WHEN clip_path IS NULL OR clip_path='' THEN 'not_requested' ELSE 'ready' END`},

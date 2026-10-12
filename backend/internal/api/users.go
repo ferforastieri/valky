@@ -28,17 +28,3 @@ func (s *Server) adminDeleteUser(w http.ResponseWriter, r *http.Request) {
 	}
 	w.WriteHeader(204)
 }
-
-func (s *Server) ruleRecipients(w http.ResponseWriter, r *http.Request) {
-	var in struct {
-		IDs []string `json:"recipientUserIds"`
-	}
-	if !decode(w, r, &in) {
-		return
-	}
-	if err := s.rules.SetRecipients(r.Context(), r.PathValue("id"), in.IDs); err != nil {
-		writeError(w, 400, err)
-		return
-	}
-	writeSuccess(w, 200, "Recipients updated successfully", in)
-}

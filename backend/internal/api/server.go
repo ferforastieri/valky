@@ -164,7 +164,6 @@ func (s *Server) Handler() http.Handler {
 	protected.HandleFunc("DELETE /cameras/{id}/live/webrtc/whep/{session}", s.liveWebRTC)
 	protected.HandleFunc("GET /detectors", s.detectors)
 	protected.Handle("GET /rules", s.auth.RequireRules(false, http.HandlerFunc(s.listRules)))
-	protected.Handle("PUT /rules/{id}/recipients", s.auth.RequireRules(true, http.HandlerFunc(s.ruleRecipients)))
 	protected.Handle("POST /rules", s.auth.RequireRules(true, http.HandlerFunc(s.createRule)))
 	protected.Handle("PUT /rules/{id}", s.auth.RequireRules(true, http.HandlerFunc(s.updateRule)))
 	protected.Handle("DELETE /rules/{id}", s.auth.RequireRules(true, http.HandlerFunc(s.deleteRule)))
@@ -195,6 +194,8 @@ func (s *Server) Handler() http.Handler {
 	protected.Handle("PUT /settings/push", s.auth.RequireAdmin(http.HandlerFunc(s.setPushConfiguration)))
 	protected.HandleFunc("GET /settings/retention", s.getRetention)
 	protected.Handle("PUT /settings/retention", s.auth.RequireAdmin(http.HandlerFunc(s.setRetention)))
+	protected.HandleFunc("GET /settings/location-alerts", s.getLocationAlerts)
+	protected.Handle("PUT /settings/location-alerts", s.auth.RequireAdmin(http.HandlerFunc(s.setLocationAlerts)))
 	protected.Handle("POST /detections", s.auth.RequireAdmin(http.HandlerFunc(s.submitDetection)))
 	protected.HandleFunc("GET /system/update", s.systemUpdate)
 	protected.Handle("/realtime", s.hub)
@@ -1136,6 +1137,30 @@ func (s *Server) setRetention(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeSuccess(w, http.StatusOK, "Media retention settings saved successfully", result)
+}
+func (s *Server) getLocationAlerts(w http.ResponseWriter, r *http.Request) {
+	if s.preferences == nil {
+		writeError(w, http.StatusServiceUnavailable, fmt.Errorf("settings service is not configured"))
+		return
+	}
+	value, err := s.preferences.LocationAlerts(r.Context())
+	respondWithMessage(w, value, err, "Location alert settings loaded successfully")
+}
+func (s *Server) setLocationAlerts(w http.ResponseWriter, r *http.Request) {
+	if s.preferences == nil {
+		writeError(w, http.StatusServiceUnavailable, fmt.Errorf("settings service is not configured"))
+		return
+	}
+	var value camera.AlertPresentation
+	if !decode(w, r, &value) {
+		return
+	}
+	result, err := s.preferences.SetLocationAlerts(r.Context(), value)
+	if err != nil {
+		writeError(w, http.StatusBadRequest, err)
+		return
+	}
+	writeSuccess(w, http.StatusOK, "Location alert settings saved successfully", result)
 }
 func (s *Server) submitDetection(w http.ResponseWriter, r *http.Request) {
 	if s.submitter == nil {

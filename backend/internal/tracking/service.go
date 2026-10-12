@@ -64,19 +64,21 @@ func New(s *store.Store) *Service { return &Service{store: s, now: time.Now} }
 // User is a family profile. It deliberately has no device credential in its
 // public representation: a device belongs to a user, not the other way round.
 type User struct {
-	ID            string     `json:"id"`
-	Name          string     `json:"name"`
-	Color         string     `json:"color"`
-	AvatarData    string     `json:"avatarData,omitempty"`
-	Enabled       bool       `json:"enabled"`
-	LastLatitude  *float64   `json:"lastLatitude,omitempty"`
-	LastLongitude *float64   `json:"lastLongitude,omitempty"`
-	LastAccuracy  *float64   `json:"lastAccuracy,omitempty"`
-	LastLocatedAt *time.Time `json:"lastLocatedAt,omitempty"`
-	Battery       int        `json:"battery"`
-	BatteryAt     *time.Time `json:"batteryAt,omitempty"`
-	CreatedAt     time.Time  `json:"createdAt"`
-	UpdatedAt     time.Time  `json:"updatedAt"`
+	ID             string     `json:"id"`
+	Name           string     `json:"name"`
+	Color          string     `json:"color"`
+	AvatarData     string     `json:"avatarData,omitempty"`
+	Enabled        bool       `json:"enabled"`
+	LastLatitude   *float64   `json:"lastLatitude,omitempty"`
+	LastLongitude  *float64   `json:"lastLongitude,omitempty"`
+	LastAccuracy   *float64   `json:"lastAccuracy,omitempty"`
+	LastLocatedAt  *time.Time `json:"lastLocatedAt,omitempty"`
+	Battery        int        `json:"battery"`
+	BatteryAt      *time.Time `json:"batteryAt,omitempty"`
+	NotifyCamera   bool       `json:"notifyCamera"`
+	NotifyLocation bool       `json:"notifyLocation"`
+	CreatedAt      time.Time  `json:"createdAt"`
+	UpdatedAt      time.Time  `json:"updatedAt"`
 }
 
 type UserLocation struct {
@@ -99,7 +101,7 @@ type UserTransition struct {
 }
 
 func (s *Service) ListUsers(ctx context.Context) ([]User, error) {
-	rows, err := s.store.DB.QueryContext(ctx, `SELECT id,name,color,avatar_data,enabled,last_latitude,last_longitude,last_accuracy,last_located_at,battery,battery_at,created_at,updated_at FROM users WHERE enabled=1 ORDER BY name COLLATE NOCASE`)
+	rows, err := s.store.DB.QueryContext(ctx, `SELECT id,name,color,avatar_data,enabled,last_latitude,last_longitude,last_accuracy,last_located_at,battery,battery_at,notify_camera,notify_location,created_at,updated_at FROM users WHERE enabled=1 ORDER BY name COLLATE NOCASE`)
 	if err != nil {
 		return nil, err
 	}
@@ -118,7 +120,7 @@ func (s *Service) ListUsers(ctx context.Context) ([]User, error) {
 // CurrentUser returns the family profile owned by the authenticated phone.
 // A profile is never created separately from a device.
 func (s *Service) CurrentUser(ctx context.Context, deviceID string) (User, error) {
-	return scanUser(s.store.DB.QueryRowContext(ctx, `SELECT u.id,u.name,u.color,u.avatar_data,u.enabled,u.last_latitude,u.last_longitude,u.last_accuracy,u.last_located_at,u.battery,u.battery_at,u.created_at,u.updated_at FROM users u JOIN devices d ON d.user_id=u.id WHERE d.id=? AND d.enabled=1`, deviceID))
+	return scanUser(s.store.DB.QueryRowContext(ctx, `SELECT u.id,u.name,u.color,u.avatar_data,u.enabled,u.last_latitude,u.last_longitude,u.last_accuracy,u.last_located_at,u.battery,u.battery_at,u.notify_camera,u.notify_location,u.created_at,u.updated_at FROM users u JOIN devices d ON d.user_id=u.id WHERE d.id=? AND d.enabled=1`, deviceID))
 }
 
 func (s *Service) UpdateUser(ctx context.Context, id string, in User) (User, error) {
@@ -135,14 +137,14 @@ func (s *Service) UpdateUser(ctx context.Context, id string, in User) (User, err
 		return User{}, fmt.Errorf("profile photo is invalid")
 	}
 	now := s.now().UTC().Format(time.RFC3339Nano)
-	result, err := s.store.DB.ExecContext(ctx, `UPDATE users SET name=?,color=?,avatar_data=?,updated_at=? WHERE id=?`, name, color, avatarData, now, id)
+	result, err := s.store.DB.ExecContext(ctx, `UPDATE users SET name=?,color=?,avatar_data=?,notify_camera=?,notify_location=?,updated_at=? WHERE id=?`, name, color, avatarData, boolInt(in.NotifyCamera), boolInt(in.NotifyLocation), now, id)
 	if err != nil {
 		return User{}, err
 	}
 	if affected, _ := result.RowsAffected(); affected == 0 {
 		return User{}, sql.ErrNoRows
 	}
-	return scanUser(s.store.DB.QueryRowContext(ctx, `SELECT id,name,color,avatar_data,enabled,last_latitude,last_longitude,last_accuracy,last_located_at,battery,battery_at,created_at,updated_at FROM users WHERE id=?`, id))
+	return scanUser(s.store.DB.QueryRowContext(ctx, `SELECT id,name,color,avatar_data,enabled,last_latitude,last_longitude,last_accuracy,last_located_at,battery,battery_at,notify_camera,notify_location,created_at,updated_at FROM users WHERE id=?`, id))
 }
 
 func (s *Service) UpdateCurrentUser(ctx context.Context, deviceID string, in User) (User, error) {
@@ -322,11 +324,14 @@ func scanUser(row scanner) (User, error) {
 	var lat, lon, accuracy sql.NullFloat64
 	var located, batteryAt sql.NullString
 	var created, updated string
-	err := row.Scan(&user.ID, &user.Name, &user.Color, &user.AvatarData, &enabled, &lat, &lon, &accuracy, &located, &user.Battery, &batteryAt, &created, &updated)
+	var notifyCamera, notifyLocation int
+	err := row.Scan(&user.ID, &user.Name, &user.Color, &user.AvatarData, &enabled, &lat, &lon, &accuracy, &located, &user.Battery, &batteryAt, &notifyCamera, &notifyLocation, &created, &updated)
 	if err != nil {
 		return user, err
 	}
 	user.Enabled = enabled == 1
+	user.NotifyCamera = notifyCamera == 1
+	user.NotifyLocation = notifyLocation == 1
 	if lat.Valid {
 		user.LastLatitude = &lat.Float64
 	}

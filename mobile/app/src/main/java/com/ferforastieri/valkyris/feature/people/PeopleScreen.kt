@@ -78,6 +78,7 @@ fun PeopleScreen(onPerson: (String) -> Unit = {}, vm: PeopleViewModel = hiltView
     var historyUser by remember { mutableStateOf<TrackedPerson?>(null) }
     var areaPickerOpen by remember { mutableStateOf(false) }
     var areasOpen by remember { mutableStateOf(false) }
+    var alertsOpen by remember { mutableStateOf(false) }
     var deletingPlace by remember { mutableStateOf<TrackedPlace?>(null) }
 
     Box(Modifier.fillMaxSize()) {
@@ -158,7 +159,9 @@ fun PeopleScreen(onPerson: (String) -> Unit = {}, vm: PeopleViewModel = hiltView
         onCreate = { areasOpen = false; areaPickerOpen = true },
         onEdit = { areasOpen = false; placeEditor = it },
         onDelete = { areasOpen = false; deletingPlace = it },
+        onAlerts = { areasOpen = false; alertsOpen = true },
     )
+    if (alertsOpen) LocationAlertsSheet(vm) { alertsOpen = false }
     deletingPlace?.let { place ->
         AlertDialog(
             onDismissRequest = { if (!busy) deletingPlace = null },
@@ -277,6 +280,47 @@ internal fun FamilyMap(users: List<TrackedPerson>, places: List<TrackedPlace>, m
         }
         map.invalidate()
     }, onRelease = { it.onDetach() }, modifier = modifier.clip(RoundedCornerShape(16.dp)).background(MaterialTheme.colorScheme.surfaceVariant))
+}
+
+@Composable
+private fun LocationAlertsSheet(vm: PeopleViewModel, onDismiss: () -> Unit) {
+    var alerts by remember { mutableStateOf<com.ferforastieri.valkyris.core.model.AlertPresentation?>(null) }
+    LaunchedEffect(Unit) { runCatching { vm.locationAlerts() }.onSuccess { alerts = it } }
+    val current = alerts
+    ValkyrisBottomSheet(
+        title = "Notificação de localização",
+        onDismiss = onDismiss,
+        actions = {
+            TextButton(onClick = onDismiss) { Text("Cancelar") }
+            Button(
+                onClick = { current?.let { value -> vm.saveLocationAlerts(value) { if (it) onDismiss() } } },
+                enabled = current != null,
+            ) { Text("Salvar") }
+        },
+    ) {
+        if (current == null) {
+            LinearProgressIndicator(Modifier.fillMaxWidth())
+        } else {
+            Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                Text("Como os alertas de localização e bateria devem tocar neste celular.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text(stringResource(R.string.alert_alarm_sound), style = MaterialTheme.typography.labelLarge)
+                listOf("alarm" to R.string.alert_sound_alarm, "ringtone" to R.string.alert_sound_ringtone, "silent" to R.string.alert_sound_silent).forEach { (value, label) ->
+                    Row(Modifier.fillMaxWidth().clickable { alerts = current.copy(alarmSound = value) }, verticalAlignment = Alignment.CenterVertically) {
+                        RadioButton(selected = current.alarmSound == value, onClick = { alerts = current.copy(alarmSound = value) })
+                        Text(stringResource(label), Modifier.weight(1f))
+                    }
+                }
+                Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                    Text(stringResource(R.string.alert_vibrate), Modifier.weight(1f))
+                    Switch(current.vibrate, { alerts = current.copy(vibrate = it) })
+                }
+                Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                    Text(stringResource(R.string.alert_full_screen), Modifier.weight(1f))
+                    Switch(current.fullScreen, { alerts = current.copy(fullScreen = it) })
+                }
+            }
+        }
+    }
 }
 
 @Composable
@@ -444,10 +488,14 @@ private fun AreasSheet(
     onCreate: () -> Unit,
     onEdit: (TrackedPlace) -> Unit,
     onDelete: (TrackedPlace) -> Unit,
+    onAlerts: () -> Unit = {},
 ) = ValkyrisBottomSheet(
     title = "Áreas",
     onDismiss = onDismiss,
-    actions = { Button(onClick = onCreate, enabled = !busy) { Text("Cadastrar área") } },
+    actions = {
+        TextButton(onClick = onAlerts) { Text("Notificação de localização") }
+        Button(onClick = onCreate, enabled = !busy) { Text("Cadastrar área") }
+    },
 ) {
     if (places.isEmpty()) {
         Text("Nenhuma área cadastrada.", color = MaterialTheme.colorScheme.onSurfaceVariant)

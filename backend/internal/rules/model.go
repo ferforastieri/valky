@@ -6,11 +6,10 @@ import (
 )
 
 type Actions struct {
-	Alerts           *camera.AlertPresentation `json:"alerts,omitempty"`
-	RecipientUserIDs []string                  `json:"recipientUserIds"`
-	Record           bool                      `json:"record"`
-	Notify           bool                      `json:"notify"`
-	Alarm            bool                      `json:"alarm"`
+	Alerts *camera.AlertPresentation `json:"alerts,omitempty"`
+	Record bool                      `json:"record"`
+	Notify bool                      `json:"notify"`
+	Alarm  bool                      `json:"alarm"`
 }
 type Schedule struct {
 	Days     []int  `json:"days"`

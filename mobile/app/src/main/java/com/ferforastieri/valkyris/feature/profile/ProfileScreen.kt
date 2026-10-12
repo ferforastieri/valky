@@ -25,6 +25,7 @@ import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Switch
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Slider
@@ -64,6 +65,8 @@ fun ProfileScreen(admin: Boolean, vm: ProfileViewModel = hiltViewModel()) {
     val scope = rememberCoroutineScope()
     var name by remember(current?.id, current?.name) { mutableStateOf(current?.name.orEmpty()) }
     var avatarData by remember(current?.id, current?.avatarData) { mutableStateOf(current?.avatarData.orEmpty()) }
+    var notifyCamera by remember(current?.id, current?.notifyCamera) { mutableStateOf(current?.notifyCamera ?: true) }
+    var notifyLocation by remember(current?.id, current?.notifyLocation) { mutableStateOf(current?.notifyLocation ?: true) }
     var currentPassword by remember { mutableStateOf("") }
     var newPassword by remember { mutableStateOf("") }
     var confirmation by remember { mutableStateOf("") }
@@ -103,8 +106,16 @@ fun ProfileScreen(admin: Boolean, vm: ProfileViewModel = hiltViewModel()) {
                 singleLine = true,
                 modifier = Modifier.fillMaxWidth(),
             )
+            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                Text("Alertas de câmera", Modifier.weight(1f))
+                Switch(notifyCamera, { notifyCamera = it }, enabled = !saving)
+            }
+            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                Text("Alertas de localização e bateria", Modifier.weight(1f))
+                Switch(notifyLocation, { notifyLocation = it }, enabled = !saving)
+            }
             Button(
-                onClick = { vm.save(profile.copy(name = name.trim(), avatarData = avatarData)) },
+                onClick = { vm.save(profile.copy(name = name.trim(), avatarData = avatarData, notifyCamera = notifyCamera, notifyLocation = notifyLocation)) },
                 enabled = !saving && name.isNotBlank(),
                 modifier = Modifier.fillMaxWidth(),
             ) { Text("Salvar perfil") }

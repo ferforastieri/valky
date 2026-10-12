@@ -125,6 +125,8 @@ CREATE TABLE IF NOT EXISTS users (
   battery INTEGER NOT NULL DEFAULT -1,
   battery_at TEXT NOT NULL DEFAULT '',
   battery_notified_at TEXT NOT NULL DEFAULT '',
+  notify_camera INTEGER NOT NULL DEFAULT 1,
+  notify_location INTEGER NOT NULL DEFAULT 1,
   created_at TEXT NOT NULL,
   updated_at TEXT NOT NULL
 );

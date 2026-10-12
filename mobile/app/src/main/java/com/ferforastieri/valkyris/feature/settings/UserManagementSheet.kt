@@ -28,6 +28,8 @@ fun UserManagementSheet(users: List<ManagedUser>, error: String?, busy: Boolean,
                 var name by remember(user) { mutableStateOf(user.name) }
                 var enabled by remember(user) { mutableStateOf(user.enabled) }
                 var admin by remember(user) { mutableStateOf(user.admin) }
+                var notifyCamera by remember(user) { mutableStateOf(user.notifyCamera) }
+                var notifyLocation by remember(user) { mutableStateOf(user.notifyLocation) }
                 val expanded = editing == user.id
                 OutlinedCard(Modifier.fillMaxWidth(), colors = CardDefaults.outlinedCardColors(containerColor = MaterialTheme.colorScheme.surface)) {
                     Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -49,6 +51,8 @@ fun UserManagementSheet(users: List<ManagedUser>, error: String?, busy: Boolean,
                             UserAccessOption("Visualizar regras", "Pode consultar as regras das câmeras.", admin || viewRules, !busy && !admin) { viewRules = it; if (!it) editRules = false }
                             UserAccessOption("Editar regras", "Pode criar, alterar, remover e escolher quem recebe alertas.", admin || editRules, !busy && !admin && viewRules) { editRules = it }
                             UserAccessOption("Administrador", "Pode gerenciar usuários e configurações do sistema.", admin, !busy) { admin = it }
+                            UserAccessOption("Alertas de câmera", "Recebe notificações e alarmes das câmeras.", notifyCamera, !busy) { notifyCamera = it }
+                            UserAccessOption("Alertas de localização", "Recebe chegada/saída de áreas e bateria fraca.", notifyLocation, !busy) { notifyLocation = it }
                             HorizontalDivider()
                             Text(if (user.credentialsConfigured) "Redefinir acesso" else "Configurar acesso", style = MaterialTheme.typography.titleSmall)
                             com.ferforastieri.valkyris.feature.onboarding.UsernameField(username, { username = it }, !busy)
@@ -56,7 +60,7 @@ fun UserManagementSheet(users: List<ManagedUser>, error: String?, busy: Boolean,
                             Text("Preencha a senha para definir as credenciais. Isso encerra as sessões desta pessoa; ela deverá entrar novamente.", style = MaterialTheme.typography.bodySmall)
                             com.ferforastieri.valkyris.core.design.AdaptiveRow(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                                 TextButton({ removing = user }, enabled = !busy) { Text("Remover pessoa", color = MaterialTheme.colorScheme.error) }
-                                Button({ onSave(user.copy(name = name.trim(), enabled = enabled, admin = admin, viewRules = viewRules, editRules = editRules, username = username.trim(), password = password)); password = "" }, enabled = !busy && name.isNotBlank() && (password.isEmpty() || username.isNotBlank() && password.toByteArray().size in 12..72)) {
+                                Button({ onSave(user.copy(name = name.trim(), enabled = enabled, admin = admin, viewRules = viewRules, editRules = editRules, notifyCamera = notifyCamera, notifyLocation = notifyLocation, username = username.trim(), password = password)); password = "" }, enabled = !busy && name.isNotBlank() && (password.isEmpty() || username.isNotBlank() && password.toByteArray().size in 12..72)) {
                                     if (busy) CircularProgressIndicator(Modifier.size(18.dp), strokeWidth = 2.dp) else Text("Salvar alterações")
                                 }
                             }

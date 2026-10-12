@@ -158,7 +158,6 @@ fun RuleEditorDialog(cameras: List<Camera>, detectors: List<DetectorKind>, exist
     var camera by remember(existing?.id) { mutableStateOf(cameras.firstOrNull { it.id == existing?.cameraId } ?: cameras.firstOrNull()) }
     var detector by remember(existing?.id) { mutableStateOf(detectors.firstOrNull { it.id == existing?.detectorTypes?.firstOrNull() } ?: detectors.firstOrNull()) }
     var name by remember(existing?.id) { mutableStateOf(existing?.name.orEmpty()) }
-    var recipients by remember(existing?.id) { mutableStateOf(existing?.actions?.recipientUserIds) }
     var record by remember(existing?.id) { mutableStateOf(existing?.actions?.record ?: true) }
     var notify by remember(existing?.id) { mutableStateOf(existing?.actions?.notify ?: true) }
     var alarm by remember(existing?.id) { mutableStateOf(existing?.actions?.alarm ?: false) }
@@ -197,7 +196,7 @@ fun RuleEditorDialog(cameras: List<Camera>, detectors: List<DetectorKind>, exist
                         schedule = if (scheduled) RuleSchedule(days.sorted(), start, end, timezone) else RuleSchedule(),
                         motion = if (useRegion) MotionSettings(checkNotNull(region), duration.toInt(), fraction.toDouble().coerceIn(.01, .5)) else null,
                         cooldownSeconds = cooldown.toInt(),
-                        actions = RuleActions(record, notify, alarm, recipients, alerts),
+                        actions = RuleActions(record, notify, alarm, alerts),
                         enabled = existing?.enabled ?: true,
                     ))
                 },
@@ -225,14 +224,6 @@ fun RuleEditorDialog(cameras: List<Camera>, detectors: List<DetectorKind>, exist
             ExposedDropdownMenuBox(detectorExpanded, { detectorExpanded = it }) {
                 OutlinedTextField(detector?.let { stringResource(detectorLabelRes(it.id)) }.orEmpty(), {}, readOnly = true, label = { Text(stringResource(R.string.detector)) }, trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(detectorExpanded) }, modifier = Modifier.menuAnchor(MenuAnchorType.PrimaryNotEditable).fillMaxWidth())
                 ExposedDropdownMenu(detectorExpanded, { detectorExpanded = false }) { detectors.forEach { item -> DropdownMenuItem({ Text(stringResource(detectorLabelRes(item.id))) }, { detector = item; detectorExpanded = false }) } }
-            }
-            RuleSectionTitle("Quem recebe", "Estas pessoas receberão as notificações e os alarmes desta regra.")
-            RuleActionRow(recipients == null, { recipients = if (it) null else emptyList() }, "Toda a família")
-            if (recipients != null) {
-                people.forEach { person ->
-                    RuleActionRow(person.id in recipients.orEmpty(), { checked -> recipients = if (checked) recipients.orEmpty() + person.id else recipients.orEmpty() - person.id }, person.name)
-                }
-                if (recipients.orEmpty().isEmpty()) Text("Ninguém receberá notificações desta regra.", style = MaterialTheme.typography.bodySmall)
             }
             RuleSectionTitle("Quando monitorar", "Monitore o dia todo ou escolha dias e horários.")
             RuleActionRow(scheduled, { scheduled = it }, "Limitar por horário")
