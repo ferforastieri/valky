@@ -535,22 +535,10 @@ async function eventDetails(id: string) {
     $("#detail-body").innerHTML =
       `${ev.source === "tracking" ? "" : `<div class="media-stage" id="event-media"><span>Carregando imagem…</span></div>`}${dl([["Origem", eventSource(ev)], ["Quando", date(ev.occurredAt)], ["Status", ev.acknowledgedAt ? `Reconhecido em ${date(ev.acknowledgedAt)}` : "Não reconhecido"], ...(ev.source === "tracking" ? [] : [["Confiança", `${Math.round(ev.confidence * 100)}%`] as [string, string]])])}<div class="media-actions">${ev.clipStatus === "ready" ? '<button id="play-clip" class="primary">Reproduzir clipe</button>' : ""}</div>${ev.source !== "tracking" && ev.clipStatus !== "ready" ? `<p class="notice">${ev.clipStatus === "processing" ? "Clipe em processamento. Abra o evento novamente em alguns instantes." : ev.clipStatus === "failed" ? "Não foi possível preparar o clipe." : "Nenhum clipe associado a este evento."}</p>` : ""}`;
     if (ev.source !== "tracking") {
-      if (ev.snapshotPath)
-        try {
-          const blob = await api.blob(
-            `/events/${key(id)}/snapshot`,
-            modalController.signal,
-          );
-          if (version !== dialogVersion) return;
-          const url = URL.createObjectURL(blob);
-          modalCleanups.push(() => URL.revokeObjectURL(url));
-          $("#event-media").innerHTML =
-            `<img src="${url}" alt="Imagem do evento"/>`;
-        } catch {
-          if (version === dialogVersion)
-            $("#event-media").textContent = "Imagem indisponível.";
-        }
-      else $("#event-media").textContent = "Sem imagem associada.";
+      $("#event-media").textContent =
+        ev.clipStatus === "ready"
+          ? "Use “Reproduzir clipe” para ver o evento."
+          : "Sem imagem associada.";
     }
     if (version === dialogVersion && $("#play-clip"))
       $("#play-clip").onclick = async () => {

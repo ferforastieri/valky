@@ -34,13 +34,34 @@ class PeopleViewModel @Inject constructor(
     private val _historyMore = MutableStateFlow(false)
     val historyMore = _historyMore.asStateFlow()
     private var historyJob: Job? = null
+    private var realtime: okhttp3.WebSocket? = null
+    private var observing = false
     private var historyOwner = ""
     private var historyGeneration = 0
     private var historyUntil = ""
     private val _busy = MutableStateFlow(false)
     val busy = _busy.asStateFlow()
 
-    fun observe() = viewModelScope.launch {        while (isActive) { refresh().join(); delay(15_000) }
+    fun observe() = viewModelScope.launch {
+        observing = true
+        refresh().join()
+        connectRealtime()
+        try {
+            // The realtime channel drives the updates; this slow poll is only a
+            // safety net for a dropped socket.
+            while (isActive) { delay(60_000); refresh() }
+        } finally {
+            observing = false
+            realtime?.cancel()
+            realtime = null
+        }
+    }
+
+    private fun connectRealtime() {
+        realtime = repository.api.realtime(
+            { viewModelScope.launch { refresh() } },
+            { if (observing) viewModelScope.launch { delay(5_000); if (observing) connectRealtime() } },
+        )
     }
     fun refresh() = viewModelScope.launch {
         runCatching { repository.refreshUsers() }

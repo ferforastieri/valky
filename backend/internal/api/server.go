@@ -184,7 +184,6 @@ func (s *Server) Handler() http.Handler {
 	protected.HandleFunc("POST /events/acknowledge-all", s.ackAllEvents)
 	protected.HandleFunc("GET /events/{id}", s.getEvent)
 	protected.HandleFunc("POST /events/{id}/acknowledge", s.ackEvent)
-	protected.HandleFunc("GET /events/{id}/snapshot", s.eventSnapshot)
 	protected.HandleFunc("GET /events/{id}/clip", s.eventClip)
 	protected.HandleFunc("POST /devices/push", s.push)
 	protected.HandleFunc("GET /settings/push", s.getPushConfiguration)
@@ -1035,24 +1034,6 @@ func (s *Server) eventClip(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Cache-Control", "private, max-age=3600")
 	setOutcomeHeaders(w, http.StatusOK, "Event clip loaded")
 	http.ServeFile(w, r, filepath.Clean(e.ClipPath))
-}
-func (s *Server) eventSnapshot(w http.ResponseWriter, r *http.Request) {
-	e, err := s.events.Get(r.Context(), r.PathValue("id"))
-	if err != nil {
-		respond(w, nil, err)
-		return
-	}
-	if e.SnapshotPath == "" {
-		writeError(w, 404, fmt.Errorf("event snapshot is not ready"))
-		return
-	}
-	if _, err = os.Stat(filepath.Clean(e.SnapshotPath)); err != nil {
-		writeError(w, http.StatusNotFound, fmt.Errorf("event snapshot file is unavailable: %w", err))
-		return
-	}
-	w.Header().Set("Cache-Control", "private, max-age=86400")
-	setOutcomeHeaders(w, http.StatusOK, "Event snapshot loaded")
-	http.ServeFile(w, r, filepath.Clean(e.SnapshotPath))
 }
 func (s *Server) push(w http.ResponseWriter, r *http.Request) {
 	var in notify.Registration
