@@ -138,6 +138,7 @@
     <string name="detector_doorbell">Campainha</string>
     <string name="detector_knock">Batida</string>
     <string name="detector_dog_bark">Latido</string>
+    <string name="detector_cough">Tosse</string>
     <string name="detector_other">Evento de monitoramento</string>
     <string name="no_rules">Nenhuma regra ainda</string>
     <string name="rule_name">Nome da regra</string>

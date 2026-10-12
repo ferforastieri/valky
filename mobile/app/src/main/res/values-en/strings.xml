@@ -138,6 +138,7 @@
     <string name="detector_doorbell">Doorbell</string>
     <string name="detector_knock">Knock</string>
     <string name="detector_dog_bark">Dog bark</string>
+    <string name="detector_cough">Cough</string>
     <string name="detector_other">Monitoring event</string>
     <string name="no_rules">No rules yet</string>
     <string name="rule_name">Rule name</string>

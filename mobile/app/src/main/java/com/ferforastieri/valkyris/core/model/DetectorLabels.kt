@@ -21,6 +21,7 @@ fun detectorLabelRes(type: String): Int = when (type.trim().lowercase()) {
     "doorbell" -> R.string.detector_doorbell
     "knock" -> R.string.detector_knock
     "dog_bark" -> R.string.detector_dog_bark
+    "cough" -> R.string.detector_cough
     else -> R.string.detector_other
 }
 

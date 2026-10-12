@@ -122,6 +122,7 @@ fun EventDetailScreen(vm: EventDetailViewModel = hiltViewModel()) {
                 "doorbell" -> "Foi identificado um toque de campainha."
                 "knock" -> "Foi identificado um som de batida."
                 "dog_bark" -> "Foi identificado um som compatível com latido."
+                "cough" -> "Foi identificado um som compatível com tosse."
                 "tamper" -> "A câmera sinalizou uma possível obstrução ou alteração no enquadramento."
                 else -> "Consulte os detalhes deste registro para entender o que aconteceu."
             }, style = MaterialTheme.typography.bodyMedium)

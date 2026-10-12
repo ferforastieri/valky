@@ -10,7 +10,7 @@ func AudioThreshold(kind string) float64 {
 		return .78
 	case "glass_break", "smoke_alarm", "fire_alarm", "siren":
 		return .85
-	case "doorbell", "knock", "dog_bark":
+	case "doorbell", "knock", "dog_bark", "cough":
 		return .72
 	default:
 		return .70

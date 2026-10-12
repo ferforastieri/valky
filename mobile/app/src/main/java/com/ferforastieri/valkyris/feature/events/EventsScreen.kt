@@ -135,6 +135,6 @@ private fun formatTime(value: String) = runCatching {
 
 internal fun eventCategoryRes(event: ValkyrisEvent): Int = when {
     event.source == "tracking" || event.type.startsWith("place_") -> R.string.event_category_location
-    event.type in setOf("baby_cry", "crying", "scream", "glass_break", "smoke_alarm", "fire_alarm", "siren", "doorbell", "knock", "dog_bark") -> R.string.event_category_audio
+    event.type in setOf("baby_cry", "crying", "scream", "glass_break", "smoke_alarm", "fire_alarm", "siren", "doorbell", "knock", "dog_bark", "cough") -> R.string.event_category_audio
     else -> R.string.event_category_camera
 }
