@@ -64,6 +64,9 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
+/** Espaço único entre os botões do controle. */
+private val KeyGap = 8.dp
+
 /**
  * Full-screen remote shaped like a TV remote, laid out top to bottom: power
  * (centred) with the settings key beside it, the numeric keypad, the navigation
@@ -80,7 +83,7 @@ fun RemoteControlScreen(onBack: () -> Unit, vm: RemoteControlViewModel = hiltVie
         if (remote?.tokenConfigured == true) {
             Column(Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
                 PowerButton(powering = state.powering, onPower = vm::power)
-                Spacer(Modifier.height(6.dp))
+                Spacer(Modifier.height(KeyGap))
                 KeypadModeToggle(qwerty = qwerty, onToggle = { qwerty = !qwerty })
             }
         }
@@ -140,13 +143,13 @@ private val QwertyRows = listOf(
 private fun QwertyPad(enabled: Boolean, onText: (String) -> Unit) {
     Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
         QwertyRows.forEach { row ->
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(KeyGap)) {
                 row.forEach { letter ->
                     HoldKey(KeySpec(Lucide.Tv, letter, letter), enabled, Modifier.weight(1f).height(44.dp), RoundedCornerShape(10.dp), onText, text = letter)
                 }
             }
         }
-        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(KeyGap)) {
             HoldKey(KeySpec(Lucide.Tv, "Espaço", " "), enabled, Modifier.weight(3f).height(44.dp), RoundedCornerShape(10.dp), onText, text = "espaço")
             HoldKey(KeySpec(Lucide.Tv, "Apagar", "\b"), enabled, Modifier.weight(1f).height(44.dp), RoundedCornerShape(10.dp), onText, text = "⌫")
             HoldKey(KeySpec(Lucide.Tv, "Enter", "\n"), enabled, Modifier.weight(1f).height(44.dp), RoundedCornerShape(10.dp), onText, text = "⏎")
@@ -181,8 +184,8 @@ private fun ConnectedRemote(state: RemoteControlState, vm: RemoteControlViewMode
                 border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
             ) {
                 Row(
-                    Modifier.padding(6.dp),
-                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                    Modifier.padding(KeyGap),
+                    horizontalArrangement = Arrangement.spacedBy(KeyGap),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     HoldKey(KeySpec(Lucide.ArrowLeft, stringResource(R.string.remote_back), "KEY_RETURN"), enabled, Modifier.size(58.dp), CircleShape, vm::send)
@@ -203,7 +206,7 @@ private fun Rocker(up: KeySpec, down: KeySpec, enabled: Boolean, onSend: (String
         color = MaterialTheme.colorScheme.surfaceVariant,
         border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
     ) {
-        Column(Modifier.padding(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+        Column(Modifier.padding(KeyGap), verticalArrangement = Arrangement.spacedBy(KeyGap)) {
             HoldKey(up, enabled, Modifier.size(54.dp), CircleShape, onSend)
             middle?.let { HoldKey(it, enabled, Modifier.size(54.dp), CircleShape, onSend) }
             HoldKey(down, enabled, Modifier.size(54.dp), CircleShape, onSend)
@@ -248,9 +251,9 @@ private fun PadArrow(icon: ImageVector, label: String, key: String, enabled: Boo
 
 @Composable
 private fun NumberPad(enabled: Boolean, onSend: (String) -> Unit) {
-    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+    Column(verticalArrangement = Arrangement.spacedBy(KeyGap)) {
         listOf(listOf("1", "2", "3"), listOf("4", "5", "6"), listOf("7", "8", "9"), listOf("", "0", "")).forEach { row ->
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(KeyGap)) {
                 row.forEach { digit ->
                     if (digit.isEmpty()) {
                         Spacer(Modifier.weight(1f))

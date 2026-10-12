@@ -212,25 +212,20 @@ fun OverviewContent(
                 }
             }
         } else {
-            // Favoritos por seção: um ícone simples abre cada grupo e os cartões
-            // ficam três por linha, para caber mais coisa sem perder o toque.
-            favoriteSections.forEach { section ->
-                val items = favorites.filter { it.type == section.type }
-                if (items.isEmpty()) return@forEach
-                item(key = "favorites-${section.type}") { SectionIcon(section.icon) }
-                item(key = "favorites-${section.type}-grid") {
-                    FavoriteGrid(
-                        items = items,
-                        onOpen = { favorite ->
-                            when (favorite.type) {
-                                "camera" -> onCamera(favorite.id)
-                                "light" -> onLight()
-                                else -> onFavorite(favorite)
-                            }
-                        },
-                        onToggleLight = onToggleLight,
-                    )
-                }
+            // Todos os favoritos em uma grade só, na ordem câmeras, luzes e
+            // controles: o ícone de cada cartão já diz de que se trata.
+            item(key = "favorites-grid") {
+                FavoriteGrid(
+                    items = orderedFavorites(favorites),
+                    onOpen = { favorite ->
+                        when (favorite.type) {
+                            "camera" -> onCamera(favorite.id)
+                            "light" -> onLight()
+                            else -> onFavorite(favorite)
+                        }
+                    },
+                    onToggleLight = onToggleLight,
+                )
             }
         }
         item { activityChart() }
@@ -322,14 +317,11 @@ private fun MetricCard(icon: androidx.compose.ui.graphics.vector.ImageVector, va
     }
 }
 
-private data class FavoriteSection(val type: String, val icon: ImageVector)
+// Ordem dos favoritos na visão geral: câmeras, luzes e controles.
+private val favoriteOrder = listOf("camera", "light", "remote")
 
-// Cada seção é identificada por um ícone simples; o texto sai da tela.
-private val favoriteSections = listOf(
-    FavoriteSection("camera", Lucide.Video),
-    FavoriteSection("light", Lucide.Lightbulb),
-    FavoriteSection("remote", Lucide.Tv),
-)
+internal fun orderedFavorites(favorites: List<FavoriteItem>): List<FavoriteItem> =
+    favoriteOrder.flatMap { type -> favorites.filter { it.type == type } }
 
 /**
  * Cartões favoritos em linhas de três. Com fonte ampliada (ou tela estreita) os
@@ -410,11 +402,6 @@ private fun FavoriteCard(item: FavoriteItem, modifier: Modifier, onClick: () -> 
             )
         }
     }
-}
-
-@Composable
-private fun SectionIcon(icon: ImageVector) {
-    Icon(icon, null, Modifier.size(19.dp), tint = MaterialTheme.colorScheme.secondary)
 }
 
 @Composable

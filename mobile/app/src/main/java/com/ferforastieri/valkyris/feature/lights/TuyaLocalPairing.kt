@@ -1,6 +1,8 @@
 package com.ferforastieri.valkyris.feature.lights
 
 import android.content.Context
+import android.net.ConnectivityManager
+import android.net.NetworkCapabilities
 import android.net.wifi.WifiManager
 import java.net.DatagramPacket
 import java.net.DatagramSocket
@@ -161,7 +163,9 @@ internal object TuyaSmartConfig {
  * open. The phone must be connected to the 2.4 GHz network the lamp will join.
  */
 internal class LocalPairingSender(context: Context) {
-    private val wifi = context.applicationContext.getSystemService(Context.WIFI_SERVICE) as? WifiManager
+    private val appContext = context.applicationContext
+    private val wifi = appContext.getSystemService(Context.WIFI_SERVICE) as? WifiManager
+    private val connectivity = appContext.getSystemService(ConnectivityManager::class.java)
 
     /**
      * @param durationMillis por quanto tempo insistir; zero significa até o
@@ -177,6 +181,9 @@ internal class LocalPairingSender(context: Context) {
     ) = withContext(Dispatchers.IO) {
         val multicastLock = wifi?.createMulticastLock("valkyris-pairing")?.apply { setReferenceCounted(false); acquire() }
         DatagramSocket().use { socket ->
+            // Sem esta amarração o pacote pode sair pela rede móvel, e a lâmpada
+            // só escuta o ar do Wi-Fi de casa.
+            wifiNetwork()?.let { network -> runCatching { network.bindSocket(socket) } }
             socket.broadcast = true
             socket.soTimeout = 200
             val broadcast = InetAddress.getByName("255.255.255.255")
@@ -203,6 +210,14 @@ internal class LocalPairingSender(context: Context) {
             }
         }
         multicastLock?.let { if (it.isHeld) it.release() }
+    }
+
+    /** Rede Wi-Fi atual, quando existe uma. */
+    private fun wifiNetwork(): android.net.Network? {
+        val manager = connectivity ?: return null
+        val active = manager.activeNetwork
+        if (active != null && manager.getNetworkCapabilities(active)?.hasTransport(NetworkCapabilities.TRANSPORT_WIFI) == true) return active
+        return manager.allNetworks.firstOrNull { manager.getNetworkCapabilities(it)?.hasTransport(NetworkCapabilities.TRANSPORT_WIFI) == true }
     }
 
     private fun DatagramSocket.sendAddress(address: InetAddress, port: Int) {

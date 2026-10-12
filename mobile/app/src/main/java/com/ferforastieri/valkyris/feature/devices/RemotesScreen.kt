@@ -23,6 +23,7 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -48,6 +49,7 @@ import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.LifecycleResumeEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.composables.icons.lucide.Link
+import com.composables.icons.lucide.Plus
 import com.composables.icons.lucide.Lucide
 import com.composables.icons.lucide.Pencil
 import com.composables.icons.lucide.Radar
@@ -64,11 +66,10 @@ import com.ferforastieri.valkyris.core.model.RemoteUpdate
 fun RemotesScreen(admin: Boolean, onRemote: (String) -> Unit = {}, vm: RemotesViewModel = hiltViewModel()) {
     val context = LocalContext.current
     LifecycleResumeEffect(Unit) { vm.refresh(); onPauseOrDispose {} }
-    // Entering the listing already starts looking for TVs on the network.
-    LaunchedEffect(Unit) { vm.discover(context) }
     val state by vm.state.collectAsStateWithLifecycle()
     var editingId by remember { mutableStateOf<String?>(null) }
     var removingId by remember { mutableStateOf<String?>(null) }
+    var adding by remember { mutableStateOf(false) }
     val editing = state.remotes.firstOrNull { it.id == editingId }
     val removing = state.remotes.firstOrNull { it.id == removingId }
     // A TV already registered must not be offered for pairing again.
@@ -77,7 +78,7 @@ fun RemotesScreen(admin: Boolean, onRemote: (String) -> Unit = {}, vm: RemotesVi
     Box(Modifier.fillMaxSize()) {
         Column(Modifier.fillMaxSize().padding(horizontal = 18.dp)) {
             state.error?.let { /* errors surface as a toast */ }
-            if (admin) {
+            if (admin && adding) {
                 DiscoveryHeader(
                     discovering = state.discovering,
                     found = state.discovered.size,
@@ -95,6 +96,9 @@ fun RemotesScreen(admin: Boolean, onRemote: (String) -> Unit = {}, vm: RemotesVi
                         DiscoveredTvCard(tv, onConnect = { vm.addAndPair(RemoteInput(name = tv.name, host = tv.host, port = 8002)) })
                     }
                     item { HorizontalDivider() }
+                }
+                if (admin && adding && discovered.isEmpty() && !state.discovering) {
+                    item { Text(stringResource(R.string.remote_discover_empty), color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodySmall) }
                 }
                 if (state.loading && state.remotes.isEmpty()) {
                     item { Box(Modifier.fillMaxWidth().padding(top = 40.dp), contentAlignment = Alignment.Center) { CircularProgressIndicator() } }
@@ -117,6 +121,12 @@ fun RemotesScreen(admin: Boolean, onRemote: (String) -> Unit = {}, vm: RemotesVi
                 }
             }
         }
+        if (admin) FloatingActionButton(
+            onClick = { adding = true; if (state.discovered.isEmpty()) vm.discover(context) },
+            modifier = Modifier.align(Alignment.BottomEnd).padding(end = 20.dp, bottom = 18.dp),
+            containerColor = MaterialTheme.colorScheme.secondary,
+            contentColor = MaterialTheme.colorScheme.onSecondary,
+        ) { Icon(Lucide.Plus, stringResource(R.string.add_remote)) }
     }
 
     editing?.let { remote ->

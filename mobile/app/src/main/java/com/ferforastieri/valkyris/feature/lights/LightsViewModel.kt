@@ -42,8 +42,10 @@ data class LightsState(
     val pairing: PairingProgress? = null,
     /** Rede usada no pareamento; vem da última vez ou do Wi-Fi atual. */
     val network: String = "",
-    /** Quando falso, a tela precisa da senha do Wi-Fi uma única vez. */
-    val hasCredentials: Boolean = false,
+    /** Rodadas já transmitidas na janela atual, prova de que o envio está vivo. */
+    val rounds: Int = 0,
+    /** O celular está na faixa de 5 GHz, que a lâmpada não escuta. */
+    val onFiveGigahertz: Boolean = false,
 )
 
 @HiltViewModel
@@ -65,13 +67,10 @@ class LightsViewModel @Inject constructor(
         viewModelScope.launch { repository.lights.collect { value -> _state.update { it.copy(lights = value, loading = false) } } }
         refresh(); connectRealtime()
         viewModelScope.launch { while (isActive) { delay(20_000); runCatching { repository.refreshLights() } } }
-        _state.update {
-            it.copy(
-                network = wifiSecrets.credentials()?.ssid ?: currentSsid(context).orEmpty(),
-                hasCredentials = wifiSecrets.credentials() != null,
-            )
-        }
+        _state.update { it.copy(network = wifiSecrets.credentials()?.ssid ?: currentSsid(context).orEmpty()) }
     }
+
+    private fun currentBandWarning(): Boolean = currentWifiIsFiveGigahertz(context)
 
     private fun connectRealtime() {
         realtime = repository.api.realtime({ refresh() }, { if (active) viewModelScope.launch { delay(5_000); if (active) connectRealtime() } }, eventPrefix = "light.")
@@ -98,20 +97,11 @@ class LightsViewModel @Inject constructor(
     /** Nome da rede atual, quando o sistema permite ler (precisa de localização). */
     fun suggestedSsid(): String = _state.value.network.ifBlank { savedSsid ?: currentSsid(context).also { savedSsid = it }.orEmpty() }
 
-    /**
-     * A tela chama isto ao aparecer: se a rede já foi informada alguma vez, a
-     * busca e o envio começam sozinhos e a lâmpada aparece na lista sem nenhum
-     * toque. Sem a senha guardada, a tela pede uma única vez.
-     */
-    fun watch() {
-        if (pairingJob?.isActive == true) return
-        val credentials = wifiSecrets.credentials()
-        if (credentials == null) {
-            _state.update { it.copy(pairing = null, hasCredentials = false, network = it.network.ifBlank { currentSsid(context).orEmpty() }) }
-            return
-        }
-        configure(credentials.ssid, credentials.password, remember = false)
-    }
+    /** Senha já guardada no aparelho, para o formulário vir preenchido. */
+    fun savedPassword(): String = wifiSecrets.credentials()?.password.orEmpty()
+
+    /** Rede já guardada, quando houver. */
+    fun savedNetwork(): String = wifiSecrets.credentials()?.ssid.orEmpty()
 
     /**
      * Configura uma lâmpada em modo de pareamento: o backend abre a janela, o
@@ -137,13 +127,20 @@ class LightsViewModel @Inject constructor(
                     return@launch
                 }
             pairingSessionId = session.id
-            _state.update { it.copy(network = network, hasCredentials = true, pairing = PairingProgress("sending", "Enviando os dados do Wi-Fi para a lâmpada…")) }
+            _state.update {
+                it.copy(
+                    network = network,
+                    rounds = 0,
+                    onFiveGigahertz = currentBandWarning(),
+                    pairing = PairingProgress("sending", "Enviando os dados do Wi-Fi para a lâmpada…"),
+                )
+            }
             val tokenGroup = TuyaSmartConfig.tokenGroup(session.region, session.token, session.secret)
             val sender = LocalPairingSender(context)
             // O envio acompanha a janela inteira: a lâmpada pode ser resetada
             // alguns minutos depois de a tela abrir.
             val send = launch {
-                runCatching { sender.send(network, password, tokenGroup) }
+                runCatching { sender.send(network, password, tokenGroup, onRound = { round -> _state.update { it.copy(rounds = round) } }) }
                     .onFailure { error -> _state.update { it.copy(error = error.message) } }
             }
             try {
@@ -162,17 +159,14 @@ class LightsViewModel @Inject constructor(
         }
     }
 
-    /** Para de enviar e encerra a janela do servidor ao sair da tela. */
-    fun stopWatching() {
+    /** Para de enviar, encerra a janela do servidor e limpa o resultado. */
+    fun dismissPairing() {
         val sessionId = pairingSessionId
         pairingSessionId = null
         pairingJob?.cancel()
         pairingJob = null
-        if (sessionId != null) viewModelScope.launch { runCatching { repository.cancelLightPairing(sessionId) } }
-    }
-
-    fun dismissPairingResult() {
         _state.update { it.copy(pairing = null) }
+        if (sessionId != null) viewModelScope.launch { runCatching { repository.cancelLightPairing(sessionId) } }
     }
 
     private fun guarded(id: String, useGlobalGate: Boolean = true, block: suspend () -> Unit) {
@@ -193,6 +187,14 @@ class LightsViewModel @Inject constructor(
         realtime?.close(1000, "lights screen closed")
         super.onCleared()
     }
+}
+
+/** A lâmpada só escuta a faixa de 2,4 GHz; o aviso vale para o celular. */
+internal fun currentWifiIsFiveGigahertz(context: Context): Boolean {
+    if (ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED) return false
+    val wifi = context.applicationContext.getSystemService(Context.WIFI_SERVICE) as? WifiManager ?: return false
+    val frequency = runCatching { wifi.connectionInfo?.frequency }.getOrNull() ?: return false
+    return frequency in 4900..5900
 }
 
 /** Nome da rede Wi-Fi atual, quando o sistema permite ler. */

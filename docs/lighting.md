@@ -19,12 +19,12 @@ O pareamento é conduzido por dois lados: o **aplicativo Android** tem o rádio 
 
 ## Como configurar uma lâmpada
 
-A tela de iluminação já procura uma lâmpada em modo de pareamento enquanto está aberta: não existe botão de adicionar nem formulário de cadastro.
+A tela de iluminação é só a listagem das lâmpadas. O cadastro é o botão **+**:
 
-1. Abra **Dispositivos → Iluminação** no Android (apenas administradores).
+1. No Android, abra **Dispositivos → Iluminação** e toque em **+** (apenas administradores).
 2. Deixe a lâmpada **piscando rápido**: ligue e desligue três vezes até ela entrar em modo de pareamento.
-3. Na primeira vez o aplicativo pede a senha do Wi-Fi, porque o Android não permite ler a senha salva do sistema para nenhum aplicativo. Depois disso ela fica cifrada no próprio aparelho e os próximos pareamentos são automáticos.
-4. A lâmpada aparece na lista sozinha, já respondendo na rede local. Dê um nome e escolha o cômodo.
+3. Na primeira vez o aplicativo pede a senha do Wi-Fi, porque o Android não permite ler a senha salva do sistema para nenhum aplicativo. Depois disso ela fica cifrada no próprio aparelho e vem preenchida nas próximas vezes.
+4. Toque em **Configurar**: o aplicativo envia os dados pelo ar, procura e registra a lâmpada sozinho. Ela aparece na lista já respondendo na rede local — dê um nome e escolha o cômodo.
 
 O fluxo inteiro leva menos de um minuto e não pede identificador, endereço nem chave: tudo isso é descoberto e gerado automaticamente.
 
@@ -37,6 +37,10 @@ Depois disso, o controle é 100% local: o Valkyris não usa nuvem para ligar, de
 ### Firmwares que exigem ativação
 
 Algumas lâmpadas só aceitam controle local depois de uma ativação única no serviço do fabricante — é uma característica do firmware, não do Valkyris. Quando é esse o caso, o fluxo informa exatamente isso: a lâmpada aparece na rede, mas recusa a chave local, e a tela mostra a mensagem. O Valkyris **não** oferece caminho de ativação em nuvem: se a sua lâmpada estiver nesse grupo, o pareamento dirá o motivo em vez de prometer algo que não acontece.
+
+## Firewall do servidor
+
+O backend precisa de três coisas na rede local: enviar o anúncio de descoberta (UDP 6666, 6667 e 7000), receber as respostas das lâmpadas (UDP, mesma faixa) e abrir a conexão de controle (TCP 6668). Se o Valkyris roda em um container no Proxmox com o firewall do host ativo, isso vira quatro regras — duas de saída e duas de entrada — para a sub-rede da casa. Sem elas a lâmpada nunca aparece, mesmo estando na rede.
 
 ## Descoberta de endereço
 

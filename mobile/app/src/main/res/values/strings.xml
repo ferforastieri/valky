@@ -29,11 +29,14 @@
     <string name="lighting">Iluminação</string>
     <string name="no_lights">Iluminação local</string>
     <string name="no_lights_body">A base de controle está pronta para receber adaptadores locais padronizados, sem vincular sua casa a uma conta de fabricante.</string>
+    <string name="light_pair_transmitting">Transmitindo para a lâmpada (rodada %1$d)…</string>
+    <string name="light_pair_five_ghz">Seu celular está na faixa de 5 GHz e a lâmpada só escuta 2,4 GHz. Conecte o celular na rede de 2,4 GHz e informe-a acima.</string>
     <string name="light_pair_waiting">Coloque a lâmpada piscando rápido: desligue e ligue três vezes.</string>
     <string name="light_pair_idle">Nenhuma lâmpada em pareamento</string>
     <string name="light_pair_idle_hint">Deixe uma lâmpada piscando rápido na rede %1$s que ela aparece aqui sozinha.</string>
     <string name="light_pair_password_once">Perguntamos uma vez; depois o pareamento é automático.</string>
     <string name="light_pair_action">Configurar</string>
+    <string name="add_light">Adicionar lâmpada</string>
     <string name="light_edit">Editar lâmpada</string>
     <string name="light_name">Nome</string>
     <string name="light_room">Cômodo</string>
@@ -326,6 +329,7 @@
     <string name="location_route_all">Ver tudo</string>
     <string name="location_map_selected">Selecionado no mapa · precisão de %1$d m</string>
     <string name="remote_control">Controle remoto</string>
+    <string name="add_remote">Adicionar controle remoto</string>
     <string name="remote_edit">Editar controle remoto</string>
     <string name="no_remotes">Nenhum controle remoto</string>
     <string name="no_remotes_body">Adicione sua TV para controlá-la pelo app. A busca na rede começa automaticamente.</string>

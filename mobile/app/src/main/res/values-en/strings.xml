@@ -31,11 +31,14 @@
     <string name="lighting">Lighting</string>
     <string name="no_lights">Local lighting</string>
     <string name="no_lights_body">The control foundation is ready for standard local adapters, without tying your home to a manufacturer account.</string>
+    <string name="light_pair_transmitting">Transmitting to the bulb (round %1$d)…</string>
+    <string name="light_pair_five_ghz">Your phone is on the 5 GHz band and the bulb only listens to 2.4 GHz. Connect the phone to the 2.4 GHz network and enter it above.</string>
     <string name="light_pair_waiting">Put the bulb blinking fast: switch it off and on three times.</string>
     <string name="light_pair_idle">No bulb pairing right now</string>
     <string name="light_pair_idle_hint">Leave a bulb blinking fast on %1$s and it shows up here by itself.</string>
     <string name="light_pair_password_once">Asked once; after that pairing is automatic.</string>
     <string name="light_pair_action">Set up</string>
+    <string name="add_light">Add bulb</string>
     <string name="light_edit">Edit bulb</string>
     <string name="light_name">Name</string>
     <string name="light_room">Room</string>
@@ -326,6 +329,7 @@
     <string name="location_route_all">Show all</string>
     <string name="location_map_selected">Selected on map · accuracy %1$d m</string>
     <string name="remote_control">Remote control</string>
+    <string name="add_remote">Add remote control</string>
     <string name="remote_edit">Edit remote control</string>
     <string name="no_remotes">No remote controls</string>
     <string name="no_remotes_body">Add your TV to control it from the app. The network search starts automatically.</string>
