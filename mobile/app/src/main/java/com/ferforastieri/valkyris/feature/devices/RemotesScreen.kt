@@ -23,7 +23,6 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -51,7 +50,6 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.composables.icons.lucide.Link
 import com.composables.icons.lucide.Lucide
 import com.composables.icons.lucide.Pencil
-import com.composables.icons.lucide.Plus
 import com.composables.icons.lucide.Radar
 import com.composables.icons.lucide.Star
 import com.composables.icons.lucide.Trash2
@@ -71,7 +69,6 @@ fun RemotesScreen(admin: Boolean, onRemote: (String) -> Unit = {}, vm: RemotesVi
     val state by vm.state.collectAsStateWithLifecycle()
     var editingId by remember { mutableStateOf<String?>(null) }
     var removingId by remember { mutableStateOf<String?>(null) }
-    var manualAdd by remember { mutableStateOf(false) }
     val editing = state.remotes.firstOrNull { it.id == editingId }
     val removing = state.remotes.firstOrNull { it.id == removingId }
     // A TV already registered must not be offered for pairing again.
@@ -120,19 +117,8 @@ fun RemotesScreen(admin: Boolean, onRemote: (String) -> Unit = {}, vm: RemotesVi
                 }
             }
         }
-        if (admin) FloatingActionButton(
-            onClick = { manualAdd = true },
-            modifier = Modifier.align(Alignment.BottomEnd).padding(end = 20.dp, bottom = 18.dp),
-            containerColor = MaterialTheme.colorScheme.secondary,
-            contentColor = MaterialTheme.colorScheme.onSecondary,
-        ) { Icon(Lucide.Plus, stringResource(R.string.add_remote)) }
     }
 
-    if (manualAdd) RemoteEditorSheet(
-        saving = false,
-        onDismiss = { manualAdd = false },
-        onSave = { input -> vm.add(input) { if (it) manualAdd = false } },
-    )
     editing?.let { remote ->
         RemoteEditorSheet(
             initial = remote,
@@ -269,16 +255,16 @@ private fun RemoteCard(
 
 @Composable
 private fun RemoteEditorSheet(
-    initial: RemoteDevice? = null,
+    initial: RemoteDevice,
     saving: Boolean,
     onDismiss: () -> Unit,
     onSave: (RemoteInput) -> Unit,
 ) {
-    var name by remember(initial?.id) { mutableStateOf(initial?.name.orEmpty()) }
-    var host by remember(initial?.id) { mutableStateOf(initial?.host.orEmpty()) }
-    var port by remember(initial?.id) { mutableStateOf((initial?.port ?: 8002).toString()) }
+    var name by remember(initial.id) { mutableStateOf(initial.name) }
+    var host by remember(initial.id) { mutableStateOf(initial.host) }
+    var port by remember(initial.id) { mutableStateOf(initial.port.toString()) }
     ValkyrisBottomSheet(
-        title = stringResource(if (initial == null) R.string.add_remote else R.string.remote_edit),
+        title = stringResource(R.string.remote_edit),
         onDismiss = onDismiss,
         dismissEnabled = !saving,
         actions = {

@@ -80,7 +80,7 @@ fun RemoteControlScreen(onBack: () -> Unit, vm: RemoteControlViewModel = hiltVie
         if (remote?.tokenConfigured == true) {
             Column(Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
                 PowerButton(powering = state.powering, onPower = vm::power)
-                Spacer(Modifier.height(10.dp))
+                Spacer(Modifier.height(6.dp))
                 KeypadModeToggle(qwerty = qwerty, onToggle = { qwerty = !qwerty })
             }
         }
@@ -118,7 +118,7 @@ private fun PowerButton(powering: Boolean, onPower: () -> Unit, modifier: Modifi
 private fun KeypadModeToggle(qwerty: Boolean, onToggle: () -> Unit, modifier: Modifier = Modifier) {
     Surface(
         onClick = onToggle,
-        modifier = modifier.size(46.dp),
+        modifier = modifier.size(56.dp),
         shape = CircleShape,
         color = if (qwerty) MaterialTheme.colorScheme.secondaryContainer else MaterialTheme.colorScheme.surfaceVariant,
         border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),

@@ -323,7 +323,6 @@
     <string name="location_route_all">Show all</string>
     <string name="location_map_selected">Selected on map · accuracy %1$d m</string>
     <string name="remote_control">Remote control</string>
-    <string name="add_remote">Add remote control</string>
     <string name="remote_edit">Edit remote control</string>
     <string name="no_remotes">No remote controls</string>
     <string name="no_remotes_body">Add your TV to control it from the app. The network search starts automatically.</string>
@@ -342,9 +341,6 @@
     <string name="favorite">Add to favorites</string>
     <string name="unfavorite">Remove from favorites</string>
     <string name="overview_favorites">Favorites</string>
-    <string name="favorite_section_cameras">Favorite cameras</string>
-    <string name="favorite_section_lights">Favorite lights</string>
-    <string name="favorite_section_remotes">Favorite remotes</string>
     <string name="favorite_light_on">On</string>
     <string name="favorite_light_off">Off</string>
     <string name="overview_no_favorites">No favorite devices yet. Star cameras, lights or remotes to reach them quickly here.</string>

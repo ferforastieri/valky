@@ -323,7 +323,6 @@
     <string name="location_route_all">Ver tudo</string>
     <string name="location_map_selected">Selecionado no mapa · precisão de %1$d m</string>
     <string name="remote_control">Controle remoto</string>
-    <string name="add_remote">Adicionar controle remoto</string>
     <string name="remote_edit">Editar controle remoto</string>
     <string name="no_remotes">Nenhum controle remoto</string>
     <string name="no_remotes_body">Adicione sua TV para controlá-la pelo app. A busca na rede começa automaticamente.</string>
@@ -342,9 +341,6 @@
     <string name="favorite">Favoritar</string>
     <string name="unfavorite">Remover dos favoritos</string>
     <string name="overview_favorites">Favoritos</string>
-    <string name="favorite_section_cameras">Câmeras favoritas</string>
-    <string name="favorite_section_lights">Luzes favoritas</string>
-    <string name="favorite_section_remotes">Controles favoritos</string>
     <string name="favorite_light_on">Ligada</string>
     <string name="favorite_light_off">Desligada</string>
     <string name="overview_no_favorites">Nenhum dispositivo favorito. Marque a estrela em câmeras, lâmpadas ou controles para acessá-los rápido aqui.</string>

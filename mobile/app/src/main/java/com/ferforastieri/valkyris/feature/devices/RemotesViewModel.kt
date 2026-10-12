@@ -38,22 +38,6 @@ class RemotesViewModel @Inject constructor(
             .onFailure { error -> _state.update { it.copy(loading = false, error = error.message) } }
     }
 
-    fun add(input: RemoteInput, done: (Boolean) -> Unit = {}) {
-        if (!actionGate.tryAcquire()) return
-        viewModelScope.launch {
-            try {
-                runCatching { api.createRemote(input) }
-                    .onSuccess { created ->
-                        _state.update { it.copy(remotes = (it.remotes + created).distinctBy(RemoteDevice::id), error = null) }
-                        done(true)
-                    }
-                    .onFailure { error -> _state.update { it.copy(error = error.message) } }
-            } finally {
-                actionGate.release()
-            }
-        }
-    }
-
     /** Registers a TV found on the network and starts pairing right away. */
     fun addAndPair(input: RemoteInput) {
         if (!actionGate.tryAcquire()) return

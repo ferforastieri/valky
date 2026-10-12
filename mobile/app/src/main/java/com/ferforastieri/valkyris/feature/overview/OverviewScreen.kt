@@ -4,6 +4,7 @@ import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -21,6 +22,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
@@ -32,11 +34,13 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.ViewModel
@@ -48,6 +52,7 @@ import com.composables.icons.lucide.Camera
 import com.composables.icons.lucide.Lightbulb
 import com.composables.icons.lucide.Lucide
 import com.composables.icons.lucide.Mic
+import com.composables.icons.lucide.Power
 import com.composables.icons.lucide.Star
 import com.composables.icons.lucide.Tv
 import com.composables.icons.lucide.UserRound
@@ -207,31 +212,24 @@ fun OverviewContent(
                 }
             }
         } else {
-            // Favorites replace the old metric cards and stay grouped by section,
-            // so a bulb can be switched from the overview without opening it.
+            // Favoritos por seção: um ícone simples abre cada grupo e os cartões
+            // ficam três por linha, para caber mais coisa sem perder o toque.
             favoriteSections.forEach { section ->
                 val items = favorites.filter { it.type == section.type }
                 if (items.isEmpty()) return@forEach
-                item(key = "favorites-${section.type}") {
-                    SectionLabel(stringResource(section.label), section.icon)
-                }
-                item(key = "favorites-${section.type}-row") {
-                    com.ferforastieri.valkyris.core.design.AdaptiveRow(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                        items.forEach { favorite ->
-                            FavoriteCard(
-                                item = favorite,
-                                modifier = Modifier.weight(1f),
-                                onClick = {
-                                    when (favorite.type) {
-                                        "camera" -> onCamera(favorite.id)
-                                        "light" -> onLight()
-                                        else -> onFavorite(favorite)
-                                    }
-                                },
-                                onTogglePower = if (favorite.type == "light") ({ onToggleLight(favorite) }) else null,
-                            )
-                        }
-                    }
+                item(key = "favorites-${section.type}") { SectionIcon(section.icon) }
+                item(key = "favorites-${section.type}-grid") {
+                    FavoriteGrid(
+                        items = items,
+                        onOpen = { favorite ->
+                            when (favorite.type) {
+                                "camera" -> onCamera(favorite.id)
+                                "light" -> onLight()
+                                else -> onFavorite(favorite)
+                            }
+                        },
+                        onToggleLight = onToggleLight,
+                    )
                 }
             }
         }
@@ -324,54 +322,99 @@ private fun MetricCard(icon: androidx.compose.ui.graphics.vector.ImageVector, va
     }
 }
 
-private data class FavoriteSection(val type: String, val label: Int, val icon: ImageVector)
+private data class FavoriteSection(val type: String, val icon: ImageVector)
 
+// Cada seção é identificada por um ícone simples; o texto sai da tela.
 private val favoriteSections = listOf(
-    FavoriteSection("camera", R.string.favorite_section_cameras, Lucide.Video),
-    FavoriteSection("light", R.string.favorite_section_lights, Lucide.Lightbulb),
-    FavoriteSection("remote", R.string.favorite_section_remotes, Lucide.Tv),
+    FavoriteSection("camera", Lucide.Video),
+    FavoriteSection("light", Lucide.Lightbulb),
+    FavoriteSection("remote", Lucide.Tv),
 )
 
+/**
+ * Cartões favoritos em linhas de três. Com fonte ampliada (ou tela estreita) os
+ * cartões passam a ocupar a linha inteira, para o rótulo não ser espremido.
+ */
 @Composable
-private fun FavoriteCard(item: FavoriteItem, modifier: Modifier, onClick: () -> Unit, onTogglePower: (() -> Unit)? = null) {
-    Card(
-        onClick = onClick,
-        modifier = modifier,
-        shape = RoundedCornerShape(18.dp),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
-        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
-    ) {
-        Row(
-            Modifier.fillMaxWidth().padding(start = 12.dp, end = 6.dp, top = 12.dp, bottom = 12.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(10.dp),
-        ) {
-            Surface(shape = RoundedCornerShape(12.dp), color = MaterialTheme.colorScheme.secondary.copy(alpha = .14f)) {
-                Icon(favoriteIcon(item.type), null, Modifier.padding(8.dp).size(18.dp), tint = MaterialTheme.colorScheme.secondary)
-            }
-            Column(Modifier.weight(1f)) {
-                Text(
-                    item.name,
-                    style = MaterialTheme.typography.bodyMedium,
-                    fontWeight = FontWeight.Medium,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
-                if (item.type == "light") {
-                    Text(
-                        if (item.online) stringResource(if (item.power) R.string.favorite_light_on else R.string.favorite_light_off) else stringResource(R.string.unavailable),
-                        style = MaterialTheme.typography.labelSmall,
-                        color = if (item.online) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.error,
-                        maxLines = 1,
-                    )
+private fun FavoriteGrid(
+    items: List<FavoriteItem>,
+    onOpen: (FavoriteItem) -> Unit,
+    onToggleLight: (FavoriteItem) -> Unit,
+) {
+    val fontScale = LocalDensity.current.fontScale
+    BoxWithConstraints {
+        val columns = if (fontScale >= 1.3f || maxWidth < 320.dp) 1 else 3
+        Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            items.chunked(columns).forEach { row ->
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                    row.forEach { favorite ->
+                        FavoriteCard(
+                            item = favorite,
+                            modifier = Modifier.weight(1f),
+                            onClick = { onOpen(favorite) },
+                            onTogglePower = if (favorite.type == "light") ({ onToggleLight(favorite) }) else null,
+                        )
+                    }
+                    // Linhas incompletas mantêm a largura dos cartões.
+                    repeat(columns - row.size) { Spacer(Modifier.weight(1f)) }
                 }
-            }
-            onTogglePower?.let { toggle ->
-                Switch(checked = item.power, onCheckedChange = { toggle() }, enabled = item.online)
             }
         }
     }
+}
+
+@Composable
+private fun FavoriteCard(item: FavoriteItem, modifier: Modifier, onClick: () -> Unit, onTogglePower: (() -> Unit)? = null) {
+    val lamp = item.type == "light"
+    val tint = when {
+        !lamp -> MaterialTheme.colorScheme.secondary
+        item.power -> Color(0xFFFFC46B)
+        else -> MaterialTheme.colorScheme.onSurfaceVariant
+    }
+    Card(
+        onClick = onClick,
+        modifier = modifier,
+        shape = RoundedCornerShape(16.dp),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+        border = BorderStroke(1.dp, if (lamp && item.online) tint.copy(alpha = .55f) else MaterialTheme.colorScheme.outlineVariant),
+        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
+    ) {
+        Column(
+            Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 9.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(6.dp),
+        ) {
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+                Surface(shape = RoundedCornerShape(10.dp), color = MaterialTheme.colorScheme.secondary.copy(alpha = .14f)) {
+                    Icon(favoriteIcon(item.type), null, Modifier.padding(6.dp).size(16.dp), tint = MaterialTheme.colorScheme.secondary)
+                }
+                onTogglePower?.let { toggle ->
+                    IconButton(onClick = toggle, enabled = item.online, modifier = Modifier.size(28.dp)) {
+                        Icon(
+                            Lucide.Power,
+                            contentDescription = stringResource(if (item.power) R.string.favorite_light_off else R.string.favorite_light_on),
+                            modifier = Modifier.size(17.dp),
+                            tint = tint,
+                        )
+                    }
+                }
+            }
+            Text(
+                item.name,
+                style = MaterialTheme.typography.bodySmall,
+                fontWeight = FontWeight.Medium,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                textAlign = TextAlign.Center,
+                color = if (lamp && !item.online) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.onSurface,
+            )
+        }
+    }
+}
+
+@Composable
+private fun SectionIcon(icon: ImageVector) {
+    Icon(icon, null, Modifier.size(19.dp), tint = MaterialTheme.colorScheme.secondary)
 }
 
 @Composable
