@@ -70,7 +70,6 @@ import kotlinx.coroutines.launch
 fun RemoteControlScreen(onBack: () -> Unit, vm: RemoteControlViewModel = hiltViewModel()) {
     val state by vm.state.collectAsStateWithLifecycle()
     val remote = state.remote
-    var keypad by remember { mutableStateOf(false) }
     Column(Modifier.fillMaxSize().padding(horizontal = 18.dp)) {
         Row(Modifier.fillMaxWidth().padding(vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
             Column(Modifier.weight(1f)) {
@@ -88,8 +87,6 @@ fun RemoteControlScreen(onBack: () -> Unit, vm: RemoteControlViewModel = hiltVie
                 )
             }
             if (remote?.tokenConfigured == true) {
-                KeypadToggle(active = keypad, onToggle = { keypad = !keypad })
-                Spacer(Modifier.width(8.dp))
                 PowerButton(powering = state.powering, onPower = vm::power)
             }
         }
@@ -99,21 +96,7 @@ fun RemoteControlScreen(onBack: () -> Unit, vm: RemoteControlViewModel = hiltVie
         when {
             remote == null -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { CircularProgressIndicator() }
             !remote.tokenConfigured -> PairingPanel(pairing = state.pairing, onPair = vm::pair)
-            else -> ConnectedRemote(state, vm, keypad)
-        }
-    }
-}
-
-@Composable
-private fun KeypadToggle(active: Boolean, onToggle: () -> Unit) {
-    Surface(
-        onClick = onToggle,
-        shape = CircleShape,
-        color = if (active) MaterialTheme.colorScheme.secondaryContainer else MaterialTheme.colorScheme.surfaceVariant,
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
-    ) {
-        Box(Modifier.size(46.dp), contentAlignment = Alignment.Center) {
-            Text("123", style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.secondary)
+            else -> ConnectedRemote(state, vm)
         }
     }
 }
@@ -138,17 +121,17 @@ private fun PowerButton(powering: Boolean, onPower: () -> Unit) {
 }
 
 @Composable
-private fun ConnectedRemote(state: RemoteControlState, vm: RemoteControlViewModel, keypad: Boolean) {
+private fun ConnectedRemote(state: RemoteControlState, vm: RemoteControlViewModel) {
     val enabled = !state.powering
     Column(Modifier.fillMaxSize()) {
-        Spacer(Modifier.weight(1f))
-        NavigationPad(enabled, vm::send)
-        Spacer(Modifier.height(14.dp))
-        BottomRow(enabled, vm::send)
-        if (keypad) {
-            Spacer(Modifier.height(12.dp))
-            NumberPad(enabled, vm::send)
+        // The navigation pad grows to fill the space so the remote has no dead
+        // area at the top and the main controls stay within thumb reach.
+        Box(Modifier.fillMaxWidth().weight(1f), contentAlignment = Alignment.Center) {
+            NavigationPad(enabled, vm::send)
         }
+        NumberPad(enabled, vm::send)
+        Spacer(Modifier.height(12.dp))
+        BottomRow(enabled, vm::send)
         Spacer(Modifier.height(10.dp))
     }
 }

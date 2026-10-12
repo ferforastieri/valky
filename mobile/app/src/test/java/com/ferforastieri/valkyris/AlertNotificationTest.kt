@@ -38,7 +38,9 @@ class AlertNotificationTest {
         assertEquals("Latido", event.extras.getString(Notification.EXTRA_TITLE))
         assertEquals(AlarmNotifier.ALARMS, alarm.channelId)
         assertEquals(AlarmNotifier.EVENTS, event.channelId)
-        assertNotNull(manager.getNotificationChannel(AlarmNotifier.ALARMS).sound)
+        // The alarm channel is silent: the ringtone is played by the playback
+        // service so the per-device volume setting is respected.
+        assertNull(manager.getNotificationChannel(AlarmNotifier.ALARMS).sound)
         assertEquals(NotificationCompat.GROUP_ALERT_CHILDREN, alarm.groupAlertBehavior)
         assertEquals(NotificationCompat.GROUP_ALERT_CHILDREN, notifications[AlarmNotifier.SUMMARY_ID]?.groupAlertBehavior)
         notifier.cancel("cry")
@@ -87,7 +89,7 @@ class AlertNotificationTest {
         assertTrue(intent.component?.className?.endsWith("AlarmPlaybackService") == true)
         val notification = app.getSystemService(NotificationManager::class.java).activeNotifications.single { it.id == "sound".hashCode() }.notification
         assertNull(notification.fullScreenIntent)
-        assertEquals(android.media.AudioAttributes.USAGE_ALARM,
-            app.getSystemService(NotificationManager::class.java).getNotificationChannel(notification.channelId).audioAttributes.usage)
+        assertEquals(AlarmNotifier.ALARMS, notification.channelId)
+        assertNull(app.getSystemService(NotificationManager::class.java).getNotificationChannel(notification.channelId).sound)
     }
 }

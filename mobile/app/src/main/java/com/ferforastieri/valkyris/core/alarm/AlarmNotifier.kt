@@ -29,14 +29,17 @@ class AlarmNotifier @Inject constructor(@param:ApplicationContext private val co
         // Remove the pre-versioned channels so users do not keep a stale,
         // possibly silenced, entry in the system settings.
         listOf("valkyris_events", "valkyris_alarms").forEach { manager.deleteNotificationChannel(it) }
-        val sound = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_ALARM)
         val policyAccess = manager.isNotificationPolicyAccessGranted
         // Channel importance, sound and DND bypass are immutable after creation.
         // If a phone kept a channel from an older or misconfigured install, drop
         // it so the alert is recreated loud and able to break through silent
         // mode. This is what fixes phones that stopped showing baby-cry alarms.
+        // The alarm channel is intentionally silent: the ringtone is played by
+        // AlarmPlaybackService so the per-device volume setting is respected
+        // (a channel sound is played by the system at the alarm stream volume,
+        // which an app cannot control without Do Not Disturb access).
         manager.getNotificationChannel(ALARMS)?.let { existing ->
-            if (existing.importance != NotificationManager.IMPORTANCE_HIGH || existing.sound == null || (policyAccess && !existing.canBypassDnd())) {
+            if (existing.importance != NotificationManager.IMPORTANCE_HIGH || existing.sound != null || (policyAccess && !existing.canBypassDnd())) {
                 manager.deleteNotificationChannel(ALARMS)
             }
         }
@@ -51,7 +54,7 @@ class AlarmNotifier @Inject constructor(@param:ApplicationContext private val co
         manager.createNotificationChannel(
             NotificationChannel(ALARMS, context.getString(R.string.notification_channel_alarm), NotificationManager.IMPORTANCE_HIGH).apply {
                 enableVibration(true)
-                setSound(sound, AudioAttributes.Builder().setUsage(AudioAttributes.USAGE_ALARM).build())
+                setSound(null, null)
                 lockscreenVisibility = Notification.VISIBILITY_PUBLIC
                 setBypassDnd(policyAccess)
             },
@@ -150,12 +153,9 @@ class AlarmNotifier @Inject constructor(@param:ApplicationContext private val co
     private fun presentationChannel(alarm: Boolean, alerts: AlertPresentation): String {
         if (alerts.vibrate && (!alarm || alerts.alarmSound == "alarm")) return if (alarm) ALARMS else EVENTS
         val id = "${if (alarm) ALARMS else EVENTS}_${if (alarm) alerts.alarmSound else "default"}_${alerts.vibrate}"
-        val sound = when {
-            !alarm -> RingtoneManager.getDefaultUri(RingtoneManager.TYPE_NOTIFICATION)
-            alerts.alarmSound == "silent" -> null
-            alerts.alarmSound == "ringtone" -> RingtoneManager.getDefaultUri(RingtoneManager.TYPE_RINGTONE)
-            else -> RingtoneManager.getDefaultUri(RingtoneManager.TYPE_ALARM)
-        }
+        // Alarms stay silent on the channel: AlarmPlaybackService plays the chosen
+        // ringtone at the per-device level, which the channel sound cannot respect.
+        val sound = if (alarm) null else RingtoneManager.getDefaultUri(RingtoneManager.TYPE_NOTIFICATION)
         context.getSystemService(NotificationManager::class.java).createNotificationChannel(
             NotificationChannel(id, context.getString(if (alarm) R.string.notification_channel_alarm else R.string.notification_channel_events), NotificationManager.IMPORTANCE_HIGH).apply {
                 enableVibration(alerts.vibrate)

@@ -61,15 +61,12 @@ class AlarmPlaybackService : Service() {
         }
         val type = if (intent.getStringExtra("sound") == "ringtone") RingtoneManager.TYPE_RINGTONE else RingtoneManager.TYPE_ALARM
         val uri = RingtoneManager.getActualDefaultRingtoneUri(this, type)
-        // The alarm stream volume is the only one the user may have lowered.
-        // Raise it to the maximum for the alert, matching the previous
-        // guaranteed-loud behaviour on phones that never alerted audibly.
-        runCatching {
-            audio.setStreamVolume(AudioManager.STREAM_ALARM, audio.getStreamMaxVolume(AudioManager.STREAM_ALARM), 0)
-        }
-        // Per-device level chosen in Settings; the alarm stream stays at max so
-        // the setting is a predictable fraction of full volume.
+        // The per-device level chosen in Settings is applied to the player itself.
+        // The system alarm stream volume is deliberately left untouched: an app
+        // cannot reliably change it without Do Not Disturb access, and forcing it
+        // to the maximum was exactly what made the alert ignore the setting.
         alarmLevel = AlarmVolume.read(this) / 100f
+        Log.i("ValkyrisAlarm", "Alarm playback starting at level $alarmLevel (setting ${AlarmVolume.read(this)}%)")
         play(uri ?: fallbackUri(), fallback = uri == null)
         if (intent.getBooleanExtra("vibrate", true)) {
             getSystemService(Vibrator::class.java).vibrate(VibrationEffect.createWaveform(longArrayOf(0, 800, 400), 0), attributes)
@@ -88,7 +85,7 @@ class AlarmPlaybackService : Service() {
             next.setVolume(alarmLevel, alarmLevel)
             next.setDataSource(this, uri)
             next.isLooping = true
-            next.setOnPreparedListener { it.start() }
+            next.setOnPreparedListener { mp -> mp.setVolume(alarmLevel, alarmLevel); mp.start() }
             next.setOnErrorListener { _, _, _ ->
                 next.release()
                 player = null
