@@ -386,7 +386,7 @@ func (s *Service) History(ctx context.Context, personID string, limit int) ([]Lo
 		return nil, err
 	}
 	defer rows.Close()
-	var out []Location
+	out := make([]Location, 0)
 	for rows.Next() {
 		var l Location
 		var at string

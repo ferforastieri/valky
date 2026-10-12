@@ -112,6 +112,7 @@ fun PersonDetailScreen(onBack: () -> Unit, vm: PersonDetailViewModel = hiltViewM
     val error by vm.error.collectAsStateWithLifecycle()
     val user = users.firstOrNull { it.id == vm.id }
     var day by remember { mutableStateOf<String?>(null) }
+    @Suppress("UNUSED_EXPRESSION") error
 
     val days = remember(history) { history.map { it.occurredAt.take(10) }.distinct().sortedDescending() }
     val selectedDay = day
@@ -130,7 +131,6 @@ fun PersonDetailScreen(onBack: () -> Unit, vm: PersonDetailViewModel = hiltViewM
                 )
             }
         }
-        error?.let { Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(bottom = 6.dp)) }
         Surface(
             modifier = Modifier.fillMaxWidth().height(230.dp),
             shape = MaterialTheme.shapes.extraLarge,

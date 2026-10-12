@@ -19,7 +19,7 @@ fun UserManagementSheet(users: List<ManagedUser>, error: String?, busy: Boolean,
     ValkyrisBottomSheet(scrollContent = false, title = "Gerenciar usuários", onDismiss = onDismiss, dismissEnabled = !busy) {
         Column(Modifier.fillMaxWidth().heightIn(max = 560.dp).imePadding().verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(12.dp)) {
             Text("Escolha uma pessoa para editar o perfil e as permissões de acesso.", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            error?.let { Text(it, color = MaterialTheme.colorScheme.error) }
+            error?.let { /* errors surface as a toast */ }
             users.forEach { user -> key(user.id) {
                 var username by remember(user) { mutableStateOf(user.username) }
                 var password by remember(user) { mutableStateOf("") }

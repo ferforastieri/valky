@@ -52,7 +52,7 @@ internal fun MotionRegionEditor(
     Text("Região da imagem", style = MaterialTheme.typography.labelLarge)
     Text("Arraste de um canto ao outro para marcar o berço ou a região a observar. Mantenha o enquadramento fixo; após mover a câmera, selecione a região novamente.", style = MaterialTheme.typography.bodySmall)
     if (loading) LinearProgressIndicator(Modifier.fillMaxWidth())
-    error?.let { Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error) }
+    error?.let { /* errors surface as a toast */ }
     bitmap?.let { frame ->
         val accent = MaterialTheme.colorScheme.secondary
         var origin by remember(cameraId) { mutableStateOf<Offset?>(null) }

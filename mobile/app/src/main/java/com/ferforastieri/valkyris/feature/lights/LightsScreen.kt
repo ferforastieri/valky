@@ -28,7 +28,7 @@ import com.ferforastieri.valkyris.core.model.*
     val state by vm.state.collectAsStateWithLifecycle();var selected by remember{mutableStateOf<LightDevice?>(null)};var removing by remember{mutableStateOf<LightDevice?>(null)}
     Box(Modifier.fillMaxSize()){
         Column(Modifier.fillMaxSize().padding(horizontal=18.dp)){
-            state.error?.let{Text(it,color=MaterialTheme.colorScheme.error,style=MaterialTheme.typography.bodySmall)}
+            state.error?.let{ /* errors surface as a toast */ }
             when{
                 state.loading->Box(Modifier.fillMaxSize(),contentAlignment=Alignment.Center){CircularProgressIndicator()}
                 state.lights.isEmpty()->EmptyLighting()

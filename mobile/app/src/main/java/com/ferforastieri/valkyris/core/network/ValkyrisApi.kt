@@ -106,13 +106,16 @@ class ValkyrisApi(
             }
         } catch (error: Throwable) {
             if (error is ApiException) {
-                if (announceBackend) publishBackend(error.technicalMessage, false)
+                // Failures always surface as a toast, whatever the action: the
+                // screens never render backend errors inline.
+                publishBackend(error.technicalMessage, false)
                 throw error
             }
             val complete = buildString {
                 append(error::class.simpleName ?: "Network error")
                 error.message?.takeIf { it.isNotBlank() }?.let { append(": ").append(it) }
             }
+            publishBackend(complete, false)
             throw localizedError(complete, cause = error)
         }
     }
@@ -249,7 +252,7 @@ class ValkyrisApi(
     suspend fun pairRemote(id: String): RemoteDevice = post("/remotes/$id/pair", emptyMap<String, String>(), announceBackend = true)
     suspend fun sendRemoteKey(id: String, key: String): RemoteDevice = post("/remotes/$id/keys", RemoteKeyInput(key))
     suspend fun wakeRemote(id: String): RemoteDevice = post("/remotes/$id/wake", emptyMap<String, String>())
-    suspend fun powerRemote(id: String): RemoteDevice = post("/remotes/$id/power", emptyMap<String, String>(), announceBackend = true)
+    suspend fun powerRemote(id: String): RemoteDevice = post("/remotes/$id/power", emptyMap<String, String>())
 
     suspend fun setFavorite(type: String, id: String, favorite: Boolean) {
         val current = requireNotNull(session())

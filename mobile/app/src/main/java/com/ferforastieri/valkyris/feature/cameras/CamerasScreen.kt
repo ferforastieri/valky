@@ -133,7 +133,7 @@ internal fun CamerasContent(state: CamerasState, stream: CameraListStream? = nul
     Box(Modifier.fillMaxSize()){
         Column(Modifier.fillMaxSize().padding(horizontal=18.dp)){
             Spacer(Modifier.height(10.dp))
-            state.error?.let{Text(it,color=MaterialTheme.colorScheme.error,style=MaterialTheme.typography.bodySmall)}
+            state.error?.let{ /* errors surface as a toast */ }
             if(state.creating){Spacer(Modifier.height(10.dp));LinearProgressIndicator(Modifier.fillMaxWidth());Text(stringResource(R.string.validating_camera),style=MaterialTheme.typography.labelSmall,color=MaterialTheme.colorScheme.onSurfaceVariant)}
             Spacer(Modifier.height(10.dp))
             when{
@@ -193,7 +193,7 @@ fun CameraFailureSheet(camera:Camera,onDismiss:()->Unit,onEdit:(()->Unit)?=null,
         },
     ) {
         Column(Modifier.fillMaxWidth().heightIn(max=520.dp).imePadding().verticalScroll(rememberScrollState()),verticalArrangement=Arrangement.spacedBy(8.dp)){
-            error?.let { Text(it, color = MaterialTheme.colorScheme.error) }
+            error?.let { /* errors surface as a toast */ }
             OutlinedTextField(name,{name=it},Modifier.fillMaxWidth(),label={Text(stringResource(R.string.camera_name))})
             Text(stringResource(R.string.camera_icon),style=MaterialTheme.typography.labelLarge)
             Column(verticalArrangement=Arrangement.spacedBy(8.dp)){

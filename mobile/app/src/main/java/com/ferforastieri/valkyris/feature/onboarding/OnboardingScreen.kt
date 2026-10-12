@@ -50,7 +50,7 @@ fun OnboardingScreen(viewModel: MainViewModel) {
                 if (confirmation.isNotEmpty() && confirmation != password) Text("As senhas precisam ser iguais.", color = MaterialTheme.colorScheme.error)
             }
         }
-        error?.let { Text(it, color = MaterialTheme.colorScheme.error) }
+        error?.let { /* errors surface as a toast */ }
         Button(onClick = {
             when {
                 invitation != null -> viewModel.registerAccount(username, password, name)

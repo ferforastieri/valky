@@ -441,7 +441,7 @@ private fun InvitationDialog(state: InvitationState, onCreate: () -> Unit, onDis
                     )
                     Text(stringResource(R.string.invite_expires), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
-                state.error != null -> Text(state.error, color = MaterialTheme.colorScheme.error)
+                state.error != null -> Unit
             }
         }
     }

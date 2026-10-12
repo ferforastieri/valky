@@ -74,42 +74,19 @@ fun RemoteControlScreen(onBack: () -> Unit, vm: RemoteControlViewModel = hiltVie
     val state by vm.state.collectAsStateWithLifecycle()
     val remote = state.remote
     Column(Modifier.fillMaxSize().padding(horizontal = 18.dp)) {
-        Box(Modifier.fillMaxWidth().padding(vertical = 6.dp)) {
-            if (remote?.tokenConfigured == true) {
-                SettingsKey(Modifier.align(Alignment.CenterStart), vm::send)
-                PowerButton(powering = state.powering, onPower = vm::power, modifier = Modifier.align(Alignment.Center))
-            }
-        }
         Text(
             (remote?.name ?: stringResource(R.string.remote_control)) +
                 " · " + if (remote?.tokenConfigured == true) stringResource(R.string.remote_paired) else stringResource(R.string.remote_not_paired),
             style = MaterialTheme.typography.labelSmall,
             color = if (remote?.tokenConfigured == true) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.error,
-            modifier = Modifier.fillMaxWidth().padding(bottom = 6.dp),
+            modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp),
             textAlign = androidx.compose.ui.text.style.TextAlign.Center,
         )
-        state.error?.let {
-            Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(bottom = 6.dp))
-        }
+        state.error?.let { /* errors surface as a toast */ }
         when {
             remote == null -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { CircularProgressIndicator() }
             !remote.tokenConfigured -> PairingPanel(pairing = state.pairing, onPair = vm::pair)
             else -> ConnectedRemote(state, vm)
-        }
-    }
-}
-
-@Composable
-private fun SettingsKey(modifier: Modifier, onSend: (String) -> Unit) {
-    Surface(
-        onClick = { onSend("KEY_MENU") },
-        modifier = modifier.size(46.dp),
-        shape = CircleShape,
-        color = MaterialTheme.colorScheme.surfaceVariant,
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
-    ) {
-        Box(contentAlignment = Alignment.Center) {
-            Icon(Lucide.Settings, stringResource(R.string.settings), Modifier.size(22.dp), tint = MaterialTheme.colorScheme.secondary)
         }
     }
 }
@@ -154,7 +131,16 @@ private fun ConnectedRemote(state: RemoteControlState, vm: RemoteControlViewMode
             )
         }
         Spacer(Modifier.weight(1f))
-        HomeBackRow(enabled, vm::send)
+        Row(
+            Modifier.fillMaxWidth().padding(vertical = 8.dp),
+            horizontalArrangement = Arrangement.SpaceEvenly,
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            HoldKey(KeySpec(Lucide.ArrowLeft, stringResource(R.string.remote_back), "KEY_RETURN"), enabled, Modifier.size(60.dp), CircleShape, vm::send)
+            HoldKey(KeySpec(Lucide.House, stringResource(R.string.remote_home), "KEY_HOME"), enabled, Modifier.size(64.dp), CircleShape, vm::send)
+            HoldKey(KeySpec(Lucide.Settings, stringResource(R.string.settings), "KEY_MENU"), enabled, Modifier.size(60.dp), CircleShape, vm::send)
+            PowerButton(powering = state.powering, onPower = vm::power)
+        }
         Spacer(Modifier.height(10.dp))
     }
 }
@@ -225,14 +211,6 @@ private fun NumberPad(enabled: Boolean, onSend: (String) -> Unit) {
                 }
             }
         }
-    }
-}
-
-@Composable
-private fun HomeBackRow(enabled: Boolean, onSend: (String) -> Unit) {
-    Box(Modifier.fillMaxWidth().height(60.dp)) {
-        HoldKey(KeySpec(Lucide.ArrowLeft, stringResource(R.string.remote_back), "KEY_RETURN"), enabled, Modifier.align(Alignment.CenterStart).size(60.dp), CircleShape, onSend)
-        HoldKey(KeySpec(Lucide.House, stringResource(R.string.remote_home), "KEY_HOME"), enabled, Modifier.align(Alignment.Center).size(64.dp), CircleShape, onSend)
     }
 }
 
