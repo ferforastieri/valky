@@ -177,9 +177,12 @@ func (s *Service) probePairingDevices(id string) {
 		return
 	}
 	for _, candidate := range candidates {
-		if candidate.DeviceID == "" || candidate.Address == "" {
+		if candidate.Address == "" {
 			continue
 		}
+		// A lâmpada pode esconder o identificador até ser configurada; o
+		// endereço basta para testar a chave.
+
 		if knownDevice(registered, candidate) || s.pairingTriedAddress(candidate.Address) {
 			continue
 		}
@@ -193,8 +196,13 @@ func (s *Service) probePairingDevices(id string) {
 		if err != nil {
 			s.markPairingTried(candidate.Address)
 			s.logger.Debug("pairing key refused", "device", deviceFingerprint(candidate), "error", err)
+			attempted := len(pairingKeyCandidates(session, candidate))
+			s.logger.Info("pairing refused every key", "device", deviceFingerprint(candidate), "keys", attempted, "error", err)
 			s.updatePairing(id, func(session *PairingSession) {
-				session.Message = fmt.Sprintf("A lâmpada em %s respondeu na rede, mas não aceitou a chave local.", candidate.Address)
+				session.Message = fmt.Sprintf(
+					"A lâmpada em %s (id %s) respondeu na rede, mas não aceitou nenhuma das %d chaves testadas. Firmwares que exigem ativação na nuvem do fabricante não permitem controle local.",
+					candidate.Address, displayDeviceID(candidate), attempted,
+				)
 			})
 			continue
 		}
@@ -242,7 +250,7 @@ func (s *Service) registerPairedLight(ctx context.Context, candidate Candidate, 
 	created, err := s.repo.Create(ctx, Light{
 		ID:              uuid.NewString(),
 		Name:            s.nextLightName(ctx),
-		DeviceID:        candidate.DeviceID,
+		DeviceID:        deviceIdentity(candidate),
 		ProtocolVersion: result.Version,
 		Capabilities:    result.Capabilities,
 		DPMapping:       result.Mapping,
@@ -336,6 +344,26 @@ func (s *Service) nextLightName(ctx context.Context) string {
 		return "Lâmpada"
 	}
 	return fmt.Sprintf("Lâmpada %d", len(items)+1)
+}
+
+// deviceIdentity is the identifier stored for a lamp. Devices that hide the
+// announced identifier keep the network address as their identity, which is
+// enough to address them later.
+func deviceIdentity(candidate Candidate) string {
+	if candidate.DeviceID != "" {
+		return candidate.DeviceID
+	}
+	if candidate.MAC != "" {
+		return candidate.MAC
+	}
+	return "light-" + strings.ReplaceAll(candidate.Address, ".", "-")
+}
+
+func displayDeviceID(candidate Candidate) string {
+	if candidate.DeviceID != "" {
+		return candidate.DeviceID
+	}
+	return "não anunciado"
 }
 
 // deviceFingerprint describes a candidate for logs.
