@@ -74,17 +74,21 @@ import kotlinx.coroutines.launch
 fun RemoteControlScreen(onBack: () -> Unit, vm: RemoteControlViewModel = hiltViewModel()) {
     val state by vm.state.collectAsStateWithLifecycle()
     val remote = state.remote
+    var qwerty by remember { mutableStateOf(false) }
     Column(Modifier.fillMaxSize().padding(horizontal = 18.dp)) {
         Spacer(Modifier.height(40.dp))
         if (remote?.tokenConfigured == true) {
-            PowerButton(powering = state.powering, onPower = vm::power, modifier = Modifier.align(Alignment.CenterHorizontally))
+            Box(Modifier.fillMaxWidth()) {
+                PowerButton(powering = state.powering, onPower = vm::power, modifier = Modifier.align(Alignment.Center))
+                KeypadModeToggle(qwerty = qwerty, onToggle = { qwerty = !qwerty }, modifier = Modifier.align(Alignment.CenterEnd))
+            }
         }
         Spacer(Modifier.height(14.dp))
         state.error?.let { /* errors surface as a toast */ }
         when {
             remote == null -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { CircularProgressIndicator() }
             !remote.tokenConfigured -> PairingPanel(pairing = state.pairing, onPair = vm::pair)
-            else -> ConnectedRemote(state, vm)
+            else -> ConnectedRemote(state, vm, qwerty)
         }
     }
 }
@@ -110,10 +114,50 @@ private fun PowerButton(powering: Boolean, onPower: () -> Unit, modifier: Modifi
 }
 
 @Composable
-private fun ConnectedRemote(state: RemoteControlState, vm: RemoteControlViewModel) {
+private fun KeypadModeToggle(qwerty: Boolean, onToggle: () -> Unit, modifier: Modifier = Modifier) {
+    Surface(
+        onClick = onToggle,
+        modifier = modifier.size(46.dp),
+        shape = CircleShape,
+        color = if (qwerty) MaterialTheme.colorScheme.secondaryContainer else MaterialTheme.colorScheme.surfaceVariant,
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+    ) {
+        Box(contentAlignment = Alignment.Center) {
+            Text(if (qwerty) "123" else "ABC", style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.secondary)
+        }
+    }
+}
+
+private val QwertyRows = listOf(
+    listOf("q", "w", "e", "r", "t", "y", "u", "i", "o", "p"),
+    listOf("a", "s", "d", "f", "g", "h", "j", "k", "l"),
+    listOf("z", "x", "c", "v", "b", "n", "m"),
+)
+
+/** Letters, space, backspace and enter typed straight into the TV's text field. */
+@Composable
+private fun QwertyPad(enabled: Boolean, onText: (String) -> Unit) {
+    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+        QwertyRows.forEach { row ->
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                row.forEach { letter ->
+                    HoldKey(KeySpec(Lucide.Tv, letter, letter), enabled, Modifier.weight(1f).height(44.dp), RoundedCornerShape(10.dp), onText, text = letter)
+                }
+            }
+        }
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+            HoldKey(KeySpec(Lucide.Tv, "Espaço", " "), enabled, Modifier.weight(3f).height(44.dp), RoundedCornerShape(10.dp), onText, text = "espaço")
+            HoldKey(KeySpec(Lucide.Tv, "Apagar", "\b"), enabled, Modifier.weight(1f).height(44.dp), RoundedCornerShape(10.dp), onText, text = "⌫")
+            HoldKey(KeySpec(Lucide.Tv, "Enter", "\n"), enabled, Modifier.weight(1f).height(44.dp), RoundedCornerShape(10.dp), onText, text = "⏎")
+        }
+    }
+}
+
+@Composable
+private fun ConnectedRemote(state: RemoteControlState, vm: RemoteControlViewModel, qwerty: Boolean) {
     val enabled = !state.powering
     Column(Modifier.fillMaxSize(), verticalArrangement = Arrangement.SpaceEvenly) {
-        NumberPad(enabled, vm::send)
+        if (qwerty) QwertyPad(enabled, vm::sendText) else NumberPad(enabled, vm::send)
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
             Rocker(
                 up = KeySpec(Lucide.Volume2, stringResource(R.string.remote_volume_up), "KEY_VOLUP"),

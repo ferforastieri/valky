@@ -135,6 +135,39 @@ func (d *SmartTVDriver) writeKey(ctx context.Context, item *tvConn, key string) 
 	return nil
 }
 
+// SendText types text into the TV's focused field using the remote-control
+// channel's text input command, after announcing that a text session started.
+func (d *SmartTVDriver) SendText(ctx context.Context, device Device, token, text string) error {
+	item, err := d.ready(ctx, device, token)
+	if err != nil {
+		return err
+	}
+	emit, _ := json.Marshal(map[string]any{
+		"method": "ms.channel.emit",
+		"params": map[string]any{"event": "custom.remote.textReceived", "to": "broadcast"},
+	})
+	payload, _ := json.Marshal(map[string]any{
+		"method": "ms.remote.control",
+		"params": map[string]any{
+			"Cmd":          "SendInputString",
+			"DataOfCmd":    "base64",
+			"TypeOfRemote": "SendInputString",
+			"Data":         base64.StdEncoding.EncodeToString([]byte(text)),
+		},
+	})
+	writeCtx, cancel := context.WithTimeout(ctx, 4*time.Second)
+	defer cancel()
+	if err := item.conn.Write(writeCtx, websocket.MessageText, emit); err != nil {
+		d.drop(item)
+		return fmt.Errorf("não foi possível iniciar o texto: %w", err)
+	}
+	if err := item.conn.Write(writeCtx, websocket.MessageText, payload); err != nil {
+		d.drop(item)
+		return fmt.Errorf("não foi possível enviar o texto: %w", err)
+	}
+	return nil
+}
+
 func (d *SmartTVDriver) dial(ctx context.Context, device Device, token string) (*websocket.Conn, error) {
 	port := device.Port
 	if port == 0 {

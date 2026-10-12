@@ -152,6 +152,7 @@ func (s *Server) Handler() http.Handler {
 	protected.Handle("DELETE /remotes/{id}", s.auth.RequireAdmin(http.HandlerFunc(s.deleteRemote)))
 	protected.Handle("POST /remotes/{id}/pair", s.auth.RequireAdmin(http.HandlerFunc(s.pairRemote)))
 	protected.HandleFunc("POST /remotes/{id}/keys", s.sendRemoteKey)
+	protected.HandleFunc("POST /remotes/{id}/text", s.sendRemoteText)
 	protected.HandleFunc("POST /remotes/{id}/wake", s.wakeRemote)
 	protected.HandleFunc("POST /remotes/{id}/power", s.powerRemote)
 	protected.HandleFunc("GET /cameras/{id}/snapshot", s.snapshot)

@@ -154,7 +154,6 @@ fun OverviewScreen(
         onTv = { state.remotes.firstOrNull()?.let { remote -> onRemote(remote.id) } ?: onCameras() },
         onLight = onLight,
         onFavorite = onFavorite,
-        activityChart = { OverviewActivityChart(onEvent = onEvent) },
     )
     failedCamera?.let { CameraFailureSheet(it, onDismiss = { failedCameraId = null }) }
 }
@@ -174,22 +173,12 @@ fun OverviewContent(
     onTv: () -> Unit = {},
     onLight: () -> Unit = {},
     onFavorite: (FavoriteItem) -> Unit = {},
-    activityChart: @Composable () -> Unit = {},
 ) {
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
         contentPadding = PaddingValues(start = 18.dp, end = 18.dp, top = 10.dp, bottom = 24.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-        item {
-            com.ferforastieri.valkyris.core.design.AdaptiveRow(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                MetricCard(Lucide.Camera, cameras.size.toString(), stringResource(R.string.cameras), Modifier.weight(1f), onClick = onCameras, accent = true)
-                MetricCard(Lucide.UserRound, trackedPeople.toString(), stringResource(R.string.people), Modifier.weight(1f), onClick = onPeople)
-                MetricCard(Lucide.Tv, remotes.size.toString(), stringResource(R.string.tv), Modifier.weight(1f), onClick = onTv)
-            }
-        }
-        item { activityChart() }
-        item { SectionLabel(stringResource(R.string.overview_favorites)) }
         if (favorites.isEmpty()) {
             item {
                 Surface(Modifier.fillMaxWidth(), RoundedCornerShape(18.dp), color = MaterialTheme.colorScheme.surface) {
@@ -197,8 +186,26 @@ fun OverviewContent(
                 }
             }
         } else {
-            items(favorites, key = { "${it.type}-${it.id}" }) { favorite ->
-                FavoriteCard(favorite, onCamera = onCamera, onLight = onLight, onFavorite = onFavorite)
+            item {
+                // Favorites replace the old metric cards and keep their visual.
+                com.ferforastieri.valkyris.core.design.AdaptiveRow(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                    favorites.forEach { favorite ->
+                        MetricCard(
+                            icon = favoriteIcon(favorite.type),
+                            value = favorite.name,
+                            label = favorite.subtitle,
+                            modifier = Modifier.weight(1f),
+                            onClick = {
+                                when (favorite.type) {
+                                    "camera" -> onCamera(favorite.id)
+                                    "light" -> onLight()
+                                    else -> onFavorite(favorite)
+                                }
+                            },
+                            accent = true,
+                        )
+                    }
+                }
             }
         }
         item { SectionLabel(stringResource(R.string.recent_activity)) }

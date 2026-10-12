@@ -253,6 +253,7 @@ class ValkyrisApi(
     suspend fun updateRemote(id: String, input: RemoteUpdate): RemoteDevice = put("/remotes/$id", input, announceBackend = true)
     suspend fun pairRemote(id: String): RemoteDevice = post("/remotes/$id/pair", emptyMap<String, String>(), announceBackend = true)
     suspend fun sendRemoteKey(id: String, key: String): RemoteDevice = post("/remotes/$id/keys", RemoteKeyInput(key))
+    suspend fun sendRemoteText(id: String, text: String): RemoteDevice = post("/remotes/$id/text", RemoteTextInput(text))
     suspend fun wakeRemote(id: String): RemoteDevice = post("/remotes/$id/wake", emptyMap<String, String>())
     suspend fun powerRemote(id: String): RemoteDevice = post("/remotes/$id/power", emptyMap<String, String>())
 

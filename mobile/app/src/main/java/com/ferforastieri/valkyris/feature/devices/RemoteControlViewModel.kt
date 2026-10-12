@@ -54,6 +54,15 @@ class RemoteControlViewModel @Inject constructor(
         }
     }
 
+    fun sendText(text: String) {
+        if (text.isEmpty()) return
+        _state.update { it.copy(error = null) }
+        viewModelScope.launch {
+            runCatching { api.sendRemoteText(id, text) }
+                .onFailure { error -> _state.update { it.copy(error = error.message) } }
+        }
+    }
+
     fun pair() {
         if (_state.value.pairing) return
         _state.update { it.copy(pairing = true, error = null) }

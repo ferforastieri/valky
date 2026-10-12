@@ -10,6 +10,7 @@ import com.ferforastieri.valkyris.core.design.ValkyrisTheme
 import com.ferforastieri.valkyris.core.model.ManagedUser
 import com.ferforastieri.valkyris.feature.settings.UserManagementSheet
 import com.ferforastieri.valkyris.feature.overview.OverviewContent
+import com.ferforastieri.valkyris.feature.overview.FavoriteItem
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertTrue
 import org.junit.Rule
@@ -38,15 +39,23 @@ class LargeFontTest {
         assertNotNull(saved)
     }
 
-    @Test fun overviewCardsMoveToSeparateRowsWithLargeFonts() {
+    @Test fun overviewFavoritesMoveToSeparateRowsWithLargeFonts() {
         compose.setContent {
             val density = LocalDensity.current.density
             CompositionLocalProvider(LocalDensity provides Density(density, 2f)) {
-                ValkyrisTheme { OverviewContent(emptyList(), 2, emptyList()) }
+                ValkyrisTheme {
+                    OverviewContent(
+                        emptyList(), 2, emptyList(),
+                        favorites = listOf(
+                            FavoriteItem("camera", "c1", "Câmera do quarto", "10.0.0.1"),
+                            FavoriteItem("light", "l1", "Luz da sala", "Sala"),
+                        ),
+                    )
+                }
             }
         }
-        val cameras = compose.onNodeWithText("Câmeras", useUnmergedTree = true).fetchSemanticsNode().boundsInRoot
-        val family = compose.onNodeWithText("Pessoas", useUnmergedTree = true).fetchSemanticsNode().boundsInRoot
-        assertTrue("Cards must flow vertically instead of squeezing enlarged labels", family.top > cameras.bottom)
+        val first = compose.onNodeWithText("Câmera do quarto", useUnmergedTree = true).fetchSemanticsNode().boundsInRoot
+        val second = compose.onNodeWithText("Luz da sala", useUnmergedTree = true).fetchSemanticsNode().boundsInRoot
+        assertTrue("Cards must flow vertically instead of squeezing enlarged labels", second.top > first.bottom)
     }
 }

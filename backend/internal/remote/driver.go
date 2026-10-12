@@ -15,6 +15,8 @@ type Driver interface {
 	Pair(context.Context, Device) (string, error)
 	// Send forwards one remote key using a previously stored token.
 	Send(context.Context, Device, string, string) error
+	// SendText types text into the TV's focused field.
+	SendText(context.Context, Device, string, string) error
 	// DeviceMAC reads the device network address used for Wake-on-LAN.
 	DeviceMAC(context.Context, Device) (string, error)
 	// Reachable reports whether the device is powered on and answering.
@@ -35,6 +37,10 @@ func (*UnavailableDriver) Pair(context.Context, Device) (string, error) {
 }
 
 func (*UnavailableDriver) Send(context.Context, Device, string, string) error {
+	return ErrNoRemoteAdapter
+}
+
+func (*UnavailableDriver) SendText(context.Context, Device, string, string) error {
 	return ErrNoRemoteAdapter
 }
 

@@ -177,6 +177,47 @@ func (s *Service) Send(ctx context.Context, id, key string) (Device, error) {
 	return item, nil
 }
 
+// SendText types text into the TV's focused field.
+func (s *Service) SendText(ctx context.Context, id, text string) (Device, error) {
+	text = strings.TrimSpace(text)
+	if text == "" {
+		return Device{}, fmt.Errorf("informe o texto")
+	}
+	if len(text) > 64 {
+		return Device{}, fmt.Errorf("o texto é muito longo")
+	}
+	unlock := s.lock(id)
+	defer unlock()
+	item, credentials, err := s.repo.Get(ctx, id)
+	if err != nil {
+		return Device{}, err
+	}
+	if !item.Enabled {
+		return Device{}, fmt.Errorf("este controle remoto está desativado")
+	}
+	if credentials.Token == "" {
+		return Device{}, fmt.Errorf("pareie o controle com a TV antes de enviar texto")
+	}
+	if !s.Available() {
+		return Device{}, ErrNoRemoteAdapter
+	}
+	sendCtx, cancel := context.WithTimeout(ctx, 12*time.Second)
+	defer cancel()
+	if err = s.driver.SendText(sendCtx, item, credentials.Token, text); err != nil {
+		_ = s.repo.SetStatus(ctx, id, "failed", err.Error(), false)
+		if updated, getErr := s.Get(ctx, id); getErr == nil {
+			s.broadcast("remote.updated", updated)
+		}
+		return Device{}, err
+	}
+	if item.SetupStatus != "ready" || item.SetupError != "" {
+		_ = s.repo.SetStatus(ctx, id, "ready", "", true)
+		item.SetupStatus = "ready"
+		item.SetupError = ""
+	}
+	return item, nil
+}
+
 // Wake sends a Wake-on-LAN magic packet so a standby TV powers on.
 func (s *Service) Wake(ctx context.Context, id string) (Device, error) {
 	unlock := s.lock(id)

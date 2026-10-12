@@ -106,6 +106,25 @@ func (s *Server) sendRemoteKey(w http.ResponseWriter, r *http.Request) {
 	writeSuccess(w, http.StatusOK, "Remote command sent", item)
 }
 
+func (s *Server) sendRemoteText(w http.ResponseWriter, r *http.Request) {
+	var in struct {
+		Text string `json:"text"`
+	}
+	if !decode(w, r, &in) {
+		return
+	}
+	item, err := s.remotes.SendText(r.Context(), r.PathValue("id"), in.Text)
+	if errors.Is(err, sql.ErrNoRows) {
+		writeError(w, http.StatusNotFound, err)
+		return
+	}
+	if err != nil {
+		writeError(w, http.StatusBadGateway, err)
+		return
+	}
+	writeSuccess(w, http.StatusOK, "Remote text sent", item)
+}
+
 func (s *Server) wakeRemote(w http.ResponseWriter, r *http.Request) {
 	item, err := s.remotes.Wake(r.Context(), r.PathValue("id"))
 	if errors.Is(err, sql.ErrNoRows) {
