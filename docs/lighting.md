@@ -38,6 +38,19 @@ Uma lâmpada que ainda não foi pareada aceita comandos com uma chave temporári
 
 Se a lâmpada for resetada ou pareada novamente, edite-a no Android e informe a nova chave.
 
+## Verificação pelo servidor
+
+O passo de pareamento também pode ser conferido sem o aplicativo, direto no servidor:
+
+```bash
+cd backend
+go run ./cmd/lightscan                      # lista o que responde na rede local
+go run ./cmd/lightscan -probe               # também testa a porta de controle de cada endereço
+go run ./cmd/lightscan -id <dispositivo> -key <chave> -address 192.168.1.60
+```
+
+O utilitário usa exatamente o mesmo caminho do backend: sem conta, sem nuvem e sem enviar nada para fora da rede local.
+
 ## Descoberta de endereço
 
 O Valkyris guarda o último endereço funcional. Quando a lâmpada não responde, ele procura de novo pelo identificador do dispositivo nos anúncios da rede local. Redes com isolamento entre clientes, VLANs ou firewall precisam permitir que o container do Valkyris alcance a lâmpada na porta TCP 6668; a descoberta usa UDP 6666, 6667 e 7000.
