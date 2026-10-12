@@ -59,7 +59,9 @@ fun OverviewActivityChart(onEvent: (String) -> Unit, vm: ActivityViewModel = hil
                 try { buckets = vm.api.activity(hours); failed = null }
                 catch (cancelled: CancellationException) { throw cancelled }
                 catch (error: Exception) { failed = error.message }
-                delay(15_000)
+                // The chart aggregates 12-48 h buckets: refreshing it every few
+                // seconds was pure round-trip waste.
+                delay(60_000)
             }
         }
     }
