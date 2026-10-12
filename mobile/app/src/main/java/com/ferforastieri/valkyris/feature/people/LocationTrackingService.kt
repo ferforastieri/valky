@@ -150,8 +150,13 @@ class LocationTrackingService : Service() {
             .digest((it.baseUrl + "\n" + it.token).toByteArray()).joinToString("") { byte -> "%02x".format(byte) }
     }
 
-    private fun report(location: Location, force: Boolean = false) {
-        scope.launch {
+    private fun batteryLevel(): Int {
+        val manager = getSystemService(android.os.BatteryManager::class.java) ?: return -1
+        val level = manager.getIntProperty(android.os.BatteryManager.BATTERY_PROPERTY_CAPACITY)
+        return if (level in 0..100) level else -1
+    }
+
+    private fun report(location: Location, force: Boolean = false) {        scope.launch {
             reportingMutex.withLock {
                 val owner = sessionKey()
                 if (owner == null) { stopSelf(); return@withLock }
@@ -168,6 +173,7 @@ class LocationTrackingService : Service() {
                     val result = api.reportMyLocation(LocationReport(
                         latitude = location.latitude, longitude = location.longitude,
                         accuracy = location.accuracy.toDouble(), occurredAt = Instant.ofEpochMilli(location.time).toString(),
+                        battery = batteryLevel(),
                     ))
                     if (owner != sessionKey()) return@withLock
                     persistReportedLocation(location, result.pendingConfirmations > 0)

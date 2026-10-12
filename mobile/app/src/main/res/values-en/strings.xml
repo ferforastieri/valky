@@ -260,6 +260,7 @@
     <string name="people">People</string>
     <string name="profile">Profile</string>
     <string name="event_place_entered">Area arrival</string>
+    <string name="event_battery_low">Low battery</string>
     <string name="event_place_exited">Area departure</string>
     <string name="event_confidence">Detection confidence: %1$d%%</string>
     <string name="location_notification_title">Location active</string>

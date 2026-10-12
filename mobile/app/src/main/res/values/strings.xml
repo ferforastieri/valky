@@ -260,6 +260,7 @@
     <string name="people">Pessoas</string>
     <string name="profile">Perfil</string>
     <string name="event_place_entered">Entrada na área</string>
+    <string name="event_battery_low">Bateria fraca</string>
     <string name="event_place_exited">Saída da área</string>
     <string name="event_confidence">Confiança da detecção: %1$d%%</string>
     <string name="location_notification_title">Localização ativa</string>

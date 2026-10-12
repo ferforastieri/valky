@@ -409,6 +409,15 @@ private fun UserCard(user: TrackedPerson, onHistory: () -> Unit) = Card(
             Text(user.name, fontWeight = FontWeight.SemiBold)
             Text(user.lastLocatedAt?.let { "Atualizado ${formatTime(it)}" } ?: "Ainda sem localização", color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodySmall)
         }
+        if (user.battery in 0..100) {
+            Text(
+                "${user.battery}%",
+                style = MaterialTheme.typography.labelMedium,
+                fontWeight = FontWeight.SemiBold,
+                color = if (user.battery <= 20) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(end = 10.dp),
+            )
+        }
         Icon(Lucide.History, "Abrir histórico", tint = MaterialTheme.colorScheme.onSurfaceVariant)
     }
 }

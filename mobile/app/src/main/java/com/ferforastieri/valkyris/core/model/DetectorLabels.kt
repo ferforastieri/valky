@@ -7,6 +7,7 @@ import com.ferforastieri.valkyris.R
 fun detectorLabelRes(type: String): Int = when (type.trim().lowercase()) {
     "place_entered" -> R.string.event_place_entered
     "place_exited" -> R.string.event_place_exited
+    "battery_low" -> R.string.event_battery_low
     "motion" -> R.string.detector_motion
     "person" -> R.string.detector_person
     "tamper" -> R.string.detector_tamper

@@ -123,7 +123,11 @@ fun PersonDetailScreen(onBack: () -> Unit, vm: PersonDetailViewModel = hiltViewM
             IconButton(onClick = onBack) { Icon(Lucide.ArrowLeft, stringResource(R.string.back)) }
             Column(Modifier.weight(1f)) {
                 Text(user?.name ?: "Localização", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold)
-                Text(lastSeenLabel(user?.lastLocatedAt), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text(
+                    lastSeenLabel(user?.lastLocatedAt) + if (user != null && user.battery in 0..100) " · Bateria ${user.battery}%" else "",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
             }
         }
         error?.let { Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(bottom = 6.dp)) }

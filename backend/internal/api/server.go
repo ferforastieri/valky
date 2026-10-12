@@ -956,6 +956,21 @@ func (s *Server) reportMyLocation(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 	}
+	if in.Battery >= 0 && in.Battery <= 20 {
+		if user, userErr := s.tracking.CurrentUser(r.Context(), auth.DeviceID(r.Context())); userErr == nil && s.tracking.BatteryNotificationDue(r.Context(), user.ID, 6*time.Hour) {
+			e, createErr := s.events.Create(r.Context(), event.Event{Source: "tracking", SubjectID: user.ID, Type: "battery_low", Confidence: 1, OccurredAt: time.Now().UTC(), Metadata: map[string]any{"personName": user.Name, "battery": in.Battery}})
+			if createErr != nil {
+				s.logger.Error("create low battery event", "error", createErr)
+			} else {
+				s.hub.Broadcast(map[string]any{"type": "event.created", "event": e})
+				if s.notify != nil {
+					if enqueueErr := s.notify.Enqueue(r.Context(), e); enqueueErr != nil {
+						s.logger.Error("enqueue low battery notification", "event", e.ID, "error", enqueueErr)
+					}
+				}
+			}
+		}
+	}
 	pending, pendingErr := s.tracking.PendingConfirmations(r.Context(), auth.DeviceID(r.Context()))
 	if pendingErr != nil {
 		s.logger.Error("read geofence confirmations", "error", pendingErr)

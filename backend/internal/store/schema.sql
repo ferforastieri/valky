@@ -122,6 +122,9 @@ CREATE TABLE IF NOT EXISTS users (
   last_longitude REAL,
   last_accuracy REAL,
   last_located_at TEXT,
+  battery INTEGER NOT NULL DEFAULT -1,
+  battery_at TEXT NOT NULL DEFAULT '',
+  battery_notified_at TEXT NOT NULL DEFAULT '',
   created_at TEXT NOT NULL,
   updated_at TEXT NOT NULL
 );

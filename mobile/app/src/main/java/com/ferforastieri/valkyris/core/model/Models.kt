@@ -47,7 +47,7 @@ import kotlinx.serialization.json.JsonElement
 @Serializable data class CameraOperation(val id:String,val status:String,val message:String,val camera:Camera?=null,val createdAt:String="",val updatedAt:String="")
 @Serializable data class UpdateInfo(val currentVersion:String="",val clientVersion:String="",val latestVersion:String,val available:Boolean=false,val serverUpdateAvailable:Boolean=false,val apkUpdateAvailable:Boolean=false,val releaseUrl:String="",val apkUrl:String="",val publishedAt:String="",val message:String="")
 @Serializable data class RetentionSettings(val maxAgeDays:Int=7,val maxStorageGB:Long=5)
-@Serializable data class TrackedPerson(val id:String="",val name:String,val color:String="#5B5BD6",val avatarData:String="",val deviceId:String="",val enabled:Boolean=true,val lastLatitude:Double?=null,val lastLongitude:Double?=null,val lastAccuracy:Double?=null,val lastLocatedAt:String?=null,val createdAt:String="",val updatedAt:String="")
+@Serializable data class TrackedPerson(val id:String="",val name:String,val color:String="#5B5BD6",val avatarData:String="",val deviceId:String="",val enabled:Boolean=true,val lastLatitude:Double?=null,val lastLongitude:Double?=null,val lastAccuracy:Double?=null,val lastLocatedAt:String?=null,val battery:Int=-1,val batteryAt:String?=null,val createdAt:String="",val updatedAt:String="")
 @Serializable data class TrackedPlace(val id:String="",val name:String,val latitude:Double,val longitude:Double,val radiusMeters:Double=100.0,val enabled:Boolean=true,val createdAt:String="",val updatedAt:String="")
 @Serializable data class PlaceUpsertRequest(val name:String,val latitude:Double,val longitude:Double,val radiusMeters:Double,val enabled:Boolean)
 @Serializable data class PersonLocation(val id:String="",val personId:String="",val latitude:Double,val longitude:Double,val accuracy:Double=0.0,val address:String="",val occurredAt:String="",val lastSeenAt:String="")
@@ -56,7 +56,7 @@ import kotlinx.serialization.json.JsonElement
 
 @Serializable data class ActivityBucket(val start: String, val end: String, val count: Int)
 
-@Serializable data class LocationReport(val latitude: Double, val longitude: Double, val accuracy: Double, val occurredAt: String)
+@Serializable data class LocationReport(val latitude: Double, val longitude: Double, val accuracy: Double, val occurredAt: String, val battery: Int = -1)
 
 @Serializable data class ManagedUser(val id:String="",val name:String,val enabled:Boolean=true,val admin:Boolean=false,val devices:Int=0,val username:String="",val credentialsConfigured:Boolean=false,val viewRules:Boolean=false,val editRules:Boolean=false,val password:String="")
 

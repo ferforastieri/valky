@@ -73,6 +73,8 @@ type User struct {
 	LastLongitude *float64   `json:"lastLongitude,omitempty"`
 	LastAccuracy  *float64   `json:"lastAccuracy,omitempty"`
 	LastLocatedAt *time.Time `json:"lastLocatedAt,omitempty"`
+	Battery       int        `json:"battery"`
+	BatteryAt     *time.Time `json:"batteryAt,omitempty"`
 	CreatedAt     time.Time  `json:"createdAt"`
 	UpdatedAt     time.Time  `json:"updatedAt"`
 }
@@ -83,6 +85,7 @@ type UserLocation struct {
 	Latitude   float64   `json:"latitude"`
 	Longitude  float64   `json:"longitude"`
 	Accuracy   float64   `json:"accuracy"`
+	Battery    int       `json:"battery"`
 	Address    string    `json:"address"`
 	LastSeenAt time.Time `json:"lastSeenAt"`
 	OccurredAt time.Time `json:"occurredAt"`
@@ -96,7 +99,7 @@ type UserTransition struct {
 }
 
 func (s *Service) ListUsers(ctx context.Context) ([]User, error) {
-	rows, err := s.store.DB.QueryContext(ctx, `SELECT id,name,color,avatar_data,enabled,last_latitude,last_longitude,last_accuracy,last_located_at,created_at,updated_at FROM users WHERE enabled=1 ORDER BY name COLLATE NOCASE`)
+	rows, err := s.store.DB.QueryContext(ctx, `SELECT id,name,color,avatar_data,enabled,last_latitude,last_longitude,last_accuracy,last_located_at,battery,battery_at,created_at,updated_at FROM users WHERE enabled=1 ORDER BY name COLLATE NOCASE`)
 	if err != nil {
 		return nil, err
 	}
@@ -115,7 +118,7 @@ func (s *Service) ListUsers(ctx context.Context) ([]User, error) {
 // CurrentUser returns the family profile owned by the authenticated phone.
 // A profile is never created separately from a device.
 func (s *Service) CurrentUser(ctx context.Context, deviceID string) (User, error) {
-	return scanUser(s.store.DB.QueryRowContext(ctx, `SELECT u.id,u.name,u.color,u.avatar_data,u.enabled,u.last_latitude,u.last_longitude,u.last_accuracy,u.last_located_at,u.created_at,u.updated_at FROM users u JOIN devices d ON d.user_id=u.id WHERE d.id=? AND d.enabled=1`, deviceID))
+	return scanUser(s.store.DB.QueryRowContext(ctx, `SELECT u.id,u.name,u.color,u.avatar_data,u.enabled,u.last_latitude,u.last_longitude,u.last_accuracy,u.last_located_at,u.battery,u.battery_at,u.created_at,u.updated_at FROM users u JOIN devices d ON d.user_id=u.id WHERE d.id=? AND d.enabled=1`, deviceID))
 }
 
 func (s *Service) UpdateUser(ctx context.Context, id string, in User) (User, error) {
@@ -139,7 +142,7 @@ func (s *Service) UpdateUser(ctx context.Context, id string, in User) (User, err
 	if affected, _ := result.RowsAffected(); affected == 0 {
 		return User{}, sql.ErrNoRows
 	}
-	return scanUser(s.store.DB.QueryRowContext(ctx, `SELECT id,name,color,avatar_data,enabled,last_latitude,last_longitude,last_accuracy,last_located_at,created_at,updated_at FROM users WHERE id=?`, id))
+	return scanUser(s.store.DB.QueryRowContext(ctx, `SELECT id,name,color,avatar_data,enabled,last_latitude,last_longitude,last_accuracy,last_located_at,battery,battery_at,created_at,updated_at FROM users WHERE id=?`, id))
 }
 
 func (s *Service) UpdateCurrentUser(ctx context.Context, deviceID string, in User) (User, error) {
@@ -189,7 +192,9 @@ func (s *Service) ReportMyLocation(ctx context.Context, deviceID string, locatio
 		return nil, nil
 	}
 	location.ID, location.UserID = uuid.NewString(), user.ID
-	if _, err = tx.ExecContext(ctx, `UPDATE users SET last_latitude=?,last_longitude=?,last_accuracy=?,last_located_at=?,updated_at=? WHERE id=?`, location.Latitude, location.Longitude, location.Accuracy, location.OccurredAt.Format(time.RFC3339Nano), now.Format(time.RFC3339Nano), user.ID); err != nil {
+	if _, err = tx.ExecContext(ctx, `UPDATE users SET last_latitude=?,last_longitude=?,last_accuracy=?,last_located_at=?,battery=CASE WHEN ?>=0 THEN ? ELSE battery END,battery_at=CASE WHEN ?>=0 THEN ? ELSE battery_at END,updated_at=? WHERE id=?`,
+		location.Latitude, location.Longitude, location.Accuracy, location.OccurredAt.Format(time.RFC3339Nano),
+		location.Battery, location.Battery, location.Battery, now.Format(time.RFC3339Nano), now.Format(time.RFC3339Nano), user.ID); err != nil {
 		return nil, err
 	}
 	rows, err := tx.QueryContext(ctx, `SELECT id,name,latitude,longitude,radius_meters,enabled,created_at,updated_at FROM places WHERE enabled=1`)
@@ -487,9 +492,9 @@ func scanUser(row scanner) (User, error) {
 	var user User
 	var enabled int
 	var lat, lon, accuracy sql.NullFloat64
-	var located sql.NullString
+	var located, batteryAt sql.NullString
 	var created, updated string
-	err := row.Scan(&user.ID, &user.Name, &user.Color, &user.AvatarData, &enabled, &lat, &lon, &accuracy, &located, &created, &updated)
+	err := row.Scan(&user.ID, &user.Name, &user.Color, &user.AvatarData, &enabled, &lat, &lon, &accuracy, &located, &user.Battery, &batteryAt, &created, &updated)
 	if err != nil {
 		return user, err
 	}
@@ -504,6 +509,7 @@ func scanUser(row scanner) (User, error) {
 		user.LastAccuracy = &accuracy.Float64
 	}
 	user.LastLocatedAt = store.NullTime(located)
+	user.BatteryAt = store.NullTime(batteryAt)
 	user.CreatedAt, _ = time.Parse(time.RFC3339Nano, created)
 	user.UpdatedAt, _ = time.Parse(time.RFC3339Nano, updated)
 	return user, nil
@@ -661,6 +667,22 @@ func updateMembership(ctx context.Context, tx *sql.Tx, kind, owner, table, colum
 
 // PendingConfirmations lets the phone keep reporting while a boundary change
 // is being confirmed, including slow crossings near the end of a sampling burst.
+// BatteryNotificationDue reports whether a low-battery alert should be raised
+// for the user. It records the attempt so repeated reports while the battery
+// stays low do not spam the family; the caller decides the cooldown.
+func (s *Service) BatteryNotificationDue(ctx context.Context, userID string, cooldown time.Duration) bool {
+	now := s.now().UTC()
+	var notified sql.NullString
+	if err := s.store.DB.QueryRowContext(ctx, `SELECT battery_notified_at FROM users WHERE id=?`, userID).Scan(&notified); err != nil {
+		return false
+	}
+	if previous := store.NullTime(notified); previous != nil && now.Sub(*previous) < cooldown {
+		return false
+	}
+	_, err := s.store.DB.ExecContext(ctx, `UPDATE users SET battery_notified_at=? WHERE id=?`, now.Format(time.RFC3339Nano), userID)
+	return err == nil
+}
+
 func (s *Service) PendingConfirmations(ctx context.Context, deviceID string) (int, error) {
 	var count int
 	err := s.store.DB.QueryRowContext(ctx, `SELECT COUNT(*) FROM geofence_candidates c JOIN devices d ON d.user_id=c.owner_id JOIN places p ON p.id=c.place_id WHERE c.owner_kind='user' AND d.id=? AND d.enabled=1 AND p.enabled=1 AND c.last_at>=?`, deviceID, s.now().UTC().Add(-3*time.Minute).Format(time.RFC3339Nano)).Scan(&count)
