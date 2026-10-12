@@ -80,10 +80,9 @@ fun RemoteControlScreen(onBack: () -> Unit, vm: RemoteControlViewModel = hiltVie
             PowerButton(powering = state.powering, onPower = vm::power, modifier = Modifier.align(Alignment.CenterHorizontally))
         }
         Text(
-            (remote?.name ?: stringResource(R.string.remote_control)) +
-                " · " + if (remote?.tokenConfigured == true) stringResource(R.string.remote_paired) else stringResource(R.string.remote_not_paired),
+            remote?.name ?: stringResource(R.string.remote_control),
             style = MaterialTheme.typography.labelSmall,
-            color = if (remote?.tokenConfigured == true) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.error,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier.fillMaxWidth().padding(vertical = 10.dp),
             textAlign = androidx.compose.ui.text.style.TextAlign.Center,
         )

@@ -223,7 +223,7 @@ func (s *Service) deliverBatch(ctx context.Context) {
 		_ = json.Unmarshal([]byte(i.metadata), &metadata)
 		alerts := camera.DefaultAlertPresentation()
 		_ = json.Unmarshal([]byte(i.alerts), &alerts)
-		s.deliver(ctx, i.id, i.attempts, i.endpoint, i.secret, map[string]any{"alerts": alerts, "cameraName": i.cameraName, "eventId": i.eventID, "cameraId": i.cameraID, "type": i.eventType, "confidence": i.confidence, "occurredAt": i.occurred, "alarm": metadata["alarm"], "target": notificationTarget(i.eventType), "personName": metadata["personName"], "placeName": metadata["placeName"]})
+		s.deliver(ctx, i.id, i.attempts, i.endpoint, i.secret, map[string]any{"alerts": alerts, "cameraName": i.cameraName, "eventId": i.eventID, "cameraId": i.cameraID, "type": i.eventType, "confidence": i.confidence, "occurredAt": i.occurred, "alarm": metadata["alarm"], "target": notificationTarget(i.eventType), "personName": metadata["personName"], "placeName": metadata["placeName"], "battery": metadata["battery"]})
 	}
 }
 

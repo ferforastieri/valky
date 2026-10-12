@@ -31,6 +31,7 @@ internal fun locationEventTitle(type: String, personName: String?, placeName: St
     return when (type) {
         "place_entered" -> "$person chegou em $place"
         "place_exited" -> "$person saiu de $place"
+        "battery_low" -> "$person está com bateria baixa"
         else -> null
     }
 }

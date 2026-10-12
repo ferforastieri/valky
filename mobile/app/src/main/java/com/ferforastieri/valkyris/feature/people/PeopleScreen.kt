@@ -17,6 +17,7 @@ import kotlinx.coroutines.launch
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.*
+import androidx.compose.material3.FloatingActionButton
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -79,18 +80,8 @@ fun PeopleScreen(onPerson: (String) -> Unit = {}, vm: PeopleViewModel = hiltView
     var areasOpen by remember { mutableStateOf(false) }
     var deletingPlace by remember { mutableStateOf<TrackedPlace?>(null) }
 
+    Box(Modifier.fillMaxSize()) {
     Column(Modifier.fillMaxSize().padding(horizontal = 18.dp)) {
-        Row(
-            Modifier.fillMaxWidth().padding(top = 14.dp, bottom = 12.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.End,
-        ) {
-            TextButton(onClick = { areasOpen = true }) {
-                Icon(Lucide.Plus, null, Modifier.size(18.dp))
-                Spacer(Modifier.width(6.dp))
-                Text("Registrar")
-            }
-        }
         when (locationStatus) {
             LocationTrackingStatus.State.Locating -> Text(stringResource(R.string.location_updating), style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(bottom = 8.dp))
             LocationTrackingStatus.State.LocationUnavailable, LocationTrackingStatus.State.SendFailed, LocationTrackingStatus.State.PermissionRequired -> {
@@ -137,6 +128,13 @@ fun PeopleScreen(onPerson: (String) -> Unit = {}, vm: PeopleViewModel = hiltView
                 }
             }
         }
+    }
+        FloatingActionButton(
+            onClick = { areasOpen = true },
+            modifier = Modifier.align(Alignment.BottomEnd).padding(end = 20.dp, bottom = 18.dp),
+            containerColor = MaterialTheme.colorScheme.secondary,
+            contentColor = MaterialTheme.colorScheme.onSecondary,
+        ) { Icon(Lucide.Plus, "Áreas") }
     }
     if (areaPickerOpen) AreaEditorSheet(
         busy = busy,

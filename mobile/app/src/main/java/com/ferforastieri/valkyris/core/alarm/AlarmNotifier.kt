@@ -70,7 +70,10 @@ class AlarmNotifier @Inject constructor(@param:ApplicationContext private val co
             defaultTitle
         }
         val body = alerts.notificationBody.ifBlank {
-            context.getString(if (alarm) R.string.notification_alarm_body else R.string.notification_event_body)
+            when (type) {
+                "battery_low" -> "Bateria baixa — ajude se puder."
+                else -> context.getString(if (alarm) R.string.notification_alarm_body else R.string.notification_event_body)
+            }
         }
         val channel = presentationChannel(alarm, alerts)
         val eventIntent = PendingIntent.getActivity(

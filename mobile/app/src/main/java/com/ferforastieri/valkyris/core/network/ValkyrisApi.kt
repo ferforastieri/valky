@@ -111,6 +111,8 @@ class ValkyrisApi(
                 publishBackend(error.technicalMessage, false)
                 throw error
             }
+            // A cancelled coroutine is not a failure; never toast it.
+            if (error is kotlinx.coroutines.CancellationException) throw error
             val complete = buildString {
                 append(error::class.simpleName ?: "Network error")
                 error.message?.takeIf { it.isNotBlank() }?.let { append(": ").append(it) }
