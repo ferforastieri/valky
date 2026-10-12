@@ -28,7 +28,8 @@ import kotlinx.serialization.json.JsonElement
 @Serializable data class Rule(val id:String="",val cameraId:String,val name:String,val detectorTypes:List<String>,val confirmations:Int=1,val cooldownSeconds:Int=60,val schedule:RuleSchedule=RuleSchedule(),val motion:MotionSettings?=null,val actions:RuleActions=RuleActions(),val enabled:Boolean=true)
 @OptIn(kotlinx.serialization.ExperimentalSerializationApi::class)
 @Serializable data class RuleActionsRequest(val record:Boolean,val notify:Boolean,val alarm:Boolean,@kotlinx.serialization.EncodeDefault val alerts:AlertPresentation=AlertPresentation())
-@Serializable data class RuleUpsertRequest(val cameraId:String,val name:String,val detectorTypes:List<String>,val actions:RuleActionsRequest,val schedule:RuleSchedule=RuleSchedule(),val motion:MotionSettings?=null,val cooldownSeconds:Int=60,val confirmations:Int=1)
+@OptIn(kotlinx.serialization.ExperimentalSerializationApi::class)
+@Serializable data class RuleUpsertRequest(val cameraId:String,val name:String,val detectorTypes:List<String>,val actions:RuleActionsRequest,val schedule:RuleSchedule=RuleSchedule(),val motion:MotionSettings?=null,@kotlinx.serialization.EncodeDefault val cooldownSeconds:Int=60,@kotlinx.serialization.EncodeDefault val confirmations:Int=1)
 @Serializable data class DetectorKind(val id:String,val label:String,val source:String)
 @Serializable data class AuthStatus(val initialized:Boolean)
 @Serializable data class LoginRequest(val password:String,val deviceName:String,val userName:String="",val locale:String,val username:String="")
@@ -46,8 +47,10 @@ import kotlinx.serialization.json.JsonElement
 @Serializable data class ApiEnvelope<T>(val success:Boolean,val message:String="",val data:T?=null,val error:String?=null)
 @Serializable data class CameraOperation(val id:String,val status:String,val message:String,val camera:Camera?=null,val createdAt:String="",val updatedAt:String="")
 @Serializable data class UpdateInfo(val currentVersion:String="",val clientVersion:String="",val latestVersion:String,val available:Boolean=false,val serverUpdateAvailable:Boolean=false,val apkUpdateAvailable:Boolean=false,val releaseUrl:String="",val apkUrl:String="",val publishedAt:String="",val message:String="")
-@Serializable data class RetentionSettings(val maxAgeDays:Int=7,val maxStorageGB:Long=5)
-@Serializable data class TrackedPerson(val id:String="",val name:String,val color:String="#5B5BD6",val avatarData:String="",val deviceId:String="",val enabled:Boolean=true,val lastLatitude:Double?=null,val lastLongitude:Double?=null,val lastAccuracy:Double?=null,val lastLocatedAt:String?=null,val battery:Int=-1,val batteryAt:String?=null,val notifyCamera:Boolean=true,val notifyLocation:Boolean=true,val createdAt:String="",val updatedAt:String="")
+@OptIn(kotlinx.serialization.ExperimentalSerializationApi::class)
+@Serializable data class RetentionSettings(@kotlinx.serialization.EncodeDefault val maxAgeDays:Int=7,@kotlinx.serialization.EncodeDefault val maxStorageGB:Long=5)
+@OptIn(kotlinx.serialization.ExperimentalSerializationApi::class)
+@Serializable data class TrackedPerson(val id:String="",val name:String,val color:String="#5B5BD6",val avatarData:String="",val deviceId:String="",val enabled:Boolean=true,val lastLatitude:Double?=null,val lastLongitude:Double?=null,val lastAccuracy:Double?=null,val lastLocatedAt:String?=null,val battery:Int=-1,val batteryAt:String?=null,@kotlinx.serialization.EncodeDefault val notifyCamera:Boolean=true,@kotlinx.serialization.EncodeDefault val notifyLocation:Boolean=true,val createdAt:String="",val updatedAt:String="")
 @Serializable data class TrackedPlace(val id:String="",val name:String,val latitude:Double,val longitude:Double,val radiusMeters:Double=100.0,val enabled:Boolean=true,val createdAt:String="",val updatedAt:String="")
 @Serializable data class PlaceUpsertRequest(val name:String,val latitude:Double,val longitude:Double,val radiusMeters:Double,val enabled:Boolean)
 @Serializable data class PersonLocation(val id:String="",val personId:String="",val latitude:Double,val longitude:Double,val accuracy:Double=0.0,val address:String="",val occurredAt:String="",val lastSeenAt:String="")
@@ -56,9 +59,11 @@ import kotlinx.serialization.json.JsonElement
 
 @Serializable data class ActivityBucket(val start: String, val end: String, val count: Int)
 
-@Serializable data class LocationReport(val latitude: Double, val longitude: Double, val accuracy: Double, val occurredAt: String, val battery: Int = -1)
+@OptIn(kotlinx.serialization.ExperimentalSerializationApi::class)
+@Serializable data class LocationReport(val latitude: Double, val longitude: Double, val accuracy: Double, val occurredAt: String, @kotlinx.serialization.EncodeDefault val battery: Int = -1)
 
-@Serializable data class ManagedUser(val id:String="",val name:String,val enabled:Boolean=true,val admin:Boolean=false,val devices:Int=0,val username:String="",val credentialsConfigured:Boolean=false,val viewRules:Boolean=false,val editRules:Boolean=false,val notifyCamera:Boolean=true,val notifyLocation:Boolean=true,val avatarData:String="",val password:String="")
+@OptIn(kotlinx.serialization.ExperimentalSerializationApi::class)
+@Serializable data class ManagedUser(val id:String="",val name:String,@kotlinx.serialization.EncodeDefault val enabled:Boolean=true,val admin:Boolean=false,val devices:Int=0,val username:String="",val credentialsConfigured:Boolean=false,val viewRules:Boolean=false,val editRules:Boolean=false,@kotlinx.serialization.EncodeDefault val notifyCamera:Boolean=true,@kotlinx.serialization.EncodeDefault val notifyLocation:Boolean=true,val avatarData:String="",val password:String="")
 
 @Serializable data class SessionPermissions(val admin:Boolean=false,val readOnly:Boolean=false,val viewRules:Boolean=false,val editRules:Boolean=false,val username:String="",val credentialsConfigured:Boolean=false)
 

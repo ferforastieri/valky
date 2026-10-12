@@ -101,7 +101,9 @@ type UserTransition struct {
 }
 
 func (s *Service) ListUsers(ctx context.Context) ([]User, error) {
-	rows, err := s.store.DB.QueryContext(ctx, `SELECT id,name,color,avatar_data,enabled,last_latitude,last_longitude,last_accuracy,last_located_at,battery,battery_at,notify_camera,notify_location,created_at,updated_at FROM users WHERE enabled=1 ORDER BY name COLLATE NOCASE`)
+	// Every family member stays on the map: notifications and account state are
+	// separate switches and must never hide someone from the family view.
+	rows, err := s.store.DB.QueryContext(ctx, `SELECT id,name,color,avatar_data,enabled,last_latitude,last_longitude,last_accuracy,last_located_at,battery,battery_at,notify_camera,notify_location,created_at,updated_at FROM users ORDER BY name COLLATE NOCASE`)
 	if err != nil {
 		return nil, err
 	}
