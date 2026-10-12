@@ -151,9 +151,13 @@ class LocationTrackingService : Service() {
     }
 
     private fun batteryLevel(): Int {
-        val manager = getSystemService(android.os.BatteryManager::class.java) ?: return -1
-        val level = manager.getIntProperty(android.os.BatteryManager.BATTERY_PROPERTY_CAPACITY)
-        return if (level in 0..100) level else -1
+        // getIntProperty(BATTERY_PROPERTY_CAPACITY) returns 0/unknown on several
+        // devices; the sticky battery broadcast is the reliable source.
+        val intent = registerReceiver(null, android.content.IntentFilter(android.content.Intent.ACTION_BATTERY_CHANGED))
+        val level = intent?.getIntExtra(android.os.BatteryManager.EXTRA_LEVEL, -1) ?: -1
+        val scale = intent?.getIntExtra(android.os.BatteryManager.EXTRA_SCALE, -1) ?: -1
+        if (level < 0 || scale <= 0) return -1
+        return (level * 100 / scale).coerceIn(0, 100)
     }
 
     private fun report(location: Location, force: Boolean = false) {        scope.launch {

@@ -144,6 +144,7 @@ fun PersonDetailScreen(onBack: () -> Unit, vm: PersonDetailViewModel = hiltViewM
             FamilyMap(
                 users = listOfNotNull(user),
                 places = places,
+                route = filtered,
                 modifier = Modifier.fillMaxSize().clip(MaterialTheme.shapes.extraLarge),
             )
         }

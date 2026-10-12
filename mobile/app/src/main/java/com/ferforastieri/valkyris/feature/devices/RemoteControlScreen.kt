@@ -51,6 +51,7 @@ import com.composables.icons.lucide.ChevronRight
 import com.composables.icons.lucide.ChevronUp
 import com.composables.icons.lucide.House
 import com.composables.icons.lucide.Link
+import com.composables.icons.lucide.List
 import com.composables.icons.lucide.Lucide
 import com.composables.icons.lucide.Power
 import com.composables.icons.lucide.Settings
@@ -118,8 +119,7 @@ private fun PowerButton(powering: Boolean, onPower: () -> Unit, modifier: Modifi
 @Composable
 private fun ConnectedRemote(state: RemoteControlState, vm: RemoteControlViewModel) {
     val enabled = !state.powering
-    Column(Modifier.fillMaxSize(), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        Spacer(Modifier.weight(1f))
+    Column(Modifier.fillMaxSize(), verticalArrangement = Arrangement.spacedBy(14.dp)) {
         NumberPad(enabled, vm::send)
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
             Rocker(
@@ -132,19 +132,26 @@ private fun ConnectedRemote(state: RemoteControlState, vm: RemoteControlViewMode
             Rocker(
                 up = KeySpec(Lucide.ChevronUp, stringResource(R.string.remote_channel_up), "KEY_CHUP"),
                 down = KeySpec(Lucide.ChevronDown, stringResource(R.string.remote_channel_down), "KEY_CHDOWN"),
+                middle = KeySpec(Lucide.List, stringResource(R.string.remote_channel_list), "KEY_CH_LIST"),
                 enabled = enabled, onSend = vm::send,
             )
         }
-        Row(
-            Modifier.fillMaxWidth().padding(vertical = 8.dp),
-            horizontalArrangement = Arrangement.SpaceEvenly,
-            verticalAlignment = Alignment.CenterVertically,
+        Surface(
+            shape = RoundedCornerShape(30.dp),
+            color = MaterialTheme.colorScheme.surfaceVariant,
+            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
         ) {
-            HoldKey(KeySpec(Lucide.ArrowLeft, stringResource(R.string.remote_back), "KEY_RETURN"), enabled, Modifier.size(60.dp), CircleShape, vm::send)
-            HoldKey(KeySpec(Lucide.House, stringResource(R.string.remote_home), "KEY_HOME"), enabled, Modifier.size(64.dp), CircleShape, vm::send)
-            HoldKey(KeySpec(Lucide.Settings, stringResource(R.string.settings), "KEY_MENU"), enabled, Modifier.size(60.dp), CircleShape, vm::send)
+            Row(
+                Modifier.fillMaxWidth().padding(6.dp),
+                horizontalArrangement = Arrangement.SpaceEvenly,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                HoldKey(KeySpec(Lucide.ArrowLeft, stringResource(R.string.remote_back), "KEY_RETURN"), enabled, Modifier.size(58.dp), CircleShape, vm::send)
+                HoldKey(KeySpec(Lucide.House, stringResource(R.string.remote_home), "KEY_HOME"), enabled, Modifier.size(62.dp), CircleShape, vm::send)
+                HoldKey(KeySpec(Lucide.Settings, stringResource(R.string.settings), "KEY_MENU"), enabled, Modifier.size(58.dp), CircleShape, vm::send)
+            }
         }
-        Spacer(Modifier.height(10.dp))
+        Spacer(Modifier.weight(1f))
     }
 }
 

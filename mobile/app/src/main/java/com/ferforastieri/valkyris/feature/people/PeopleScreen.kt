@@ -57,6 +57,7 @@ import org.osmdroid.views.MapView
 import org.osmdroid.views.overlay.MapEventsOverlay
 import org.osmdroid.views.overlay.Marker
 import org.osmdroid.views.overlay.Polygon
+import org.osmdroid.views.overlay.Polyline
 import org.osmdroid.util.BoundingBox
 
 @Composable
@@ -186,7 +187,7 @@ fun PeopleScreen(onPerson: (String) -> Unit = {}, vm: PeopleViewModel = hiltView
 }
 
 @Composable
-internal fun FamilyMap(users: List<TrackedPerson>, places: List<TrackedPlace>, modifier: Modifier = Modifier) {
+internal fun FamilyMap(users: List<TrackedPerson>, places: List<TrackedPlace>, modifier: Modifier = Modifier, route: List<PersonLocation> = emptyList()) {
     var selectedId by remember { mutableStateOf<String?>(null) }
     val mapStyle = currentMapVisualStyle()
     val surface = MaterialTheme.colorScheme.surface.toArgb()
@@ -204,7 +205,18 @@ internal fun FamilyMap(users: List<TrackedPerson>, places: List<TrackedPlace>, m
     }, update = { map ->
         map.applyValkyrisMapStyle(mapStyle)
         InfoWindow.closeAllInfoWindowsOn(map)
-        map.overlays.removeAll { it is Marker || it is Polygon }
+        map.overlays.removeAll { it is Marker || it is Polygon || it is Polyline }
+        if (route.size >= 2) {
+            val points = route.sortedBy { it.occurredAt }.map { GeoPoint(it.latitude, it.longitude) }
+            map.overlays.add(Polyline().apply {
+                setPoints(points)
+                outlinePaint.color = mapStyle.accent
+                outlinePaint.strokeWidth = 9f
+                outlinePaint.isAntiAlias = true
+                outlinePaint.strokeCap = android.graphics.Paint.Cap.ROUND
+                outlinePaint.strokeJoin = android.graphics.Paint.Join.ROUND
+            })
+        }
         places.forEach { place ->
             val circle = Polygon().apply {
                 setPoints(Polygon.pointsAsCircle(GeoPoint(place.latitude, place.longitude), place.radiusMeters))
@@ -239,7 +251,18 @@ internal fun FamilyMap(users: List<TrackedPerson>, places: List<TrackedPlace>, m
         }
         val located = users.filter { it.lastLatitude?.isFinite() == true && it.lastLongitude?.isFinite() == true }
         val participantIds = located.map { it.id }.sorted()
-        if (located.isNotEmpty() && map.tag != participantIds) {
+        if (route.size >= 2 && map.tag != "route-${route.size}-${route.firstOrNull()?.id}") {
+            map.tag = "route-${route.size}-${route.firstOrNull()?.id}"
+            val coordinates = route.map { GeoPoint(it.latitude, it.longitude) }
+            map.post {
+                val padding = (40 * map.resources.displayMetrics.density).toInt()
+                if (coordinates.distinctBy { it.latitude to it.longitude }.size == 1) {
+                    map.controller.setZoom(17.0); map.controller.setCenter(coordinates.first())
+                } else {
+                    map.zoomToBoundingBox(BoundingBox.fromGeoPoints(coordinates), false, padding, 18.0, null)
+                }
+            }
+        } else if (located.isNotEmpty() && map.tag != participantIds) {
             map.tag = participantIds
             val coordinates = located.map { GeoPoint(it.lastLatitude!!, it.lastLongitude!!) }
             map.post {
