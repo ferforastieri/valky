@@ -218,6 +218,7 @@ import com.ferforastieri.valkyris.core.model.*
         title=stringResource(R.string.add_light),
         onDismiss=onDismiss,
         dismissEnabled=!running,
+        dismissByOutsideTap=false,
         actions={
             when{
                 paired!=null->Button(onClick=onDismiss){Text(stringResource(R.string.close))}

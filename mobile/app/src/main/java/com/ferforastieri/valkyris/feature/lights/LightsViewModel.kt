@@ -70,6 +70,8 @@ class LightsViewModel @Inject constructor(
     private var pendingHomeSsid: String? = null
     private var pendingPassword: String? = null
     private var savedSsid: String? = null
+    /** Último relato que ainda não chegou ao servidor (fica para reenviar). */
+    private var diagnosticoPendente: Pair<String, String>? = null
 
     init {
         viewModelScope.launch { repository.lights.collect { value -> _state.update { it.copy(lights = value, loading = false) } } }
@@ -82,7 +84,7 @@ class LightsViewModel @Inject constructor(
         realtime = repository.api.realtime({ refresh() }, { if (active) viewModelScope.launch { delay(5_000); if (active) connectRealtime() } }, eventPrefix = "light.")
     }
 
-    fun refresh() = viewModelScope.launch { runCatching { repository.refreshLights() }.onFailure { error -> _state.update { it.copy(loading = false, error = error.message) } } }
+    fun refresh() = viewModelScope.launch { reenviarDiagnostico(); runCatching { repository.refreshLights() }.onFailure { error -> _state.update { it.copy(loading = false, error = error.message) } } }
     fun control(id: String, patch: LightStatePatch) = guarded(id, false) { repository.controlLight(id, patch) }
     fun toggleFavorite(id: String, favorite: Boolean) = viewModelScope.launch { runCatching { repository.api.setFavorite("light", id, favorite) }.onSuccess { repository.refreshLights() }.onFailure { error -> _state.update { it.copy(error = error.message) } } }
     fun delete(id: String, done: () -> Unit = {}) = guarded(id) { repository.deleteLight(id); done() }
@@ -130,6 +132,24 @@ class LightsViewModel @Inject constructor(
         } else {
             manager.isProviderEnabled(android.location.LocationManager.GPS_PROVIDER) ||
                 manager.isProviderEnabled(android.location.LocationManager.NETWORK_PROVIDER)
+        }
+    }
+
+    /** Relata ao servidor e guarda o relato para reenviar quando houver rede. */
+    private fun relatar(sessionId: String, detalhe: String) {
+        diagnosticoPendente = sessionId to detalhe
+        viewModelScope.launch {
+            runCatching { repository.api.reportLightPairingDiagnostic(sessionId, detalhe) }
+                .onSuccess { if (diagnosticoPendente == sessionId to detalhe) diagnosticoPendente = null }
+        }
+    }
+
+    /** Tenta de novo o último relato (chamado no refresh, quando a rede voltou). */
+    private fun reenviarDiagnostico() {
+        val pendente = diagnosticoPendente ?: return
+        viewModelScope.launch {
+            runCatching { repository.api.reportLightPairingDiagnostic(pendente.first, pendente.second) }
+                .onSuccess { if (diagnosticoPendente == pendente) diagnosticoPendente = null }
         }
     }
 
@@ -229,7 +249,7 @@ class LightsViewModel @Inject constructor(
                 pendingLampSsid = lamp
                 pendingHomeSsid = network
                 pendingPassword = password
-                runCatching { repository.api.reportLightPairingDiagnostic(session.id, "não entrei sozinho na rede $lamp; aguardando conexão manual") }
+                relatar(session.id, "não entrei sozinho na rede $lamp; aguardando conexão manual")
                 _state.update {
                     it.copy(pairing = PairingProgress("manual-wifi", "Não consegui entrar sozinho na rede “$lamp”. Toque em Abrir Wi-Fi, conecte nela e volte para cá — eu continuo daqui."))
                 }
@@ -276,7 +296,7 @@ class LightsViewModel @Inject constructor(
         } finally {
             closeLink?.invoke()
         }
-        runCatching { repository.api.reportLightPairingDiagnostic(session.id, resultado.detalhe) }
+        relatar(session.id, resultado.detalhe)
         if (!resultado.aceito) {
             _state.update {
                 it.copy(pairing = PairingProgress("failed", "A lâmpada não aceitou os dados (${resultado.detalhe}). Deixe-a piscando devagar e tente de novo."))

@@ -38,6 +38,9 @@ import com.ferforastieri.valkyris.R
 /**
  * The single modal surface used by Valkyris. It supports swipe-to-dismiss,
  * outside-tap dismissal and, when appropriate, an explicit close action.
+ *
+ * Com [dismissByOutsideTap] falso, o toque fora (e o botão voltar) não fecham:
+ * só o gesto de arrastar e o botão de fechar.
  */
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
@@ -45,6 +48,7 @@ fun ValkyrisBottomSheet(
     title: String,
     onDismiss: () -> Unit,
     dismissEnabled: Boolean = true,
+    dismissByOutsideTap: Boolean = true,
     swipeToDismissEnabled: Boolean = true,
     showCloseButton: Boolean = true,
     scrollContent: Boolean = true,
@@ -56,7 +60,16 @@ fun ValkyrisBottomSheet(
         confirmValueChange = { (dismissEnabled && swipeToDismissEnabled) || it != SheetValue.Hidden },
     )
     ModalBottomSheet(
-        onDismissRequest = { if (dismissEnabled) onDismiss() },
+        onDismissRequest = {
+            if (!dismissEnabled) {
+                // nada: o sheet está travado durante uma operação
+            } else if (dismissByOutsideTap) {
+                onDismiss()
+            } else if (sheetState.currentValue == SheetValue.Hidden || sheetState.targetValue == SheetValue.Hidden) {
+                // chegou aqui pelo gesto de arrastar: pode fechar
+                onDismiss()
+            }
+        },
         sheetState = sheetState,
         containerColor = MaterialTheme.colorScheme.surface,
         contentColor = MaterialTheme.colorScheme.onSurface,

@@ -22,28 +22,31 @@ import javax.crypto.spec.IvParameterSpec
 import javax.crypto.spec.SecretKeySpec
 
 /**
- * O pareamento do aparelho, exatamente como o firmware do fabricante pede
- * (código aberto TuyaOpen: `ap_netcfg.c`, `tuya_protocol.c`, `tuya_tls.c`):
+ * O pareamento do aparelho, como o firmware do fabricante pede (código aberto
+ * TuyaOpen: `ap_netcfg.c`, `tuya_protocol.c`, `tuya_tls.c`):
  *
- *  - TLS 1.2 na porta 6668 com chave pré-compartilhada: PSK "123456" e
- *    identidade "psk_identity";
- *  - a única cifra da lista PSK do firmware é
- *    TLS_ECDHE_PSK_WITH_AES_128_CBC_SHA256 (0xC037);
+ *  - TLS 1.2 na porta 6668 com chave pré-compartilhada (PSK "123456",
+ *    identidade "psk_identity");
+ *  - o aplicativo oferece as cifras PSK das gerações do firmware e segue a
+ *    que a lâmpada escolher: ECDHE_PSK_AES_128_CBC_SHA256 (0xC037),
+ *    ECDHE_PSK_AES_128_CBC_SHA (0xC035) e PSK_AES_128_GCM_SHA256 (0x00A8);
  *  - dentro do canal vai um quadro LPV3.5 (00 00 66 99, tipo 0x14) com o
- *    conteúdo em AES-128-GCM usando a chave fixa MD5("OXLvslCvUxcTPLGO");
- *  - o conteúdo é JSON puro: {"ssid","passwd","token","reg"} — o aparelho
- *    analisa direto com cJSON;
+ *    conteúdo em AES-128-GCM com a chave fixa MD5("OXLvslCvUxcTPLGO");
+ *  - o conteúdo é o JSON puro {ssid, passwd, token, reg};
  *  - o aparelho responde o mesmo tipo com um código (0 = aceito).
  */
 internal object TuyaApTlsPsk {
     private const val PORTA = 6668
     private const val PSK = "123456"
     private const val PSK_ID = "psk_identity"
-    private const val SUITE_ECDHE_PSK_CBC_SHA256 = 0xC037
+
+    private const val CIFRA_ECDHE_PSK_CBC_SHA256 = 0xC037
+    private const val CIFRA_ECDHE_PSK_CBC_SHA = 0xC035
+    private const val CIFRA_PSK_GCM_SHA256 = 0x00A8
 
     private val aleatorio = SecureRandom()
 
-    /** O que aconteceu numa tentativa, para mostrar ao usuário. */
+    /** O que aconteceu numa tentativa, para mostrar ao usuário e ao servidor. */
     data class Entrega(val aceito: Boolean, val detalhe: String) {
         companion object {
             fun falhou(endereco: String, motivo: String) = Entrega(false, "$endereco: $motivo")
@@ -57,15 +60,17 @@ internal object TuyaApTlsPsk {
             val conectou = runCatching { socket.connect(InetSocketAddress(endereco, PORTA), 2_500) }.isSuccess
             if (!conectou) return@use Entrega.falhou(endereco, "sem conexão na porta $PORTA")
             socket.soTimeout = 4_500
-            val tls = runCatching {
+            val tls = try {
                 Handshake(socket.getInputStream(), socket.getOutputStream()).also { it.abre() }
-            }.getOrNull() ?: return@use Entrega.falhou(endereco, "TLS recusado")
+            } catch (erro: Exception) {
+                return@use Entrega.falhou(endereco, "TLS recusado (" + (erro.message ?: erro::class.simpleName) + ")")
+            }
             val resposta = runCatching { tls.envia(quadro(0x14, corpo)) }.getOrNull()
                 ?: return@use Entrega.falhou(endereco, "enviado, sem resposta")
             val (aceito, codigo) = respostaCodigo(resposta)
             Entrega(aceito, "$endereco: respondeu $codigo")
         }
-    }.getOrDefault(Entrega.falhou(endereco, "falhou"))
+    }.getOrElse { Entrega.falhou(endereco, "falhou (" + (it.message ?: it::class.simpleName) + ")") }
 
     /** Lê a resposta do aparelho: (aceitou, código em texto). */
     private fun respostaCodigo(resposta: ByteArray): Pair<Boolean, String> {
@@ -141,36 +146,42 @@ internal object TuyaApTlsPsk {
         ((origem[posicao].toInt() and 0xFF) shl 24) or ((origem[posicao + 1].toInt() and 0xFF) shl 16) or
             ((origem[posicao + 2].toInt() and 0xFF) shl 8) or (origem[posicao + 3].toInt() and 0xFF)
 
-    // ------------------------------------------------------------------ TLS 1.2 ECDHE_PSK
+    // ------------------------------------------------------------------ TLS 1.2 com PSK
 
     /**
-     * Diálogo TLS 1.2 com a cifra ECDHE_PSK_AES_128_CBC_SHA256 — exatamente a
-     * única da lista PSK do firmware. Sem certificados; autenticação pela
-     * chave pré-compartilhada.
+     * Diálogo TLS 1.2 somente com chave pré-compartilhada (sem certificados),
+     * seguindo a cifra que o aparelho escolher entre as oferecidas.
      */
     internal class Handshake(private val entrada: InputStream, private val saida: java.io.OutputStream) {
         private val clienteAleatorio = ByteArray(32).also { aleatorio.nextBytes(it) }
         private val historico = ByteArrayOutputStream()
         private val pendente = ByteArrayOutputStream()
         private var servidorAleatorio = ByteArray(32)
-        private var macCliente = ByteArray(32)
-        private var macServidor = ByteArray(32)
+        private var ecdhe = true
+        private var gcm = false
+        private var algoritmoMac = "HmacSHA256"
+        private var tamanhoMac = 32
+        private var macCliente = ByteArray(0)
+        private var macServidor = ByteArray(0)
         private var chaveCliente = ByteArray(16)
         private var chaveServidor = ByteArray(16)
+        private var ivCliente = ByteArray(4)
+        private var ivServidor = ByteArray(4)
         private var seqCliente = 0L
         private var seqServidor = 0L
         private var estendido = false
 
         fun abre() {
-            // ClientHello com as extensões que o firmware espera de um cliente
-            // ECDHE: grupos (secp256r1), formato de ponto, segredo mestre
-            // estendido e renegociação.
+            // ClientHello: oferece as cifras PSK que os firmwares usam, os
+            // grupos, o formato de ponto, o segredo estendido e a renegociação.
             val corpo = ByteArrayOutputStream()
             corpo.write(byteArrayOf(0x03, 0x03))
             corpo.write(clienteAleatorio)
             corpo.write(0)
-            corpo.write(byteArrayOf(0x00, 0x02))
-            corpo.write(byteArrayOf((SUITE_ECDHE_PSK_CBC_SHA256 ushr 8).toByte(), (SUITE_ECDHE_PSK_CBC_SHA256 and 0xFF).toByte()))
+            corpo.write(byteArrayOf(0x00, 0x06))
+            corpo.write(byteArrayOf((CIFRA_ECDHE_PSK_CBC_SHA256 ushr 8).toByte(), (CIFRA_ECDHE_PSK_CBC_SHA256 and 0xFF).toByte()))
+            corpo.write(byteArrayOf((CIFRA_ECDHE_PSK_CBC_SHA ushr 8).toByte(), (CIFRA_ECDHE_PSK_CBC_SHA and 0xFF).toByte()))
+            corpo.write(byteArrayOf((CIFRA_PSK_GCM_SHA256 ushr 8).toByte(), (CIFRA_PSK_GCM_SHA256 and 0xFF).toByte()))
             corpo.write(byteArrayOf(0x01, 0x00))
             val extensoes = ByteArrayOutputStream()
             extensao(extensoes, 0x000A, byteArrayOf(0x00, 0x02, 0x00, 0x17)) // grupos: secp256r1
@@ -190,7 +201,18 @@ internal object TuyaApTlsPsk {
             val tamSessao = servidorHello[pos - 1].toInt() and 0xFF
             pos += tamSessao
             val cifra = ((servidorHello[pos].toInt() and 0xFF) shl 8) or (servidorHello[pos + 1].toInt() and 0xFF)
-            require(cifra == SUITE_ECDHE_PSK_CBC_SHA256) { "cifra inesperada: $cifra" }
+            when (cifra) {
+                CIFRA_ECDHE_PSK_CBC_SHA256 -> {
+                    ecdhe = true; gcm = false; algoritmoMac = "HmacSHA256"; tamanhoMac = 32
+                }
+                CIFRA_ECDHE_PSK_CBC_SHA -> {
+                    ecdhe = true; gcm = false; algoritmoMac = "HmacSHA1"; tamanhoMac = 20
+                }
+                CIFRA_PSK_GCM_SHA256 -> {
+                    ecdhe = false; gcm = true; algoritmoMac = ""; tamanhoMac = 0
+                }
+                else -> error("cifra inesperada: " + String.format("0x%04X", cifra))
+            }
             pos += 2 + 1
             if (pos + 2 <= servidorHello.size) {
                 val tamExt = ((servidorHello[pos].toInt() and 0xFF) shl 8) or (servidorHello[pos + 1].toInt() and 0xFF)
@@ -204,62 +226,67 @@ internal object TuyaApTlsPsk {
                 }
             }
 
-            // ServerKeyExchange (ECDHE) e ServerHelloDone
+            // ServerKeyExchange (só nas cifras ECDHE) e ServerHelloDone
             var pontoServidor: ECPoint? = null
             while (true) {
                 val dados = proximaMensagemLivre() ?: continue
-                val tipo = dados.tipo
-                if (tipo == 12) {
+                if (dados.tipo == 12 && ecdhe) {
                     val mensagem = dados.corpo
-                    // RFC 5489: a dica de identidade vem antes dos parâmetros
-                    // da curva no ServerKeyExchange.
+                    // RFC 5489: a dica de identidade vem antes dos parâmetros.
                     val dica = ((mensagem[0].toInt() and 0xFF) shl 8) or (mensagem[1].toInt() and 0xFF)
                     val base = 2 + dica
                     require(base + 4 < mensagem.size && mensagem[base] == 0x03.toByte()) {
-                        "curva inesperada: " + mensagem.take(10).joinToString("") { "%02x".format(it) }
+                        "parâmetros da curva inesperados: " + mensagem.take(8).joinToString("") { "%02x".format(it) }
                     }
                     val curva = ((mensagem[base + 1].toInt() and 0xFF) shl 8) or (mensagem[base + 2].toInt() and 0xFF)
                     require(curva == 0x0017) { "curva inesperada: $curva" }
                     val tamPonto = mensagem[base + 3].toInt() and 0xFF
                     val ponto = mensagem.copyOfRange(base + 4, base + 4 + tamPonto)
                     require(ponto.size == 65 && ponto[0] == 0x04.toByte()) { "ponto inesperado" }
-                    val x = BigInteger(1, ponto.copyOfRange(1, 33))
-                    val y = BigInteger(1, ponto.copyOfRange(33, 65))
-                    pontoServidor = ECPoint(x, y)
+                    pontoServidor = ECPoint(BigInteger(1, ponto.copyOfRange(1, 33)), BigInteger(1, ponto.copyOfRange(33, 65)))
                 }
-                if (tipo == 14) break
+                if (dados.tipo == 14) break
             }
-            val ponto = pontoServidor ?: error("sem chave do servidor")
 
-            // Nossa chave ECDHE e o ClientKeyExchange
-            val gerador = KeyPairGenerator.getInstance("EC")
-            gerador.initialize(ECGenParameterSpec("secp256r1"))
-            val nosso = gerador.generateKeyPair()
-            val publico = (nosso.public as java.security.interfaces.ECPublicKey).w
-            val nossoPonto = byteArrayOf(0x04) + para32(publico.affineX) + para32(publico.affineY)
-            // RFC 5489: a identidade vem antes da chave pública no CKE.
+            // ClientKeyExchange: identidade e, nas cifras ECDHE, a chave pública
             val identidadeBytes = PSK_ID.toByteArray()
+            var compartilhado: ByteArray? = null
             val cke = ByteArrayOutputStream()
             cke.write((identidadeBytes.size ushr 8) and 0xFF)
             cke.write(identidadeBytes.size and 0xFF)
             cke.write(identidadeBytes)
-            cke.write(nossoPonto.size)
-            cke.write(nossoPonto)
+            if (ecdhe) {
+                val ponto = pontoServidor ?: error("sem chave do servidor")
+                val gerador = KeyPairGenerator.getInstance("EC")
+                gerador.initialize(ECGenParameterSpec("secp256r1"))
+                val nosso = gerador.generateKeyPair()
+                val publico = (nosso.public as java.security.interfaces.ECPublicKey).w
+                val nossoPonto = byteArrayOf(0x04) + para32(publico.affineX) + para32(publico.affineY)
+                cke.write(nossoPonto.size)
+                cke.write(nossoPonto)
+
+                val parametros = AlgorithmParameters.getInstance("EC")
+                parametros.init(ECGenParameterSpec("secp256r1"))
+                val spec = parametros.getParameterSpec(ECParameterSpec::class.java)
+                val chavePublica = KeyFactory.getInstance("EC").generatePublic(ECPublicKeySpec(ponto, spec))
+                val acordo = KeyAgreement.getInstance("ECDH")
+                acordo.init(nosso.private)
+                acordo.doPhase(chavePublica, true)
+                compartilhado = para32(BigInteger(1, acordo.generateSecret()))
+            }
             enviaHandshake(16, cke.toByteArray())
 
-            // Segredo: ECDH + PSK (RFC 5489)
-            val parametros = AlgorithmParameters.getInstance("EC")
-            parametros.init(ECGenParameterSpec("secp256r1"))
-            val spec = parametros.getParameterSpec(ECParameterSpec::class.java)
-            val chavePublica = KeyFactory.getInstance("EC").generatePublic(ECPublicKeySpec(ponto, spec))
-            val acordo = KeyAgreement.getInstance("ECDH")
-            acordo.init(nosso.private)
-            acordo.doPhase(chavePublica, true)
-            val compartilhado = para32(BigInteger(1, acordo.generateSecret()))
+            // Pré-mestre: RFC 5489 (ECDHE) ou RFC 4279 (PSK pura)
             val psk = PSK.toByteArray()
-            // RFC 5489: pré-mestre = (tamanho + Z) + (tamanho + PSK).
             val preMestra = ByteArrayOutputStream().apply {
-                write((compartilhado.size ushr 8) and 0xFF); write(compartilhado.size and 0xFF); write(compartilhado)
+                if (compartilhado != null) {
+                    // RFC 5489: other_secret = Z (o segredo do ECDH).
+                    write((compartilhado.size ushr 8) and 0xFF); write(compartilhado.size and 0xFF); write(compartilhado)
+                } else {
+                    // RFC 4279: na PSK pura, other_secret são zeros do mesmo
+                    // tamanho da chave.
+                    write((psk.size ushr 8) and 0xFF); write(psk.size and 0xFF); write(ByteArray(psk.size))
+                }
                 write((psk.size ushr 8) and 0xFF); write(psk.size and 0xFF); write(psk)
             }.toByteArray()
 
@@ -270,11 +297,19 @@ internal object TuyaApTlsPsk {
                 "master secret".toByteArray() + clienteAleatorio + servidorAleatorio
             }
             val mestra = prf(preMestra, sementeMestra, 48)
-            val material = prf(mestra, "key expansion".toByteArray() + servidorAleatorio + clienteAleatorio, 96)
-            macCliente = material.copyOfRange(0, 32)
-            macServidor = material.copyOfRange(32, 64)
-            chaveCliente = material.copyOfRange(64, 80)
-            chaveServidor = material.copyOfRange(80, 96)
+            val tamanhoMaterial = if (gcm) 16 + 16 + 4 + 4 else tamanhoMac * 2 + 16 + 16
+            val material = prf(mestra, "key expansion".toByteArray() + servidorAleatorio + clienteAleatorio, tamanhoMaterial)
+            if (gcm) {
+                chaveCliente = material.copyOfRange(0, 16)
+                chaveServidor = material.copyOfRange(16, 32)
+                ivCliente = material.copyOfRange(32, 36)
+                ivServidor = material.copyOfRange(36, 40)
+            } else {
+                macCliente = material.copyOfRange(0, tamanhoMac)
+                macServidor = material.copyOfRange(tamanhoMac, tamanhoMac * 2)
+                chaveCliente = material.copyOfRange(tamanhoMac * 2, tamanhoMac * 2 + 16)
+                chaveServidor = material.copyOfRange(tamanhoMac * 2 + 16, tamanhoMac * 2 + 32)
+            }
 
             // ChangeCipherSpec + Finished
             enviaRegistro(20, byteArrayOf(1))
@@ -286,7 +321,7 @@ internal object TuyaApTlsPsk {
             // ChangeCipherSpec + Finished do servidor (conferido)
             val (tipoCcs, corpoCcs) = leRegistro()
             require(tipoCcs == 20) {
-                "sem troca de cifra: tipo $tipoCcs bytes " + corpoCcs.take(8).joinToString("") { "%02x".format(it) } + " ems=$estendido"
+                "sem troca de cifra: tipo $tipoCcs bytes " + corpoCcs.take(8).joinToString("") { "%02x".format(it) }
             }
             val (tipoFin, corpoFin) = leRegistroCifrado()
             require(tipoFin == 22 && corpoFin.size >= 16) { "finished inesperado" }
@@ -344,7 +379,6 @@ internal object TuyaApTlsPsk {
 
         private class MensagemHandshake(val tipo: Int, val corpo: ByteArray)
 
-        /** Lê a próxima mensagem de handshake de um tipo específico. */
         private fun proximaMensagem(tipoEsperado: Int): ByteArray {
             while (true) {
                 val dados = proximaMensagemLivre() ?: continue
@@ -383,21 +417,31 @@ internal object TuyaApTlsPsk {
         }
 
         private fun enviaRegistroCifrado(tipo: Int, dados: ByteArray) {
-            val mac = Mac.getInstance("HmacSHA256")
-            mac.init(SecretKeySpec(macCliente, "HmacSHA256"))
-            mac.update(cabecalhoMac(seqCliente, tipo, dados.size))
-            mac.update(dados)
-            val assinatura = mac.doFinal()
-            val comMac = dados + assinatura
-            // Preenchimento do TLS: "padding_length" bytes com esse valor,
-            // mais um byte final igual a ele (RFC 5246, 6.2.3.2).
-            val total = comMac.size
-            val folga = (16 - ((total + 1) % 16)) % 16
-            val preenchido = comMac + ByteArray(folga + 1) { folga.toByte() }
-            val iv = ByteArray(16).also { aleatorio.nextBytes(it) }
-            val cifra = Cipher.getInstance("AES/CBC/NoPadding")
-            cifra.init(Cipher.ENCRYPT_MODE, SecretKeySpec(chaveCliente, "AES"), IvParameterSpec(iv))
-            val registro = iv + cifra.doFinal(preenchido)
+            val registro: ByteArray
+            if (gcm) {
+                val explicito = ByteArray(8)
+                var s = seqCliente
+                for (i in 7 downTo 0) { explicito[i] = (s and 0xFF).toByte(); s = s ushr 8 }
+                val cifra = Cipher.getInstance("AES/GCM/NoPadding")
+                cifra.init(Cipher.ENCRYPT_MODE, SecretKeySpec(chaveCliente, "AES"), GCMParameterSpec(128, ivCliente + explicito))
+                cifra.updateAAD(cabecalhoMac(seqCliente, tipo, dados.size))
+                registro = explicito + cifra.doFinal(dados)
+            } else {
+                val mac = Mac.getInstance(algoritmoMac)
+                mac.init(SecretKeySpec(macCliente, algoritmoMac))
+                mac.update(cabecalhoMac(seqCliente, tipo, dados.size))
+                mac.update(dados)
+                val comMac = dados + mac.doFinal()
+                // Preenchimento do TLS: "padding_length" bytes com esse valor,
+                // mais um byte final igual a ele (RFC 5246, 6.2.3.2).
+                val total = comMac.size
+                val folga = (16 - ((total + 1) % 16)) % 16
+                val preenchido = comMac + ByteArray(folga + 1) { folga.toByte() }
+                val iv = ByteArray(16).also { aleatorio.nextBytes(it) }
+                val cifra = Cipher.getInstance("AES/CBC/NoPadding")
+                cifra.init(Cipher.ENCRYPT_MODE, SecretKeySpec(chaveCliente, "AES"), IvParameterSpec(iv))
+                registro = iv + cifra.doFinal(preenchido)
+            }
             val cabecalho = byteArrayOf(tipo.toByte(), 0x03, 0x03, ((registro.size ushr 8) and 0xFF).toByte(), (registro.size and 0xFF).toByte())
             saida.write(cabecalho)
             saida.write(registro)
@@ -409,22 +453,33 @@ internal object TuyaApTlsPsk {
             val cabecalho = leBytes(5)
             val tipo = cabecalho[0].toInt() and 0xFF
             val tamanho = ((cabecalho[3].toInt() and 0xFF) shl 8) or (cabecalho[4].toInt() and 0xFF)
-            val dados = leBytes(tamanho)
-            return tipo to dados
+            return tipo to leBytes(tamanho)
         }
 
         private fun leRegistroCifrado(): Pair<Int, ByteArray> {
             val (tipo, registro) = leRegistro()
             if (tipo == 20) return tipo to ByteArray(0)
-            require(registro.size > 32) { "registro curto" }
-            val iv = registro.copyOfRange(0, 16)
-            val cifra = Cipher.getInstance("AES/CBC/NoPadding")
-            cifra.init(Cipher.DECRYPT_MODE, SecretKeySpec(chaveServidor, "AES"), IvParameterSpec(iv))
-            val aberto = cifra.doFinal(registro.copyOfRange(16, registro.size))
-            val preenchimento = aberto.last().toInt() and 0xFF
-            require(preenchimento + 1 <= aberto.size) { "preenchimento inválido" }
-            val comMac = aberto.copyOfRange(0, aberto.size - (preenchimento + 1))
-            val dados = comMac.copyOfRange(0, comMac.size - 32)
+            val dados: ByteArray
+            if (gcm) {
+                require(registro.size > 24) { "registro curto" }
+                val explicito = registro.copyOfRange(0, 8)
+                val corpo = registro.copyOfRange(8, registro.size)
+                val claro = corpo.size - 16
+                val cifra = Cipher.getInstance("AES/GCM/NoPadding")
+                cifra.init(Cipher.DECRYPT_MODE, SecretKeySpec(chaveServidor, "AES"), GCMParameterSpec(128, ivServidor + explicito))
+                cifra.updateAAD(cabecalhoMac(seqServidor, tipo, claro))
+                dados = cifra.doFinal(corpo)
+            } else {
+                require(registro.size > 32) { "registro curto" }
+                val iv = registro.copyOfRange(0, 16)
+                val cifra = Cipher.getInstance("AES/CBC/NoPadding")
+                cifra.init(Cipher.DECRYPT_MODE, SecretKeySpec(chaveServidor, "AES"), IvParameterSpec(iv))
+                val aberto = cifra.doFinal(registro.copyOfRange(16, registro.size))
+                val preenchimento = aberto.last().toInt() and 0xFF
+                require(preenchimento + 1 <= aberto.size) { "preenchimento inválido" }
+                val comMac = aberto.copyOfRange(0, aberto.size - (preenchimento + 1))
+                dados = comMac.copyOfRange(0, comMac.size - tamanhoMac)
+            }
             seqServidor++
             return tipo to dados
         }

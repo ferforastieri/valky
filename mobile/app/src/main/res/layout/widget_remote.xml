@@ -1,6 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Controle da TV com as mesmas posições e ícones do controle do aplicativo:
-     números em cima, volume e canais ao lado do direcional, voltar/casa/menu embaixo. -->
+<!-- Controle da TV com a MESMA ordem e as MESMAS medidas do controle do
+     aplicativo (RemoteControlScreen): nome, energia centralizada (círculo),
+     botão ABC embaixo dela, números, volume/direcional/canais e, por fim,
+     voltar/casa/menu centralizados. -->
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools"
     android:id="@+id/widget_remote_root"
@@ -36,17 +38,6 @@
             android:textColor="@color/widget_ink"
             android:textSize="14sp"
             android:textStyle="bold" />
-
-        <ImageView
-            android:id="@+id/widget_remote_power"
-            android:layout_width="38dp"
-            android:layout_height="38dp"
-            android:background="@drawable/widget_pill"
-            android:contentDescription="@string/widget_remote_power"
-            android:padding="9dp"
-            android:src="@drawable/widget_power"
-            android:tint="@color/widget_alarm"
-            tools:ignore="UseAppTint" />
     </LinearLayout>
 
     <TextView
@@ -65,155 +56,88 @@
         android:layout_height="wrap_content"
         android:layout_marginTop="8dp"
         android:orientation="vertical">
-            <LinearLayout
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="6dp"
-                android:orientation="horizontal">
-                <TextView
-                    android:id="@+id/widget_remote_digit_1"
-                    android:layout_width="0dp"
-                    android:layout_height="44dp"
-                    android:layout_marginStart="3dp"
-                    android:layout_weight="1"
-                    android:background="@drawable/widget_pill"
-                    android:gravity="center"
-                    android:text="1"
-                    android:textColor="@color/widget_ink"
-                    android:textSize="15sp" />
-                <TextView
-                    android:id="@+id/widget_remote_digit_2"
-                    android:layout_width="0dp"
-                    android:layout_height="44dp"
-                    android:layout_marginStart="3dp"
-                    android:layout_weight="1"
-                    android:background="@drawable/widget_pill"
-                    android:gravity="center"
-                    android:text="2"
-                    android:textColor="@color/widget_ink"
-                    android:textSize="15sp" />
-                <TextView
-                    android:id="@+id/widget_remote_digit_3"
-                    android:layout_width="0dp"
-                    android:layout_height="44dp"
-                    android:layout_marginStart="3dp"
-                    android:layout_weight="1"
-                    android:background="@drawable/widget_pill"
-                    android:gravity="center"
-                    android:text="3"
-                    android:textColor="@color/widget_ink"
-                    android:textSize="15sp" />
-            </LinearLayout>
-            <LinearLayout
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="6dp"
-                android:orientation="horizontal">
-                <TextView
-                    android:id="@+id/widget_remote_digit_4"
-                    android:layout_width="0dp"
-                    android:layout_height="44dp"
-                    android:layout_marginStart="3dp"
-                    android:layout_weight="1"
-                    android:background="@drawable/widget_pill"
-                    android:gravity="center"
-                    android:text="4"
-                    android:textColor="@color/widget_ink"
-                    android:textSize="15sp" />
-                <TextView
-                    android:id="@+id/widget_remote_digit_5"
-                    android:layout_width="0dp"
-                    android:layout_height="44dp"
-                    android:layout_marginStart="3dp"
-                    android:layout_weight="1"
-                    android:background="@drawable/widget_pill"
-                    android:gravity="center"
-                    android:text="5"
-                    android:textColor="@color/widget_ink"
-                    android:textSize="15sp" />
-                <TextView
-                    android:id="@+id/widget_remote_digit_6"
-                    android:layout_width="0dp"
-                    android:layout_height="44dp"
-                    android:layout_marginStart="3dp"
-                    android:layout_weight="1"
-                    android:background="@drawable/widget_pill"
-                    android:gravity="center"
-                    android:text="6"
-                    android:textColor="@color/widget_ink"
-                    android:textSize="15sp" />
-            </LinearLayout>
-            <LinearLayout
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="6dp"
-                android:orientation="horizontal">
-                <TextView
-                    android:id="@+id/widget_remote_digit_7"
-                    android:layout_width="0dp"
-                    android:layout_height="44dp"
-                    android:layout_marginStart="3dp"
-                    android:layout_weight="1"
-                    android:background="@drawable/widget_pill"
-                    android:gravity="center"
-                    android:text="7"
-                    android:textColor="@color/widget_ink"
-                    android:textSize="15sp" />
-                <TextView
-                    android:id="@+id/widget_remote_digit_8"
-                    android:layout_width="0dp"
-                    android:layout_height="44dp"
-                    android:layout_marginStart="3dp"
-                    android:layout_weight="1"
-                    android:background="@drawable/widget_pill"
-                    android:gravity="center"
-                    android:text="8"
-                    android:textColor="@color/widget_ink"
-                    android:textSize="15sp" />
-                <TextView
-                    android:id="@+id/widget_remote_digit_9"
-                    android:layout_width="0dp"
-                    android:layout_height="44dp"
-                    android:layout_marginStart="3dp"
-                    android:layout_weight="1"
-                    android:background="@drawable/widget_pill"
-                    android:gravity="center"
-                    android:text="9"
-                    android:textColor="@color/widget_ink"
-                    android:textSize="15sp" />
-            </LinearLayout>
-            <LinearLayout
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="6dp"
-                android:orientation="horizontal">
-                <TextView
-                    android:layout_width="0dp"
-                    android:layout_height="1dp"
-                    android:layout_marginStart="3dp"
-                    android:layout_weight="1" />
-                <TextView
-                    android:id="@+id/widget_remote_digit_0"
-                    android:layout_width="0dp"
-                    android:layout_height="44dp"
-                    android:layout_marginStart="3dp"
-                    android:layout_weight="1"
-                    android:background="@drawable/widget_pill"
-                    android:gravity="center"
-                    android:text="0"
-                    android:textColor="@color/widget_ink"
-                    android:textSize="15sp" />
-                <TextView
-                    android:layout_width="0dp"
-                    android:layout_height="1dp"
-                    android:layout_marginStart="3dp"
-                    android:layout_weight="1" />
-            </LinearLayout>
+
+        <!-- energia centralizada, como no app (círculo de 56dp) -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:gravity="center"
+            android:orientation="vertical">
+
+            <ImageView
+                android:id="@+id/widget_remote_power"
+                android:layout_width="56dp"
+                android:layout_height="56dp"
+                android:background="@drawable/widget_circle_alert"
+                android:contentDescription="@string/widget_remote_power"
+                android:padding="15dp"
+                android:src="@drawable/widget_power"
+                android:tint="@color/widget_alarm"
+            tools:ignore="UseAppTint" />
+
+            <TextView
+                android:id="@+id/widget_remote_abc"
+                android:layout_width="56dp"
+                android:layout_height="56dp"
+                android:layout_marginTop="8dp"
+                android:background="@drawable/widget_circle_key"
+                android:gravity="center"
+                android:text="@string/widget_remote_keypad_toggle"
+                android:textColor="@color/widget_signal"
+                android:textSize="13sp"
+                android:textStyle="bold" />
+        </LinearLayout>
+
+        <!-- números: 1 a 9 e 0, iguais ao app (44dp de altura) -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="10dp"
+            android:orientation="horizontal">
+
+            <TextView android:id="@+id/widget_remote_digit_1" android:layout_width="0dp" android:layout_height="44dp" android:layout_marginStart="4dp" android:layout_weight="1" android:background="@drawable/widget_pill" android:gravity="center" android:text="1" android:textColor="@color/widget_ink" android:textSize="15sp" />
+            <TextView android:id="@+id/widget_remote_digit_2" android:layout_width="0dp" android:layout_height="44dp" android:layout_marginStart="4dp" android:layout_weight="1" android:background="@drawable/widget_pill" android:gravity="center" android:text="2" android:textColor="@color/widget_ink" android:textSize="15sp" />
+            <TextView android:id="@+id/widget_remote_digit_3" android:layout_width="0dp" android:layout_height="44dp" android:layout_marginStart="4dp" android:layout_weight="1" android:background="@drawable/widget_pill" android:gravity="center" android:text="3" android:textColor="@color/widget_ink" android:textSize="15sp" />
+        </LinearLayout>
 
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="8dp"
+            android:layout_marginTop="4dp"
+            android:orientation="horizontal">
+
+            <TextView android:id="@+id/widget_remote_digit_4" android:layout_width="0dp" android:layout_height="44dp" android:layout_marginStart="4dp" android:layout_weight="1" android:background="@drawable/widget_pill" android:gravity="center" android:text="4" android:textColor="@color/widget_ink" android:textSize="15sp" />
+            <TextView android:id="@+id/widget_remote_digit_5" android:layout_width="0dp" android:layout_height="44dp" android:layout_marginStart="4dp" android:layout_weight="1" android:background="@drawable/widget_pill" android:gravity="center" android:text="5" android:textColor="@color/widget_ink" android:textSize="15sp" />
+            <TextView android:id="@+id/widget_remote_digit_6" android:layout_width="0dp" android:layout_height="44dp" android:layout_marginStart="4dp" android:layout_weight="1" android:background="@drawable/widget_pill" android:gravity="center" android:text="6" android:textColor="@color/widget_ink" android:textSize="15sp" />
+        </LinearLayout>
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="4dp"
+            android:orientation="horizontal">
+
+            <TextView android:id="@+id/widget_remote_digit_7" android:layout_width="0dp" android:layout_height="44dp" android:layout_marginStart="4dp" android:layout_weight="1" android:background="@drawable/widget_pill" android:gravity="center" android:text="7" android:textColor="@color/widget_ink" android:textSize="15sp" />
+            <TextView android:id="@+id/widget_remote_digit_8" android:layout_width="0dp" android:layout_height="44dp" android:layout_marginStart="4dp" android:layout_weight="1" android:background="@drawable/widget_pill" android:gravity="center" android:text="8" android:textColor="@color/widget_ink" android:textSize="15sp" />
+            <TextView android:id="@+id/widget_remote_digit_9" android:layout_width="0dp" android:layout_height="44dp" android:layout_marginStart="4dp" android:layout_weight="1" android:background="@drawable/widget_pill" android:gravity="center" android:text="9" android:textColor="@color/widget_ink" android:textSize="15sp" />
+        </LinearLayout>
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="4dp"
+            android:orientation="horizontal">
+
+            <TextView android:layout_width="0dp" android:layout_height="1dp" android:layout_marginStart="4dp" android:layout_weight="1" />
+            <TextView android:id="@+id/widget_remote_digit_0" android:layout_width="0dp" android:layout_height="44dp" android:layout_marginStart="4dp" android:layout_weight="1" android:background="@drawable/widget_pill" android:gravity="center" android:text="0" android:textColor="@color/widget_ink" android:textSize="15sp" />
+            <TextView android:layout_width="0dp" android:layout_height="1dp" android:layout_marginStart="4dp" android:layout_weight="1" />
+        </LinearLayout>
+
+        <!-- volume | direcional | canais -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="10dp"
             android:gravity="center"
             android:orientation="horizontal">
 
@@ -222,42 +146,11 @@
                 android:layout_height="wrap_content"
                 android:background="@drawable/widget_pill"
                 android:orientation="vertical"
-                android:padding="4dp">
+                android:padding="6dp">
 
-                <ImageView
-                    android:id="@+id/widget_remote_volume_up"
-                    android:layout_width="54dp"
-                    android:layout_height="54dp"
-                    android:background="@drawable/widget_circle_key"
-                    android:contentDescription="@string/widget_remote_volume_up"
-                    android:padding="12dp"
-                    android:src="@drawable/widget_volume_up"
-                    android:tint="@color/widget_ink"
-            tools:ignore="UseAppTint" />
-
-                <ImageView
-                    android:id="@+id/widget_remote_mute"
-                    android:layout_width="54dp"
-                    android:layout_height="54dp"
-                    android:layout_marginTop="4dp"
-                    android:background="@drawable/widget_circle_key"
-                    android:contentDescription="@string/widget_remote_mute"
-                    android:padding="12dp"
-                    android:src="@drawable/widget_mute"
-                    android:tint="@color/widget_ink"
-            tools:ignore="UseAppTint" />
-
-                <ImageView
-                    android:id="@+id/widget_remote_volume_down"
-                    android:layout_width="54dp"
-                    android:layout_height="54dp"
-                    android:layout_marginTop="4dp"
-                    android:background="@drawable/widget_circle_key"
-                    android:contentDescription="@string/widget_remote_volume_down"
-                    android:padding="12dp"
-                    android:src="@drawable/widget_volume_down"
-                    android:tint="@color/widget_ink"
-            tools:ignore="UseAppTint" />
+                <ImageView android:id="@+id/widget_remote_volume_up" android:layout_width="54dp" android:layout_height="54dp" android:background="@drawable/widget_circle_key" android:contentDescription="@string/widget_remote_volume_up" android:padding="13dp" android:src="@drawable/widget_volume_up" android:tint="@color/widget_ink" tools:ignore="UseAppTint" />
+                <ImageView android:id="@+id/widget_remote_mute" android:layout_width="54dp" android:layout_height="54dp" android:layout_marginTop="4dp" android:background="@drawable/widget_circle_key" android:contentDescription="@string/widget_remote_mute" android:padding="13dp" android:src="@drawable/widget_mute" android:tint="@color/widget_ink" tools:ignore="UseAppTint" />
+                <ImageView android:id="@+id/widget_remote_volume_down" android:layout_width="54dp" android:layout_height="54dp" android:layout_marginTop="4dp" android:background="@drawable/widget_circle_key" android:contentDescription="@string/widget_remote_volume_down" android:padding="13dp" android:src="@drawable/widget_volume_down" android:tint="@color/widget_ink" tools:ignore="UseAppTint" />
             </LinearLayout>
 
             <FrameLayout
@@ -275,53 +168,14 @@
                     android:background="@drawable/widget_circle_key"
                     android:gravity="center"
                     android:text="@string/remote_ok"
-                    android:textColor="@color/widget_ink"
-                    android:textSize="14sp"
+                    android:textColor="@color/widget_signal"
+                    android:textSize="15sp"
                     android:textStyle="bold" />
 
-                <ImageView
-                    android:id="@+id/widget_remote_up"
-                    android:layout_width="48dp"
-                    android:layout_height="48dp"
-                    android:layout_gravity="top|center_horizontal"
-                    android:contentDescription="@string/widget_remote_up"
-                    android:padding="13dp"
-                    android:src="@drawable/widget_chevron_up"
-                    android:tint="@color/widget_ink"
-            tools:ignore="UseAppTint" />
-
-                <ImageView
-                    android:id="@+id/widget_remote_left"
-                    android:layout_width="48dp"
-                    android:layout_height="48dp"
-                    android:layout_gravity="center_vertical|start"
-                    android:contentDescription="@string/widget_remote_left"
-                    android:padding="13dp"
-                    android:src="@drawable/widget_chevron_left"
-                    android:tint="@color/widget_ink"
-            tools:ignore="UseAppTint" />
-
-                <ImageView
-                    android:id="@+id/widget_remote_right"
-                    android:layout_width="48dp"
-                    android:layout_height="48dp"
-                    android:layout_gravity="center_vertical|end"
-                    android:contentDescription="@string/widget_remote_right"
-                    android:padding="13dp"
-                    android:src="@drawable/widget_chevron_right"
-                    android:tint="@color/widget_ink"
-            tools:ignore="UseAppTint" />
-
-                <ImageView
-                    android:id="@+id/widget_remote_down"
-                    android:layout_width="48dp"
-                    android:layout_height="48dp"
-                    android:layout_gravity="bottom|center_horizontal"
-                    android:contentDescription="@string/widget_remote_down"
-                    android:padding="13dp"
-                    android:src="@drawable/widget_chevron_down"
-                    android:tint="@color/widget_ink"
-            tools:ignore="UseAppTint" />
+                <ImageView android:id="@+id/widget_remote_up" android:layout_width="48dp" android:layout_height="48dp" android:layout_gravity="top|center_horizontal" android:contentDescription="@string/widget_remote_up" android:padding="12dp" android:src="@drawable/widget_chevron_up" android:tint="@color/widget_ink" tools:ignore="UseAppTint" />
+                <ImageView android:id="@+id/widget_remote_left" android:layout_width="48dp" android:layout_height="48dp" android:layout_gravity="center_vertical|start" android:contentDescription="@string/widget_remote_left" android:padding="12dp" android:src="@drawable/widget_chevron_left" android:tint="@color/widget_ink" tools:ignore="UseAppTint" />
+                <ImageView android:id="@+id/widget_remote_right" android:layout_width="48dp" android:layout_height="48dp" android:layout_gravity="center_vertical|end" android:contentDescription="@string/widget_remote_right" android:padding="12dp" android:src="@drawable/widget_chevron_right" android:tint="@color/widget_ink" tools:ignore="UseAppTint" />
+                <ImageView android:id="@+id/widget_remote_down" android:layout_width="48dp" android:layout_height="48dp" android:layout_gravity="bottom|center_horizontal" android:contentDescription="@string/widget_remote_down" android:padding="12dp" android:src="@drawable/widget_chevron_down" android:tint="@color/widget_ink" tools:ignore="UseAppTint" />
             </FrameLayout>
 
             <LinearLayout
@@ -329,49 +183,19 @@
                 android:layout_height="wrap_content"
                 android:background="@drawable/widget_pill"
                 android:orientation="vertical"
-                android:padding="4dp">
+                android:padding="6dp">
 
-                <ImageView
-                    android:id="@+id/widget_remote_channel_up"
-                    android:layout_width="54dp"
-                    android:layout_height="54dp"
-                    android:background="@drawable/widget_circle_key"
-                    android:contentDescription="@string/remote_channel_up"
-                    android:padding="12dp"
-                    android:src="@drawable/widget_chevron_up"
-                    android:tint="@color/widget_ink"
-            tools:ignore="UseAppTint" />
-
-                <ImageView
-                    android:id="@+id/widget_remote_channel_list"
-                    android:layout_width="54dp"
-                    android:layout_height="54dp"
-                    android:layout_marginTop="4dp"
-                    android:background="@drawable/widget_circle_key"
-                    android:contentDescription="@string/remote_channel_list"
-                    android:padding="12dp"
-                    android:src="@drawable/widget_list"
-                    android:tint="@color/widget_ink"
-            tools:ignore="UseAppTint" />
-
-                <ImageView
-                    android:id="@+id/widget_remote_channel_down"
-                    android:layout_width="54dp"
-                    android:layout_height="54dp"
-                    android:layout_marginTop="4dp"
-                    android:background="@drawable/widget_circle_key"
-                    android:contentDescription="@string/remote_channel_down"
-                    android:padding="12dp"
-                    android:src="@drawable/widget_chevron_down"
-                    android:tint="@color/widget_ink"
-            tools:ignore="UseAppTint" />
+                <ImageView android:id="@+id/widget_remote_channel_up" android:layout_width="54dp" android:layout_height="54dp" android:background="@drawable/widget_circle_key" android:contentDescription="@string/remote_channel_up" android:padding="13dp" android:src="@drawable/widget_chevron_up" android:tint="@color/widget_ink" tools:ignore="UseAppTint" />
+                <ImageView android:id="@+id/widget_remote_channel_list" android:layout_width="54dp" android:layout_height="54dp" android:layout_marginTop="4dp" android:background="@drawable/widget_circle_key" android:contentDescription="@string/remote_channel_list" android:padding="13dp" android:src="@drawable/widget_list" android:tint="@color/widget_ink" tools:ignore="UseAppTint" />
+                <ImageView android:id="@+id/widget_remote_channel_down" android:layout_width="54dp" android:layout_height="54dp" android:layout_marginTop="4dp" android:background="@drawable/widget_circle_key" android:contentDescription="@string/remote_channel_down" android:padding="13dp" android:src="@drawable/widget_chevron_down" android:tint="@color/widget_ink" tools:ignore="UseAppTint" />
             </LinearLayout>
         </LinearLayout>
 
+        <!-- voltar / casa / menu centralizados, como no app -->
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="8dp"
+            android:layout_marginTop="10dp"
             android:gravity="center"
             android:orientation="horizontal">
 
@@ -381,39 +205,11 @@
                 android:background="@drawable/widget_pill"
                 android:gravity="center_vertical"
                 android:orientation="horizontal"
-                android:padding="4dp">
-                    <ImageView
-                        android:id="@+id/widget_remote_back"
-                        android:layout_width="54dp"
-                        android:layout_height="54dp"
-                        android:background="@drawable/widget_circle_key"
-                        android:contentDescription="@string/remote_back"
-                        android:padding="12dp"
-                        android:src="@drawable/widget_arrow_left"
-                        android:tint="@color/widget_ink"
-            tools:ignore="UseAppTint" />
-                    <ImageView
-                        android:id="@+id/widget_remote_home"
-                        android:layout_width="58dp"
-                        android:layout_height="58dp"
-                        android:layout_marginStart="6dp"
-                        android:layout_marginEnd="6dp"
-                        android:background="@drawable/widget_circle_key"
-                        android:contentDescription="@string/remote_home"
-                        android:padding="12dp"
-                        android:src="@drawable/widget_home"
-                        android:tint="@color/widget_ink"
-            tools:ignore="UseAppTint" />
-                    <ImageView
-                        android:id="@+id/widget_remote_menu"
-                        android:layout_width="54dp"
-                        android:layout_height="54dp"
-                        android:background="@drawable/widget_circle_key"
-                        android:contentDescription="@string/settings"
-                        android:padding="12dp"
-                        android:src="@drawable/widget_menu"
-                        android:tint="@color/widget_ink"
-            tools:ignore="UseAppTint" />
+                android:padding="6dp">
+
+                <ImageView android:id="@+id/widget_remote_back" android:layout_width="58dp" android:layout_height="58dp" android:background="@drawable/widget_circle_key" android:contentDescription="@string/remote_back" android:padding="14dp" android:src="@drawable/widget_arrow_left" android:tint="@color/widget_ink" tools:ignore="UseAppTint" />
+                <ImageView android:id="@+id/widget_remote_home" android:layout_width="62dp" android:layout_height="62dp" android:layout_marginStart="4dp" android:layout_marginEnd="4dp" android:background="@drawable/widget_circle_key" android:contentDescription="@string/remote_home" android:padding="15dp" android:src="@drawable/widget_home" android:tint="@color/widget_ink" tools:ignore="UseAppTint" />
+                <ImageView android:id="@+id/widget_remote_menu" android:layout_width="58dp" android:layout_height="58dp" android:background="@drawable/widget_circle_key" android:contentDescription="@string/settings" android:padding="14dp" android:src="@drawable/widget_menu" android:tint="@color/widget_ink" tools:ignore="UseAppTint" />
             </LinearLayout>
         </LinearLayout>
     </LinearLayout>

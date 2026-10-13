@@ -412,6 +412,7 @@
     <string name="widget_camera_empty">Cadastre uma câmera</string>
     <string name="widget_camera_waiting">Aguardando imagem…</string>
     <string name="widget_remote_title">Controle</string>
+    <string name="widget_remote_keypad_toggle">ABC</string>
     <string name="widget_remote_empty">Nenhum controle cadastrado</string>
     <string name="widget_remote_power">Energia</string>
     <string name="widget_remote_up">Cima</string>

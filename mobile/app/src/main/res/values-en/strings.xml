@@ -412,6 +412,7 @@
     <string name="widget_camera_empty">Register a camera</string>
     <string name="widget_camera_waiting">Waiting for a picture…</string>
     <string name="widget_remote_title">Remote</string>
+    <string name="widget_remote_keypad_toggle">ABC</string>
     <string name="widget_remote_empty">No remote registered</string>
     <string name="widget_remote_power">Power</string>
     <string name="widget_remote_up">Up</string>

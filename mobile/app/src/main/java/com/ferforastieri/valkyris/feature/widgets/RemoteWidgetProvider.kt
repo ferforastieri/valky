@@ -45,6 +45,7 @@ class RemoteWidgetProvider : ValkyrisWidgetProvider() {
         }
         views.setOnClickPendingIntent(R.id.widget_remote_power, pendingRemoteKey(context, "KEY_POWER", 31))
         views.setOnClickPendingIntent(R.id.widget_remote_name, pendingOpenApp(context, "remote:${remote!!.id}", 32))
+        views.setOnClickPendingIntent(R.id.widget_remote_abc, pendingOpenApp(context, "remote:${remote!!.id}", 33))
         val keys = listOf(
             Key(R.id.widget_remote_up, "KEY_UP"),
             Key(R.id.widget_remote_down, "KEY_DOWN"),
