@@ -145,7 +145,10 @@ class LightsViewModel @Inject constructor(
      * casa e volta. Não depende do roteador nem da faixa de 2,4 GHz.
      */
     fun configure(ssid: String, password: String, remember: Boolean = true, lampSsid: String? = null) {
-        if (pairingJob?.isActive == true) return
+        // Um toque novo sempre vale: cancela o que estiver em andamento (a
+        // lista que se atualiza sozinha segura o trabalho antigo).
+        pairingJob?.cancel()
+        pairingJob = null
         val network = ssid.trim()
         if (network.isEmpty()) {
             _state.update { it.copy(error = "Não identifiquei a rede do celular. Conecte o celular no Wi-Fi de casa e tente de novo.") }
@@ -163,6 +166,9 @@ class LightsViewModel @Inject constructor(
                     return@launch
                 }
             pairingSessionId = session.id
+            pendingSession = session
+            pendingHomeSsid = network
+            pendingPassword = password
             try {
             _state.update {
                 it.copy(
@@ -230,6 +236,7 @@ class LightsViewModel @Inject constructor(
             }
             deliverAndWait(session, connection.network, network, password) { connection.close() }
             } catch (error: Throwable) {
+                if (error is kotlinx.coroutines.CancellationException) throw error
                 // Qualquer falha inesperada vira aviso na folha, nunca um fechamento.
                 _state.update {
                     it.copy(pairing = PairingProgress("failed", error.message ?: "Não foi possível falar com a lâmpada. Tente de novo."))
@@ -282,16 +289,20 @@ class LightsViewModel @Inject constructor(
 
     /** Continua quando o usuário conecta na rede da lâmpada pelo Wi-Fi do sistema. */
     fun continueManual() {
-        if (_state.value.pairing?.phase != "manual-wifi") return
-        if (pairingJob?.isActive == true) return
+        val progress = _state.value.pairing ?: return
+        if (progress.phase != "manual-wifi" && progress.phase != "choose-lamp") return
         val session = pendingSession ?: return
-        val lamp = pendingLampSsid ?: return
         val home = pendingHomeSsid ?: return
         val password = pendingPassword ?: return
         val connector = WifiApConnector(context)
         val ssid = currentSsid(context) ?: return
-        if (!ssid.equals(lamp, ignoreCase = true)) return
+        val lamp = pendingLampSsid
+        val connected = (lamp != null && ssid.equals(lamp, ignoreCase = true)) || connector.looksLikeLamp(ssid)
+        if (!connected) return
         val link = connector.wifiNetwork() ?: return
+        // O trabalho antigo (a lista que se atualiza) sai de cena.
+        pairingJob?.cancel()
+        pairingJob = null
         pendingSession = null
         pendingLampSsid = null
         pendingHomeSsid = null
@@ -302,10 +313,9 @@ class LightsViewModel @Inject constructor(
         }
     }
 
-    /** Ao sair da tela: cancela tudo, menos quando o usuário foi conectar no Wi-Fi. */
+    /** Ao sair da tela: mantém o pareamento vivo enquanto ele estiver em andamento. */
     fun pausePairing() {
-        if (_state.value.pairing?.phase == "manual-wifi") return
-        dismissPairing()
+        if (_state.value.pairing?.phase == "failed") dismissPairing()
     }
 
     /** Para de enviar, encerra a janela do servidor e limpa o resultado. */

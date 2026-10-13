@@ -86,6 +86,9 @@ internal class WifiApConnector(context: Context) {
     /** Todas as redes visíveis, para o usuário escolher quando o nome é incomum. */
     fun visibleNetworks(): List<String> = scanned()
 
+    /** O nome parece de uma lâmpada em modo de configuração (SMARTLIFE, NEO, …). */
+    fun looksLikeLamp(ssid: String): Boolean = lampPrefixes.any { ssid.lowercase().startsWith(it) }
+
     /** A rede Wi-Fi em uso agora (quando o usuário conecta pelo sistema). */
     @Suppress("DEPRECATION")
     fun wifiNetwork(): Network? = runCatching {

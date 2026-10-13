@@ -17,6 +17,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.*
@@ -29,6 +30,7 @@ import androidx.compose.ui.draw.scale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
@@ -92,6 +94,14 @@ import com.ferforastieri.valkyris.core.model.*
             containerColor=MaterialTheme.colorScheme.secondary,
             contentColor=MaterialTheme.colorScheme.onSecondary,
         ){Icon(Lucide.Plus,stringResource(R.string.add_light))}
+    }
+    // Tudo automático: ao abrir a folha do +, se a senha do Wi-Fi já está
+    // guardada o pareamento começa sozinho — sem tocar em nada.
+    LaunchedEffect(pairing, state.pairing) {
+        val autoNetwork=vm.suggestedSsid().ifBlank{vm.savedNetwork()}
+        if(pairing&&state.pairing==null&&vm.savedPassword().isNotBlank()&&autoNetwork.isNotBlank()){
+            beginPairing(autoNetwork,vm.savedPassword(),null,true)
+        }
     }
     if(pairing)LightPairingSheet(
         progress=state.pairing,
@@ -259,7 +269,8 @@ import com.ferforastieri.valkyris.core.model.*
                         password,{password=it},Modifier.fillMaxWidth(),
                         label={Text(stringResource(R.string.light_pair_password))},
                         visualTransformation=PasswordVisualTransformation(),
-                        keyboardOptions=KeyboardOptions(keyboardType=KeyboardType.Password),
+                        keyboardOptions=KeyboardOptions(keyboardType=KeyboardType.Password,imeAction=ImeAction.Done),
+                        keyboardActions=KeyboardActions(onDone={if(network.isNotBlank()&&password.isNotBlank())onConfigure(network,password)}),
                         singleLine=true,
                     ) else Row(verticalAlignment=Alignment.CenterVertically){
                         Text(stringResource(R.string.light_pair_password_saved),Modifier.weight(1f),style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant)
