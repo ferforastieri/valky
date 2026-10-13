@@ -42,7 +42,7 @@ import com.ferforastieri.valkyris.core.design.ValkyrisBottomSheet
 import com.ferforastieri.valkyris.core.model.*
 
 @Composable fun LightsScreen(admin:Boolean,vm:LightsViewModel=hiltViewModel()){
-    LifecycleResumeEffect(Unit){vm.refresh();onPauseOrDispose{vm.dismissPairing()}}
+    LifecycleResumeEffect(Unit){vm.refresh();vm.continueManual();onPauseOrDispose{vm.pausePairing()}}
     val state by vm.state.collectAsStateWithLifecycle()
     var selected by remember{mutableStateOf<LightDevice?>(null)}
     var removing by remember{mutableStateOf<LightDevice?>(null)}
@@ -99,9 +99,11 @@ import com.ferforastieri.valkyris.core.model.*
         savedPassword=remember{vm.savedPassword()},
         lampNetworks=state.lampNetworks,
         locationOff=!vm.locationEnabled(),
+        manualWifi=state.pairing?.phase=="manual-wifi",
         onConfigure={ssid,password->beginPairing(ssid,password,null,true)},
         onPickLamp={lampSsid,password->beginPairing(state.network,password,lampSsid,false)},
         onOpenLocation={runCatching{context.startActivity(Intent(Settings.ACTION_LOCATION_SOURCE_SETTINGS))}},
+        onOpenWifi={runCatching{context.startActivity(Intent(Settings.ACTION_WIFI_SETTINGS))}},
         onDismiss={pairing=false;vm.dismissPairing()},
     )
     selected?.let{light->LightControls(light,light.id in state.busy,{selected=null}){vm.control(light.id,it)}}
@@ -185,16 +187,18 @@ import com.ferforastieri.valkyris.core.model.*
     savedPassword:String,
     lampNetworks:List<String>,
     locationOff:Boolean,
+    manualWifi:Boolean,
     onConfigure:(String,String)->Unit,
     onPickLamp:(String,String)->Unit,
     onOpenLocation:()->Unit,
+    onOpenWifi:()->Unit,
     onDismiss:()->Unit,
 ){
     var password by remember{mutableStateOf(savedPassword)}
     var editingPassword by remember{mutableStateOf(savedPassword.isBlank())}
     val paired=progress?.light
     val failed=progress?.phase=="failed"
-    val running=progress!=null&&!failed&&progress.phase!="paired"&&progress.phase!="choose-lamp"
+    val running=progress!=null&&!failed&&progress.phase!="paired"&&progress.phase!="choose-lamp"&&progress.phase!="manual-wifi"
     ValkyrisBottomSheet(
         title=stringResource(R.string.add_light),
         onDismiss=onDismiss,
@@ -247,8 +251,9 @@ import com.ferforastieri.valkyris.core.model.*
                     TextButton({onConfigure(network,password)}){Text(stringResource(R.string.light_pair_search_again))}
                 }
                 else->Column(verticalArrangement=Arrangement.spacedBy(10.dp)){
-                    if(failed)progress?.message?.takeIf{it.isNotBlank()}?.let{Text(it,color=MaterialTheme.colorScheme.error,style=MaterialTheme.typography.bodySmall)}
+                    progress?.message?.takeIf{it.isNotBlank()&&(failed||manualWifi)}?.let{Text(it,color=if(failed)MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurface,style=MaterialTheme.typography.bodySmall)}
                     if(failed&&locationOff)TextButton({onOpenLocation}){Text(stringResource(R.string.light_pair_open_location))}
+                    if(manualWifi)TextButton({onOpenWifi}){Text(stringResource(R.string.light_pair_open_wifi))}
                     Text(stringResource(R.string.light_pair_network_auto,network.ifBlank{stringResource(R.string.light_pair_network_unknown)}),style=MaterialTheme.typography.bodyMedium)
                     if(editingPassword)OutlinedTextField(
                         password,{password=it},Modifier.fillMaxWidth(),

@@ -10,6 +10,8 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.ferforastieri.valkyris.core.action.MobileActionGate
 import com.ferforastieri.valkyris.core.model.LightDevice
+import com.ferforastieri.valkyris.core.model.LightPairingSession
+import kotlin.coroutines.coroutineContext
 import com.ferforastieri.valkyris.core.model.LightStatePatch
 import com.ferforastieri.valkyris.core.model.LightUpdate
 import com.ferforastieri.valkyris.core.network.ValkyrisRepository
@@ -63,6 +65,10 @@ class LightsViewModel @Inject constructor(
     private var active = true
     private var pairingJob: Job? = null
     private var pairingSessionId: String? = null
+    private var pendingSession: LightPairingSession? = null
+    private var pendingLampSsid: String? = null
+    private var pendingHomeSsid: String? = null
+    private var pendingPassword: String? = null
     private var savedSsid: String? = null
 
     init {
@@ -210,40 +216,19 @@ class LightsViewModel @Inject constructor(
             _state.update { it.copy(pairing = PairingProgress("lamp-network", "Entrando na rede “$lamp” da lâmpada — aceite o aviso do Android.")) }
             val connection = connector.connect(lamp) ?: connector.connect(lamp)
             if (connection == null) {
+                // Caminho garantido quando a entrada automática é recusada: o
+                // usuário conecta pelo Wi-Fi do sistema e volta; o app detecta
+                // a rede e continua daqui (continueManual).
+                pendingSession = session
+                pendingLampSsid = lamp
+                pendingHomeSsid = network
+                pendingPassword = password
                 _state.update {
-                    it.copy(pairing = PairingProgress("failed", "O celular não conseguiu entrar na rede “$lamp”. Tente de novo e aceite o aviso do Android."))
+                    it.copy(pairing = PairingProgress("manual-wifi", "Não consegui entrar sozinho na rede “$lamp”. Toque em Abrir Wi-Fi, conecte nela e volte para cá — eu continuo daqui."))
                 }
                 return@launch
             }
-            try {
-                _state.update { it.copy(pairing = PairingProgress("sending", "Conectado na lâmpada; entregando os dados do Wi-Fi de casa…")) }
-                TuyaApConfig.deliverWithRetries(
-                    network = connection.network,
-                    ssid = network,
-                    password = password,
-                    appToken = session.token,
-                    secret = session.secret,
-                    region = session.region,
-                ) { format ->
-                    _state.update { state -> state.copy(pairing = PairingProgress("sending", "Entregando os dados do Wi-Fi ($format)…")) }
-                }
-                _state.update { it.copy(pairing = PairingProgress("waiting", "Dados entregues. A lâmpada vai entrar na rede de casa sozinha…")) }
-            } finally {
-                connection.close()
-            }
-            // De volta à rede de casa, acompanha o backend até adotar a lâmpada.
-            while (isActive) {
-                val status = runCatching { repository.lightPairingStatus(session.id) }.getOrNull()
-                if (status != null) {
-                    _state.update { it.copy(pairing = PairingProgress(status.status, status.message, status.address, status.light)) }
-                    if (status.status == "paired") {
-                        repository.refreshLights()
-                        return@launch
-                    }
-                    if (status.status == "failed") return@launch
-                }
-                delay(1500)
-            }
+            deliverAndWait(session, connection.network, network, password) { connection.close() }
             } catch (error: Throwable) {
                 // Qualquer falha inesperada vira aviso na folha, nunca um fechamento.
                 _state.update {
@@ -253,10 +238,84 @@ class LightsViewModel @Inject constructor(
         }
     }
 
+    /**
+     * Entrega os dados pela rede da lâmpada e acompanha o backend até ela ser
+     * adotada. Serve tanto para a entrada automática quanto para quando o
+     * usuário conecta pelo Wi-Fi do sistema.
+     */
+    private suspend fun deliverAndWait(
+        session: LightPairingSession,
+        link: android.net.Network,
+        homeSsid: String,
+        password: String,
+        closeLink: (() -> Unit)? = null,
+    ) {
+        _state.update { it.copy(pairing = PairingProgress("sending", "Conectado na lâmpada; entregando os dados do Wi-Fi de casa…")) }
+        try {
+            TuyaApConfig.deliverWithRetries(
+                network = link,
+                ssid = homeSsid,
+                password = password,
+                appToken = session.token,
+                secret = session.secret,
+                region = session.region,
+            ) { format ->
+                _state.update { state -> state.copy(pairing = PairingProgress("sending", "Entregando os dados do Wi-Fi ($format)…")) }
+            }
+        } finally {
+            closeLink?.invoke()
+        }
+        _state.update { it.copy(pairing = PairingProgress("waiting", "Dados entregues. Volte o celular para a rede de casa: a lâmpada entra sozinha e eu confirmo aqui.")) }
+        while (coroutineContext.isActive) {
+            val status = runCatching { repository.lightPairingStatus(session.id) }.getOrNull()
+            if (status != null) {
+                _state.update { it.copy(pairing = PairingProgress(status.status, status.message, status.address, status.light)) }
+                if (status.status == "paired") {
+                    repository.refreshLights()
+                    return
+                }
+                if (status.status == "failed") return
+            }
+            delay(1500)
+        }
+    }
+
+    /** Continua quando o usuário conecta na rede da lâmpada pelo Wi-Fi do sistema. */
+    fun continueManual() {
+        if (_state.value.pairing?.phase != "manual-wifi") return
+        if (pairingJob?.isActive == true) return
+        val session = pendingSession ?: return
+        val lamp = pendingLampSsid ?: return
+        val home = pendingHomeSsid ?: return
+        val password = pendingPassword ?: return
+        val connector = WifiApConnector(context)
+        val ssid = currentSsid(context) ?: return
+        if (!ssid.equals(lamp, ignoreCase = true)) return
+        val link = connector.wifiNetwork() ?: return
+        pendingSession = null
+        pendingLampSsid = null
+        pendingHomeSsid = null
+        pendingPassword = null
+        pairingJob = viewModelScope.launch {
+            runCatching { deliverAndWait(session, link, home, password) }
+                .onFailure { error -> _state.update { it.copy(pairing = PairingProgress("failed", error.message ?: "Não foi possível entregar os dados. Tente de novo.")) } }
+        }
+    }
+
+    /** Ao sair da tela: cancela tudo, menos quando o usuário foi conectar no Wi-Fi. */
+    fun pausePairing() {
+        if (_state.value.pairing?.phase == "manual-wifi") return
+        dismissPairing()
+    }
+
     /** Para de enviar, encerra a janela do servidor e limpa o resultado. */
     fun dismissPairing() {
         val sessionId = pairingSessionId
         pairingSessionId = null
+        pendingSession = null
+        pendingLampSsid = null
+        pendingHomeSsid = null
+        pendingPassword = null
         pairingJob?.cancel()
         pairingJob = null
         _state.update { it.copy(pairing = null) }

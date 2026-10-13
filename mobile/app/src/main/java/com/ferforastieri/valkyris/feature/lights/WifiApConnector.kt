@@ -86,6 +86,14 @@ internal class WifiApConnector(context: Context) {
     /** Todas as redes visíveis, para o usuário escolher quando o nome é incomum. */
     fun visibleNetworks(): List<String> = scanned()
 
+    /** A rede Wi-Fi em uso agora (quando o usuário conecta pelo sistema). */
+    @Suppress("DEPRECATION")
+    fun wifiNetwork(): Network? = runCatching {
+        connectivity?.allNetworks?.firstOrNull { n ->
+            connectivity.getNetworkCapabilities(n)?.hasTransport(NetworkCapabilities.TRANSPORT_WIFI) == true
+        }
+    }.getOrNull()
+
     /** Rede da lâmpada conectada; fechar devolve o celular à rede anterior. */
     internal class LampNetwork(
         val network: Network,

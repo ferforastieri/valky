@@ -46,6 +46,7 @@
     <string name="light_pair_location_needed">I need the Location permission to look for Wi-Fi networks. Allow it and tap Set up again.</string>
     <string name="light_pair_location_off">Your phone\'s Location is off. Turn it on and try again.</string>
     <string name="light_pair_open_location">Turn on Location</string>
+    <string name="light_pair_open_wifi">Open Wi-Fi</string>
     <string name="light_pair_search_again">Search again</string>
     <string name="permission_location">Location</string>
     <string name="permission_location_needed">Needed for the map and to set up bulbs</string>

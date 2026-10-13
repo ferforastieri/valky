@@ -44,6 +44,7 @@
     <string name="light_pair_location_needed">Preciso da permissão de Localização para procurar redes Wi-Fi. Autorize e toque em Configurar de novo.</string>
     <string name="light_pair_location_off">A Localização do celular está desligada. Ligue e tente de novo.</string>
     <string name="light_pair_open_location">Ligar Localização</string>
+    <string name="light_pair_open_wifi">Abrir Wi-Fi</string>
     <string name="light_pair_search_again">Procurar de novo</string>
     <string name="permission_location">Localização</string>
     <string name="permission_location_needed">Necessária para o mapa e para configurar lâmpadas</string>
