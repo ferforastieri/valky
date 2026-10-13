@@ -234,7 +234,7 @@ class LightsViewModel @Inject constructor(
                 }
                 return@launch
             }
-            deliverAndWait(session, connection.network, network, password) { connection.close() }
+            deliverAndWait(session, connection.network, network, password, connector.gatewayAddresses()) { connection.close() }
             } catch (error: Throwable) {
                 if (error is kotlinx.coroutines.CancellationException) throw error
                 // Qualquer falha inesperada vira aviso na folha, nunca um fechamento.
@@ -255,6 +255,7 @@ class LightsViewModel @Inject constructor(
         link: android.net.Network,
         homeSsid: String,
         password: String,
+        gateways: List<String>,
         closeLink: (() -> Unit)? = null,
     ) {
         _state.update { it.copy(pairing = PairingProgress("sending", "Conectado na lâmpada; entregando os dados do Wi-Fi de casa…")) }
@@ -266,6 +267,7 @@ class LightsViewModel @Inject constructor(
                 appToken = session.token,
                 secret = session.secret,
                 region = session.region,
+                gateways = gateways,
             ) { format ->
                 _state.update { state -> state.copy(pairing = PairingProgress("sending", "Entregando os dados do Wi-Fi ($format)…")) }
             }
@@ -308,7 +310,7 @@ class LightsViewModel @Inject constructor(
         pendingHomeSsid = null
         pendingPassword = null
         pairingJob = viewModelScope.launch {
-            runCatching { deliverAndWait(session, link, home, password) }
+            runCatching { deliverAndWait(session, link, home, password, connector.gatewayAddresses()) }
                 .onFailure { error -> _state.update { it.copy(pairing = PairingProgress("failed", error.message ?: "Não foi possível entregar os dados. Tente de novo.")) } }
         }
     }

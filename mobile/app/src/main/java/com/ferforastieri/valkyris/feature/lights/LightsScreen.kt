@@ -103,6 +103,11 @@ import com.ferforastieri.valkyris.core.model.*
             beginPairing(autoNetwork,vm.savedPassword(),null,true)
         }
     }
+    // Se o Android recusar a entrada automática na rede da lâmpada, a tela de
+    // Wi-Fi do sistema abre sozinha — sem precisar tocar em nada.
+    LaunchedEffect(state.pairing?.phase) {
+        if(pairing&&state.pairing?.phase=="manual-wifi")openWifiSettings(context)
+    }
     if(pairing)LightPairingSheet(
         progress=state.pairing,
         network=remember{vm.suggestedSsid().ifBlank{vm.savedNetwork()}},
@@ -298,14 +303,16 @@ import com.ferforastieri.valkyris.core.model.*
 
 /** Abre o Wi-Fi do sistema; alguns aparelhos exigem outra porta de entrada. */
 private fun openWifiSettings(context: android.content.Context) {
-    val tentativas = listOf(
-        Intent(Settings.ACTION_WIFI_SETTINGS),
-        Intent(Settings.ACTION_WIRELESS_SETTINGS),
-        Intent(Settings.ACTION_SETTINGS),
+    val destinos = listOf(
+        Settings.ACTION_WIFI_SETTINGS,
+        Settings.ACTION_WIRELESS_SETTINGS,
+        Settings.ACTION_SETTINGS,
     )
-    tentativas.forEach { intent ->
-        intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-        if (runCatching { context.startActivity(intent) }.isSuccess) return
+    // Primeiro como um aplicativo comum (sem bandeira); depois com as
+    // bandeiras que alguns aparelhos exigem.
+    destinos.forEach { acao ->
+        if (runCatching { context.startActivity(Intent(acao)) }.isSuccess) return
+        if (runCatching { context.startActivity(Intent(acao).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) }.isSuccess) return
     }
 }
 

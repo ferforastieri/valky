@@ -97,6 +97,21 @@ internal class WifiApConnector(context: Context) {
         }
     }.getOrNull()
 
+    /** O endereço da lâmpada em modo AP: o gateway que o celular recebeu. */
+    @Suppress("DEPRECATION")
+    fun gatewayAddresses(): List<String> = runCatching {
+        val encontrados = mutableListOf<String>()
+        connectivity?.allNetworks?.forEach { rede ->
+            if (connectivity.getNetworkCapabilities(rede)?.hasTransport(NetworkCapabilities.TRANSPORT_WIFI) == true) {
+                connectivity.getLinkProperties(rede)?.routes?.forEach { rota ->
+                    val gw = rota.gateway?.hostAddress
+                    if (rota.isDefaultRoute && !gw.isNullOrBlank() && gw !in encontrados) encontrados += gw
+                }
+            }
+        }
+        encontrados
+    }.getOrDefault(emptyList())
+
     /** Rede da lâmpada conectada; fechar devolve o celular à rede anterior. */
     internal class LampNetwork(
         val network: Network,
