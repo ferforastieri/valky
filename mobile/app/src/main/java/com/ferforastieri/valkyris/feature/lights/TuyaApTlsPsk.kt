@@ -70,6 +70,7 @@ internal object TuyaApTlsPsk {
      */
     fun entrega(network: android.net.Network, endereco: String, corpo: String): Entrega {
         val quadroBytes = quadro(0x14, corpo)
+        var servidorAtual: Servidor? = null
         return runCatching {
             Socket().use { socket ->
                 network.bindSocket(socket)
@@ -89,6 +90,7 @@ internal object TuyaApTlsPsk {
                 // ela falou primeiro: completamos o TLS como servidor
                 val entrada = java.io.SequenceInputStream(java.io.ByteArrayInputStream(iniciais), socket.getInputStream())
                 val servidor = Servidor(entrada, socket.getOutputStream())
+                servidorAtual = servidor
                 servidor.abre()
                 val resposta = servidor.envia(quadroBytes)
                 if (resposta != null) {
@@ -98,7 +100,11 @@ internal object TuyaApTlsPsk {
                     Entrega(true, false, "$endereco: tls-servidor enviado (sem resposta)")
                 }
             }
-        }.getOrElse { Entrega.falhou(endereco, "falhou (" + (it.message ?: it::class.simpleName) + ")") }
+        }.getOrElse {
+            val etapa = servidorAtual?.etapa
+            val onde = if (etapa != null) "tls-servidor parou em \"$etapa\": " else ""
+            Entrega.falhou(endereco, onde + "falhou (" + (it.message ?: it::class.simpleName) + ")")
+        }
     }
 
     /** Abre uma conexão nova com a lâmpada e roda o passo pedido. */
@@ -604,6 +610,9 @@ internal object TuyaApTlsPsk {
      * servidor. Depois do aperto de mão enviamos o quadro e lemos a resposta.
      */
     internal class Servidor(private val entrada: InputStream, private val saida: java.io.OutputStream) {
+        /** Em que passo do diálogo estamos (vai para o relato se algo falhar). */
+        internal var etapa = "início"
+
         private val nossoAleatorio = ByteArray(32).also { aleatorio.nextBytes(it) }
         private val historico = ByteArrayOutputStream()
         private val pendente = ByteArrayOutputStream()
@@ -623,6 +632,7 @@ internal object TuyaApTlsPsk {
         private var estendido = false
 
         fun abre() {
+            etapa = "lendo o oi da lâmpada"
             // registro de handshake e, dentro dele, o ClientHello da lâmpada
             val registro = leBytes(5)
             require((registro[0].toInt() and 0xFF) == 22) { "registro inicial não é handshake: " + (registro[0].toInt() and 0xFF) }
@@ -687,6 +697,7 @@ internal object TuyaApTlsPsk {
             hello.write((exts.size() ushr 8) and 0xFF)
             hello.write(exts.size() and 0xFF)
             hello.write(exts.toByteArray())
+            etapa = "enviando ServerHello"
             enviaHandshake(2, hello.toByteArray())
 
             // ServerKeyExchange (ECDHE) e ServerHelloDone
@@ -705,11 +716,14 @@ internal object TuyaApTlsPsk {
                 val ske = ByteArrayOutputStream()
                 ske.write(byteArrayOf(0x00, 0x00))
                 ske.write(parametros.toByteArray())
-                enviaHandshake(12, ske.toByteArray())
+                etapa = "enviando a chave do servidor"
+            enviaHandshake(12, ske.toByteArray())
             }
+            etapa = "pedindo o ClientKeyExchange"
             enviaHandshake(14, ByteArray(0))
 
             // ClientKeyExchange da lâmpada: identidade e, nas cifras ECDHE, a chave
+            etapa = "aguardando o ClientKeyExchange"
             val cke = proximaMensagem(16)
             var posCke = 0
             val tamIdentidade = ((cke[posCke].toInt() and 0xFF) shl 8) or (cke[posCke + 1].toInt() and 0xFF)
@@ -764,13 +778,16 @@ internal object TuyaApTlsPsk {
             }
 
             // Finished da lâmpada (conferido) e o nosso
+            etapa = "aguardando a troca de cifra"
             val (tipoCcs, _) = leRegistro()
             require(tipoCcs == 20) { "sem troca de cifra da lâmpada: tipo $tipoCcs" }
+            etapa = "aguardando o Finished dela"
             val (tipoFin, corpoFin) = leRegistroCifrado()
             require(tipoFin == 22 && corpoFin.size >= 16) { "finished da lâmpada inesperado" }
             val esperado = prf(mestra, "client finished".toByteArray() + resumo, 12)
             require(corpoFin.copyOfRange(4, 16).contentEquals(esperado)) { "finished da lâmpada não confere" }
             historico.write(corpoFin)
+            etapa = "enviando o nosso Finished"
             enviaRegistro(20, byteArrayOf(1))
             val resumoFinal = MessageDigest.getInstance("SHA-256").digest(historico.toByteArray())
             enviaRegistroCifrado(22, mensagem(20, prf(mestra, "server finished".toByteArray() + resumoFinal, 12)))
@@ -778,6 +795,7 @@ internal object TuyaApTlsPsk {
 
         /** Manda os dados de aplicação e devolve a próxima resposta dela. */
         fun envia(dados: ByteArray): ByteArray? {
+            etapa = "enviando o quadro"
             enviaRegistroCifrado(23, dados)
             repeat(4) {
                 val registro = runCatching { leRegistroCifrado() }.getOrNull() ?: return null
