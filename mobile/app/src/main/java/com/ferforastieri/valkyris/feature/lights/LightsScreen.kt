@@ -52,11 +52,15 @@ import com.ferforastieri.valkyris.core.model.*
     var pendingPairing by remember{mutableStateOf<PendingPairing?>(null)}
     val locationNeededNotice=stringResource(R.string.light_pair_location_needed)
     val locationOffNotice=stringResource(R.string.light_pair_location_off)
-    val locationPermission=rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()){granted->
+    val neededPermissions=remember{
+        if(android.os.Build.VERSION.SDK_INT>=33) arrayOf(Manifest.permission.ACCESS_FINE_LOCATION,Manifest.permission.NEARBY_WIFI_DEVICES)
+        else arrayOf(Manifest.permission.ACCESS_FINE_LOCATION)
+    }
+    val locationPermission=rememberLauncherForActivityResult(ActivityResultContracts.RequestMultiplePermissions()){granted->
         val pending=pendingPairing
         pendingPairing=null
         when{
-            !granted->vm.pairingNotice(locationNeededNotice)
+            !neededPermissions.all{granted[it]==true}->vm.pairingNotice(locationNeededNotice)
             pending==null->{}
             !vm.locationEnabled()->vm.pairingNotice(locationOffNotice)
             else->vm.configure(pending.ssid,pending.password,pending.remember,pending.lampSsid)
@@ -66,7 +70,7 @@ import com.ferforastieri.valkyris.core.model.*
     // acontece aqui mesmo, na hora, e o fluxo continua sozinho após a resposta.
     fun beginPairing(ssid:String,password:String,lampSsid:String?,remember:Boolean){
         when{
-            !vm.hasLocationPermission()->{pendingPairing=PendingPairing(ssid,password,lampSsid,remember);locationPermission.launch(Manifest.permission.ACCESS_FINE_LOCATION)}
+            !vm.hasPairingPermissions()->{pendingPairing=PendingPairing(ssid,password,lampSsid,remember);locationPermission.launch(neededPermissions)}
             !vm.locationEnabled()->vm.pairingNotice(locationOffNotice)
             else->vm.configure(ssid,password,remember,lampSsid)
         }
@@ -223,8 +227,15 @@ import com.ferforastieri.valkyris.core.model.*
                 }
                 progress?.phase=="choose-lamp"->Column(verticalArrangement=Arrangement.spacedBy(6.dp)){
                     Text(progress.message,style=MaterialTheme.typography.bodyMedium)
+                    if(editingPassword)OutlinedTextField(
+                        password,{password=it},Modifier.fillMaxWidth(),
+                        label={Text(stringResource(R.string.light_pair_password))},
+                        visualTransformation=PasswordVisualTransformation(),
+                        keyboardOptions=KeyboardOptions(keyboardType=KeyboardType.Password),
+                        singleLine=true,
+                    )
                     lampNetworks.forEach{name->
-                        Surface(onClick={onPickLamp(name,password)},modifier=Modifier.fillMaxWidth(),shape=MaterialTheme.shapes.medium,color=MaterialTheme.colorScheme.surfaceVariant){
+                        Surface(onClick={if(password.isBlank())editingPassword=true else onPickLamp(name,password)},modifier=Modifier.fillMaxWidth(),shape=MaterialTheme.shapes.medium,color=MaterialTheme.colorScheme.surfaceVariant){
                             Row(Modifier.fillMaxWidth().padding(horizontal=14.dp,vertical=12.dp),verticalAlignment=Alignment.CenterVertically){
                                 Icon(Lucide.Wifi,null,Modifier.size(18.dp),tint=MaterialTheme.colorScheme.secondary)
                                 Spacer(Modifier.width(10.dp))

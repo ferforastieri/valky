@@ -50,12 +50,8 @@
 
     <ImageView
         android:id="@+id/widget_light_power"
-        android:layout_width="38dp"
-        android:layout_height="38dp"
-        android:background="@drawable/widget_pill"
+        android:layout_width="42dp"
+        android:layout_height="24dp"
         android:contentDescription="@string/widget_light_toggle"
-        android:padding="9dp"
-        android:src="@drawable/widget_power"
-        android:tint="@color/widget_muted"
-            tools:ignore="UseAppTint" />
+        android:src="@drawable/widget_switch_off" />
 </LinearLayout>

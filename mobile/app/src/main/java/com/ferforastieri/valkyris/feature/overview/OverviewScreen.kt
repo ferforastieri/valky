@@ -333,24 +333,14 @@ private fun FavoriteGrid(
     onOpen: (FavoriteItem) -> Unit,
     onToggleLight: (FavoriteItem) -> Unit,
 ) {
-    val fontScale = LocalDensity.current.fontScale
-    BoxWithConstraints {
-        val columns = if (fontScale >= 1.3f || maxWidth < 320.dp) 1 else 3
-        Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-            items.chunked(columns).forEach { row ->
-                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                    row.forEach { favorite ->
-                        FavoriteCard(
-                            item = favorite,
-                            modifier = Modifier.weight(1f),
-                            onClick = { onOpen(favorite) },
-                            onTogglePower = if (favorite.type == "light") ({ onToggleLight(favorite) }) else null,
-                        )
-                    }
-                    // Linhas incompletas mantêm a largura dos cartões.
-                    repeat(columns - row.size) { Spacer(Modifier.weight(1f)) }
-                }
-            }
+    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        items.forEach { favorite ->
+            FavoriteCard(
+                item = favorite,
+                modifier = Modifier.fillMaxWidth(),
+                onClick = { onOpen(favorite) },
+                onTogglePower = if (favorite.type == "light") ({ onToggleLight(favorite) }) else null,
+            )
         }
     }
 }
@@ -371,32 +361,30 @@ private fun FavoriteCard(item: FavoriteItem, modifier: Modifier, onClick: () -> 
         border = BorderStroke(1.dp, if (lamp && item.online) tint.copy(alpha = .55f) else MaterialTheme.colorScheme.outlineVariant),
         elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
     ) {
-        Row(
-            Modifier.fillMaxWidth().padding(horizontal = 9.dp, vertical = 9.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-        ) {
-            Surface(shape = RoundedCornerShape(10.dp), color = MaterialTheme.colorScheme.secondary.copy(alpha = .14f)) {
-                Icon(favoriteIcon(item.type), null, Modifier.padding(6.dp).size(16.dp), tint = MaterialTheme.colorScheme.secondary)
+        Row(Modifier.fillMaxWidth().padding(15.dp), verticalAlignment = Alignment.CenterVertically) {
+            Surface(Modifier.size(40.dp), RoundedCornerShape(12.dp), color = com.ferforastieri.valkyris.core.design.ColorTokens.BrandTile) {
+                Icon(favoriteIcon(item.type), null, Modifier.padding(10.dp), tint = tint)
             }
+            Spacer(Modifier.width(12.dp))
             Text(
                 item.name,
                 Modifier.weight(1f),
-                style = MaterialTheme.typography.bodySmall,
-                fontWeight = FontWeight.Medium,
+                fontWeight = FontWeight.SemiBold,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
                 color = if (lamp && !item.online) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.onSurface,
             )
-            onTogglePower?.let { toggle ->
-                IconButton(onClick = toggle, enabled = item.online, modifier = Modifier.size(26.dp)) {
+            if (onTogglePower != null) {
+                IconButton(onClick = onTogglePower, enabled = item.online, modifier = Modifier.size(30.dp)) {
                     Icon(
                         Lucide.Power,
                         contentDescription = stringResource(if (item.power) R.string.favorite_light_off else R.string.favorite_light_on),
-                        modifier = Modifier.size(16.dp),
+                        modifier = Modifier.size(18.dp),
                         tint = tint,
                     )
                 }
+            } else {
+                Icon(Lucide.Star, null, Modifier.size(16.dp), tint = MaterialTheme.colorScheme.secondary)
             }
         }
     }

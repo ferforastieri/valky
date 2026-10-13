@@ -101,9 +101,8 @@ internal class WifiApConnector(context: Context) {
             .build()
         withTimeoutOrNull(timeoutMillis) {
             suspendCancellableCoroutine { continuation ->
+                var resumed = false
                 val callback = object : ConnectivityManager.NetworkCallback() {
-                    private var resumed = false
-
                     override fun onAvailable(network: Network) {
                         if (!resumed) {
                             resumed = true
@@ -118,7 +117,13 @@ internal class WifiApConnector(context: Context) {
                         }
                     }
                 }
-                manager.requestNetwork(request, callback)
+                // Sem a permissão certa o Android lança exceção aqui: melhor
+                // virar "não deu" do que fechar o aplicativo.
+                val registered = runCatching { manager.requestNetwork(request, callback) }.isSuccess
+                if (!registered && !resumed) {
+                    resumed = true
+                    continuation.resume(null)
+                }
                 continuation.invokeOnCancellation { runCatching { manager.unregisterNetworkCallback(callback) } }
             }
         }

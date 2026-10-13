@@ -61,8 +61,8 @@ class LightsWidgetProvider : ValkyrisWidgetProvider() {
             val on = light.power && light.online
             row.setImageViewResource(R.id.widget_light_bulb, if (on) R.drawable.widget_light_glow else R.drawable.widget_bulb_off)
             row.setInt(R.id.widget_light_bulb, "setColorFilter", if (on) light.color else context.getColor(R.color.widget_muted))
-            row.setInt(R.id.widget_light_power, "setBackgroundResource", if (light.power) R.drawable.widget_pill_active else R.drawable.widget_pill)
-            row.setInt(R.id.widget_light_power, "setColorFilter", if (light.power) context.getColor(R.color.widget_signal) else context.getColor(R.color.widget_muted))
+            row.setImageViewResource(R.id.widget_light_power, if (light.power) R.drawable.widget_switch_on else R.drawable.widget_switch_off)
+            row.setFloat(R.id.widget_light_power, "setAlpha", if (light.online) 1f else .4f)
             row.setOnClickPendingIntent(R.id.widget_light_power, pendingToggleLight(context, light.id, 100 + index))
             row.setOnClickPendingIntent(R.id.widget_light_row, pendingOpenApp(context, "lights", 120 + index))
             views.addView(R.id.widget_lights_list, row)

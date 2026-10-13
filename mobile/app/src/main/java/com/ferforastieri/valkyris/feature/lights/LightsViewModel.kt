@@ -107,6 +107,15 @@ class LightsViewModel @Inject constructor(
     fun hasLocationPermission(): Boolean =
         ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED
 
+    /** Permissões que o pareamento precisa (Localização e, no Android 13+, Wi-Fi por perto). */
+    fun hasPairingPermissions(): Boolean {
+        if (!hasLocationPermission()) return false
+        if (android.os.Build.VERSION.SDK_INT >= 33 &&
+            ContextCompat.checkSelfPermission(context, Manifest.permission.NEARBY_WIFI_DEVICES) != PackageManager.PERMISSION_GRANTED
+        ) return false
+        return true
+    }
+
     /** O interruptor de Localização do celular está ligado? */
     fun locationEnabled(): Boolean {
         val manager = context.getSystemService(Context.LOCATION_SERVICE) as? android.location.LocationManager ?: return false
@@ -148,6 +157,7 @@ class LightsViewModel @Inject constructor(
                     return@launch
                 }
             pairingSessionId = session.id
+            try {
             _state.update {
                 it.copy(
                     network = network,
@@ -221,6 +231,12 @@ class LightsViewModel @Inject constructor(
                     if (status.status == "failed") return@launch
                 }
                 delay(1500)
+            }
+            } catch (error: Throwable) {
+                // Qualquer falha inesperada vira aviso na folha, nunca um fechamento.
+                _state.update {
+                    it.copy(pairing = PairingProgress("failed", error.message ?: "Não foi possível falar com a lâmpada. Tente de novo."))
+                }
             }
         }
     }

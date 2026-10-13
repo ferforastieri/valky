@@ -151,6 +151,49 @@
                     android:tint="@color/widget_ink"
             tools:ignore="UseAppTint" />
             </LinearLayout>
+
+            <LinearLayout
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="6dp"
+                android:gravity="center"
+                android:orientation="horizontal">
+
+                <ImageView
+                    android:id="@+id/widget_remote_back"
+                    android:layout_width="34dp"
+                    android:layout_height="34dp"
+                    android:background="@drawable/widget_pill"
+                    android:contentDescription="@string/remote_back"
+                    android:padding="8dp"
+                    android:src="@drawable/widget_arrow_left"
+                    android:tint="@color/widget_ink"
+            tools:ignore="UseAppTint" />
+
+                <ImageView
+                    android:id="@+id/widget_remote_home"
+                    android:layout_width="34dp"
+                    android:layout_height="34dp"
+                    android:layout_marginStart="6dp"
+                    android:layout_marginEnd="6dp"
+                    android:background="@drawable/widget_pill"
+                    android:contentDescription="@string/remote_home"
+                    android:padding="8dp"
+                    android:src="@drawable/widget_home"
+                    android:tint="@color/widget_ink"
+            tools:ignore="UseAppTint" />
+
+                <ImageView
+                    android:id="@+id/widget_remote_menu"
+                    android:layout_width="34dp"
+                    android:layout_height="34dp"
+                    android:background="@drawable/widget_pill"
+                    android:contentDescription="@string/settings"
+                    android:padding="8dp"
+                    android:src="@drawable/widget_menu"
+                    android:tint="@color/widget_ink"
+            tools:ignore="UseAppTint" />
+            </LinearLayout>
         </LinearLayout>
 
         <LinearLayout
@@ -191,6 +234,30 @@
                 android:contentDescription="@string/widget_remote_mute"
                 android:padding="9dp"
                 android:src="@drawable/widget_mute"
+                android:tint="@color/widget_ink"
+            tools:ignore="UseAppTint" />
+
+            <ImageView
+                android:id="@+id/widget_remote_channel_up"
+                android:layout_width="40dp"
+                android:layout_height="40dp"
+                android:layout_marginTop="6dp"
+                android:background="@drawable/widget_pill"
+                android:contentDescription="@string/remote_channel_up"
+                android:padding="9dp"
+                android:src="@drawable/widget_arrow_up"
+                android:tint="@color/widget_ink"
+            tools:ignore="UseAppTint" />
+
+            <ImageView
+                android:id="@+id/widget_remote_channel_down"
+                android:layout_width="40dp"
+                android:layout_height="40dp"
+                android:layout_marginTop="6dp"
+                android:background="@drawable/widget_pill"
+                android:contentDescription="@string/remote_channel_down"
+                android:padding="9dp"
+                android:src="@drawable/widget_arrow_down"
                 android:tint="@color/widget_ink"
             tools:ignore="UseAppTint" />
         </LinearLayout>
