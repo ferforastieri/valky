@@ -29,3 +29,5 @@ web/public/openapi.yaml
 web/public/screenshots/landing/
 
 web/dist-viewer/
+__pycache__/
+*.pyc

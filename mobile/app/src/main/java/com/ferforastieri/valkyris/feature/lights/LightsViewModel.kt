@@ -44,6 +44,8 @@ data class LightsState(
     val pairing: PairingProgress? = null,
     /** Rede usada no pareamento; vem da última vez ou do Wi-Fi atual. */
     val network: String = "",
+    /** Redes visíveis quando nenhuma se parece com uma lâmpada, para o usuário escolher. */
+    val lampNetworks: List<String> = emptyList(),
     /** Quando falso, a tela precisa da senha do Wi-Fi uma única vez. */
     val hasCredentials: Boolean = false,
 )
@@ -106,7 +108,7 @@ class LightsViewModel @Inject constructor(
      * o celular entra na rede que a lâmpada cria, entrega os dados da rede de
      * casa e volta. Não depende do roteador nem da faixa de 2,4 GHz.
      */
-    fun configure(ssid: String, password: String, remember: Boolean = true) {
+    fun configure(ssid: String, password: String, remember: Boolean = true, lampSsid: String? = null) {
         if (pairingJob?.isActive == true) return
         val network = ssid.trim()
         if (network.isEmpty()) {
@@ -139,10 +141,16 @@ class LightsViewModel @Inject constructor(
                 }
                 return@launch
             }
-            val lamp = withContext(Dispatchers.IO) { connector.candidateNetworks() }.firstOrNull()
+            val candidates = withContext(Dispatchers.IO) { connector.candidateNetworks() }
+            val visible = withContext(Dispatchers.IO) { connector.visibleNetworks() }
+            val lamp = lampSsid?.takeIf { it.isNotBlank() } ?: candidates.firstOrNull()
             if (lamp == null) {
+                // Nenhum nome conhecido: oferece as redes visíveis para escolha.
                 _state.update {
-                    it.copy(pairing = PairingProgress("failed", "Não encontrei a rede da lâmpada. Confirme que ela está piscando rápido (ligar/desligar 3 vezes) e tente de novo."))
+                    it.copy(
+                        lampNetworks = visible,
+                        pairing = PairingProgress("choose-lamp", "Não reconheci a rede da lâmpada pelo nome. Escolha abaixo a rede que apareceu quando ela começou a piscar."),
+                    )
                 }
                 return@launch
             }

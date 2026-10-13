@@ -23,6 +23,7 @@ import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.LifecycleResumeEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.composables.icons.lucide.*
+import com.composables.icons.lucide.Wifi
 import com.ferforastieri.valkyris.R
 import com.ferforastieri.valkyris.core.design.ValkyrisBottomSheet
 import com.ferforastieri.valkyris.core.model.*
@@ -56,7 +57,9 @@ import com.ferforastieri.valkyris.core.model.*
         progress=state.pairing,
         network=remember{vm.suggestedSsid().ifBlank{vm.savedNetwork()}},
         savedPassword=remember{vm.savedPassword()},
+        lampNetworks=state.lampNetworks,
         onConfigure={ssid,password->vm.configure(ssid,password)},
+        onPickLamp={lampSsid,password->vm.configure(state.network,password,remember=false,lampSsid=lampSsid)},
         onDismiss={pairing=false;vm.dismissPairing()},
     )
     selected?.let{light->LightControls(light,light.id in state.busy,{selected=null}){vm.control(light.id,it)}}
@@ -141,7 +144,9 @@ import com.ferforastieri.valkyris.core.model.*
     progress:PairingProgress?,
     network:String,
     savedPassword:String,
+    lampNetworks:List<String>,
     onConfigure:(String,String)->Unit,
+    onPickLamp:(String,String)->Unit,
     onDismiss:()->Unit,
 ){
     var password by remember{mutableStateOf(savedPassword)}
@@ -186,6 +191,19 @@ import com.ferforastieri.valkyris.core.model.*
                         Text(progress?.message.orEmpty().ifBlank{stringResource(R.string.light_pair_sending)},Modifier.weight(1f),style=MaterialTheme.typography.bodyMedium)
                     }
                     Text(stringResource(R.string.light_pair_waiting),style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+                progress?.phase=="choose-lamp"->Column(verticalArrangement=Arrangement.spacedBy(8.dp)){
+                    Text(progress.message,style=MaterialTheme.typography.bodyMedium)
+                    lampNetworks.forEach{name->
+                        Surface(onClick={onPickLamp(name,password)},modifier=Modifier.fillMaxWidth(),shape=MaterialTheme.shapes.medium,color=MaterialTheme.colorScheme.surfaceVariant){
+                            Row(Modifier.fillMaxWidth().padding(horizontal=14.dp,vertical=12.dp),verticalAlignment=Alignment.CenterVertically){
+                                Icon(Lucide.Wifi,null,Modifier.size(18.dp),tint=MaterialTheme.colorScheme.secondary)
+                                Spacer(Modifier.width(10.dp))
+                                Text(name,Modifier.weight(1f),style=MaterialTheme.typography.bodyMedium)
+                                Icon(Lucide.ChevronRight,null,Modifier.size(18.dp),tint=MaterialTheme.colorScheme.onSurfaceVariant)
+                            }
+                        }
+                    }
                 }
                 else->Column(verticalArrangement=Arrangement.spacedBy(10.dp)){
                     Text(stringResource(R.string.light_pair_steps),style=MaterialTheme.typography.bodyMedium)

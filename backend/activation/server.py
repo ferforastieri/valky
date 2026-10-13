@@ -52,7 +52,7 @@ from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
 IDENTITY_PREFIX = b"BAohbmd6aG91IFR1"
 PSK_HINT = b"1dHRsc2NjbHltbGx3eWh5" + b"0000000000000000"
 DEFAULT_SEC_KEY = "0000000000000000"
-DEFAULT_TOKEN = "M3w3edeunVSpqYDL"
+DEFAULT_TOKEN = "0000000000000000"
 
 ARGS: argparse.Namespace
 LOG_LOCK = threading.Lock()
@@ -337,7 +337,7 @@ def main() -> None:
     parser = argparse.ArgumentParser(description="Servidor de ativação local do Valkyris")
     parser.add_argument("--addr", default="", help="endereço usado quando a lâmpada não informa um nome")
     parser.add_argument("--database", default="/data/valkyris.db", help="banco do Valkyris, para ler a chave da janela")
-    parser.add_argument("--local-key", default=DEFAULT_TOKEN, help="chave usada quando o banco não pode ser lido")
+    parser.add_argument("--local-key", default=DEFAULT_TOKEN, help="chave neutra usada apenas quando o banco não pode ser lido; o valor real vem sempre da janela de pareamento")
     parser.add_argument("--sec-key", default=DEFAULT_SEC_KEY, help="chave de sessão do protocolo de ativação")
     parser.add_argument("--timezone", default="-03:00")
     parser.add_argument("--http-port", type=int, default=80)

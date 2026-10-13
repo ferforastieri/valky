@@ -74,6 +74,26 @@ internal object TuyaApConfig {
         (value and 0xFF).toByte(),
     )
 
+    /** Tenta o mesmo envio por uma conexão TLS (certificado do próprio aparelho). */
+    private fun deliverTls(network: android.net.Network, address: String, payload: ByteArray): Boolean = runCatching {
+        val context = javax.net.ssl.SSLContext.getInstance("TLS")
+        context.init(null, arrayOf(object : javax.net.ssl.X509TrustManager {
+            override fun checkClientTrusted(chain: Array<java.security.cert.X509Certificate>?, authType: String?) = Unit
+            override fun checkServerTrusted(chain: Array<java.security.cert.X509Certificate>?, authType: String?) = Unit
+            override fun getAcceptedIssuers(): Array<java.security.cert.X509Certificate> = emptyArray()
+        }), java.security.SecureRandom())
+        val socket = context.socketFactory.createSocket()
+        network.bindSocket(socket)
+        (socket as javax.net.ssl.SSLSocket).soTimeout = 3000
+        socket.connect(InetSocketAddress(address, PORT), 2500)
+        socket.startHandshake()
+        socket.getOutputStream().apply { write(payload); flush() }
+        val reply = ByteArray(64)
+        val read = runCatching { socket.getInputStream().read(reply) }.getOrDefault(-1)
+        socket.close()
+        read > 0
+    }.getOrDefault(false)
+
     /**
      * Tenta entregar os dados. Devolve o nome do formato que foi aceito quando a
      * lâmpada responde algo, ou nulo quando nenhum formato teve resposta.
@@ -103,6 +123,7 @@ internal object TuyaApConfig {
                     }
                 }.getOrDefault(false)
                 if (answered) return@withContext name
+                if (deliverTls(network, address, payload)) return@withContext "$name-tls"
             }
         }
         null

@@ -1,4 +1,9 @@
-"""Testes do servidor de ativação local (rode com: python3 -m unittest)."""
+"""Testes do servidor de ativação local (rode com: python3 -m unittest).
+
+A criptografia vem do `cryptography`, que já está na imagem do serviço; quando
+ele não está instalado na máquina de desenvolvimento, os testes são pulados em
+vez de falhar.
+"""
 import base64
 import hashlib
 import json
@@ -6,6 +11,11 @@ import sqlite3
 import tempfile
 import unittest
 from pathlib import Path
+
+try:
+    import cryptography  # noqa: F401  (dependência do serviço)
+except ImportError:  # pragma: no cover - ambiente de desenvolvimento sem a lib
+    raise __import__("unittest").SkipTest("cryptography não instalado; testes do serviço pulados")
 
 import server
 
@@ -17,7 +27,7 @@ class CryptoTest(unittest.TestCase):
         self.assertEqual(server.decrypt_ecb(server.encrypt_ecb(plain, key), key), plain)
 
     def test_psk_is_deterministic_and_sized(self):
-        identity = server.IDENTITY_PREFIX + b"d9ce7ed9c23513a3" + b"0000"
+        identity = server.IDENTITY_PREFIX + b"0000111122223333" + b"0000"
         first = server.psk_for(identity)
         second = server.psk_for(identity)
         self.assertEqual(first, second)
