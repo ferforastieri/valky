@@ -72,49 +72,41 @@ internal object TuyaApTlsPsk {
         val quadroBytes = quadro(0x14, corpo)
         var servidorAtual: Servidor? = null
         return runCatching {
+            // A lâmpada é o CLIENTE TLS (confirmado no firmware): ao conectar,
+            // ela manda o ClientHello sozinha. Não podemos enviar NADA antes do
+            // diálogo (qualquer byte nosso faz ela esperar um registro inválido
+            // para sempre). Se ela estiver ocupada com a conexão anterior,
+            // tentamos de novo com uma conexão nova.
             var iniciais: ByteArray? = null
             var conversa: Socket? = null
-            // 1) Espera ela falar SEM mandar nada antes: qualquer byte nosso
-            //    ficaria no canal e desencontraria a leitura do TLS dela.
-            runCatching {
-                val socket = Socket()
-                network.bindSocket(socket)
-                socket.connect(InetSocketAddress(endereco, PORTA), 2_500)
-                socket.soTimeout = 5_000
-                val falou = lerAte(socket.getInputStream(), 5_000)
+            var conectouAlguma = false
+            for (tentativa in 1..3) {
+                if (conversa != null) break
+                val socket = runCatching { Socket() }.getOrNull() ?: break
+                val ok = runCatching {
+                    network.bindSocket(socket)
+                    socket.connect(InetSocketAddress(endereco, PORTA), 2_500)
+                }.isSuccess
+                if (!ok) {
+                    runCatching { socket.close() }
+                    continue
+                }
+                conectouAlguma = true
+                socket.soTimeout = 6_000
+                val falou = lerAte(socket.getInputStream(), 6_000)
                 if (falou != null && falou.size > 6 && falou[0] == 0x16.toByte() && falou[5] == 0x01.toByte()) {
                     iniciais = falou
                     conversa = socket
                 } else {
-                    socket.close()
+                    runCatching { socket.close() }
                 }
             }
-            // 2) Se ela ficou quieta, dá um empurrão (o quadro) e, se ela falar,
-            //    reabre uma conversa limpa para o diálogo.
             if (conversa == null) {
-                val fala = comSocket(network, endereco) { socket ->
-                    socket.soTimeout = 5_000
-                    socket.getOutputStream().apply { write(quadroBytes); flush() }
-                    lerAte(socket.getInputStream(), 5_000)
-                } ?: return Entrega(true, false, "$endereco: sem resposta")
-                if (!(fala.size > 6 && fala[0] == 0x16.toByte() && fala[5] == 0x01.toByte())) {
-                    val (aceito, codigo) = respostaCodigo(fala)
-                    return Entrega(true, aceito, "$endereco: respondeu $codigo")
+                return if (!conectouAlguma) {
+                    Entrega.falhou(endereco, "não aceitou a conexão na porta $PORTA")
+                } else {
+                    Entrega(true, false, "$endereco: conectou, mas não falou nada (3 tentativas)")
                 }
-                runCatching {
-                    val socket = Socket()
-                    network.bindSocket(socket)
-                    socket.connect(InetSocketAddress(endereco, PORTA), 2_500)
-                    socket.soTimeout = 4_000
-                    val limpo = lerAte(socket.getInputStream(), 4_000)
-                    if (limpo != null && limpo.size > 6 && limpo[0] == 0x16.toByte() && limpo[5] == 0x01.toByte()) {
-                        iniciais = limpo
-                        conversa = socket
-                    } else {
-                        socket.close()
-                    }
-                }
-                if (conversa == null) return Entrega(true, false, "$endereco: ela falou, mas não abriu o diálogo limpo")
             }
             val socket = conversa!!
             socket.use {

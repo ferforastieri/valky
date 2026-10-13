@@ -242,10 +242,12 @@ class ValkyrisApi(
     suspend fun lightPairingStatus(id: String): LightPairingSession = get("/lights/pairing-sessions/$id")
     /** Conta ao servidor o que aconteceu numa tentativa de pareamento. */
     suspend fun reportLightPairingDiagnostic(sessionId: String, detail: String) {
+        // Silencioso de propósito: é acompanhamento interno, não um aviso para
+        // o usuário (a resposta do servidor não deve virar toast na tela).
         post<JsonElement, Map<String, String>>(
             "/lights/pairing-diagnostics",
             mapOf("sessionId" to sessionId, "detail" to detail.take(300)),
-            announceBackend = true,
+            announceBackend = false,
         )
     }
     suspend fun cancelLightPairing(id: String) {
