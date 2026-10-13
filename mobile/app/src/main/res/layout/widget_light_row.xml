@@ -14,6 +14,16 @@
     android:paddingTop="4dp"
     android:paddingBottom="4dp">
 
+    <ImageView
+        android:id="@+id/widget_light_bulb"
+        android:layout_width="24dp"
+        android:layout_height="24dp"
+        android:layout_marginEnd="8dp"
+        android:contentDescription="@null"
+        android:src="@drawable/widget_bulb_off"
+        android:tint="@color/widget_muted"
+        tools:ignore="UseAppTint" />
+
     <LinearLayout
         android:layout_width="0dp"
         android:layout_height="wrap_content"

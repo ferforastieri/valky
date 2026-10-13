@@ -1,5 +1,15 @@
 package com.ferforastieri.valkyris.feature.lights
 
+import android.Manifest
+import android.content.Intent
+import android.provider.Settings
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
@@ -14,6 +24,9 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.draw.scale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
@@ -35,12 +48,35 @@ import com.ferforastieri.valkyris.core.model.*
     var removing by remember{mutableStateOf<LightDevice?>(null)}
     var renaming by remember{mutableStateOf<LightDevice?>(null)}
     var pairing by remember{mutableStateOf(false)}
+    val context=LocalContext.current
+    var pendingPairing by remember{mutableStateOf<PendingPairing?>(null)}
+    val locationNeededNotice=stringResource(R.string.light_pair_location_needed)
+    val locationOffNotice=stringResource(R.string.light_pair_location_off)
+    val locationPermission=rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()){granted->
+        val pending=pendingPairing
+        pendingPairing=null
+        when{
+            !granted->vm.pairingNotice(locationNeededNotice)
+            pending==null->{}
+            !vm.locationEnabled()->vm.pairingNotice(locationOffNotice)
+            else->vm.configure(pending.ssid,pending.password,pending.remember,pending.lampSsid)
+        }
+    }
+    // O Android só deixa procurar redes com a Localização liberada: o pedido
+    // acontece aqui mesmo, na hora, e o fluxo continua sozinho após a resposta.
+    fun beginPairing(ssid:String,password:String,lampSsid:String?,remember:Boolean){
+        when{
+            !vm.hasLocationPermission()->{pendingPairing=PendingPairing(ssid,password,lampSsid,remember);locationPermission.launch(Manifest.permission.ACCESS_FINE_LOCATION)}
+            !vm.locationEnabled()->vm.pairingNotice(locationOffNotice)
+            else->vm.configure(ssid,password,remember,lampSsid)
+        }
+    }
     Box(Modifier.fillMaxSize()){
         Column(Modifier.fillMaxSize().padding(horizontal=18.dp)){
             state.error?.let{ /* errors surface as a toast */ }
             when{
                 state.loading->Box(Modifier.fillMaxSize(),contentAlignment=Alignment.Center){CircularProgressIndicator()}
-                state.lights.isEmpty()->EmptyLighting(admin,{pairing=true})
+                state.lights.isEmpty()->EmptyLighting(admin)
                 else->LazyColumn(verticalArrangement=Arrangement.spacedBy(12.dp),contentPadding=PaddingValues(top=12.dp,bottom=96.dp)){
                     items(state.lights,key={it.id}){light->LightCard(light,light.id in state.busy,{vm.control(light.id,LightStatePatch(power=!light.state.power))},{selected=light},if(admin){{removing=light}}else null,{vm.toggleFavorite(light.id,!light.favorite)},if(admin){{renaming=light}}else null)}
                 }
@@ -58,8 +94,10 @@ import com.ferforastieri.valkyris.core.model.*
         network=remember{vm.suggestedSsid().ifBlank{vm.savedNetwork()}},
         savedPassword=remember{vm.savedPassword()},
         lampNetworks=state.lampNetworks,
-        onConfigure={ssid,password->vm.configure(ssid,password)},
-        onPickLamp={lampSsid,password->vm.configure(state.network,password,remember=false,lampSsid=lampSsid)},
+        locationOff=!vm.locationEnabled(),
+        onConfigure={ssid,password->beginPairing(ssid,password,null,true)},
+        onPickLamp={lampSsid,password->beginPairing(state.network,password,lampSsid,false)},
+        onOpenLocation={runCatching{context.startActivity(Intent(Settings.ACTION_LOCATION_SOURCE_SETTINGS))}},
         onDismiss={pairing=false;vm.dismissPairing()},
     )
     selected?.let{light->LightControls(light,light.id in state.busy,{selected=null}){vm.control(light.id,it)}}
@@ -67,14 +105,13 @@ import com.ferforastieri.valkyris.core.model.*
     removing?.let{light->AlertDialog(onDismissRequest={removing=null},title={Text(stringResource(R.string.remove_light_title))},text={Text(stringResource(R.string.remove_light_body,light.name))},dismissButton={TextButton(onClick={removing=null}){Text(stringResource(R.string.cancel))}},confirmButton={Button(onClick={vm.delete(light.id){removing=null}},colors=ButtonDefaults.buttonColors(containerColor=MaterialTheme.colorScheme.error)){Text(stringResource(R.string.remove))}})}
 }
 
-@Composable private fun EmptyLighting(admin:Boolean,onAdd:()->Unit){
+@Composable private fun EmptyLighting(admin:Boolean){
     Box(Modifier.fillMaxSize(),contentAlignment=Alignment.Center){
         Surface(shape=MaterialTheme.shapes.large,color=MaterialTheme.colorScheme.surface,border=BorderStroke(1.dp,MaterialTheme.colorScheme.outlineVariant),shadowElevation=3.dp){
             Column(Modifier.padding(horizontal=26.dp,vertical=24.dp).widthIn(max=340.dp),horizontalAlignment=Alignment.CenterHorizontally,verticalArrangement=Arrangement.spacedBy(10.dp)){
                 Surface(shape=CircleShape,color=MaterialTheme.colorScheme.secondaryContainer){Icon(Lucide.Lightbulb,null,Modifier.padding(13.dp).size(28.dp),tint=MaterialTheme.colorScheme.onSecondaryContainer)}
                 Text(stringResource(R.string.no_lights),fontWeight=FontWeight.SemiBold,style=MaterialTheme.typography.titleMedium)
                 Text(stringResource(if(admin)R.string.no_lights_body_admin else R.string.no_lights_body),color=MaterialTheme.colorScheme.onSurfaceVariant,style=MaterialTheme.typography.bodyMedium,textAlign=androidx.compose.ui.text.style.TextAlign.Center)
-                if(admin)Button(onClick=onAdd){Icon(Lucide.Plus,null,Modifier.size(18.dp));Spacer(Modifier.width(8.dp));Text(stringResource(R.string.add_light))}
             }
         }
     }
@@ -82,9 +119,13 @@ import com.ferforastieri.valkyris.core.model.*
 
 @Composable private fun LightCard(light:LightDevice,busy:Boolean,onPower:()->Unit,onOpen:()->Unit,onRemove:(()->Unit)?,onFavorite:(()->Unit)?=null,onEdit:(()->Unit)?=null){
     val aura=if(light.state.mode=="color")Color.hsv(light.state.color.hue.toFloat(),light.state.color.saturation/100f,light.state.color.value/100f)else Color(0xFFFFD7A0)
+    // Acesa, a lâmpada respira: o brilho do ícone pulsa na cor atual.
+    val lit=light.state.power&&light.state.online
+    val pulse=rememberInfiniteTransition(label="lamp")
+    val glow by pulse.animateFloat(initialValue=.62f,targetValue=1f,animationSpec=infiniteRepeatable(tween(1400),RepeatMode.Reverse),label="glow")
     Card(onClick=onOpen,colors=CardDefaults.cardColors(containerColor=MaterialTheme.colorScheme.surface),border=BorderStroke(1.dp,if(light.state.online)aura.copy(alpha=.7f)else MaterialTheme.colorScheme.outlineVariant)){
         Row(Modifier.fillMaxWidth().background(aura.copy(alpha=if(light.state.power).12f else .03f)).padding(16.dp),verticalAlignment=Alignment.CenterVertically){
-            Surface(shape=CircleShape,color=aura.copy(alpha=if(light.state.power).28f else .08f)){Icon(if(light.state.power)Lucide.Lightbulb else Lucide.LightbulbOff,null,Modifier.padding(12.dp).size(24.dp),tint=if(light.state.power)aura else MaterialTheme.colorScheme.onSurfaceVariant)}
+            Surface(shape=CircleShape,color=aura.copy(alpha=if(light.state.power).28f*glow else .08f)){Icon(if(light.state.power)Lucide.Lightbulb else Lucide.LightbulbOff,null,Modifier.padding(12.dp).size(24.dp).alpha(if(lit)glow else 1f).scale(if(lit)(.96f+.06f*glow)else 1f),tint=if(light.state.power)aura else MaterialTheme.colorScheme.onSurfaceVariant)}
             Spacer(Modifier.width(13.dp));Column(Modifier.weight(1f)){
                 Text(light.name,fontWeight=FontWeight.SemiBold)
                 Text(
@@ -130,30 +171,26 @@ import com.ferforastieri.valkyris.core.model.*
 }
 
 /**
- * Folha do pareamento, aberta pelo botão de adicionar. Pede a rede e a senha do
- * Wi-Fi (a senha fica guardada no aparelho e vem preenchida nas próximas vezes),
- * envia os dados pelo ar e acompanha até a lâmpada aparecer na lista.
- */
-/**
- * Folha do pareamento pelo caminho direto (modo AP). O celular entra na rede que
- * a lâmpada cria e entrega os dados da rede de casa — nada de banda 2,4/5 GHz,
- * nada de mexer no roteador. A senha do Wi-Fi é pedida uma única vez e fica
- * guardada no aparelho.
+ * Folha do pareamento pelo caminho direto (modo AP) — a mais simples possível:
+ * a rede do celular, a senha (pedida uma única vez e depois guardada) e o botão
+ * de configurar. Sem texto explicativo.
  */
 @Composable private fun LightPairingSheet(
     progress:PairingProgress?,
     network:String,
     savedPassword:String,
     lampNetworks:List<String>,
+    locationOff:Boolean,
     onConfigure:(String,String)->Unit,
     onPickLamp:(String,String)->Unit,
+    onOpenLocation:()->Unit,
     onDismiss:()->Unit,
 ){
     var password by remember{mutableStateOf(savedPassword)}
     var editingPassword by remember{mutableStateOf(savedPassword.isBlank())}
     val paired=progress?.light
-    val running=progress!=null&&progress.phase!="failed"&&progress.phase!="paired"
     val failed=progress?.phase=="failed"
+    val running=progress!=null&&!failed&&progress.phase!="paired"&&progress.phase!="choose-lamp"
     ValkyrisBottomSheet(
         title=stringResource(R.string.add_light),
         onDismiss=onDismiss,
@@ -174,25 +211,17 @@ import com.ferforastieri.valkyris.core.model.*
     ){
         Column(Modifier.fillMaxWidth().heightIn(max=560.dp).verticalScroll(rememberScrollState()),verticalArrangement=Arrangement.spacedBy(10.dp)){
             when{
-                paired!=null->Column(verticalArrangement=Arrangement.spacedBy(8.dp)){
-                    Row(verticalAlignment=Alignment.CenterVertically){
-                        Surface(shape=CircleShape,color=MaterialTheme.colorScheme.secondaryContainer){Icon(Lucide.Lightbulb,null,Modifier.padding(10.dp).size(22.dp),tint=MaterialTheme.colorScheme.onSecondaryContainer)}
-                        Spacer(Modifier.width(12.dp))
-                        Column(Modifier.weight(1f)){
-                            Text(stringResource(R.string.light_pair_done),fontWeight=FontWeight.SemiBold)
-                            Text(stringResource(R.string.light_pair_done_hint),style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant)
-                        }
-                    }
+                paired!=null->Row(verticalAlignment=Alignment.CenterVertically){
+                    Surface(shape=CircleShape,color=MaterialTheme.colorScheme.secondaryContainer){Icon(Lucide.Lightbulb,null,Modifier.padding(10.dp).size(22.dp),tint=MaterialTheme.colorScheme.onSecondaryContainer)}
+                    Spacer(Modifier.width(12.dp))
+                    Text(stringResource(R.string.light_pair_done),fontWeight=FontWeight.SemiBold)
                 }
-                running->Column(verticalArrangement=Arrangement.spacedBy(8.dp)){
-                    Row(verticalAlignment=Alignment.CenterVertically){
-                        CircularProgressIndicator(Modifier.size(20.dp),strokeWidth=2.dp)
-                        Spacer(Modifier.width(10.dp))
-                        Text(progress?.message.orEmpty().ifBlank{stringResource(R.string.light_pair_sending)},Modifier.weight(1f),style=MaterialTheme.typography.bodyMedium)
-                    }
-                    Text(stringResource(R.string.light_pair_waiting),style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant)
+                running->Row(verticalAlignment=Alignment.CenterVertically){
+                    CircularProgressIndicator(Modifier.size(20.dp),strokeWidth=2.dp)
+                    Spacer(Modifier.width(10.dp))
+                    Text(progress?.message.orEmpty().ifBlank{stringResource(R.string.light_pair_sending)},Modifier.weight(1f),style=MaterialTheme.typography.bodyMedium)
                 }
-                progress?.phase=="choose-lamp"->Column(verticalArrangement=Arrangement.spacedBy(8.dp)){
+                progress?.phase=="choose-lamp"->Column(verticalArrangement=Arrangement.spacedBy(6.dp)){
                     Text(progress.message,style=MaterialTheme.typography.bodyMedium)
                     lampNetworks.forEach{name->
                         Surface(onClick={onPickLamp(name,password)},modifier=Modifier.fillMaxWidth(),shape=MaterialTheme.shapes.medium,color=MaterialTheme.colorScheme.surfaceVariant){
@@ -204,28 +233,30 @@ import com.ferforastieri.valkyris.core.model.*
                             }
                         }
                     }
+                    TextButton({onConfigure(network,password)}){Text(stringResource(R.string.light_pair_search_again))}
                 }
                 else->Column(verticalArrangement=Arrangement.spacedBy(10.dp)){
-                    Text(stringResource(R.string.light_pair_steps),style=MaterialTheme.typography.bodyMedium)
                     if(failed)progress?.message?.takeIf{it.isNotBlank()}?.let{Text(it,color=MaterialTheme.colorScheme.error,style=MaterialTheme.typography.bodySmall)}
-                    Text(stringResource(R.string.light_pair_network_auto,network.ifBlank{stringResource(R.string.light_pair_network_unknown)}),style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant)
+                    if(failed&&locationOff)TextButton({onOpenLocation}){Text(stringResource(R.string.light_pair_open_location))}
+                    Text(stringResource(R.string.light_pair_network_auto,network.ifBlank{stringResource(R.string.light_pair_network_unknown)}),style=MaterialTheme.typography.bodyMedium)
                     if(editingPassword)OutlinedTextField(
                         password,{password=it},Modifier.fillMaxWidth(),
                         label={Text(stringResource(R.string.light_pair_password))},
                         visualTransformation=PasswordVisualTransformation(),
                         keyboardOptions=KeyboardOptions(keyboardType=KeyboardType.Password),
-                        supportingText={Text(stringResource(R.string.light_pair_password_once))},
                         singleLine=true,
                     ) else Row(verticalAlignment=Alignment.CenterVertically){
                         Text(stringResource(R.string.light_pair_password_saved),Modifier.weight(1f),style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant)
                         TextButton(onClick={editingPassword=true}){Text(stringResource(R.string.light_pair_password_change))}
                     }
-                    Text(stringResource(R.string.light_pair_stays_local),style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant)
                 }
             }
         }
     }
 }
+
+/** Dados guardados enquanto o Android pergunta a permissão de Localização. */
+private class PendingPairing(val ssid:String,val password:String,val lampSsid:String?,val remember:Boolean)
 
 @Composable private fun LightNameSheet(light:LightDevice,onDismiss:()->Unit,onSave:(String,String)->Unit){
     var name by remember(light.id){mutableStateOf(light.name)}

@@ -41,7 +41,9 @@ import com.ferforastieri.valkyris.core.model.RetentionSettings
 import com.google.zxing.BarcodeFormat
 import com.journeyapps.barcodescanner.BarcodeEncoder
 import com.composables.icons.lucide.AlarmClock
+import com.composables.icons.lucide.Battery
 import com.composables.icons.lucide.Bell
+import com.composables.icons.lucide.BellRing
 import com.composables.icons.lucide.BellOff
 import com.composables.icons.lucide.ChevronRight
 import com.composables.icons.lucide.Database
@@ -65,6 +67,9 @@ fun SettingsScreen(main: MainViewModel, viewModel: SettingsViewModel = hiltViewM
     val admin by main.admin.collectAsStateWithLifecycle()
     val invitation by viewModel.invitation.collectAsStateWithLifecycle()
     val retention by viewModel.retention.collectAsStateWithLifecycle()
+    val pushConfiguration by viewModel.pushConfiguration.collectAsStateWithLifecycle()
+    val batteryUnrestricted = context.getSystemService(android.os.PowerManager::class.java)
+        .isIgnoringBatteryOptimizations(context.packageName)
     var showUsers by remember { mutableStateOf(false) }
     val managedUsers by viewModel.users.collectAsStateWithLifecycle()
     val usersError by viewModel.usersError.collectAsStateWithLifecycle()
@@ -79,6 +84,11 @@ fun SettingsScreen(main: MainViewModel, viewModel: SettingsViewModel = hiltViewM
     }
     val backgroundLocationRequest = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { permissionRefresh++ }
     val foregroundLocationRequest = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { permissionRefresh++ }
+    val firebaseAccountPicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+        val data = uri?.let { runCatching { context.contentResolver.openInputStream(it)?.use { input -> input.readBytes() } }.getOrNull() }
+            ?: return@rememberLauncherForActivityResult
+        viewModel.saveFirebaseServiceAccount(data)
+    }
 
     LifecycleEventEffect(Lifecycle.Event.ON_RESUME) {
         permissionRefresh++
@@ -154,6 +164,8 @@ fun SettingsScreen(main: MainViewModel, viewModel: SettingsViewModel = hiltViewM
             fullScreenAllowed = fullScreenAllowed,
             dndAllowed = dndAllowed,
             locationAllowed = locationAllowed,
+            firebaseConfigured = pushConfiguration.configured,
+            batteryUnrestricted = batteryUnrestricted,
             onNotifications = {
                 if (Build.VERSION.SDK_INT >= 33 && !notificationsAllowed) {
                     notificationRequest.launch(Manifest.permission.POST_NOTIFICATIONS)
@@ -172,6 +184,8 @@ fun SettingsScreen(main: MainViewModel, viewModel: SettingsViewModel = hiltViewM
             },
             onDnd = { context.startActivity(Intent(Settings.ACTION_NOTIFICATION_POLICY_ACCESS_SETTINGS)) },
             onLocation = ::configureLocation,
+            onFirebase = { firebaseAccountPicker.launch(arrayOf("application/json", "text/json")) },
+            onBattery = { requestIgnoreBatteryOptimizations(context) },
             onDismiss = { showPermissions = false },
         )
     }
@@ -338,10 +352,14 @@ fun PermissionsSheet(
     fullScreenAllowed: Boolean,
     dndAllowed: Boolean,
     locationAllowed: Boolean = false,
+    firebaseConfigured: Boolean = false,
+    batteryUnrestricted: Boolean = false,
     onNotifications: () -> Unit = {},
     onFullScreen: () -> Unit = {},
     onDnd: () -> Unit = {},
     onLocation: () -> Unit = {},
+    onFirebase: () -> Unit = {},
+    onBattery: () -> Unit = {},
     onDismiss: () -> Unit = {},
 ) {
     ValkyrisBottomSheet(
@@ -371,10 +389,24 @@ fun PermissionsSheet(
             )
             PermissionOption(
                 icon = Lucide.MapPin,
-                title = "Localização em segundo plano",
-                status = if (locationAllowed) "Permitida" else "Necessária para mostrar este celular no mapa",
+                title = stringResource(R.string.permission_location),
+                status = stringResource(if (locationAllowed) R.string.permission_allowed else R.string.permission_location_needed),
                 allowed = locationAllowed,
                 onClick = onLocation,
+            )
+            PermissionOption(
+                icon = Lucide.BellRing,
+                title = stringResource(R.string.firebase_service_account),
+                status = stringResource(if (firebaseConfigured) R.string.permission_allowed else R.string.permission_required),
+                allowed = firebaseConfigured,
+                onClick = onFirebase,
+            )
+            PermissionOption(
+                icon = Lucide.Battery,
+                title = stringResource(R.string.battery_optimization),
+                status = stringResource(if (batteryUnrestricted) R.string.permission_allowed else R.string.permission_required),
+                allowed = batteryUnrestricted,
+                onClick = onBattery,
             )
             PermissionOption(
                 icon = Lucide.BellOff,

@@ -103,6 +103,27 @@ class LightsViewModel @Inject constructor(
     /** Rede já guardada, quando houver. */
     fun savedNetwork(): String = wifiSecrets.credentials()?.ssid.orEmpty()
 
+    /** Se o app tem a permissão de Localização (a varredura de redes depende dela). */
+    fun hasLocationPermission(): Boolean =
+        ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED
+
+    /** O interruptor de Localização do celular está ligado? */
+    fun locationEnabled(): Boolean {
+        val manager = context.getSystemService(Context.LOCATION_SERVICE) as? android.location.LocationManager ?: return false
+        return if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.P) {
+            manager.isLocationEnabled
+        } else {
+            manager.isProviderEnabled(android.location.LocationManager.GPS_PROVIDER) ||
+                manager.isProviderEnabled(android.location.LocationManager.NETWORK_PROVIDER)
+        }
+    }
+
+    /** Aviso na folha quando falta permissão ou a Localização está desligada. */
+    fun pairingNotice(message: String) {
+        if (pairingJob?.isActive == true) return
+        _state.update { it.copy(pairing = PairingProgress("failed", message)) }
+    }
+
     /**
      * Configura uma lâmpada em modo de pareamento pelo caminho direto (modo AP):
      * o celular entra na rede que a lâmpada cria, entrega os dados da rede de
@@ -144,17 +165,24 @@ class LightsViewModel @Inject constructor(
             // Varredura nova antes de procurar: a lista guardada pode ser antiga.
             _state.update { it.copy(pairing = PairingProgress("lamp-network", "Procurando a rede da lâmpada…")) }
             connector.refreshScan()
-            val candidates = withContext(Dispatchers.IO) { connector.candidateNetworks() }
-            val visible = withContext(Dispatchers.IO) { connector.visibleNetworks() }
+            var candidates = withContext(Dispatchers.IO) { connector.candidateNetworks() }
+            var visible = withContext(Dispatchers.IO) { connector.visibleNetworks() }
+            if (candidates.isEmpty() && visible.isEmpty()) {
+                // A primeira varredura logo após a permissão ser concedida às
+                // vezes volta vazia: uma segunda tentativa resolve.
+                connector.refreshScan(5_000)
+                candidates = withContext(Dispatchers.IO) { connector.candidateNetworks() }
+                visible = withContext(Dispatchers.IO) { connector.visibleNetworks() }
+            }
             val lamp = lampSsid?.takeIf { it.isNotBlank() } ?: candidates.firstOrNull()
             if (lamp == null) {
                 // Nenhum nome conhecido: oferece as redes visíveis para escolha.
-                _state.update {
-                    it.copy(
-                        lampNetworks = visible,
-                        pairing = PairingProgress("choose-lamp", "Não reconheci a rede da lâmpada pelo nome. Escolha abaixo a rede que apareceu quando ela começou a piscar."),
-                    )
+                val message = if (visible.isEmpty()) {
+                    "Não vi nenhuma rede. Confirme que a lâmpada está piscando devagar e que a Localização do celular está ligada."
+                } else {
+                    "Escolha a rede que a lâmpada criou:"
                 }
+                _state.update { it.copy(lampNetworks = visible, pairing = PairingProgress("choose-lamp", message)) }
                 return@launch
             }
             _state.update { it.copy(pairing = PairingProgress("lamp-network", "Entrando na rede “$lamp” da lâmpada — aceite o aviso do Android.")) }

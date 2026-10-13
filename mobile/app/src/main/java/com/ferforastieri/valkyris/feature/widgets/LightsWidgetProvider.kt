@@ -9,9 +9,10 @@ import android.widget.RemoteViews
 import com.ferforastieri.valkyris.R
 
 /**
- * Lights widget: every favorite bulb shows its state and a button that turns it
- * on or off straight from the home screen. Commands go to the Valkyris backend,
- * which talks to the bulb over the local network.
+ * Lights widget: every bulb shows its state and a button that turns it on or
+ * off straight from the home screen. The lamp icon pulses in the bulb's current
+ * colour while it is on. Commands go to the Valkyris backend, which talks to
+ * the bulb over the local network.
  */
 class LightsWidgetProvider : ValkyrisWidgetProvider() {
     private companion object {
@@ -46,7 +47,7 @@ class LightsWidgetProvider : ValkyrisWidgetProvider() {
             return views
         }
         views.setViewVisibility(R.id.widget_lights_empty, View.GONE)
-        lights.take(4).forEachIndexed { index, light ->
+        lights.forEachIndexed { index, light ->
             val row = RemoteViews(context.packageName, R.layout.widget_light_row)
             row.setTextViewText(R.id.widget_light_name, light.name)
             row.setTextViewText(
@@ -57,6 +58,9 @@ class LightsWidgetProvider : ValkyrisWidgetProvider() {
                     else -> context.getString(R.string.widget_light_off)
                 },
             )
+            val on = light.power && light.online
+            row.setImageViewResource(R.id.widget_light_bulb, if (on) R.drawable.widget_light_glow else R.drawable.widget_bulb_off)
+            row.setInt(R.id.widget_light_bulb, "setColorFilter", if (on) light.color else context.getColor(R.color.widget_muted))
             row.setInt(R.id.widget_light_power, "setBackgroundResource", if (light.power) R.drawable.widget_pill_active else R.drawable.widget_pill)
             row.setInt(R.id.widget_light_power, "setColorFilter", if (light.power) context.getColor(R.color.widget_signal) else context.getColor(R.color.widget_muted))
             row.setOnClickPendingIntent(R.id.widget_light_power, pendingToggleLight(context, light.id, 100 + index))

@@ -176,7 +176,7 @@ fun StartupAlertPermissions() {
     }
 }
 
-private fun requestIgnoreBatteryOptimizations(context: android.content.Context) {
+internal fun requestIgnoreBatteryOptimizations(context: android.content.Context) {
     val packageUri = Uri.parse("package:${context.packageName}")
     val requested = runCatching {
         context.startActivity(Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS).setData(packageUri))

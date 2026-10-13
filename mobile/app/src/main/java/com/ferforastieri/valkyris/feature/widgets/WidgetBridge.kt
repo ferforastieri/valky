@@ -30,7 +30,11 @@ internal data class WidgetLight(
     val power: Boolean = false,
     val online: Boolean = false,
     val brightness: Int = 0,
+    /** Cor atual da lâmpada (branco quente quando ela não está no modo colorido). */
+    val color: Int = WIDGET_WARM_WHITE,
 )
+
+private const val WIDGET_WARM_WHITE = 0xFFFFD7A0.toInt()
 
 @Serializable
 internal data class WidgetRemote(val id: String, val name: String)
@@ -94,7 +98,7 @@ internal object WidgetBridge {
             return@withContext false
         }
         val snapshot = WidgetSnapshot(
-            lights = lights.orEmpty().sortedByDescending(LightDevice::favorite).map { it.toWidget() },
+            lights = lights.orEmpty().sortedBy { it.name.lowercase() }.map { it.toWidget() },
             remotes = remotes.orEmpty().sortedByDescending(RemoteDevice::favorite).map { WidgetRemote(it.id, it.name) },
             camera = cameras.orEmpty().sortedByDescending(Camera::favorite).firstOrNull()?.let { WidgetCamera(it.id, it.name) },
             available = true,
@@ -114,6 +118,13 @@ internal object WidgetBridge {
         power = state.power,
         online = state.online,
         brightness = state.brightness,
+        color = if (state.mode == "color") {
+            android.graphics.Color.HSVToColor(
+                floatArrayOf(state.color.hue.toFloat(), state.color.saturation / 100f, state.color.value / 100f),
+            )
+        } else {
+            WIDGET_WARM_WHITE
+        },
     )
 
     private fun photoFile(context: Context) = File(context.applicationContext.filesDir, "widget_camera.jpg")
@@ -123,10 +134,10 @@ internal object WidgetBridge {
         val bytes = runCatching { api(context).downloadCameraSnapshot(camera.id) }.getOrNull() ?: return
         val decoded = runCatching { BitmapFactory.decodeByteArray(bytes, 0, bytes.size) }.getOrNull() ?: return
         // Widgets travel through Binder: keep the picture small enough.
-        val scaled = scale(decoded, 640)
+        val scaled = scale(decoded, 1280)
         runCatching {
             ByteArrayOutputStream().use { out ->
-                scaled.compress(Bitmap.CompressFormat.JPEG, 72, out)
+                scaled.compress(Bitmap.CompressFormat.JPEG, 85, out)
                 photoFile(context).writeBytes(out.toByteArray())
             }
             if (scaled != decoded) decoded.recycle()

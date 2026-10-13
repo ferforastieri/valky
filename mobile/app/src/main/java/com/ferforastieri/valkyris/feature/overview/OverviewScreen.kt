@@ -371,35 +371,33 @@ private fun FavoriteCard(item: FavoriteItem, modifier: Modifier, onClick: () -> 
         border = BorderStroke(1.dp, if (lamp && item.online) tint.copy(alpha = .55f) else MaterialTheme.colorScheme.outlineVariant),
         elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
     ) {
-        Column(
-            Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 9.dp),
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(6.dp),
+        Row(
+            Modifier.fillMaxWidth().padding(horizontal = 9.dp, vertical = 9.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
         ) {
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-                Surface(shape = RoundedCornerShape(10.dp), color = MaterialTheme.colorScheme.secondary.copy(alpha = .14f)) {
-                    Icon(favoriteIcon(item.type), null, Modifier.padding(6.dp).size(16.dp), tint = MaterialTheme.colorScheme.secondary)
-                }
-                onTogglePower?.let { toggle ->
-                    IconButton(onClick = toggle, enabled = item.online, modifier = Modifier.size(28.dp)) {
-                        Icon(
-                            Lucide.Power,
-                            contentDescription = stringResource(if (item.power) R.string.favorite_light_off else R.string.favorite_light_on),
-                            modifier = Modifier.size(17.dp),
-                            tint = tint,
-                        )
-                    }
-                }
+            Surface(shape = RoundedCornerShape(10.dp), color = MaterialTheme.colorScheme.secondary.copy(alpha = .14f)) {
+                Icon(favoriteIcon(item.type), null, Modifier.padding(6.dp).size(16.dp), tint = MaterialTheme.colorScheme.secondary)
             }
             Text(
                 item.name,
+                Modifier.weight(1f),
                 style = MaterialTheme.typography.bodySmall,
                 fontWeight = FontWeight.Medium,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
-                textAlign = TextAlign.Center,
                 color = if (lamp && !item.online) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.onSurface,
             )
+            onTogglePower?.let { toggle ->
+                IconButton(onClick = toggle, enabled = item.online, modifier = Modifier.size(26.dp)) {
+                    Icon(
+                        Lucide.Power,
+                        contentDescription = stringResource(if (item.power) R.string.favorite_light_off else R.string.favorite_light_on),
+                        modifier = Modifier.size(16.dp),
+                        tint = tint,
+                    )
+                }
+            }
         }
     }
 }
