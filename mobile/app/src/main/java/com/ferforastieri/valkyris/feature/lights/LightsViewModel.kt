@@ -17,6 +17,7 @@ import com.ferforastieri.valkyris.core.security.WifiSecretStore
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
 import javax.inject.Inject
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.delay
@@ -25,6 +26,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 /** O que a tela mostra enquanto a lâmpada é configurada. */
 data class PairingProgress(
@@ -42,10 +44,8 @@ data class LightsState(
     val pairing: PairingProgress? = null,
     /** Rede usada no pareamento; vem da última vez ou do Wi-Fi atual. */
     val network: String = "",
-    /** Rodadas já transmitidas na janela atual, prova de que o envio está vivo. */
-    val rounds: Int = 0,
-    /** O celular está na faixa de 5 GHz, que a lâmpada não escuta. */
-    val onFiveGigahertz: Boolean = false,
+    /** Quando falso, a tela precisa da senha do Wi-Fi uma única vez. */
+    val hasCredentials: Boolean = false,
 )
 
 @HiltViewModel
@@ -69,8 +69,6 @@ class LightsViewModel @Inject constructor(
         viewModelScope.launch { while (isActive) { delay(20_000); runCatching { repository.refreshLights() } } }
         _state.update { it.copy(network = wifiSecrets.credentials()?.ssid ?: currentSsid(context).orEmpty()) }
     }
-
-    private fun currentBandWarning(): Boolean = currentWifiIsFiveGigahertz(context)
 
     private fun connectRealtime() {
         realtime = repository.api.realtime({ refresh() }, { if (active) viewModelScope.launch { delay(5_000); if (active) connectRealtime() } }, eventPrefix = "light.")
@@ -104,15 +102,15 @@ class LightsViewModel @Inject constructor(
     fun savedNetwork(): String = wifiSecrets.credentials()?.ssid.orEmpty()
 
     /**
-     * Configura uma lâmpada em modo de pareamento: o backend abre a janela, o
-     * celular envia o Wi-Fi pelo ar e a janela acompanha o que aparecer na rede.
-     * A senha fica guardada no aparelho para os próximos pareamentos.
+     * Configura uma lâmpada em modo de pareamento pelo caminho direto (modo AP):
+     * o celular entra na rede que a lâmpada cria, entrega os dados da rede de
+     * casa e volta. Não depende do roteador nem da faixa de 2,4 GHz.
      */
     fun configure(ssid: String, password: String, remember: Boolean = true) {
         if (pairingJob?.isActive == true) return
         val network = ssid.trim()
         if (network.isEmpty()) {
-            _state.update { it.copy(error = "Informe o nome da rede Wi-Fi.") }
+            _state.update { it.copy(error = "Não identifiquei a rede do celular. Conecte o celular no Wi-Fi de casa e tente de novo.") }
             return
         }
         if (password.isBlank()) {
@@ -130,39 +128,60 @@ class LightsViewModel @Inject constructor(
             _state.update {
                 it.copy(
                     network = network,
-                    rounds = 0,
-                    onFiveGigahertz = currentBandWarning(),
-                    pairing = PairingProgress("sending", "Enviando os dados do Wi-Fi para a lâmpada…"),
+                    hasCredentials = true,
+                    pairing = PairingProgress("lamp-network", "Procurando a rede da lâmpada…"),
                 )
             }
-            val tokenGroup = TuyaSmartConfig.tokenGroup(session.region, session.token, session.secret)
-            val sender = LocalPairingSender(context)
-            // O envio acompanha a janela inteira: a lâmpada pode ser resetada
-            // alguns minutos depois de a tela abrir.
-            val send = launch {
-                runCatching { sender.send(network, password, tokenGroup, onRound = { round -> _state.update { it.copy(rounds = round) } }) }
-                    .onFailure { error -> _state.update { it.copy(error = error.message) } }
-            }
-            // O celular também escuta a rede: é ele que está no ar do Wi-Fi.
-            val listen = launch {
-                LampAnnouncementListener().listen { address, port, payload ->
-                    runCatching { repository.reportLightAnnouncement(session.id, address, port, payload.toHex()) }
-                        .onSuccess { updated -> _state.update { it.copy(pairing = PairingProgress(updated.status, updated.message, updated.address, updated.light)) } }
+            val connector = WifiApConnector(context)
+            if (!connector.supported()) {
+                _state.update {
+                    it.copy(pairing = PairingProgress("failed", "Este aparelho usa uma versão do Android anterior à 10, que não permite a conexão direta com a lâmpada. Atualize o sistema ou use outro celular."))
                 }
+                return@launch
+            }
+            val lamp = withContext(Dispatchers.IO) { connector.candidateNetworks() }.firstOrNull()
+            if (lamp == null) {
+                _state.update {
+                    it.copy(pairing = PairingProgress("failed", "Não encontrei a rede da lâmpada. Confirme que ela está piscando rápido (ligar/desligar 3 vezes) e tente de novo."))
+                }
+                return@launch
+            }
+            _state.update { it.copy(pairing = PairingProgress("lamp-network", "Entrando na rede “$lamp” da lâmpada — aceite o aviso do Android.")) }
+            val connection = connector.connect(lamp)
+            if (connection == null) {
+                _state.update {
+                    it.copy(pairing = PairingProgress("failed", "O celular não conseguiu entrar na rede da lâmpada. Tente de novo e aceite o aviso do Android."))
+                }
+                return@launch
             }
             try {
-                while (isActive) {
-                    val status = runCatching { repository.lightPairingStatus(session.id) }.getOrNull() ?: break
-                    _state.update { it.copy(pairing = PairingProgress(status.status, status.message, status.address, status.light)) }
-                    when (status.status) {
-                        "paired" -> { repository.refreshLights(); return@launch }
-                        "failed" -> return@launch
-                    }
-                    delay(1500)
+                _state.update { it.copy(pairing = PairingProgress("sending", "Conectado na lâmpada; entregando os dados do Wi-Fi de casa…")) }
+                TuyaApConfig.deliverWithRetries(
+                    network = connection.network,
+                    ssid = network,
+                    password = password,
+                    appToken = session.token,
+                    secret = session.secret,
+                    region = session.region,
+                ) { format ->
+                    _state.update { state -> state.copy(pairing = PairingProgress("sending", "Entregando os dados do Wi-Fi ($format)…")) }
                 }
+                _state.update { it.copy(pairing = PairingProgress("waiting", "Dados entregues. A lâmpada vai entrar na rede de casa sozinha…")) }
             } finally {
-                send.cancelAndJoin()
-                listen.cancelAndJoin()
+                connection.close()
+            }
+            // De volta à rede de casa, acompanha o backend até adotar a lâmpada.
+            while (isActive) {
+                val status = runCatching { repository.lightPairingStatus(session.id) }.getOrNull()
+                if (status != null) {
+                    _state.update { it.copy(pairing = PairingProgress(status.status, status.message, status.address, status.light)) }
+                    if (status.status == "paired") {
+                        repository.refreshLights()
+                        return@launch
+                    }
+                    if (status.status == "failed") return@launch
+                }
+                delay(1500)
             }
         }
     }
@@ -195,14 +214,6 @@ class LightsViewModel @Inject constructor(
         realtime?.close(1000, "lights screen closed")
         super.onCleared()
     }
-}
-
-/** A lâmpada só escuta a faixa de 2,4 GHz; o aviso vale para o celular. */
-internal fun currentWifiIsFiveGigahertz(context: Context): Boolean {
-    if (ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED) return false
-    val wifi = context.applicationContext.getSystemService(Context.WIFI_SERVICE) as? WifiManager ?: return false
-    val frequency = runCatching { wifi.connectionInfo?.frequency }.getOrNull() ?: return false
-    return frequency in 4900..5900
 }
 
 /** Nome da rede Wi-Fi atual, quando o sistema permite ler. */

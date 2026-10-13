@@ -97,7 +97,7 @@ func TestPairingRegistersALampThatAcceptedTheGeneratedToken(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(session.Token) != 16 || len(session.Secret) != 4 || session.Region == "" {
+	if len(session.Token) != 16 || len(session.Secret) != 16 || session.Region == "" {
 		t.Fatalf("material de pareamento inválido: %+v", session)
 	}
 	final := waitForStatus(t, service, session.ID, PairingPaired)

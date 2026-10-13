@@ -19,28 +19,34 @@ O pareamento é conduzido por dois lados: o **aplicativo Android** tem o rádio 
 
 ## Como configurar uma lâmpada
 
-A tela de iluminação é só a listagem das lâmpadas. O cadastro é o botão **+**:
+A configuração é **direta entre o celular e a lâmpada**, sem depender do roteador, da faixa de 2,4 GHz ou de mexer em configuração de rede:
 
-1. No Android, abra **Dispositivos → Iluminação** e toque em **+** (apenas administradores).
-2. Deixe a lâmpada **piscando rápido**: ligue e desligue três vezes até ela entrar em modo de pareamento.
-3. Na primeira vez o aplicativo pede a senha do Wi-Fi, porque o Android não permite ler a senha salva do sistema para nenhum aplicativo. Depois disso ela fica cifrada no próprio aparelho e vem preenchida nas próximas vezes.
-4. Toque em **Configurar**: o aplicativo envia os dados pelo ar, procura e registra a lâmpada sozinho. Ela aparece na lista já respondendo na rede local — dê um nome e escolha o cômodo.
+1. Abra **Dispositivos → Iluminação** e toque em **+** (apenas administradores).
+2. Deixe a lâmpada **piscando rápido**: ligue e desligue três vezes até ela entrar em modo de pareamento. Nesse estado ela cria a própria rede Wi-Fi.
+3. Toque em **Configurar**. O Android pergunta se o aplicativo pode entrar na rede da lâmpada — aceite.
+4. O aplicativo entra nessa rede, entrega o nome e a senha do seu Wi-Fi, e volta sozinho para a rede de casa.
+5. A lâmpada conecta-se ao seu Wi-Fi, recebe a chave na ativação local (abaixo) e aparece na lista. Dê um nome e escolha o cômodo.
 
-O fluxo inteiro leva menos de um minuto e não pede identificador, endereço nem chave: tudo isso é descoberto e gerado automaticamente.
+A senha do Wi-Fi é pedida **uma única vez** e fica guardada no aparelho, cifrada; o servidor nunca a recebe. O caminho direto exige Android 10 ou mais novo.
 
-## O que o pareamento faz
+### Ativação local (por que existe um serviço a mais)
 
-O aplicativo envia, no formato que a própria lâmpada espera (documentado pela comunidade em [tuya-convert](https://github.com/ct-Open-Source/tuya-convert), MIT), o nome da rede, a senha e três valores que o backend gerou (`region`, `token` e `secret`). Os valores ficam guardados no servidor por meia hora e são renovados a cada lâmpada configurada, então uma lâmpada que já recebeu o payload continua sendo aceita mesmo se a janela for reaberta. A lâmpada conecta-se à rede e passa a responder aos anúncios locais. O backend escuta esses anúncios durante a janela de pareamento e, para cada lâmpada nova, tenta as chaves que o dispositivo pode ter guardado, começando pelo valor gerado nesta sessão. A primeira que responder a uma leitura de estado vira a chave local da lâmpada — ela fica cifrada no SQLite e nunca é devolvida pela API.
+Uma lâmpada Tuya não aceita controle local antes de ser ativada uma vez, e a chave local é **entregue pelo servidor do fabricante** nesse momento (campo `localKey` da resposta de ativação). O Valkyris faz esse papel dentro de casa, com o serviço `activation` do `compose.yaml`:
 
-Depois disso, o controle é 100% local: o Valkyris não usa nuvem para ligar, desligar, mudar cor, descobrir endereço nem ler o estado.
+- a lâmpada recebe a rede e a senha pelo celular e procura os endereços do fabricante;
+- os redirecionamentos de DNS da casa apontam esses nomes para o servidor do Valkyris;
+- o serviço responde a ativação com **a chave que o backend está usando na janela de pareamento** (lida do próprio banco), em HTTP e no canal protegido TLS-PSK que as lâmpadas usam;
+- a chave roda depois de cada lâmpada configurada, então cada uma guarda a sua.
 
-### Firmwares que exigem ativação
+Nada sai da rede local e nenhuma conta é usada. Para os redirecionamentos, adicione no seu resolvedor de DNS (AdGuard Home, Pi-hole ou o roteador) apontando para o endereço do servidor Valkyris:
 
-Algumas lâmpadas só aceitam controle local depois de uma ativação única no serviço do fabricante — é uma característica do firmware, não do Valkyris. Quando é esse o caso, o fluxo informa exatamente isso: a lâmpada aparece na rede, mas recusa a chave local, e a tela mostra a mensagem. O Valkyris **não** oferece caminho de ativação em nuvem: se a sua lâmpada estiver nesse grupo, o pareamento dirá o motivo em vez de prometer algo que não acontece.
+```text
+*.tuyaus.com      -> <endereço do servidor Valkyris>
+*.tuya.com        -> <endereço do servidor Valkyris>
+stream.tuyaus.com -> <endereço real do fabricante>   # mantém as lâmpadas já existentes funcionando
+```
 
-## Firewall do servidor
-
-O backend precisa de três coisas na rede local: enviar o anúncio de descoberta (UDP 6666, 6667 e 7000), receber as respostas das lâmpadas (UDP, mesma faixa) e abrir a conexão de controle (TCP 6668). Se o Valkyris roda em um container no Proxmox com o firewall do host ativo, isso vira quatro regras — duas de saída e duas de entrada — para a sub-rede da casa. Sem elas a lâmpada nunca aparece, mesmo estando na rede.
+Lâmpadas que já foram configuradas por um aplicativo do fabricante carregam o endereço antigo em cache e podem não pedir ativação de novo; nesse caso o fluxo informa que ela respondeu na rede mas recusou a chave. Lâmpadas novas (ou depois de um reset de fábrica) pedem ativação e são adotadas com a chave local.
 
 ## Descoberta de endereço
 

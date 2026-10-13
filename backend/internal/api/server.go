@@ -146,7 +146,6 @@ func (s *Server) Handler() http.Handler {
 	protected.Handle("POST /lights/pairing-sessions", s.auth.RequireAdmin(http.HandlerFunc(s.startLightPairing)))
 	protected.Handle("GET /lights/pairing-sessions/{id}", s.auth.RequireAdmin(http.HandlerFunc(s.lightPairingStatus)))
 	protected.Handle("DELETE /lights/pairing-sessions/{id}", s.auth.RequireAdmin(http.HandlerFunc(s.cancelLightPairing)))
-	protected.Handle("POST /lights/pairing-sessions/{id}/announcements", s.auth.RequireAdmin(http.HandlerFunc(s.registerLightAnnouncement)))
 	protected.HandleFunc("GET /lights/{id}", s.getLight)
 	protected.Handle("PUT /lights/{id}", s.auth.RequireAdmin(http.HandlerFunc(s.updateLight)))
 	protected.Handle("DELETE /lights/{id}", s.auth.RequireAdmin(http.HandlerFunc(s.deleteLight)))

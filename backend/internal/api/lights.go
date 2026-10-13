@@ -2,10 +2,8 @@ package api
 
 import (
 	"database/sql"
-	"encoding/hex"
 	"errors"
 	"net/http"
-	"strings"
 
 	"github.com/ferforastieri/valkyris/backend/internal/light"
 )
@@ -91,35 +89,6 @@ func (s *Server) lightPairingStatus(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeSuccess(w, http.StatusOK, "Pairing status", session)
-}
-
-// registerLightAnnouncement recebe o que o celular ouviu no ar. O servidor não
-// escuta o Wi-Fi, então quem captura o anúncio da lâmpada é o celular; aqui o
-// anúncio é decodificado e, se trouxer identificador, a lâmpada é adotada.
-func (s *Server) registerLightAnnouncement(w http.ResponseWriter, r *http.Request) {
-	var in struct {
-		Address string `json:"address"`
-		Port    int    `json:"port"`
-		Payload string `json:"payload"`
-	}
-	if !decode(w, r, &in) {
-		return
-	}
-	raw, err := hex.DecodeString(strings.TrimSpace(in.Payload))
-	if err != nil || len(raw) == 0 {
-		writeError(w, http.StatusBadRequest, errors.New("anúncio inválido"))
-		return
-	}
-	if strings.TrimSpace(in.Address) == "" {
-		writeError(w, http.StatusBadRequest, errors.New("informe o endereço de origem do anúncio"))
-		return
-	}
-	session, err := s.lights.RegisterAnnouncement(r.Context(), r.PathValue("id"), in.Address, in.Port, raw)
-	if err != nil {
-		writeError(w, http.StatusNotFound, err)
-		return
-	}
-	writeSuccess(w, http.StatusOK, "Announcement registered", session)
 }
 
 func (s *Server) cancelLightPairing(w http.ResponseWriter, r *http.Request) {

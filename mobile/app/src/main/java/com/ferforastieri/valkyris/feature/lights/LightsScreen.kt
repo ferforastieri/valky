@@ -54,9 +54,7 @@ import com.ferforastieri.valkyris.core.model.*
     }
     if(pairing)LightPairingSheet(
         progress=state.pairing,
-        rounds=state.rounds,
-        fiveGigahertz=state.onFiveGigahertz,
-        suggestedSsid=remember{vm.suggestedSsid().ifBlank{vm.savedNetwork()}},
+        network=remember{vm.suggestedSsid().ifBlank{vm.savedNetwork()}},
         savedPassword=remember{vm.savedPassword()},
         onConfigure={ssid,password->vm.configure(ssid,password)},
         onDismiss={pairing=false;vm.dismissPairing()},
@@ -133,17 +131,21 @@ import com.ferforastieri.valkyris.core.model.*
  * Wi-Fi (a senha fica guardada no aparelho e vem preenchida nas próximas vezes),
  * envia os dados pelo ar e acompanha até a lâmpada aparecer na lista.
  */
+/**
+ * Folha do pareamento pelo caminho direto (modo AP). O celular entra na rede que
+ * a lâmpada cria e entrega os dados da rede de casa — nada de banda 2,4/5 GHz,
+ * nada de mexer no roteador. A senha do Wi-Fi é pedida uma única vez e fica
+ * guardada no aparelho.
+ */
 @Composable private fun LightPairingSheet(
     progress:PairingProgress?,
-    rounds:Int,
-    fiveGigahertz:Boolean,
-    suggestedSsid:String,
+    network:String,
     savedPassword:String,
     onConfigure:(String,String)->Unit,
     onDismiss:()->Unit,
 ){
-    var ssid by remember(suggestedSsid){mutableStateOf(suggestedSsid)}
-    var password by remember{savedPassword.let{mutableStateOf(it)}}
+    var password by remember{mutableStateOf(savedPassword)}
+    var editingPassword by remember{mutableStateOf(savedPassword.isBlank())}
     val paired=progress?.light
     val running=progress!=null&&progress.phase!="failed"&&progress.phase!="paired"
     val failed=progress?.phase=="failed"
@@ -157,7 +159,10 @@ import com.ferforastieri.valkyris.core.model.*
                 running->TextButton(onClick=onDismiss){Text(stringResource(R.string.cancel))}
                 else->{
                     TextButton(onClick=onDismiss){Text(stringResource(R.string.cancel))}
-                    Button(onClick={onConfigure(ssid,password)},enabled=ssid.isNotBlank()&&password.isNotBlank()){Text(stringResource(R.string.light_pair_action))}
+                    Button(
+                        onClick={onConfigure(network,password)},
+                        enabled=network.isNotBlank()&&password.isNotBlank(),
+                    ){Text(stringResource(R.string.light_pair_action))}
                 }
             }
         },
@@ -180,24 +185,23 @@ import com.ferforastieri.valkyris.core.model.*
                         Spacer(Modifier.width(10.dp))
                         Text(progress?.message.orEmpty().ifBlank{stringResource(R.string.light_pair_sending)},Modifier.weight(1f),style=MaterialTheme.typography.bodyMedium)
                     }
-                    Text(
-                        if(rounds>0)stringResource(R.string.light_pair_transmitting,rounds) else stringResource(R.string.light_pair_waiting),
-                        style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                    if(fiveGigahertz)Text(stringResource(R.string.light_pair_five_ghz),style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.error)
+                    Text(stringResource(R.string.light_pair_waiting),style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant)
                 }
                 else->Column(verticalArrangement=Arrangement.spacedBy(10.dp)){
                     Text(stringResource(R.string.light_pair_steps),style=MaterialTheme.typography.bodyMedium)
                     if(failed)progress?.message?.takeIf{it.isNotBlank()}?.let{Text(it,color=MaterialTheme.colorScheme.error,style=MaterialTheme.typography.bodySmall)}
-                    OutlinedTextField(ssid,{ssid=it},Modifier.fillMaxWidth(),label={Text(stringResource(R.string.light_pair_network))},supportingText={Text(stringResource(R.string.light_pair_network_hint))},singleLine=true)
-                    OutlinedTextField(
+                    Text(stringResource(R.string.light_pair_network_auto,network.ifBlank{stringResource(R.string.light_pair_network_unknown)}),style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant)
+                    if(editingPassword)OutlinedTextField(
                         password,{password=it},Modifier.fillMaxWidth(),
                         label={Text(stringResource(R.string.light_pair_password))},
                         visualTransformation=PasswordVisualTransformation(),
                         keyboardOptions=KeyboardOptions(keyboardType=KeyboardType.Password),
                         supportingText={Text(stringResource(R.string.light_pair_password_once))},
                         singleLine=true,
-                    )
+                    ) else Row(verticalAlignment=Alignment.CenterVertically){
+                        Text(stringResource(R.string.light_pair_password_saved),Modifier.weight(1f),style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant)
+                        TextButton(onClick={editingPassword=true}){Text(stringResource(R.string.light_pair_password_change))}
+                    }
                     Text(stringResource(R.string.light_pair_stays_local),style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant)
                 }
             }
