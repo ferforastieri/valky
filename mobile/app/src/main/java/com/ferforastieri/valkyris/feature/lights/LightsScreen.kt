@@ -113,7 +113,7 @@ import com.ferforastieri.valkyris.core.model.*
         onConfigure={ssid,password->beginPairing(ssid,password,null,true)},
         onPickLamp={lampSsid,password->beginPairing(state.network,password,lampSsid,false)},
         onOpenLocation={runCatching{context.startActivity(Intent(Settings.ACTION_LOCATION_SOURCE_SETTINGS))}},
-        onOpenWifi={runCatching{context.startActivity(Intent(Settings.ACTION_WIFI_SETTINGS))}},
+        onOpenWifi={openWifiSettings(context)},
         onDismiss={pairing=false;vm.dismissPairing()},
     )
     selected?.let{light->LightControls(light,light.id in state.busy,{selected=null}){vm.control(light.id,it)}}
@@ -234,10 +234,12 @@ import com.ferforastieri.valkyris.core.model.*
                     Spacer(Modifier.width(12.dp))
                     Text(stringResource(R.string.light_pair_done),fontWeight=FontWeight.SemiBold)
                 }
-                running->Row(verticalAlignment=Alignment.CenterVertically){
-                    CircularProgressIndicator(Modifier.size(20.dp),strokeWidth=2.dp)
-                    Spacer(Modifier.width(10.dp))
-                    Text(progress?.message.orEmpty().ifBlank{stringResource(R.string.light_pair_sending)},Modifier.weight(1f),style=MaterialTheme.typography.bodyMedium)
+                running->Column(verticalArrangement=Arrangement.spacedBy(8.dp)){
+                    val fase=progress?.phase.orEmpty()
+                    ProgressStep(stringResource(R.string.light_step_find),done=fase in setOf("sending","waiting","paired"),current=fase in setOf("lamp-network","choose-lamp","manual-wifi"))
+                    ProgressStep(stringResource(R.string.light_step_deliver),done=fase in setOf("waiting","paired"),current=fase=="sending")
+                    ProgressStep(stringResource(R.string.light_step_confirm),done=fase=="paired",current=fase=="waiting")
+                    Text(progress?.message.orEmpty().ifBlank{stringResource(R.string.light_pair_sending)},style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant)
                 }
                 progress?.phase=="choose-lamp"->Column(verticalArrangement=Arrangement.spacedBy(6.dp)){
                     Text(progress.message,style=MaterialTheme.typography.bodyMedium)
@@ -258,7 +260,6 @@ import com.ferforastieri.valkyris.core.model.*
                             }
                         }
                     }
-                    TextButton({onConfigure(network,password)}){Text(stringResource(R.string.light_pair_search_again))}
                 }
                 else->Column(verticalArrangement=Arrangement.spacedBy(10.dp)){
                     progress?.message?.takeIf{it.isNotBlank()&&(failed||manualWifi)}?.let{Text(it,color=if(failed)MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurface,style=MaterialTheme.typography.bodySmall)}
@@ -279,6 +280,32 @@ import com.ferforastieri.valkyris.core.model.*
                 }
             }
         }
+    }
+}
+
+/** Uma linha da lista de progresso: concluída, em andamento ou ainda não. */
+@Composable private fun ProgressStep(label:String,done:Boolean,current:Boolean){
+    Row(Modifier.fillMaxWidth(),verticalAlignment=Alignment.CenterVertically){
+        when{
+            done->Icon(Lucide.Check,null,Modifier.size(18.dp),tint=MaterialTheme.colorScheme.secondary)
+            current->CircularProgressIndicator(Modifier.size(18.dp),strokeWidth=2.dp)
+            else->Box(Modifier.size(18.dp),contentAlignment=Alignment.Center){Surface(Modifier.size(8.dp),shape=CircleShape,color=MaterialTheme.colorScheme.outlineVariant){}}
+        }
+        Spacer(Modifier.width(10.dp))
+        Text(label,style=MaterialTheme.typography.bodyMedium,color=if(done||current)MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant)
+    }
+}
+
+/** Abre o Wi-Fi do sistema; alguns aparelhos exigem outra porta de entrada. */
+private fun openWifiSettings(context: android.content.Context) {
+    val tentativas = listOf(
+        Intent(Settings.ACTION_WIFI_SETTINGS),
+        Intent(Settings.ACTION_WIRELESS_SETTINGS),
+        Intent(Settings.ACTION_SETTINGS),
+    )
+    tentativas.forEach { intent ->
+        intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        if (runCatching { context.startActivity(intent) }.isSuccess) return
     }
 }
 

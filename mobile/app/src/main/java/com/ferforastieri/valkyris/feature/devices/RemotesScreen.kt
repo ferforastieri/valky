@@ -104,7 +104,6 @@ fun RemotesScreen(admin: Boolean, onRemote: (String) -> Unit = {}, vm: RemotesVi
                     item { Box(Modifier.fillMaxWidth().padding(top = 40.dp), contentAlignment = Alignment.Center) { CircularProgressIndicator() } }
                 }
                 if (state.remotes.isNotEmpty()) {
-                    item { Text(stringResource(R.string.remote_my_controls), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold) }
                     items(state.remotes, key = { it.id }) { remote ->
                         RemoteCard(
                             remote = remote,

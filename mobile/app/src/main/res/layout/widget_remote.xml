@@ -73,7 +73,7 @@
                 <TextView
                     android:id="@+id/widget_remote_digit_1"
                     android:layout_width="0dp"
-                    android:layout_height="40dp"
+                    android:layout_height="44dp"
                     android:layout_marginStart="3dp"
                     android:layout_weight="1"
                     android:background="@drawable/widget_pill"
@@ -84,7 +84,7 @@
                 <TextView
                     android:id="@+id/widget_remote_digit_2"
                     android:layout_width="0dp"
-                    android:layout_height="40dp"
+                    android:layout_height="44dp"
                     android:layout_marginStart="3dp"
                     android:layout_weight="1"
                     android:background="@drawable/widget_pill"
@@ -95,7 +95,7 @@
                 <TextView
                     android:id="@+id/widget_remote_digit_3"
                     android:layout_width="0dp"
-                    android:layout_height="40dp"
+                    android:layout_height="44dp"
                     android:layout_marginStart="3dp"
                     android:layout_weight="1"
                     android:background="@drawable/widget_pill"
@@ -112,7 +112,7 @@
                 <TextView
                     android:id="@+id/widget_remote_digit_4"
                     android:layout_width="0dp"
-                    android:layout_height="40dp"
+                    android:layout_height="44dp"
                     android:layout_marginStart="3dp"
                     android:layout_weight="1"
                     android:background="@drawable/widget_pill"
@@ -123,7 +123,7 @@
                 <TextView
                     android:id="@+id/widget_remote_digit_5"
                     android:layout_width="0dp"
-                    android:layout_height="40dp"
+                    android:layout_height="44dp"
                     android:layout_marginStart="3dp"
                     android:layout_weight="1"
                     android:background="@drawable/widget_pill"
@@ -134,7 +134,7 @@
                 <TextView
                     android:id="@+id/widget_remote_digit_6"
                     android:layout_width="0dp"
-                    android:layout_height="40dp"
+                    android:layout_height="44dp"
                     android:layout_marginStart="3dp"
                     android:layout_weight="1"
                     android:background="@drawable/widget_pill"
@@ -151,7 +151,7 @@
                 <TextView
                     android:id="@+id/widget_remote_digit_7"
                     android:layout_width="0dp"
-                    android:layout_height="40dp"
+                    android:layout_height="44dp"
                     android:layout_marginStart="3dp"
                     android:layout_weight="1"
                     android:background="@drawable/widget_pill"
@@ -162,7 +162,7 @@
                 <TextView
                     android:id="@+id/widget_remote_digit_8"
                     android:layout_width="0dp"
-                    android:layout_height="40dp"
+                    android:layout_height="44dp"
                     android:layout_marginStart="3dp"
                     android:layout_weight="1"
                     android:background="@drawable/widget_pill"
@@ -173,7 +173,7 @@
                 <TextView
                     android:id="@+id/widget_remote_digit_9"
                     android:layout_width="0dp"
-                    android:layout_height="40dp"
+                    android:layout_height="44dp"
                     android:layout_marginStart="3dp"
                     android:layout_weight="1"
                     android:background="@drawable/widget_pill"
@@ -195,7 +195,7 @@
                 <TextView
                     android:id="@+id/widget_remote_digit_0"
                     android:layout_width="0dp"
-                    android:layout_height="40dp"
+                    android:layout_height="44dp"
                     android:layout_marginStart="3dp"
                     android:layout_weight="1"
                     android:background="@drawable/widget_pill"
@@ -226,8 +226,8 @@
 
                 <ImageView
                     android:id="@+id/widget_remote_volume_up"
-                    android:layout_width="50dp"
-                    android:layout_height="50dp"
+                    android:layout_width="54dp"
+                    android:layout_height="54dp"
                     android:background="@drawable/widget_circle_key"
                     android:contentDescription="@string/widget_remote_volume_up"
                     android:padding="12dp"
@@ -237,8 +237,8 @@
 
                 <ImageView
                     android:id="@+id/widget_remote_mute"
-                    android:layout_width="50dp"
-                    android:layout_height="50dp"
+                    android:layout_width="54dp"
+                    android:layout_height="54dp"
                     android:layout_marginTop="4dp"
                     android:background="@drawable/widget_circle_key"
                     android:contentDescription="@string/widget_remote_mute"
@@ -249,8 +249,8 @@
 
                 <ImageView
                     android:id="@+id/widget_remote_volume_down"
-                    android:layout_width="50dp"
-                    android:layout_height="50dp"
+                    android:layout_width="54dp"
+                    android:layout_height="54dp"
                     android:layout_marginTop="4dp"
                     android:background="@drawable/widget_circle_key"
                     android:contentDescription="@string/widget_remote_volume_down"
@@ -261,16 +261,16 @@
             </LinearLayout>
 
             <FrameLayout
-                android:layout_width="176dp"
-                android:layout_height="176dp"
+                android:layout_width="190dp"
+                android:layout_height="190dp"
                 android:layout_marginStart="10dp"
                 android:layout_marginEnd="10dp"
                 android:background="@drawable/widget_circle">
 
                 <TextView
                     android:id="@+id/widget_remote_enter"
-                    android:layout_width="66dp"
-                    android:layout_height="66dp"
+                    android:layout_width="72dp"
+                    android:layout_height="72dp"
                     android:layout_gravity="center"
                     android:background="@drawable/widget_circle_key"
                     android:gravity="center"
@@ -281,44 +281,44 @@
 
                 <ImageView
                     android:id="@+id/widget_remote_up"
-                    android:layout_width="46dp"
-                    android:layout_height="46dp"
+                    android:layout_width="48dp"
+                    android:layout_height="48dp"
                     android:layout_gravity="top|center_horizontal"
                     android:contentDescription="@string/widget_remote_up"
-                    android:padding="11dp"
+                    android:padding="13dp"
                     android:src="@drawable/widget_chevron_up"
                     android:tint="@color/widget_ink"
             tools:ignore="UseAppTint" />
 
                 <ImageView
                     android:id="@+id/widget_remote_left"
-                    android:layout_width="46dp"
-                    android:layout_height="46dp"
+                    android:layout_width="48dp"
+                    android:layout_height="48dp"
                     android:layout_gravity="center_vertical|start"
                     android:contentDescription="@string/widget_remote_left"
-                    android:padding="11dp"
+                    android:padding="13dp"
                     android:src="@drawable/widget_chevron_left"
                     android:tint="@color/widget_ink"
             tools:ignore="UseAppTint" />
 
                 <ImageView
                     android:id="@+id/widget_remote_right"
-                    android:layout_width="46dp"
-                    android:layout_height="46dp"
+                    android:layout_width="48dp"
+                    android:layout_height="48dp"
                     android:layout_gravity="center_vertical|end"
                     android:contentDescription="@string/widget_remote_right"
-                    android:padding="11dp"
+                    android:padding="13dp"
                     android:src="@drawable/widget_chevron_right"
                     android:tint="@color/widget_ink"
             tools:ignore="UseAppTint" />
 
                 <ImageView
                     android:id="@+id/widget_remote_down"
-                    android:layout_width="46dp"
-                    android:layout_height="46dp"
+                    android:layout_width="48dp"
+                    android:layout_height="48dp"
                     android:layout_gravity="bottom|center_horizontal"
                     android:contentDescription="@string/widget_remote_down"
-                    android:padding="11dp"
+                    android:padding="13dp"
                     android:src="@drawable/widget_chevron_down"
                     android:tint="@color/widget_ink"
             tools:ignore="UseAppTint" />
@@ -333,8 +333,8 @@
 
                 <ImageView
                     android:id="@+id/widget_remote_channel_up"
-                    android:layout_width="50dp"
-                    android:layout_height="50dp"
+                    android:layout_width="54dp"
+                    android:layout_height="54dp"
                     android:background="@drawable/widget_circle_key"
                     android:contentDescription="@string/remote_channel_up"
                     android:padding="12dp"
@@ -344,8 +344,8 @@
 
                 <ImageView
                     android:id="@+id/widget_remote_channel_list"
-                    android:layout_width="50dp"
-                    android:layout_height="50dp"
+                    android:layout_width="54dp"
+                    android:layout_height="54dp"
                     android:layout_marginTop="4dp"
                     android:background="@drawable/widget_circle_key"
                     android:contentDescription="@string/remote_channel_list"
@@ -356,8 +356,8 @@
 
                 <ImageView
                     android:id="@+id/widget_remote_channel_down"
-                    android:layout_width="50dp"
-                    android:layout_height="50dp"
+                    android:layout_width="54dp"
+                    android:layout_height="54dp"
                     android:layout_marginTop="4dp"
                     android:background="@drawable/widget_circle_key"
                     android:contentDescription="@string/remote_channel_down"
