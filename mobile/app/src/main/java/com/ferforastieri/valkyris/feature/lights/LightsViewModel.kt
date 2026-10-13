@@ -229,6 +229,7 @@ class LightsViewModel @Inject constructor(
                 pendingLampSsid = lamp
                 pendingHomeSsid = network
                 pendingPassword = password
+                runCatching { repository.api.reportLightPairingDiagnostic(session.id, "não entrei sozinho na rede $lamp; aguardando conexão manual") }
                 _state.update {
                     it.copy(pairing = PairingProgress("manual-wifi", "Não consegui entrar sozinho na rede “$lamp”. Toque em Abrir Wi-Fi, conecte nela e volte para cá — eu continuo daqui."))
                 }
@@ -259,8 +260,9 @@ class LightsViewModel @Inject constructor(
         closeLink: (() -> Unit)? = null,
     ) {
         _state.update { it.copy(pairing = PairingProgress("sending", "Conectado na lâmpada; entregando os dados do Wi-Fi de casa…")) }
+        var resultado = TuyaApConfig.Resultado(false, "sem resposta")
         try {
-            TuyaApConfig.deliverWithRetries(
+            resultado = TuyaApConfig.deliverWithRetries(
                 network = link,
                 ssid = homeSsid,
                 password = password,
@@ -274,7 +276,14 @@ class LightsViewModel @Inject constructor(
         } finally {
             closeLink?.invoke()
         }
-        _state.update { it.copy(pairing = PairingProgress("waiting", "Dados entregues. Volte o celular para a rede de casa: a lâmpada entra sozinha e eu confirmo aqui.")) }
+        runCatching { repository.api.reportLightPairingDiagnostic(session.id, resultado.detalhe) }
+        if (!resultado.aceito) {
+            _state.update {
+                it.copy(pairing = PairingProgress("failed", "A lâmpada não aceitou os dados (${resultado.detalhe}). Deixe-a piscando devagar e tente de novo."))
+            }
+            return
+        }
+        _state.update { it.copy(pairing = PairingProgress("waiting", "Dados aceitos pela lâmpada. Volte o celular para a rede de casa: ela entra sozinha e eu confirmo aqui.")) }
         while (coroutineContext.isActive) {
             val status = runCatching { repository.lightPairingStatus(session.id) }.getOrNull()
             if (status != null) {

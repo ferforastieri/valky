@@ -240,6 +240,14 @@ class ValkyrisApi(
     /** Abre uma janela de pareamento local; o celular envia os dados pelo ar. */
     suspend fun startLightPairing(): LightPairingSession = post("/lights/pairing-sessions", emptyMap<String, String>(), announceBackend = true)
     suspend fun lightPairingStatus(id: String): LightPairingSession = get("/lights/pairing-sessions/$id")
+    /** Conta ao servidor o que aconteceu numa tentativa de pareamento. */
+    suspend fun reportLightPairingDiagnostic(sessionId: String, detail: String) {
+        post<JsonElement, Map<String, String>>(
+            "/lights/pairing-diagnostics",
+            mapOf("sessionId" to sessionId, "detail" to detail.take(300)),
+            announceBackend = true,
+        )
+    }
     suspend fun cancelLightPairing(id: String) {
         val current = requireNotNull(session())
         executeUnit(current.fingerprint) {

@@ -2,6 +2,7 @@ package api
 
 import (
 	"database/sql"
+	"encoding/json"
 	"errors"
 	"net/http"
 
@@ -65,6 +66,22 @@ func (s *Server) discoverLights(w http.ResponseWriter, r *http.Request) {
 // startLightPairing opens a local pairing window. The phone sends the Wi-Fi
 // credentials to the lamp over the air; the backend only supplies the one-time
 // values and then watches the network for the new device.
+// lightPairingDiagnostic registra o que o aplicativo viu durante o pareamento.
+// Assim o acompanhamento pode ser feito pelos registros do servidor, sem o
+// usuário precisar relatar cada tentativa.
+func (s *Server) lightPairingDiagnostic(w http.ResponseWriter, r *http.Request) {
+	var body struct {
+		SessionID string `json:"sessionId"`
+		Detail    string `json:"detail"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		writeError(w, http.StatusBadRequest, err)
+		return
+	}
+	s.logger.Info("pareamento: relato do aplicativo", "sessao", body.SessionID, "detalhe", body.Detail)
+	writeSuccess(w, http.StatusOK, "Registrado", map[string]bool{"ok": true})
+}
+
 func (s *Server) startLightPairing(w http.ResponseWriter, r *http.Request) {
 	if _, ok := s.lights.Scanner(); !ok {
 		writeError(w, http.StatusServiceUnavailable, light.ErrNoLightingAdapter)
