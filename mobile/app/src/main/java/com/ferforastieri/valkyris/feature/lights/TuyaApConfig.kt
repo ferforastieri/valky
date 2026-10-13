@@ -26,12 +26,18 @@ internal object TuyaApConfig {
 
     private const val APP_KEY = "a3c6794oiu876t54"
 
+    /** Como o aplicativo oficial: o aparelho recebe região + token + segredo juntos. */
+    private fun authToken(region: String, token: String, secret: String): String = region + token + secret
+
     /** Nomes de campo usados pelos firmwares; variam entre gerações. */
     private fun json(ssid: String, password: String, token: String, region: String): String =
         """{"s":"$ssid","p":"$password","token":"$token","region":"$region"}"""
 
     private fun legacyJson(ssid: String, password: String, token: String, region: String): String =
         """{"ssid":"$ssid","password":"$password","token":"$token","region":"$region"}"""
+
+    private fun passwdJson(ssid: String, password: String, token: String, region: String): String =
+        """{"ssid":"$ssid","passwd":"$password","token":"$token","region":"$region"}"""
 
     private fun encrypted(plain: String, key: String): ByteArray {
         val block = Cipher.getInstance("AES/ECB/NoPadding")
@@ -44,18 +50,24 @@ internal object TuyaApConfig {
     private fun md5(value: String): String =
         java.security.MessageDigest.getInstance("MD5").digest(value.toByteArray()).joinToString("") { "%02x".format(it) }.substring(0, 16)
 
-    /** Formatos tentados, do mais comum ao mais raro. */
+    /** Formatos tentados, do mais provável ao mais raro. */
     private fun candidates(ssid: String, password: String, appToken: String, secret: String, region: String): List<Pair<String, ByteArray>> {
-        val body = json(ssid, password, appToken, region)
-        val legacy = legacyJson(ssid, password, appToken, region)
+        val auth = authToken(region, appToken, secret)
+        val comAuth = json(ssid, password, auth, region)
+        val legadoAuth = legacyJson(ssid, password, auth, region)
+        val passwdAuth = passwdJson(ssid, password, auth, region)
+        val comToken = json(ssid, password, appToken, region)
         val out = mutableListOf<Pair<String, ByteArray>>()
-        out += "json" to body.toByteArray()
-        out += "json-legado" to legacy.toByteArray()
-        out += "aes-app" to encrypted(body, APP_KEY)
-        out += "aes-token" to encrypted(body, md5(APP_KEY + appToken))
-        out += "aes-secret" to encrypted(body, md5(secret + appToken))
+        out += "json-auth" to comAuth.toByteArray()
+        out += "json-legado" to legadoAuth.toByteArray()
+        out += "json-passwd" to passwdAuth.toByteArray()
+        out += "json-token" to comToken.toByteArray()
+        out += "aes-app" to encrypted(comAuth, APP_KEY)
+        out += "aes-token" to encrypted(comAuth, md5(APP_KEY + appToken))
+        out += "aes-secret" to encrypted(comAuth, md5(secret + appToken))
+        out += "aes-simples" to encrypted(comAuth, md5(appToken))
         // Envelope 0F 0F + tamanho + crc + conteúdo, usado por alguns firmwares.
-        listOf("json" to body.toByteArray(), "aes-app" to encrypted(body, APP_KEY)).forEach { (name, payload) ->
+        listOf("json-auth" to comAuth.toByteArray(), "aes-app" to encrypted(comAuth, APP_KEY)).forEach { (name, payload) ->
             out += "$name-0f0f" to framed(payload)
         }
         return out
@@ -84,8 +96,8 @@ internal object TuyaApConfig {
         }), java.security.SecureRandom())
         val socket = context.socketFactory.createSocket()
         network.bindSocket(socket)
-        (socket as javax.net.ssl.SSLSocket).soTimeout = 3000
-        socket.connect(InetSocketAddress(address, PORT), 2500)
+        (socket as javax.net.ssl.SSLSocket).soTimeout = 1_500
+        socket.connect(InetSocketAddress(address, PORT), 1_500)
         socket.startHandshake()
         socket.getOutputStream().apply { write(payload); flush() }
         val reply = ByteArray(64)
@@ -95,8 +107,10 @@ internal object TuyaApConfig {
     }.getOrDefault(false)
 
     /**
-     * Tenta entregar os dados. Devolve o nome do formato que foi aceito quando a
-     * lâmpada responde algo, ou nulo quando nenhum formato teve resposta.
+     * Entrega em dois tempos, como o aplicativo oficial:
+     * 1) UDP para a rede da lâmpada (o pareamento clássico vai por datagrama);
+     * 2) TCP/TLS direto na porta 6667 (a geração atual usa conexão segura).
+     * Devolve o nome do formato que teve resposta, ou nulo.
      */
     suspend fun deliver(
         network: android.net.Network,
@@ -108,14 +122,21 @@ internal object TuyaApConfig {
         onAttempt: (String) -> Unit = {},
     ): String? = withContext(Dispatchers.IO) {
         val formats = candidates(ssid, password, appToken, secret, region)
-        for (address in gateways + advertisedAddresses(network)) {
+        val destinos = (gateways + advertisedAddresses(network)).distinct()
+        for (porta in listOf(6667, 6669)) {
+            formats.forEach { (name, payload) ->
+                onAttempt("$name-udp")
+                sendUdp(network, destinos, porta, payload)
+            }
+        }
+        for (address in destinos) {
             for ((name, payload) in formats) {
                 onAttempt(name)
                 val answered = runCatching {
                     Socket().use { socket ->
                         network.bindSocket(socket)
-                        socket.connect(InetSocketAddress(address, PORT), 2500)
-                        socket.soTimeout = 2500
+                        socket.connect(InetSocketAddress(address, PORT), 1_500)
+                        socket.soTimeout = 1_500
                         socket.getOutputStream().apply { write(payload); flush() }
                         val reply = ByteArray(64)
                         val read = runCatching { socket.getInputStream().read(reply) }.getOrDefault(-1)
@@ -127,6 +148,22 @@ internal object TuyaApConfig {
             }
         }
         null
+    }
+
+    /** Um datagrama para cada endereço conhecido e para o broadcast da rede. */
+    private fun sendUdp(network: android.net.Network, destinos: List<String>, porta: Int, payload: ByteArray) {
+        val socket = runCatching {
+            java.net.DatagramSocket().apply { network.bindSocket(this); broadcast = true }
+        }.getOrNull() ?: return
+        try {
+            (destinos + "255.255.255.255").distinct().forEach { alvo ->
+                runCatching {
+                    socket.send(java.net.DatagramPacket(payload, payload.size, java.net.InetAddress.getByName(alvo), porta))
+                }
+            }
+        } finally {
+            runCatching { socket.close() }
+        }
     }
 
     /**
@@ -160,7 +197,7 @@ internal object TuyaApConfig {
         appToken: String,
         secret: String,
         region: String,
-        rounds: Int = 3,
+        rounds: Int = 2,
         onAttempt: (String) -> Unit = {},
     ): String? {
         repeat(rounds) { round ->
