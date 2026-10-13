@@ -103,7 +103,8 @@ internal object TuyaApTlsPsk {
         }.getOrElse {
             val etapa = servidorAtual?.etapa
             val onde = if (etapa != null) "tls-servidor parou em \"$etapa\": " else ""
-            Entrega.falhou(endereco, onde + "falhou (" + (it.message ?: it::class.simpleName) + ")")
+            val hello = servidorAtual?.resumoHello?.takeIf { it.isNotBlank() }?.let { " [$it]" } ?: ""
+            Entrega.falhou(endereco, onde + "falhou (" + (it.message ?: it::class.simpleName) + ")" + hello)
         }
     }
 
@@ -612,6 +613,8 @@ internal object TuyaApTlsPsk {
     internal class Servidor(private val entrada: InputStream, private val saida: java.io.OutputStream) {
         /** Em que passo do diálogo estamos (vai para o relato se algo falhar). */
         internal var etapa = "início"
+        /** O que a lâmpada ofereceu (vai para o relato se algo falhar). */
+        internal var resumoHello = ""
 
         private val nossoAleatorio = ByteArray(32).also { aleatorio.nextBytes(it) }
         private val historico = ByteArrayOutputStream()
@@ -649,17 +652,17 @@ internal object TuyaApTlsPsk {
             val tamCifras = ((corpo[pos].toInt() and 0xFF) shl 8) or (corpo[pos + 1].toInt() and 0xFF)
             pos += 2
             val fimCifras = minOf(pos + tamCifras, corpo.size)
-            var escolhida = -1
             val oferecidas = mutableListOf<Int>()
             while (pos + 2 <= fimCifras) {
-                val cifra = ((corpo[pos].toInt() and 0xFF) shl 8) or (corpo[pos + 1].toInt() and 0xFF)
-                oferecidas += cifra
-                if (escolhida < 0 && (cifra == CIFRA_ECDHE_PSK_CBC_SHA256 || cifra == CIFRA_ECDHE_PSK_CBC_SHA || cifra == CIFRA_PSK_GCM_SHA256)) {
-                    escolhida = cifra
-                }
+                oferecidas += ((corpo[pos].toInt() and 0xFF) shl 8) or (corpo[pos + 1].toInt() and 0xFF)
                 pos += 2
             }
+            // Preferência: PSK pura (sem os passos de curva) e depois as ECDHE.
+            val preferencia = listOf(CIFRA_PSK_GCM_SHA256, CIFRA_ECDHE_PSK_CBC_SHA256, CIFRA_ECDHE_PSK_CBC_SHA)
+            var escolhida = preferencia.firstOrNull { it in oferecidas } ?: -1
             require(escolhida > 0) { "sem cifra PSK em comum: " + oferecidas.take(10).joinToString(",") { String.format("%04X", it) } }
+            val grupos = mutableListOf<Int>()
+            val tiposExt = mutableListOf<Int>()
             pos = minOf(fimCifras + 1, corpo.size)
             if (pos + 2 <= corpo.size) {
                 val tamExt = ((corpo[pos].toInt() and 0xFF) shl 8) or (corpo[pos + 1].toInt() and 0xFF)
@@ -668,10 +671,24 @@ internal object TuyaApTlsPsk {
                 while (pos + 4 <= fim) {
                     val tipo = ((corpo[pos].toInt() and 0xFF) shl 8) or (corpo[pos + 1].toInt() and 0xFF)
                     val tam = ((corpo[pos + 2].toInt() and 0xFF) shl 8) or (corpo[pos + 3].toInt() and 0xFF)
+                    tiposExt += tipo
                     if (tipo == 0x0017) estendido = true
+                    if (tipo == 0x000A && pos + 6 <= fim) {
+                        val listaTam = ((corpo[pos + 4].toInt() and 0xFF) shl 8) or (corpo[pos + 5].toInt() and 0xFF)
+                        var g = pos + 6
+                        val fimG = minOf(g + listaTam, fim)
+                        while (g + 2 <= fimG) {
+                            grupos += ((corpo[g].toInt() and 0xFF) shl 8) or (corpo[g + 1].toInt() and 0xFF)
+                            g += 2
+                        }
+                    }
                     pos += 4 + tam
                 }
             }
+            resumoHello = "cifras=" + oferecidas.take(10).joinToString(",") { String.format("%04X", it) } +
+                " escolhida=" + String.format("%04X", escolhida) +
+                " grupos=" + grupos.joinToString(",") { String.format("%04X", it) } +
+                " exts=" + tiposExt.joinToString(",") { String.format("%04X", it) }
             when (escolhida) {
                 CIFRA_ECDHE_PSK_CBC_SHA256 -> {
                     ecdhe = true; gcm = false; algoritmoMac = "HmacSHA256"; tamanhoMac = 32
@@ -703,6 +720,7 @@ internal object TuyaApTlsPsk {
             // ServerKeyExchange (ECDHE) e ServerHelloDone
             var nossoPar: java.security.KeyPair? = null
             if (ecdhe) {
+                require(grupos.isEmpty() || grupos.contains(0x0017)) { "sem curva P-256 oferecida: " + grupos.joinToString(",") { String.format("%04X", it) } }
                 val gerador = KeyPairGenerator.getInstance("EC")
                 gerador.initialize(ECGenParameterSpec("secp256r1"))
                 val par = gerador.generateKeyPair()
