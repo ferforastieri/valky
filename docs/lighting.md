@@ -84,3 +84,18 @@ Uma lâmpada ainda em modo de pareamento não aparece nessa lista: ela só entra
 - Todos os comandos passam pelo backend autenticado; o navegador nunca acessa a lâmpada diretamente.
 - Somente administradores podem configurar, renomear, remover ou disparar um pareamento. Qualquer usuário autenticado pode operar uma lâmpada já cadastrada.
 - A descoberta só envia tráfego para as sub-redes locais às quais o host está conectado, e jamais para a internet.
+
+## Compatibilidade entre gerações (pareamento AP)
+
+O diálogo do pareamento muda de transporte conforme a geração do firmware; o
+conteúdo (quadro LPV3.5 com o JSON `ssid`/`passwd`/`token`/`reg`) é o mesmo:
+
+| Geração | Transporte |
+| --- | --- |
+| TuyaOS atual | TLS 1.2 com chave pré-compartilhada (PSK `123456`, identidade `psk_identity`), porta TCP 6668 |
+| Geração anterior | O mesmo quadro LPV3.5 enviado cru no TCP 6668, sem TLS |
+| Clássico | O quadro por datagrama UDP na porta 6667 (lâmpada e broadcast) |
+
+Cada caminho abre uma conexão própria — o quadro cru nunca vai pelo mesmo canal
+onde o TLS foi tentado. O aplicativo relata ao servidor qual caminho respondeu
+(`tls-psk`, `tcp-direto`, `udp`) e o código devolvido pela lâmpada.

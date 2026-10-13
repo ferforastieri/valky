@@ -64,48 +64,63 @@ internal object TuyaApTlsPsk {
      */
     fun entrega(network: android.net.Network, endereco: String, corpo: String): Entrega {
         val quadroBytes = quadro(0x14, corpo)
-        return runCatching {
-            Socket().use { socket ->
-                network.bindSocket(socket)
-                val conectou = runCatching { socket.connect(InetSocketAddress(endereco, PORTA), 2_500) }.isSuccess
-                if (conectou) {
-                    socket.soTimeout = 2_500
-                    // 1) TLS-PSK (firmware atual)
-                    val tls = try {
-                        Handshake(socket.getInputStream(), socket.getOutputStream()).also { it.abre() }
-                    } catch (_: Exception) {
-                        null
-                    }
-                    if (tls != null) {
-                        val resposta = runCatching { tls.envia(quadroBytes) }.getOrNull()
-                        if (resposta != null) {
-                            val (confirmado, codigo) = respostaCodigo(resposta)
-                            return@use Entrega(true, confirmado, "$endereco: respondeu $codigo")
-                        }
-                    }
-                    // 2) quadro direto no TCP (geração anterior)
-                    val direto = runCatching {
-                        socket.getOutputStream().apply { write(quadroBytes); flush() }
-                        socket.soTimeout = 2_500
-                        val buffer = ByteArray(1024)
-                        val lidos = runCatching { socket.getInputStream().read(buffer) }.getOrDefault(-1)
-                        if (lidos > 0) buffer.copyOf(lidos) else null
-                    }.getOrNull()
-                    if (direto != null) {
-                        val (confirmado, codigo) = respostaCodigo(direto)
-                        return@use Entrega(true, confirmado, "$endereco: respondeu $codigo (direto)")
-                    }
-                }
-                // 3) clássico: datagrama no UDP 6667
-                val enviado = enviaUdp(network, endereco, quadroBytes)
-                if (!enviado) return@use Entrega.falhou(endereco, "sem conexão na porta $PORTA")
-                Entrega(true, false, "$endereco: enviado (sem confirmação)")
-            }
-        }.getOrElse { Entrega.falhou(endereco, "falhou (" + (it.message ?: it::class.simpleName) + ")") }
+        // Cada caminho usa uma conexão própria: mandar o quadro direto no
+        // mesmo canal onde o TLS já foi tentado estragaria o fluxo.
+        // 1) TLS-PSK na 6668 (firmware atual)
+        val viaTls = comSocket(network, endereco) { socket ->
+            socket.soTimeout = 2_500
+            val dialogo = Handshake(socket.getInputStream(), socket.getOutputStream())
+            dialogo.abre()
+            dialogo.envia(quadroBytes)
+        }
+        if (viaTls != null) {
+            val (confirmado, codigo) = respostaCodigo(viaTls)
+            return Entrega(true, confirmado, "$endereco: tls-psk respondeu $codigo")
+        }
+        // 2) quadro LPV3.5 direto no TCP 6668 (geração anterior) — conexão nova
+        val viaDireto = comSocket(network, endereco) { socket ->
+            socket.soTimeout = 3_000
+            socket.getOutputStream().apply { write(quadroBytes); flush() }
+            lerAte(socket.getInputStream(), 3_000)
+        }
+        if (viaDireto != null) {
+            val (confirmado, codigo) = respostaCodigo(viaDireto)
+            return Entrega(true, confirmado, "$endereco: tcp-direto respondeu $codigo")
+        }
+        // 3) clássico: datagrama no UDP 6667 (lâmpada e broadcast)
+        val (enviado, respostaUdp) = enviaUdp(network, endereco, quadroBytes)
+        if (!enviado) return Entrega.falhou(endereco, "sem conexão (tcp e udp)")
+        if (respostaUdp != null) {
+            val (confirmado, codigo) = respostaCodigo(respostaUdp)
+            return Entrega(true, confirmado, "$endereco: udp respondeu $codigo")
+        }
+        return Entrega(true, false, "$endereco: udp enviado (sem resposta)")
+    }
+
+    /** Abre uma conexão nova com a lâmpada e roda o passo pedido. */
+    private fun <T> comSocket(network: android.net.Network, endereco: String, passo: (Socket) -> T?): T? = runCatching {
+        Socket().use { socket ->
+            network.bindSocket(socket)
+            if (!runCatching { socket.connect(InetSocketAddress(endereco, PORTA), 2_500) }.isSuccess) return null
+            passo(socket)
+        }
+    }.getOrNull()
+
+    /** Lê o que chegar até o tempo acabar (um quadro pode vir picado). */
+    private fun lerAte(entrada: java.io.InputStream, millis: Int): ByteArray? {
+        val total = java.io.ByteArrayOutputStream()
+        val fim = System.currentTimeMillis() + millis
+        val buffer = ByteArray(512)
+        while (System.currentTimeMillis() < fim && total.size() < 2048) {
+            val lidos = runCatching { entrada.read(buffer) }.getOrDefault(-1)
+            if (lidos <= 0) break
+            total.write(buffer, 0, lidos)
+        }
+        return if (total.size() > 0) total.toByteArray() else null
     }
 
     /** Datagrama para a lâmpada e para o broadcast; espera breve por resposta. */
-    private fun enviaUdp(network: android.net.Network, endereco: String, quadroBytes: ByteArray): Boolean = runCatching {
+    private fun enviaUdp(network: android.net.Network, endereco: String, quadroBytes: ByteArray): Pair<Boolean, ByteArray?> = runCatching {
         java.net.DatagramSocket().use { socket ->
             network.bindSocket(socket)
             socket.broadcast = true
@@ -115,9 +130,12 @@ internal object TuyaApTlsPsk {
                     socket.send(java.net.DatagramPacket(quadroBytes, quadroBytes.size, java.net.InetAddress.getByName(alvo), 6667))
                 }
             }
-            true
+            val buffer = ByteArray(2048)
+            val pacote = java.net.DatagramPacket(buffer, buffer.size)
+            val recebeu = runCatching { socket.receive(pacote); true }.getOrDefault(false)
+            true to (if (recebeu) pacote.data.copyOf(pacote.length) else null)
         }
-    }.getOrDefault(false)
+    }.getOrDefault(false to null)
 
     /** Lê a resposta do aparelho: (aceitou, código em texto). */
     private fun respostaCodigo(resposta: ByteArray): Pair<Boolean, String> {
