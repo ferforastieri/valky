@@ -280,7 +280,7 @@ class LightsViewModel @Inject constructor(
         closeLink: (() -> Unit)? = null,
     ) {
         _state.update { it.copy(pairing = PairingProgress("sending", "Conectado na lâmpada; entregando os dados do Wi-Fi de casa…")) }
-        var resultado = TuyaApConfig.Resultado(false, "sem resposta")
+        var resultado = TuyaApConfig.Resultado(false, false, "sem resposta")
         try {
             resultado = TuyaApConfig.deliverWithRetries(
                 network = link,
@@ -297,14 +297,23 @@ class LightsViewModel @Inject constructor(
             closeLink?.invoke()
         }
         relatar(session.id, resultado.detalhe)
-        if (!resultado.aceito) {
+        if (!resultado.enviado) {
             _state.update {
                 it.copy(pairing = PairingProgress("failed", "A lâmpada não aceitou os dados (${resultado.detalhe}). Deixe-a piscando devagar e tente de novo."))
             }
             return
         }
-        _state.update { it.copy(pairing = PairingProgress("waiting", "Dados aceitos pela lâmpada. Volte o celular para a rede de casa: ela entra sozinha e eu confirmo aqui.")) }
-        while (coroutineContext.isActive) {
+        _state.update {
+            val texto = if (resultado.confirmado) {
+                "Dados aceitos pela lâmpada. Volte o celular para a rede de casa: ela entra sozinha e eu confirmo aqui."
+            } else {
+                "Dados enviados para a lâmpada. Volte o celular para a rede de casa e aguarde: ela entra sozinha."
+            }
+            it.copy(pairing = PairingProgress("waiting", texto))
+        }
+        // Espera limitada: se a lâmpada não aparecer em 4 minutos, avisa.
+        val limite = System.currentTimeMillis() + 4 * 60 * 1000
+        while (coroutineContext.isActive && System.currentTimeMillis() < limite) {
             val status = runCatching { repository.lightPairingStatus(session.id) }.getOrNull()
             if (status != null) {
                 _state.update { it.copy(pairing = PairingProgress(status.status, status.message, status.address, status.light)) }
@@ -315,6 +324,11 @@ class LightsViewModel @Inject constructor(
                 if (status.status == "failed") return
             }
             delay(1500)
+        }
+        if (coroutineContext.isActive) {
+            _state.update {
+                it.copy(pairing = PairingProgress("failed", "A lâmpada não apareceu na rede de casa. Deixe-a piscando devagar e tente de novo."))
+            }
         }
     }
 

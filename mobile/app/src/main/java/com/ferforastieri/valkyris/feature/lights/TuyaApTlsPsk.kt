@@ -46,31 +46,78 @@ internal object TuyaApTlsPsk {
 
     private val aleatorio = SecureRandom()
 
-    /** O que aconteceu numa tentativa, para mostrar ao usuário e ao servidor. */
-    data class Entrega(val aceito: Boolean, val detalhe: String) {
+    /**
+     * O que aconteceu numa tentativa: [enviado] diz que a mensagem saiu do
+     * celular; [confirmado] que a própria lâmpada respondeu código 0.
+     */
+    data class Entrega(val enviado: Boolean, val confirmado: Boolean, val detalhe: String) {
         companion object {
-            fun falhou(endereco: String, motivo: String) = Entrega(false, "$endereco: $motivo")
+            fun falhou(endereco: String, motivo: String) = Entrega(false, false, "$endereco: $motivo")
         }
     }
 
-    /** Faz o diálogo completo e envia o conteúdo; devolve o resultado. */
-    fun entrega(network: android.net.Network, endereco: String, corpo: String): Entrega = runCatching {
-        Socket().use { socket ->
-            network.bindSocket(socket)
-            val conectou = runCatching { socket.connect(InetSocketAddress(endereco, PORTA), 2_500) }.isSuccess
-            if (!conectou) return@use Entrega.falhou(endereco, "sem conexão na porta $PORTA")
-            socket.soTimeout = 4_500
-            val tls = try {
-                Handshake(socket.getInputStream(), socket.getOutputStream()).also { it.abre() }
-            } catch (erro: Exception) {
-                return@use Entrega.falhou(endereco, "TLS recusado (" + (erro.message ?: erro::class.simpleName) + ")")
+    /**
+     * Entrega pelo caminho da geração da lâmpada, na ordem:
+     * 1) TLS-PSK na porta 6668 (firmware atual);
+     * 2) o quadro LPV3.5 direto no TCP 6668 (geração anterior);
+     * 3) o quadro por UDP no 6667 (clássico, que também é transmitido).
+     */
+    fun entrega(network: android.net.Network, endereco: String, corpo: String): Entrega {
+        val quadroBytes = quadro(0x14, corpo)
+        return runCatching {
+            Socket().use { socket ->
+                network.bindSocket(socket)
+                val conectou = runCatching { socket.connect(InetSocketAddress(endereco, PORTA), 2_500) }.isSuccess
+                if (conectou) {
+                    socket.soTimeout = 2_500
+                    // 1) TLS-PSK (firmware atual)
+                    val tls = try {
+                        Handshake(socket.getInputStream(), socket.getOutputStream()).also { it.abre() }
+                    } catch (_: Exception) {
+                        null
+                    }
+                    if (tls != null) {
+                        val resposta = runCatching { tls.envia(quadroBytes) }.getOrNull()
+                        if (resposta != null) {
+                            val (confirmado, codigo) = respostaCodigo(resposta)
+                            return@use Entrega(true, confirmado, "$endereco: respondeu $codigo")
+                        }
+                    }
+                    // 2) quadro direto no TCP (geração anterior)
+                    val direto = runCatching {
+                        socket.getOutputStream().apply { write(quadroBytes); flush() }
+                        socket.soTimeout = 2_500
+                        val buffer = ByteArray(1024)
+                        val lidos = runCatching { socket.getInputStream().read(buffer) }.getOrDefault(-1)
+                        if (lidos > 0) buffer.copyOf(lidos) else null
+                    }.getOrNull()
+                    if (direto != null) {
+                        val (confirmado, codigo) = respostaCodigo(direto)
+                        return@use Entrega(true, confirmado, "$endereco: respondeu $codigo (direto)")
+                    }
+                }
+                // 3) clássico: datagrama no UDP 6667
+                val enviado = enviaUdp(network, endereco, quadroBytes)
+                if (!enviado) return@use Entrega.falhou(endereco, "sem conexão na porta $PORTA")
+                Entrega(true, false, "$endereco: enviado (sem confirmação)")
             }
-            val resposta = runCatching { tls.envia(quadro(0x14, corpo)) }.getOrNull()
-                ?: return@use Entrega.falhou(endereco, "enviado, sem resposta")
-            val (aceito, codigo) = respostaCodigo(resposta)
-            Entrega(aceito, "$endereco: respondeu $codigo")
+        }.getOrElse { Entrega.falhou(endereco, "falhou (" + (it.message ?: it::class.simpleName) + ")") }
+    }
+
+    /** Datagrama para a lâmpada e para o broadcast; espera breve por resposta. */
+    private fun enviaUdp(network: android.net.Network, endereco: String, quadroBytes: ByteArray): Boolean = runCatching {
+        java.net.DatagramSocket().use { socket ->
+            network.bindSocket(socket)
+            socket.broadcast = true
+            socket.soTimeout = 1_200
+            listOf(endereco, "255.255.255.255").forEach { alvo ->
+                runCatching {
+                    socket.send(java.net.DatagramPacket(quadroBytes, quadroBytes.size, java.net.InetAddress.getByName(alvo), 6667))
+                }
+            }
+            true
         }
-    }.getOrElse { Entrega.falhou(endereco, "falhou (" + (it.message ?: it::class.simpleName) + ")") }
+    }.getOrDefault(false)
 
     /** Lê a resposta do aparelho: (aceitou, código em texto). */
     private fun respostaCodigo(resposta: ByteArray): Pair<Boolean, String> {

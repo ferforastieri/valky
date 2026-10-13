@@ -13,7 +13,9 @@ import kotlinx.coroutines.withContext
  */
 internal object TuyaApConfig {
     /** O que aconteceu na entrega, para mostrar ao usuário. */
-    data class Resultado(val aceito: Boolean, val detalhe: String)
+    data class Resultado(val enviado: Boolean, val confirmado: Boolean, val detalhe: String) {
+        val aceito: Boolean get() = confirmado
+    }
 
     suspend fun deliver(
         network: android.net.Network,
@@ -25,17 +27,17 @@ internal object TuyaApConfig {
         gateways: List<String>,
         onAttempt: (String) -> Unit = {},
     ): Resultado = withContext(Dispatchers.IO) {
-        if (gateways.isEmpty()) return@withContext Resultado(false, "não achei o endereço da lâmpada")
+        if (gateways.isEmpty()) return@withContext Resultado(false, false, "não achei o endereço da lâmpada")
         // O aparelho recebe região, token e segredo juntos (authToken), como o
         // aplicativo oficial monta na API de pareamento da nuvem.
         val auth = region + appToken + secret
         val corpo = """{"ssid":"$ssid","passwd":"$password","token":"$auth","reg":"$region"}"""
-        onAttempt("tls-psk")
-        var ultimo = Resultado(false, "sem resposta")
+        onAttempt("pareamento")
+        var ultimo = Resultado(false, false, "sem resposta")
         for (endereco in gateways.distinct()) {
             val entrega = TuyaApTlsPsk.entrega(network, endereco, corpo)
-            ultimo = Resultado(entrega.aceito, entrega.detalhe)
-            if (entrega.aceito) return@withContext ultimo
+            ultimo = Resultado(entrega.enviado, entrega.confirmado, entrega.detalhe)
+            if (entrega.confirmado) return@withContext ultimo
         }
         ultimo
     }
@@ -51,10 +53,10 @@ internal object TuyaApConfig {
         rounds: Int = 2,
         onAttempt: (String) -> Unit = {},
     ): Resultado {
-        var ultimo = Resultado(false, "sem resposta")
+        var ultimo = Resultado(false, false, "sem resposta")
         repeat(rounds) { rodada ->
             ultimo = deliver(network, ssid, password, appToken, secret, region, gateways, onAttempt)
-            if (ultimo.aceito) return ultimo
+            if (ultimo.confirmado) return ultimo
             if (rodada < rounds - 1) delay(3_000)
         }
         return ultimo
