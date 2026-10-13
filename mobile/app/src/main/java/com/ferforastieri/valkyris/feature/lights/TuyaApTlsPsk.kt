@@ -68,60 +68,38 @@ internal object TuyaApTlsPsk {
      * Completamos o aperto de mão como servidor e entregamos o quadro.
      * Sem desvios: se não responder, o relato diz exatamente isso.
      */
+    /**
+     * Dois caminhos claros, um por geração:
+     *
+     * 1) Geração da Pera Neo: ela é o CLIENTE TLS — fala primeiro; nós
+     *    esperamos o ClientHello (NADA é enviado antes, senão o mbedTLS dela
+     *    trava esperando um registro inválido) e completamos como servidor;
+     * 2) Geração atual: nós falamos primeiro, como cliente TLS.
+     */
     fun entrega(network: android.net.Network, endereco: String, corpo: String): Entrega {
         val quadroBytes = quadro(0x14, corpo)
         var servidorAtual: Servidor? = null
         return runCatching {
-            // A lâmpada é o CLIENTE TLS (confirmado no firmware): ao conectar,
-            // ela manda o ClientHello sozinha. Não podemos enviar NADA antes do
-            // diálogo (qualquer byte nosso faz ela esperar um registro inválido
-            // para sempre). Se ela estiver ocupada com a conexão anterior,
-            // tentamos de novo com uma conexão nova.
-            var iniciais: ByteArray? = null
-            var conversa: Socket? = null
-            var conectouAlguma = false
-            for (tentativa in 1..3) {
-                if (conversa != null) break
-                val socket = runCatching { Socket() }.getOrNull() ?: break
-                val ok = runCatching {
-                    network.bindSocket(socket)
-                    socket.connect(InetSocketAddress(endereco, PORTA), 2_500)
-                }.isSuccess
-                if (!ok) {
-                    runCatching { socket.close() }
-                    continue
-                }
-                conectouAlguma = true
-                socket.soTimeout = 6_000
-                val falou = lerAte(socket.getInputStream(), 6_000)
-                if (falou != null && falou.size > 6 && falou[0] == 0x16.toByte() && falou[5] == 0x01.toByte()) {
-                    iniciais = falou
-                    conversa = socket
-                } else {
-                    runCatching { socket.close() }
-                }
-            }
-            if (conversa == null) {
-                return if (!conectouAlguma) {
-                    Entrega.falhou(endereco, "não aceitou a conexão na porta $PORTA")
-                } else {
-                    Entrega(true, false, "$endereco: conectou, mas não falou nada (3 tentativas)")
-                }
-            }
-            val socket = conversa!!
-            socket.use {
-                val entrada = java.io.SequenceInputStream(java.io.ByteArrayInputStream(iniciais!!), socket.getInputStream())
-                val servidor = Servidor(entrada, socket.getOutputStream())
+            // 1) espera ela falar (com uma segunda chance se estiver ocupada)
+            val falante = abrirEsperando(network, endereco)
+            if (falante != null) {
+                val servidor = Servidor(falante.entrada, falante.socket.getOutputStream())
                 servidorAtual = servidor
-                servidor.abre()
-                val resposta = servidor.envia(quadroBytes)
-                if (resposta != null) {
-                    val (aceito, codigo) = respostaCodigo(resposta)
-                    Entrega(true, aceito, "$endereco: tls-servidor respondeu $codigo")
-                } else {
-                    Entrega(true, false, "$endereco: tls-servidor enviado (sem resposta)")
+                falante.socket.use {
+                    servidor.abre()
+                    return Entrega(true, true, "$endereco: " + responder(servidor.envia(quadroBytes), "tls-servidor"))
                 }
             }
+            // 2) nós falamos primeiro (geração atual)
+            val cliente = abrirFalando(network, endereco)
+            if (cliente != null) {
+                cliente.socket.use {
+                    val tls = Handshake(cliente.entrada, it.getOutputStream())
+                    tls.abre()
+                    return Entrega(true, true, "$endereco: " + responder(tls.envia(quadroBytes), "tls-cliente"))
+                }
+            }
+            Entrega.falhou(endereco, "a lâmpada não abriu o diálogo")
         }.getOrElse {
             val etapa = servidorAtual?.etapa
             val onde = if (etapa != null) "tls-servidor parou em \"$etapa\": " else ""
@@ -130,14 +108,51 @@ internal object TuyaApTlsPsk {
         }
     }
 
-    /** Abre uma conexão nova com a lâmpada e roda o passo pedido. */
-    private fun <T> comSocket(network: android.net.Network, endereco: String, passo: (Socket) -> T?): T? = runCatching {
-        Socket().use { socket ->
-            network.bindSocket(socket)
-            if (!runCatching { socket.connect(InetSocketAddress(endereco, PORTA), 2_500) }.isSuccess) return null
-            passo(socket)
+    /** Texto do resultado a partir da resposta da lâmpada. */
+    private fun responder(resposta: ByteArray?, caminho: String): String {
+        if (resposta == null) return "$caminho enviado (sem resposta)"
+        val (aceito, codigo) = respostaCodigo(resposta)
+        return if (aceito) "$caminho respondeu $codigo (aceito)" else "$caminho respondeu $codigo"
+    }
+
+    /** Uma conversa aberta com a lâmpada. */
+    private class Conversa(val socket: Socket, val entrada: java.io.InputStream)
+
+    /**
+     * Conecta e espera o ClientHello dela, sem enviar nada. Tenta duas vezes
+     * (o serviço dela atende uma conexão por vez e pode estar ocupado).
+     */
+    private fun abrirEsperando(network: android.net.Network, endereco: String): Conversa? {
+        repeat(2) {
+            val conversa = runCatching {
+                val socket = Socket()
+                network.bindSocket(socket)
+                socket.connect(InetSocketAddress(endereco, PORTA), 2_500)
+                socket.soTimeout = 4_000
+                val falou = lerAte(socket.getInputStream(), 4_000)
+                if (falou != null && falou.size > 6 && falou[0] == 0x16.toByte() && falou[5] == 0x01.toByte()) {
+                    val entrada = java.io.SequenceInputStream(java.io.ByteArrayInputStream(falou), socket.getInputStream())
+                    Conversa(socket, entrada)
+                } else {
+                    socket.close()
+                    null
+                }
+            }.getOrNull()
+            if (conversa != null) return conversa
         }
+        return null
+    }
+
+    /** Conecta e fala primeiro, como cliente TLS (geração atual). */
+    private fun abrirFalando(network: android.net.Network, endereco: String): Conversa? = runCatching {
+        val socket = Socket()
+        network.bindSocket(socket)
+        socket.connect(InetSocketAddress(endereco, PORTA), 2_500)
+        socket.soTimeout = 4_000
+        Conversa(socket, socket.getInputStream())
     }.getOrNull()
+
+
 
     /** Lê o que chegar até o tempo acabar (um quadro pode vir picado). */
     private fun lerAte(entrada: java.io.InputStream, millis: Int): ByteArray? {
@@ -151,7 +166,6 @@ internal object TuyaApTlsPsk {
         }
         return if (total.size() > 0) total.toByteArray() else null
     }
-
 
     /** Onde o padrão aparece na resposta (ou -1). */
     private fun procura(bytes: ByteArray, padrao: ByteArray): Int {

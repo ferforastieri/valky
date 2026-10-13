@@ -344,7 +344,6 @@ class LightsViewModel @Inject constructor(
         val lamp = pendingLampSsid
         val connected = (lamp != null && ssid.equals(lamp, ignoreCase = true)) || connector.looksLikeLamp(ssid)
         if (!connected) return
-        val link = connector.wifiNetwork() ?: return
         // O trabalho antigo (a lista que se atualiza) sai de cena.
         pairingJob?.cancel()
         pairingJob = null
@@ -353,8 +352,16 @@ class LightsViewModel @Inject constructor(
         pendingHomeSsid = null
         pendingPassword = null
         pairingJob = viewModelScope.launch {
-            runCatching { deliverAndWait(session, link, home, password, connector.gatewayAddresses()) }
-                .onFailure { error -> _state.update { it.copy(pairing = PairingProgress("failed", error.message ?: "Não foi possível entregar os dados. Tente de novo.")) } }
+            // Segura o celular na rede da lâmpada durante toda a entrega: sem
+            // isso o Android volta sozinho para a rede com internet no meio.
+            val presa = if (android.os.Build.VERSION.SDK_INT >= 29) runCatching { connector.connect(ssid) }.getOrNull() else null
+            try {
+                val link = presa?.network ?: connector.wifiNetwork() ?: return@launch
+                runCatching { deliverAndWait(session, link, home, password, connector.gatewayAddresses()) }
+                    .onFailure { error -> _state.update { it.copy(pairing = PairingProgress("failed", error.message ?: "Não foi possível entregar os dados. Tente de novo.")) } }
+            } finally {
+                presa?.close()
+            }
         }
     }
 
