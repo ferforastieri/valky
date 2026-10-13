@@ -7,9 +7,11 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"strconv"
 	"strings"
 	"time"
 
+	"github.com/ferforastieri/valkyris/backend/internal/light/tuya"
 	"github.com/google/uuid"
 )
 
@@ -23,18 +25,31 @@ import (
 // the key material the lamp should have stored. The first key that answers a
 // status read becomes the light's local key and the lamp is registered.
 type PairingSession struct {
-	ID        string     `json:"id"`
-	Token     string     `json:"token"`
-	Secret    string     `json:"secret"`
-	Region    string     `json:"region"`
-	Status    string     `json:"status"`
-	Message   string     `json:"message,omitempty"`
-	DeviceID  string     `json:"deviceId,omitempty"`
-	Address   string     `json:"address,omitempty"`
-	Light     *Light     `json:"light,omitempty"`
-	ExpiresAt time.Time  `json:"expiresAt"`
-	StartedAt time.Time  `json:"startedAt"`
-	EndedAt   *time.Time `json:"endedAt,omitempty"`
+	ID       string `json:"id"`
+	Token    string `json:"token"`
+	Secret   string `json:"secret"`
+	Region   string `json:"region"`
+	Status   string `json:"status"`
+	Message  string `json:"message,omitempty"`
+	DeviceID string `json:"deviceId,omitempty"`
+	Address  string `json:"address,omitempty"`
+	Light    *Light `json:"light,omitempty"`
+	// Announcement é o que a lâmpada anunciou na rede quando o celular escutou.
+	Announcement *Announcement `json:"announcement,omitempty"`
+	ExpiresAt    time.Time     `json:"expiresAt"`
+	StartedAt    time.Time     `json:"startedAt"`
+	EndedAt      *time.Time    `json:"endedAt,omitempty"`
+}
+
+// Announcement é um anúncio ouvido na rede (o celular escuta o ar do Wi-Fi e
+// repassa ao backend, que decodifica).
+type Announcement struct {
+	Address    string         `json:"address"`
+	Port       int            `json:"port"`
+	Fields     map[string]any `json:"fields,omitempty"`
+	DeviceID   string         `json:"deviceId,omitempty"`
+	Version    float64        `json:"version,omitempty"`
+	Recognized bool           `json:"recognized"`
 }
 
 const (
@@ -155,6 +170,98 @@ func (s *Service) CancelPairing(id string) error {
 	s.pairing = nil
 	s.pairingTried = map[string]bool{}
 	return nil
+}
+
+// RegisterAnnouncement recebe o que o celular ouviu na rede. Um anúncio com
+// identificador já é suficiente para o backend conversar com a lâmpada e
+// adotá-la, sem depender de nenhuma nuvem.
+func (s *Service) RegisterAnnouncement(ctx context.Context, id, address string, port int, raw []byte) (PairingSession, error) {
+	session, err := s.PairingStatus(id)
+	if err != nil {
+		return PairingSession{}, err
+	}
+	announcement := &Announcement{Address: address, Port: port}
+	fields, decodeErr := tuya.DecodeAnnouncement(raw)
+	if decodeErr == nil {
+		announcement.Fields = fields
+		announcement.Recognized = true
+		candidate := candidateFromAnnouncement(address, fields)
+		announcement.DeviceID = candidate.DeviceID
+		announcement.Version = candidate.Version
+		s.updatePairing(id, func(current *PairingSession) {
+			current.Announcement = announcement
+			if current.Status == PairingWaiting {
+				current.Status = PairingFound
+			}
+			if candidate.DeviceID != "" {
+				current.DeviceID = candidate.DeviceID
+				current.Address = address
+				current.Message = fmt.Sprintf("A lâmpada anunciou em %s (id %s, v%.1f). Testando o controle local…", address, candidate.DeviceID, candidate.Version)
+			} else {
+				current.Message = fmt.Sprintf("A lâmpada anunciou em %s, mas sem identificador.", address)
+			}
+		})
+		if candidate.DeviceID == "" {
+			// Sem identificador não há o que registrar, mas o anúncio fica visível.
+			return s.PairingStatus(id)
+		}
+		if _, ok := s.Scanner(); !ok {
+			return s.PairingStatus(id)
+		}
+		registered, err := s.tryPairingKey(ctx, session, candidate)
+		if err != nil {
+			s.markPairingTried(address)
+			attempted := len(pairingKeyCandidates(session, candidate))
+			s.logger.Info("announced device refused every key", "device", deviceFingerprint(candidate), "keys", attempted, "error", err)
+			s.updatePairing(id, func(current *PairingSession) {
+				current.Message = fmt.Sprintf("A lâmpada em %s aceitou a conexão, mas não aceitou nenhuma das %d chaves testadas.", address, attempted)
+			})
+			return s.PairingStatus(id)
+		}
+		s.updatePairing(id, func(current *PairingSession) {
+			current.Status = PairingPaired
+			current.Message = "Lâmpada configurada."
+			current.DeviceID = candidate.DeviceID
+			current.Address = address
+			current.Light = &registered
+			now := time.Now()
+			current.EndedAt = &now
+			current.ExpiresAt = now
+		})
+		return s.PairingStatus(id)
+	}
+	// O anúncio não foi decodificado: guarda os bytes para diagnóstico.
+	s.updatePairing(id, func(current *PairingSession) { current.Announcement = announcement })
+	s.logger.Debug("announcement not decoded", "address", address, "bytes", len(raw), "error", decodeErr)
+	return s.PairingStatus(id)
+}
+
+// candidateFromAnnouncement traduz os campos anunciados para um candidato.
+func candidateFromAnnouncement(address string, fields map[string]any) Candidate {
+	candidate := Candidate{Address: address}
+	if value, ok := fields["gwId"].(string); ok {
+		candidate.DeviceID = value
+	}
+	if candidate.DeviceID == "" {
+		if value, ok := fields["id"].(string); ok {
+			candidate.DeviceID = value
+		}
+	}
+	if value, ok := fields["productKey"].(string); ok {
+		candidate.ProductKey = value
+	}
+	if value, ok := fields["mac"].(string); ok {
+		candidate.MAC = value
+	}
+	switch value := fields["version"].(type) {
+	case float64:
+		candidate.Version = value
+	case string:
+		if parsed, err := strconv.ParseFloat(strings.TrimSpace(value), 64); err == nil {
+			candidate.Version = parsed
+		}
+	}
+	return candidate
 }
 
 func (s *Service) updatePairing(id string, apply func(*PairingSession)) {

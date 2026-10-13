@@ -209,9 +209,22 @@ func listenForDevices(ctx context.Context, port int, report func(string, map[str
 	}
 }
 
-// decodeUDPPayload unwraps a discovery answer. Devices use three shapes: a
-// classic 55AA frame, a 6699 frame, or a bare AES-ECB blob; all three are
-// encrypted with the fixed application key.
+// DecodeAnnouncement unwraps a device announcement captured on the network.
+// Devices use three shapes: a classic 55AA frame, a 6699 frame, or a bare
+// AES-ECB blob; all three are encrypted with the fixed application key. It is
+// exported so an announcement heard by the phone can be read by the backend.
+func DecodeAnnouncement(raw []byte) (map[string]any, error) {
+	plain, err := decodeUDPPayload(raw)
+	if err != nil {
+		return nil, err
+	}
+	var fields map[string]any
+	if err := json.Unmarshal(plain, &fields); err != nil {
+		return nil, err
+	}
+	return fields, nil
+}
+
 func decodeUDPPayload(raw []byte) ([]byte, error) {
 	if len(raw) >= 4 {
 		switch {

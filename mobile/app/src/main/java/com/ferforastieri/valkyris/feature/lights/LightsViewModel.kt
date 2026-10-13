@@ -143,6 +143,13 @@ class LightsViewModel @Inject constructor(
                 runCatching { sender.send(network, password, tokenGroup, onRound = { round -> _state.update { it.copy(rounds = round) } }) }
                     .onFailure { error -> _state.update { it.copy(error = error.message) } }
             }
+            // O celular também escuta a rede: é ele que está no ar do Wi-Fi.
+            val listen = launch {
+                LampAnnouncementListener().listen { address, port, payload ->
+                    runCatching { repository.reportLightAnnouncement(session.id, address, port, payload.toHex()) }
+                        .onSuccess { updated -> _state.update { it.copy(pairing = PairingProgress(updated.status, updated.message, updated.address, updated.light)) } }
+                }
+            }
             try {
                 while (isActive) {
                     val status = runCatching { repository.lightPairingStatus(session.id) }.getOrNull() ?: break
@@ -155,6 +162,7 @@ class LightsViewModel @Inject constructor(
                 }
             } finally {
                 send.cancelAndJoin()
+                listen.cancelAndJoin()
             }
         }
     }

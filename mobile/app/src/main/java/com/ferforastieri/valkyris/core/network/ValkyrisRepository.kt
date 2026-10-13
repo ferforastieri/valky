@@ -68,6 +68,9 @@ class ValkyrisRepository @Inject constructor(
 
     suspend fun lightPairingStatus(id: String): LightPairingSession = api.lightPairingStatus(id)
 
+    suspend fun reportLightAnnouncement(id: String, address: String, port: Int, payloadHex: String): LightPairingSession =
+        api.reportLightAnnouncement(id, address, port, payloadHex)
+
     suspend fun cancelLightPairing(id: String) = api.cancelLightPairing(id)
 
     suspend fun updateLight(id: String, input: LightUpdate): LightDevice {
