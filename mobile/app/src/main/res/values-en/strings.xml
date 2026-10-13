@@ -41,13 +41,14 @@
     <string name="light_setup_pending">Checking the bulb…</string>
     <string name="light_setup_failed">The bulb could not be reached</string>
     <string name="no_lights_body_admin">Tap + to put a bulb in pairing mode and set it up without any third-party app.</string>
-    <string name="light_pair_steps">Leave the bulb blinking fast (switch it off and on 3 times). The phone joins the bulb\'s own network and hands over your Wi-Fi details — no router changes needed.</string>
     <string name="light_pair_network_auto">Home network: %1$s</string>
     <string name="light_pair_network_unknown">not identified</string>
     <string name="light_pair_password_saved">Wi-Fi password already stored on this device.</string>
     <string name="light_pair_password_once">Asked once; after that it stays only on this device.</string>
     <string name="light_pair_waiting">Keep the app open. If Android asks, accept connecting to the bulb\'s network.</string>
     <string name="light_pair_password_change">Change</string>
+    <string name="light_pair_steps">Leave the bulb blinking SLOWLY (one blink every 1 a 2 seconds): that is the state where it creates its own network, which the phone will look for. Keep switching it off and on until the blink is calm.</string>
+    <string name="light_pair_search_fail">I could not find the bulb\'s network. Make sure it is blinking SLOWLY (not fast) - it does not create a network while blinking fast - and try again.</string>
     <string name="light_pair_sending">Sending the Wi-Fi details to the bulb…</string>
     <string name="light_pair_password">Wi-Fi password</string>
     <string name="light_pair_keep_open">Keep the app open and the phone on this network until the bulb shows up.</string>

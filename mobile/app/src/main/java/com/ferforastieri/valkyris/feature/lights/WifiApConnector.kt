@@ -35,6 +35,29 @@ internal class WifiApConnector(context: Context) {
     /** O caminho direto existe a partir do Android 10. */
     fun supported(): Boolean = Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q
 
+    /**
+     * Força uma varredura nova e espera o resultado. O Android guarda a última
+     * lista e ela pode não incluir a rede que a lâmpada acabou de criar, então
+     * esperar o aviso de "varredura pronta" é o que garante que ela apareça.
+     */
+    @SuppressLint("MissingPermission")
+    suspend fun refreshScan(waitMillis: Long = 8_000) = withContext(Dispatchers.IO) {
+        if (!canScan()) return@withContext
+        val manager = wifi ?: return@withContext
+        val ready = java.util.concurrent.CountDownLatch(1)
+        val receiver = object : android.content.BroadcastReceiver() {
+            override fun onReceive(context: android.content.Context?, intent: android.content.Intent?) {
+                ready.countDown()
+            }
+        }
+        runCatching {
+            appContext.registerReceiver(receiver, android.content.IntentFilter(WifiManager.SCAN_RESULTS_AVAILABLE_ACTION))
+        }
+        runCatching { manager.startScan() }
+        runCatching { ready.await(waitMillis, java.util.concurrent.TimeUnit.MILLISECONDS) }
+        runCatching { appContext.unregisterReceiver(receiver) }
+    }
+
     /** Nomes típicos das redes que as lâmpadas criam para configuração. */
     private val lampPrefixes = listOf("smartlife", "tuya", "neo", "avant", "pera", "esp", "t-")
 

@@ -141,6 +141,9 @@ class LightsViewModel @Inject constructor(
                 }
                 return@launch
             }
+            // Varredura nova antes de procurar: a lista guardada pode ser antiga.
+            _state.update { it.copy(pairing = PairingProgress("lamp-network", "Procurando a rede da lâmpada…")) }
+            connector.refreshScan()
             val candidates = withContext(Dispatchers.IO) { connector.candidateNetworks() }
             val visible = withContext(Dispatchers.IO) { connector.visibleNetworks() }
             val lamp = lampSsid?.takeIf { it.isNotBlank() } ?: candidates.firstOrNull()

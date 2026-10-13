@@ -39,13 +39,14 @@
     <string name="light_setup_pending">Conferindo a lâmpada…</string>
     <string name="light_setup_failed">Não foi possível falar com a lâmpada</string>
     <string name="no_lights_body_admin">Toque em + para colocar uma lâmpada em modo de pareamento e configurá-la sem nenhum aplicativo de terceiros.</string>
-    <string name="light_pair_steps">Deixe a lâmpada piscando rápido (ligar/desligar 3 vezes). O celular vai entrar na rede dela e entregar os dados do seu Wi-Fi — não precisa mexer no roteador.</string>
     <string name="light_pair_network_auto">Rede de casa: %1$s</string>
     <string name="light_pair_network_unknown">não identificada</string>
     <string name="light_pair_password_saved">Senha do Wi-Fi já guardada neste aparelho.</string>
     <string name="light_pair_password_once">Perguntamos uma única vez; depois fica guardada só neste aparelho.</string>
     <string name="light_pair_waiting">Mantenha o app aberto. Se o Android perguntar, aceite conectar na rede da lâmpada.</string>
     <string name="light_pair_password_change">Trocar</string>
+    <string name="light_pair_steps">Deixe a lâmpada piscando DEVAGAR (uma piscada a cada 1 a 2 segundos): é nesse estado que ela cria a própria rede, que o celular vai procurar. Para chegar nele, siga ciclando ligar/desligar até a piscada ficar calma.</string>
+    <string name="light_pair_search_fail">Não encontrei a rede da lâmpada. Confirme que ela está piscando DEVAGAR (não rápido) - no piscar rápido ela não cria rede - e tente de novo.</string>
     <string name="light_pair_sending">Enviando os dados do Wi-Fi para a lâmpada…</string>
     <string name="light_pair_password">Senha do Wi-Fi</string>
     <string name="light_pair_keep_open">Mantenha o aplicativo aberto e o celular nesta rede até a lâmpada aparecer.</string>
