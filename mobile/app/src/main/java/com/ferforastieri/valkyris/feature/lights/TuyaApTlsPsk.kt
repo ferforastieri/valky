@@ -137,13 +137,41 @@ internal object TuyaApTlsPsk {
         }
     }.getOrDefault(false to null)
 
-    /** Lê a resposta do aparelho: (aceitou, código em texto). */
+    /**
+     * Lê a resposta do aparelho: (aceitou, descrição). Entende o quadro
+     * LPV3.5 (gerações atuais) e o quadro clássico 55 AA (geração anterior);
+     * quando não reconhece a moldura, descreve os bytes para o relato.
+     */
     private fun respostaCodigo(resposta: ByteArray): Pair<Boolean, String> {
-        val (tipo, conteudo) = lerQuadro(resposta) ?: return false to "formato desconhecido"
-        if (tipo != 0x14 || conteudo.size < 4) return false to "tipo $tipo"
-        val codigo = ((conteudo[0].toInt() and 0xFF) shl 24) or ((conteudo[1].toInt() and 0xFF) shl 16) or
-            ((conteudo[2].toInt() and 0xFF) shl 8) or (conteudo[3].toInt() and 0xFF)
-        return (codigo == 0) to String.format("0x%08X", codigo)
+        lerQuadro(resposta)?.let { (tipo, conteudo) ->
+            if (tipo == 0x14 && conteudo.size >= 4) {
+                val codigo = ((conteudo[0].toInt() and 0xFF) shl 24) or ((conteudo[1].toInt() and 0xFF) shl 16) or
+                    ((conteudo[2].toInt() and 0xFF) shl 8) or (conteudo[3].toInt() and 0xFF)
+                return (codigo == 0) to String.format("0x%08X", codigo)
+            }
+            return false to "lvp35 tipo $tipo"
+        }
+        // quadro clássico: 00 00 55 AA · sequência · comando · tamanho · dados
+        val inicio = procura(resposta, byteArrayOf(0x00, 0x00, 0x55, 0xAA.toByte()))
+        if (inicio >= 0 && resposta.size >= inicio + 16) {
+            val comando = leInt(resposta, inicio + 8)
+            val tamanho = leInt(resposta, inicio + 12)
+            val dados = resposta.copyOfRange(minOf(inicio + 16, resposta.size), minOf(inicio + 16 + tamanho, resposta.size))
+            return false to ("55aa cmd=" + comando + " " + dados.take(40).joinToString("") { "%02x".format(it) })
+        }
+        return false to (resposta.size.toString() + "b " + resposta.take(24).joinToString("") { "%02x".format(it) })
+    }
+
+    /** Onde o padrão aparece na resposta (ou -1). */
+    private fun procura(bytes: ByteArray, padrao: ByteArray): Int {
+        var i = 0
+        while (i + padrao.size <= bytes.size) {
+            var igual = true
+            padrao.forEachIndexed { j, b -> if (bytes[i + j] != b) igual = false }
+            if (igual) return i
+            i++
+        }
+        return -1
     }
 
     // ------------------------------------------------------------------ quadro LPV3.5
