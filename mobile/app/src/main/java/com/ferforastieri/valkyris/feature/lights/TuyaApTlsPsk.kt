@@ -62,68 +62,43 @@ internal object TuyaApTlsPsk {
      * 2) o quadro LPV3.5 direto no TCP 6668 (geração anterior);
      * 3) o quadro por UDP no 6667 (clássico, que também é transmitido).
      */
+    /**
+     * O caminho que a lâmpada respondeu (observado nos relatos): conecta na
+     * porta 6668, envia o quadro e ELA abre o TLS como cliente (ClientHello).
+     * Completamos o aperto de mão como servidor e entregamos o quadro.
+     * Sem desvios: se não responder, o relato diz exatamente isso.
+     */
     fun entrega(network: android.net.Network, endereco: String, corpo: String): Entrega {
         val quadroBytes = quadro(0x14, corpo)
-        var problema: String? = null
-        // Cada caminho usa uma conexão própria. Na primeira, espiamos quem
-        // fala primeiro: a geração anterior abre o TLS como CLIENTE (nós somos
-        // o servidor); a atual espera o nosso ClientHello.
-        val primeira = runCatching {
+        return runCatching {
             Socket().use { socket ->
                 network.bindSocket(socket)
-                if (!runCatching { socket.connect(InetSocketAddress(endereco, PORTA), 2_500) }.isSuccess) return@use null
-                socket.soTimeout = 1_500
-                val iniciais = lerAte(socket.getInputStream(), 1_500)
-                if (iniciais != null && iniciais.size > 6 && iniciais[0] == 0x16.toByte() && iniciais[5] == 0x01.toByte()) {
-                    val entrada = java.io.SequenceInputStream(java.io.ByteArrayInputStream(iniciais), socket.getInputStream())
-                    val servidor = Servidor(entrada, socket.getOutputStream())
-                    servidor.abre()
-                    val resposta = servidor.envia(quadroBytes)
-                    if (resposta != null) {
-                        val (aceito, codigo) = respostaCodigo(resposta)
-                        Entrega(true, aceito, "$endereco: tls-servidor respondeu $codigo")
-                    } else {
-                        Entrega(true, false, "$endereco: tls-servidor enviado (sem resposta)")
-                    }
+                if (!runCatching { socket.connect(InetSocketAddress(endereco, PORTA), 2_500) }.isSuccess) {
+                    return Entrega.falhou(endereco, "sem conexão na porta $PORTA")
+                }
+                socket.soTimeout = 3_000
+                // manda o quadro: é o que faz a lâmpada falar
+                socket.getOutputStream().apply { write(quadroBytes); flush() }
+                val iniciais = lerAte(socket.getInputStream(), 3_000)
+                    ?: return Entrega(true, false, "$endereco: sem resposta")
+                val ehClientHello = iniciais.size > 6 && iniciais[0] == 0x16.toByte() && iniciais[5] == 0x01.toByte()
+                if (!ehClientHello) {
+                    val (aceito, codigo) = respostaCodigo(iniciais)
+                    return Entrega(true, aceito, "$endereco: respondeu $codigo")
+                }
+                // ela falou primeiro: completamos o TLS como servidor
+                val entrada = java.io.SequenceInputStream(java.io.ByteArrayInputStream(iniciais), socket.getInputStream())
+                val servidor = Servidor(entrada, socket.getOutputStream())
+                servidor.abre()
+                val resposta = servidor.envia(quadroBytes)
+                if (resposta != null) {
+                    val (aceito, codigo) = respostaCodigo(resposta)
+                    Entrega(true, aceito, "$endereco: tls-servidor respondeu $codigo")
                 } else {
-                    val tls = try {
-                        Handshake(socket.getInputStream(), socket.getOutputStream()).also { it.abre() }
-                    } catch (_: Exception) {
-                        null
-                    }
-                    if (tls != null) {
-                        val resposta = runCatching { tls.envia(quadroBytes) }.getOrNull()
-                        if (resposta != null) {
-                            val (aceito, codigo) = respostaCodigo(resposta)
-                            return Entrega(true, aceito, "$endereco: tls-cliente respondeu $codigo")
-                        }
-                    }
-                    null
+                    Entrega(true, false, "$endereco: tls-servidor enviado (sem resposta)")
                 }
             }
-        }.getOrElse {
-            problema = it.message ?: it::class.simpleName
-            null
-        }
-        if (primeira != null) return primeira
-        // 2) quadro LPV3.5 direto no TCP 6668 (geração anterior) — conexão nova
-        val viaDireto = comSocket(network, endereco) { socket ->
-            socket.soTimeout = 3_000
-            socket.getOutputStream().apply { write(quadroBytes); flush() }
-            lerAte(socket.getInputStream(), 3_000)
-        }
-        if (viaDireto != null) {
-            val (aceito, codigo) = respostaCodigo(viaDireto)
-            return Entrega(true, aceito, "$endereco: tcp-direto respondeu $codigo")
-        }
-        // 3) clássico: datagrama no UDP 6667 (lâmpada e broadcast)
-        val (enviado, respostaUdp) = enviaUdp(network, endereco, quadroBytes)
-        if (!enviado) return Entrega.falhou(endereco, "sem conexão (tcp e udp)")
-        if (respostaUdp != null) {
-            val (aceito, codigo) = respostaCodigo(respostaUdp)
-            return Entrega(true, aceito, "$endereco: udp respondeu $codigo")
-        }
-        return Entrega(true, false, "$endereco: udp enviado (sem resposta)" + (problema?.let { " [$it]" } ?: ""))
+        }.getOrElse { Entrega.falhou(endereco, "falhou (" + (it.message ?: it::class.simpleName) + ")") }
     }
 
     /** Abre uma conexão nova com a lâmpada e roda o passo pedido. */
@@ -148,48 +123,6 @@ internal object TuyaApTlsPsk {
         return if (total.size() > 0) total.toByteArray() else null
     }
 
-    /** Datagrama para a lâmpada e para o broadcast; espera breve por resposta. */
-    private fun enviaUdp(network: android.net.Network, endereco: String, quadroBytes: ByteArray): Pair<Boolean, ByteArray?> = runCatching {
-        java.net.DatagramSocket().use { socket ->
-            network.bindSocket(socket)
-            socket.broadcast = true
-            socket.soTimeout = 1_200
-            listOf(endereco, "255.255.255.255").forEach { alvo ->
-                runCatching {
-                    socket.send(java.net.DatagramPacket(quadroBytes, quadroBytes.size, java.net.InetAddress.getByName(alvo), 6667))
-                }
-            }
-            val buffer = ByteArray(2048)
-            val pacote = java.net.DatagramPacket(buffer, buffer.size)
-            val recebeu = runCatching { socket.receive(pacote); true }.getOrDefault(false)
-            true to (if (recebeu) pacote.data.copyOf(pacote.length) else null)
-        }
-    }.getOrDefault(false to null)
-
-    /**
-     * Lê a resposta do aparelho: (aceitou, descrição). Entende o quadro
-     * LPV3.5 (gerações atuais) e o quadro clássico 55 AA (geração anterior);
-     * quando não reconhece a moldura, descreve os bytes para o relato.
-     */
-    private fun respostaCodigo(resposta: ByteArray): Pair<Boolean, String> {
-        lerQuadro(resposta)?.let { (tipo, conteudo) ->
-            if (tipo == 0x14 && conteudo.size >= 4) {
-                val codigo = ((conteudo[0].toInt() and 0xFF) shl 24) or ((conteudo[1].toInt() and 0xFF) shl 16) or
-                    ((conteudo[2].toInt() and 0xFF) shl 8) or (conteudo[3].toInt() and 0xFF)
-                return (codigo == 0) to String.format("0x%08X", codigo)
-            }
-            return false to "lvp35 tipo $tipo"
-        }
-        // quadro clássico: 00 00 55 AA · sequência · comando · tamanho · dados
-        val inicio = procura(resposta, byteArrayOf(0x00, 0x00, 0x55, 0xAA.toByte()))
-        if (inicio >= 0 && resposta.size >= inicio + 16) {
-            val comando = leInt(resposta, inicio + 8)
-            val tamanho = leInt(resposta, inicio + 12)
-            val dados = resposta.copyOfRange(minOf(inicio + 16, resposta.size), minOf(inicio + 16 + tamanho, resposta.size))
-            return false to ("55aa cmd=" + comando + " " + dados.take(40).joinToString("") { "%02x".format(it) })
-        }
-        return false to (resposta.size.toString() + "b " + resposta.take(24).joinToString("") { "%02x".format(it) })
-    }
 
     /** Onde o padrão aparece na resposta (ou -1). */
     private fun procura(bytes: ByteArray, padrao: ByteArray): Int {
@@ -256,6 +189,31 @@ internal object TuyaApTlsPsk {
         cifra.updateAAD(cabecalho)
         tipo to cifra.doFinal(cifrado + etiqueta)
     }.getOrNull()
+
+    /**
+     * Lê a resposta do aparelho: (aceitou, descrição). Entende o quadro
+     * LPV3.5, o quadro clássico 55 AA e, quando não reconhece, descreve os
+     * bytes recebidos.
+     */
+    private fun respostaCodigo(resposta: ByteArray): Pair<Boolean, String> {
+        lerQuadro(resposta)?.let { (tipo, conteudo) ->
+            if (tipo == 0x14 && conteudo.size >= 4) {
+                val codigo = ((conteudo[0].toInt() and 0xFF) shl 24) or ((conteudo[1].toInt() and 0xFF) shl 16) or
+                    ((conteudo[2].toInt() and 0xFF) shl 8) or (conteudo[3].toInt() and 0xFF)
+                return (codigo == 0) to String.format("0x%08X", codigo)
+            }
+            return false to "lvp35 tipo $tipo"
+        }
+        val inicio = procura(resposta, byteArrayOf(0x00, 0x00, 0x55, 0xAA.toByte()))
+        if (inicio >= 0 && resposta.size >= inicio + 16) {
+            val comando = leInt(resposta, inicio + 8)
+            val tamanho = leInt(resposta, inicio + 12)
+            val dados = resposta.copyOfRange(minOf(inicio + 16, resposta.size), minOf(inicio + 16 + tamanho, resposta.size))
+            return false to ("55aa cmd=" + comando + " " + dados.take(40).joinToString("") { "%02x".format(it) })
+        }
+        return false to (resposta.size.toString() + "b " + resposta.take(24).joinToString("") { "%02x".format(it) })
+    }
+
 
     private fun escreveInt(destino: ByteArray, posicao: Int, valor: Int) {
         destino[posicao] = (valor ushr 24).toByte()
