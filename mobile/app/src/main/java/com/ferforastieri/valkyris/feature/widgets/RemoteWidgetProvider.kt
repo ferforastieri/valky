@@ -55,12 +55,25 @@ class RemoteWidgetProvider : ValkyrisWidgetProvider() {
             Key(R.id.widget_remote_home, "KEY_HOME"),
             Key(R.id.widget_remote_menu, "KEY_MENU"),
             Key(R.id.widget_remote_channel_up, "KEY_CHUP"),
+            Key(R.id.widget_remote_channel_list, "KEY_CH_LIST"),
             Key(R.id.widget_remote_channel_down, "KEY_CHDOWN"),
             Key(R.id.widget_remote_volume_up, "KEY_VOLUP"),
             Key(R.id.widget_remote_volume_down, "KEY_VOLDOWN"),
             Key(R.id.widget_remote_mute, "KEY_MUTE"),
         )
         keys.forEachIndexed { index, key -> views.setOnClickPendingIntent(key.view, pendingRemoteKey(context, key.key, 40 + index)) }
+        listOf(
+            R.id.widget_remote_digit_1 to "KEY_1",
+            R.id.widget_remote_digit_2 to "KEY_2",
+            R.id.widget_remote_digit_3 to "KEY_3",
+            R.id.widget_remote_digit_4 to "KEY_4",
+            R.id.widget_remote_digit_5 to "KEY_5",
+            R.id.widget_remote_digit_6 to "KEY_6",
+            R.id.widget_remote_digit_7 to "KEY_7",
+            R.id.widget_remote_digit_8 to "KEY_8",
+            R.id.widget_remote_digit_9 to "KEY_9",
+            R.id.widget_remote_digit_0 to "KEY_0",
+        ).forEachIndexed { index, (view, key) -> views.setOnClickPendingIntent(view, pendingRemoteKey(context, key, 70 + index)) }
         return views
     }
 }

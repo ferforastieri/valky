@@ -333,20 +333,19 @@ private fun FavoriteGrid(
     onOpen: (FavoriteItem) -> Unit,
     onToggleLight: (FavoriteItem) -> Unit,
 ) {
-    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+    com.ferforastieri.valkyris.core.design.AdaptiveRow(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
         items.forEach { favorite ->
             FavoriteCard(
                 item = favorite,
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier.weight(1f),
                 onClick = { onOpen(favorite) },
-                onTogglePower = if (favorite.type == "light") ({ onToggleLight(favorite) }) else null,
             )
         }
     }
 }
 
 @Composable
-private fun FavoriteCard(item: FavoriteItem, modifier: Modifier, onClick: () -> Unit, onTogglePower: (() -> Unit)? = null) {
+private fun FavoriteCard(item: FavoriteItem, modifier: Modifier, onClick: () -> Unit) {
     val lamp = item.type == "light"
     val tint = when {
         !lamp -> MaterialTheme.colorScheme.secondary
@@ -374,18 +373,7 @@ private fun FavoriteCard(item: FavoriteItem, modifier: Modifier, onClick: () -> 
                 overflow = TextOverflow.Ellipsis,
                 color = if (lamp && !item.online) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.onSurface,
             )
-            if (onTogglePower != null) {
-                IconButton(onClick = onTogglePower, enabled = item.online, modifier = Modifier.size(30.dp)) {
-                    Icon(
-                        Lucide.Power,
-                        contentDescription = stringResource(if (item.power) R.string.favorite_light_off else R.string.favorite_light_on),
-                        modifier = Modifier.size(18.dp),
-                        tint = tint,
-                    )
-                }
-            } else {
-                Icon(Lucide.Star, null, Modifier.size(16.dp), tint = MaterialTheme.colorScheme.secondary)
-            }
+            Icon(Lucide.Star, null, Modifier.size(16.dp), tint = MaterialTheme.colorScheme.secondary)
         }
     }
 }
