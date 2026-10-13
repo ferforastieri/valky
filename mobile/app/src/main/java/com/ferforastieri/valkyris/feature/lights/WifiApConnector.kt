@@ -44,18 +44,25 @@ internal class WifiApConnector(context: Context) {
     suspend fun refreshScan(waitMillis: Long = 8_000) = withContext(Dispatchers.IO) {
         if (!canScan()) return@withContext
         val manager = wifi ?: return@withContext
-        val ready = java.util.concurrent.CountDownLatch(1)
-        val receiver = object : android.content.BroadcastReceiver() {
-            override fun onReceive(context: android.content.Context?, intent: android.content.Intent?) {
-                ready.countDown()
+        // Duas chances com espera menor: o Android limita as varreduras por
+        // aplicativo e às vezes ignora o pedido; o aviso de "varredura pronta"
+        // também chega para as varreduras do próprio sistema, que sempre
+        // enxergam a lâmpada.
+        repeat(2) {
+            val ready = java.util.concurrent.CountDownLatch(1)
+            val receiver = object : android.content.BroadcastReceiver() {
+                override fun onReceive(context: android.content.Context?, intent: android.content.Intent?) {
+                    ready.countDown()
+                }
             }
+            runCatching {
+                appContext.registerReceiver(receiver, android.content.IntentFilter(WifiManager.SCAN_RESULTS_AVAILABLE_ACTION))
+            }
+            runCatching { manager.startScan() }
+            val pronto = runCatching { ready.await(waitMillis / 2, java.util.concurrent.TimeUnit.MILLISECONDS) }.getOrDefault(false)
+            runCatching { appContext.unregisterReceiver(receiver) }
+            if (!pronto) kotlinx.coroutines.delay(1_200)
         }
-        runCatching {
-            appContext.registerReceiver(receiver, android.content.IntentFilter(WifiManager.SCAN_RESULTS_AVAILABLE_ACTION))
-        }
-        runCatching { manager.startScan() }
-        runCatching { ready.await(waitMillis, java.util.concurrent.TimeUnit.MILLISECONDS) }
-        runCatching { appContext.unregisterReceiver(receiver) }
     }
 
     /** Nomes típicos das redes que as lâmpadas criam para configuração. */

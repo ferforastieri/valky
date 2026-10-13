@@ -174,32 +174,44 @@ class LightsViewModel @Inject constructor(
             }
             // Varredura nova antes de procurar: a lista guardada pode ser antiga.
             _state.update { it.copy(pairing = PairingProgress("lamp-network", "Procurando a rede da lâmpada…")) }
-            connector.refreshScan()
-            var candidates = withContext(Dispatchers.IO) { connector.candidateNetworks() }
-            var visible = withContext(Dispatchers.IO) { connector.visibleNetworks() }
-            if (candidates.isEmpty() && visible.isEmpty()) {
-                // A primeira varredura logo após a permissão ser concedida às
-                // vezes volta vazia: uma segunda tentativa resolve.
-                connector.refreshScan(5_000)
+            var candidates = emptyList<String>()
+            var visible = emptyList<String>()
+            repeat(4) { round ->
+                connector.refreshScan(if (round == 0) 9_000 else 6_000)
                 candidates = withContext(Dispatchers.IO) { connector.candidateNetworks() }
                 visible = withContext(Dispatchers.IO) { connector.visibleNetworks() }
+                if (candidates.isNotEmpty() || visible.isNotEmpty()) return@repeat
+                delay(2_500)
             }
             val lamp = lampSsid?.takeIf { it.isNotBlank() } ?: candidates.firstOrNull()
             if (lamp == null) {
                 // Nenhum nome conhecido: oferece as redes visíveis para escolha.
                 val message = if (visible.isEmpty()) {
-                    "Não vi nenhuma rede. Confirme que a lâmpada está piscando devagar e que a Localização do celular está ligada."
+                    "Ainda não vi nenhuma rede. Confirme que a lâmpada está piscando devagar e que a Localização do celular está ligada."
                 } else {
                     "Escolha a rede que a lâmpada criou:"
                 }
                 _state.update { it.copy(lampNetworks = visible, pairing = PairingProgress("choose-lamp", message)) }
+                // A lista se atualiza sozinha: a lâmpada costuma aparecer
+                // alguns segundos depois, quando o sistema varre de novo.
+                repeat(20) {
+                    delay(7_000)
+                    if (_state.value.pairing?.phase != "choose-lamp") return@launch
+                    connector.refreshScan(6_000)
+                    val frescas = withContext(Dispatchers.IO) { connector.visibleNetworks() }
+                    val achadas = withContext(Dispatchers.IO) { connector.candidateNetworks() }
+                    if (frescas.isNotEmpty()) {
+                        val aviso = if (achadas.isNotEmpty()) "Achei a rede “${achadas.first()}” — toque nela para continuar:" else "Escolha a rede que a lâmpada criou:"
+                        _state.update { it.copy(lampNetworks = frescas, pairing = PairingProgress("choose-lamp", aviso)) }
+                    }
+                }
                 return@launch
             }
             _state.update { it.copy(pairing = PairingProgress("lamp-network", "Entrando na rede “$lamp” da lâmpada — aceite o aviso do Android.")) }
-            val connection = connector.connect(lamp)
+            val connection = connector.connect(lamp) ?: connector.connect(lamp)
             if (connection == null) {
                 _state.update {
-                    it.copy(pairing = PairingProgress("failed", "O celular não conseguiu entrar na rede da lâmpada. Tente de novo e aceite o aviso do Android."))
+                    it.copy(pairing = PairingProgress("failed", "O celular não conseguiu entrar na rede “$lamp”. Tente de novo e aceite o aviso do Android."))
                 }
                 return@launch
             }
