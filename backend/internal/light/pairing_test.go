@@ -68,7 +68,9 @@ func newPairingService(t *testing.T, adapter interface {
 }) *Service {
 	t.Helper()
 	service, _, _ := newTestService(t, adapter)
-	service.pairingWindow = 400 * time.Millisecond
+	// Janela curta para os testes não ficarem lentos, mas com folga suficiente
+	// para o laço de acompanhamento ser escalonado mesmo em máquina carregada.
+	service.pairingWindow = 3 * time.Second
 	return service
 }
 

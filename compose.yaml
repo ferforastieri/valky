@@ -91,24 +91,6 @@ services:
     security_opt:
       - no-new-privileges:true
 
-  # Servidor de ativação local: faz o papel do servidor do fabricante dentro de
-  # casa e entrega à lâmpada a chave que o Valkyris está usando no pareamento.
-  # Sem ele, uma lâmpada nova fica na rede mas recusa controle local.
-  activation:
-    image: ghcr.io/ferforastieri/valkyris-activation:${VALKYRIS_VERSION:-latest}
-    build:
-      context: backend/activation
-    restart: unless-stopped
-    ports:
-      - "80:80"
-      - "443:443"
-      - "8886:8886"
-    volumes:
-      - valkyris-data:/data:ro
-    networks: [valkyris]
-    security_opt:
-      - no-new-privileges:true
-
 networks:
   valkyris:
     internal: false
