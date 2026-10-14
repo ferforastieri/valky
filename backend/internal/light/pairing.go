@@ -50,9 +50,10 @@ const (
 	PairingFailed  = "failed"  // the window closed without a controllable device
 )
 
-// PairingWindow is how long a session stays open. The vendor application issues
-// a token valid for ten minutes; five is plenty for a lamp on the same desk.
-const PairingWindow = 5 * time.Minute
+// PairingWindow is how long a session stays open. A lamp that just received the
+// credentials takes several minutes to leave the setup access point, join the
+// home network and call home for its key, so the window covers all of that.
+const PairingWindow = 15 * time.Minute
 
 // A lampa guarda o token que recebeu pelo ar. Ele é reaproveitado entre janelas
 // por meia hora e rotacionado depois de cada lâmpada configurada, para uma

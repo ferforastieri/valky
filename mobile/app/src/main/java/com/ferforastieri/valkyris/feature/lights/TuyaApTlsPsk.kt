@@ -296,7 +296,7 @@ internal object TuyaApTlsPsk {
      * 9 = ativada). De tempo em tempo também pergunta o estado
      * (reqType query_netcfg_stat). Para no veredito ou no limite de tempo.
      */
-    private fun acompanhar(servidor: Servidor, onRelato: (String) -> Unit, limiteMillis: Long = 90_000): List<Int> {
+    private fun acompanhar(servidor: Servidor, onRelato: (String) -> Unit, limiteMillis: Long = 20_000): List<Int> {
         val vistos = mutableListOf<Int>()
         val fim = System.currentTimeMillis() + limiteMillis
         var proximaPergunta = System.currentTimeMillis() + 3_000

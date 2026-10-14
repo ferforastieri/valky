@@ -283,12 +283,19 @@ class LightsViewModel @Inject constructor(
                 gateways = gateways,
             ) { aviso ->
                 _state.update { state ->
-                    val texto = if (aviso.startsWith("pareamento")) {
-                        "Entregando os dados do Wi-Fi…"
-                    } else {
-                        "A lâmpada reportou: $aviso"
+                    val texto = when {
+                        aviso.startsWith("pareamento") -> "Entregando os dados do Wi-Fi…"
+                        // Aceite é só o começo: ela agora vai entrar na rede e isso
+                        // leva alguns minutos. A folha mostra isso desde já, sem
+                        // parecer parada esperando um veredito que não vem.
+                        aviso.startsWith("0 ") -> null
+                        else -> "A lâmpada reportou: $aviso"
                     }
-                    state.copy(pairing = PairingProgress("sending", texto))
+                    if (texto == null) {
+                        state.copy(pairing = PairingProgress("waiting", ACEITOU_AVISO))
+                    } else {
+                        state.copy(pairing = PairingProgress("sending", texto))
+                    }
                 }
             }
         } finally {
@@ -314,13 +321,14 @@ class LightsViewModel @Inject constructor(
         _state.update {
             val texto = when {
                 veredito == 9 -> "Ativada! Ela entrou na rede e pegou a chave. Pode voltar o celular para o Wi-Fi de casa."
-                resultado.confirmado -> "Dados aceitos! Pode voltar o celular para o Wi-Fi de casa — eu envio o relatório e confirmo sozinho."
+                resultado.confirmado -> ACEITOU_AVISO
                 else -> "Dados enviados! Pode voltar o celular para o Wi-Fi de casa — eu envio o relatório e confirmo sozinho."
             }
             it.copy(pairing = PairingProgress("waiting", texto))
         }
-        // Espera limitada: se a lâmpada não aparecer em 4 minutos, avisa.
-        val limite = System.currentTimeMillis() + 4 * 60 * 1000
+        // Espera limitada: ela leva alguns minutos para entrar na rede; se não
+        // aparecer até o fim da janela, a folha diz o que fazer.
+        val limite = System.currentTimeMillis() + 12 * 60 * 1000
         while (coroutineContext.isActive && System.currentTimeMillis() < limite) {
             val status = runCatching { repository.lightPairingStatus(session.id) }.getOrNull()
             if (status != null) {
@@ -335,7 +343,7 @@ class LightsViewModel @Inject constructor(
         }
         if (coroutineContext.isActive) {
             _state.update {
-                it.copy(pairing = PairingProgress("failed", "A lâmpada não apareceu na rede de casa. Deixe-a piscando devagar e tente de novo."))
+                it.copy(pairing = PairingProgress("failed", "A lâmpada não apareceu na rede de casa. Deixe-a ligada por alguns minutos e abra o + de novo — o servidor a encontra na hora."))
             }
         }
     }
@@ -411,6 +419,13 @@ class LightsViewModel @Inject constructor(
         super.onCleared()
     }
 }
+
+/**
+ * Depois do aceite a lâmpada leva alguns minutos para entrar na rede de casa.
+ * A folha mostra isso desde o primeiro instante, sem parecer travada esperando
+ * um veredito que o canal dela não entrega mais.
+ */
+private const val ACEITOU_AVISO = "Ela aceitou os dados! Agora está entrando na rede de casa — isso leva alguns minutos. Pode voltar o celular para o Wi-Fi de casa; eu acompanho sozinho."
 
 /** Nome da rede Wi-Fi atual, quando o sistema permite ler. */
 internal fun currentSsid(context: Context): String? {
