@@ -29,7 +29,7 @@ import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import com.composables.icons.lucide.*
 import com.ferforastieri.valkyris.R
-import com.ferforastieri.valkyris.core.design.LightBulbIcon
+import com.ferforastieri.valkyris.core.design.onColorFor
 import com.ferforastieri.valkyris.core.design.warmWhiteColor
 import com.ferforastieri.valkyris.core.model.LightColor
 import com.ferforastieri.valkyris.core.model.LightDevice
@@ -44,13 +44,11 @@ fun LightDetailPage(
     light: LightDevice,
     busy: Boolean,
     onDismiss: () -> Unit,
-    onRename: () -> Unit,
-    onFavorite: () -> Unit,
     onChange: (LightStatePatch) -> Unit,
 ) {
     Dialog(onDismissRequest = onDismiss, properties = DialogProperties(usePlatformDefaultWidth = false, dismissOnClickOutside = false)) {
         Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.surface) {
-            LightDetailContent(light, busy, onDismiss, onRename, onFavorite, onChange)
+            LightDetailContent(light, busy, onDismiss, onChange)
         }
     }
 }
@@ -60,8 +58,6 @@ internal fun LightDetailContent(
     light: LightDevice,
     busy: Boolean,
     onDismiss: () -> Unit,
-    onRename: () -> Unit,
-    onFavorite: () -> Unit,
     onChange: (LightStatePatch) -> Unit,
 ) {
     var brightness by remember(light.id) { mutableFloatStateOf(light.state.brightness.coerceIn(1, 100).toFloat()) }
@@ -70,8 +66,6 @@ internal fun LightDetailContent(
     var saturation by remember(light.id) { mutableFloatStateOf(light.state.color.saturation.coerceIn(0, 100).toFloat()) }
     // 0 = Cor, 1 = Branco
     var tab by remember(light.id) { mutableIntStateOf(if (light.state.mode == "color") 0 else 1) }
-    var moreColors by remember { mutableStateOf(false) }
-    var menu by remember { mutableStateOf(false) }
     val on = light.state.power
     val reachable = light.state.online && !busy
     val aura = if (light.state.mode == "color") {
@@ -91,24 +85,14 @@ internal fun LightDetailContent(
         ) {
             Column(Modifier.fillMaxSize().padding(horizontal = 18.dp)) {
                 Spacer(Modifier.height(30.dp))
-                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    LightBulbIcon(on, aura, Modifier.size(34.dp))
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Icon(
+                        if (on) Lucide.Lightbulb else Lucide.LightbulbOff,
+                        null,
+                        Modifier.size(28.dp),
+                        tint = if (on) onColorFor(aura) else MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
                     Text(light.name, Modifier.weight(1f), style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.SemiBold, maxLines = 1)
-                    Box {
-                        IconButton(onClick = { menu = true }) { Icon(Lucide.EllipsisVertical, stringResource(R.string.light_more_actions)) }
-                        DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
-                            DropdownMenuItem(
-                                text = { Text(stringResource(if (light.favorite) R.string.unfavorite else R.string.favorite)) },
-                                leadingIcon = { Icon(Lucide.Star, null) },
-                                onClick = { menu = false; onFavorite() },
-                            )
-                            DropdownMenuItem(
-                                text = { Text(stringResource(R.string.light_edit)) },
-                                leadingIcon = { Icon(Lucide.Pencil, null) },
-                                onClick = { menu = false; onRename() },
-                            )
-                        }
-                    }
                     IconButton(onClick = onDismiss) { Icon(Lucide.X, stringResource(R.string.close)) }
                 }
                 Spacer(Modifier.weight(1f))
@@ -143,29 +127,24 @@ internal fun LightDetailContent(
                     Modifier.fillMaxWidth().clip(RoundedCornerShape(18.dp)).background(MaterialTheme.colorScheme.surface),
                     horizontalArrangement = Arrangement.spacedBy(6.dp),
                 ) {
-                    DetailTab(stringResource(R.string.light_tab_color), tab == 0, light.capabilities.color, Modifier.weight(1f)) { tab = 0 }
+                    DetailTab(stringResource(R.string.light_tab_color), tab == 0, light.capabilities.color, Modifier.weight(1f)) { tab = 0; if (saturation < 5f) saturation = 100f }
                     DetailTab(stringResource(R.string.light_tab_white), tab == 1, light.capabilities.brightness || light.capabilities.colorTemperature, Modifier.weight(1f)) { tab = 1 }
                 }
                 if (!light.state.online) Text(stringResource(R.string.unavailable), color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
                 if (tab == 0) {
-                    ColorPresets(hue, moreColors, { moreColors = !moreColors }, reachable) { preset ->
-                        hue = preset.toFloat(); saturation = 100f
-                        apply(LightStatePatch(color = LightColor(preset, 100, brightness.toInt())))
-                    }
+                    // Sem sugestões: o bloco de matiz é o controle. Ao arrastar a
+                    // saturação vai a 100 — sem isso, uma lâmpada que estava no
+                    // branco (saturação 0) continuaria branca e a cor não aparecia.
                     GradientBar(
                         brush = Brush.horizontalGradient(hueSpectrum),
                         value = hue / 360f,
                         enabled = reachable,
                         height = 170.dp,
                         badge = stringResource(R.string.light_hue_badge, hue.toInt()),
-                        onChange = { hue = it * 360f },
-                        onFinished = { apply(LightStatePatch(color = LightColor(hue.toInt(), saturation.toInt(), brightness.toInt()))) },
+                        onChange = { hue = it * 360f; saturation = 100f },
+                        onFinished = { apply(LightStatePatch(color = LightColor(hue.toInt(), saturation.toInt().coerceAtLeast(100), brightness.toInt()))) },
                     )
                 } else {
-                    WhitePresets(temperature.toInt(), moreColors, { moreColors = !moreColors }, reachable) { kelvin ->
-                        temperature = kelvin.toFloat()
-                        apply(LightStatePatch(temperatureKelvin = kelvin))
-                    }
                     GradientBar(
                         brush = Brush.horizontalGradient(listOf(warmWhiteColor(2700), warmWhiteColor(4000), warmWhiteColor(6500))),
                         value = (temperature - 2700f) / 3800f,
@@ -217,52 +196,6 @@ private fun DetailTab(label: String, selected: Boolean, enabled: Boolean, modifi
                 else -> MaterialTheme.colorScheme.onSurfaceVariant
             },
         )
-    }
-}
-
-@Composable
-private fun ColorPresets(hue: Float, expanded: Boolean, onToggleMore: () -> Unit, enabled: Boolean, onPick: (Int) -> Unit) {
-    val base = listOf(30, 200, 0, 120, 275)
-    val extra = listOf(55, 90, 160, 240, 320, 350)
-    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp), verticalAlignment = Alignment.CenterVertically) {
-        (if (expanded) base + extra else base).forEach { preset ->
-            val chosen = hue.toInt() == preset
-            Surface(
-                onClick = { onPick(preset) },
-                enabled = enabled,
-                modifier = Modifier.size(38.dp),
-                shape = CircleShape,
-                color = Color.hsv(preset.toFloat(), 1f, 1f),
-                border = androidx.compose.foundation.BorderStroke(if (chosen) 2.dp else 0.dp, if (chosen) MaterialTheme.colorScheme.onSurface else Color.Transparent),
-            ) {}
-        }
-        Spacer(Modifier.weight(1f))
-        Surface(onClick = onToggleMore, enabled = enabled, modifier = Modifier.size(38.dp), shape = CircleShape, color = MaterialTheme.colorScheme.surface) {
-            Icon(if (expanded) Lucide.Minus else Lucide.Plus, stringResource(R.string.light_more_colors), Modifier.padding(9.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
-        }
-    }
-}
-
-@Composable
-private fun WhitePresets(kelvin: Int, expanded: Boolean, onToggleMore: () -> Unit, enabled: Boolean, onPick: (Int) -> Unit) {
-    val base = listOf(2700, 4000, 6500)
-    val extra = listOf(3000, 5000)
-    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp), verticalAlignment = Alignment.CenterVertically) {
-        (if (expanded) base + extra else base).forEach { value ->
-            val chosen = kotlin.math.abs(kelvin - value) < 200
-            Surface(
-                onClick = { onPick(value) },
-                enabled = enabled,
-                modifier = Modifier.size(38.dp),
-                shape = CircleShape,
-                color = warmWhiteColor(value),
-                border = androidx.compose.foundation.BorderStroke(if (chosen) 2.dp else 0.dp, if (chosen) MaterialTheme.colorScheme.onSurface else Color.Transparent),
-            ) {}
-        }
-        Spacer(Modifier.weight(1f))
-        Surface(onClick = onToggleMore, enabled = enabled, modifier = Modifier.size(38.dp), shape = CircleShape, color = MaterialTheme.colorScheme.surface) {
-            Icon(if (expanded) Lucide.Minus else Lucide.Plus, stringResource(R.string.light_more_colors), Modifier.padding(9.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
-        }
     }
 }
 

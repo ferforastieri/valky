@@ -60,7 +60,7 @@ class LightScreenshotsTest {
     fun lightDetailWhite() {
         compose.setContent {
             ValkyrisTheme(mode = "dark") {
-                LightDetailContent(sample(mode = "white", kelvin = 4000), false, {}, {}, {}, {})
+                LightDetailContent(sample(mode = "white", kelvin = 4000), false, {}, {})
             }
         }
         compose.onRoot().captureRoboImage("build/screenshots/light-detail-branco.png")
@@ -70,7 +70,7 @@ class LightScreenshotsTest {
     fun lightDetailColor() {
         compose.setContent {
             ValkyrisTheme(mode = "dark") {
-                LightDetailContent(sample(mode = "color", hue = 30), false, {}, {}, {}, {})
+                LightDetailContent(sample(mode = "color", hue = 30), false, {}, {})
             }
         }
         compose.onRoot().captureRoboImage("build/screenshots/light-detail-cor.png")

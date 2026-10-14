@@ -21,9 +21,7 @@ import androidx.lifecycle.compose.LifecycleResumeEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.composables.icons.lucide.*
 import com.ferforastieri.valkyris.R
-import com.ferforastieri.valkyris.core.design.LightBulbIcon
 import com.ferforastieri.valkyris.core.design.ValkyrisBottomSheet
-import com.ferforastieri.valkyris.core.design.warmWhiteColor
 import com.ferforastieri.valkyris.core.model.*
 
 @Composable fun LightsScreen(admin:Boolean,vm:LightsViewModel=hiltViewModel()){
@@ -64,8 +62,6 @@ import com.ferforastieri.valkyris.core.model.*
             light=light,
             busy=light.id in state.busy,
             onDismiss={selectedId=null},
-            onRename={renaming=light},
-            onFavorite={vm.toggleFavorite(light.id,!light.favorite)},
             onChange={vm.control(light.id,it)},
         )
     }
@@ -77,7 +73,7 @@ import com.ferforastieri.valkyris.core.model.*
     Box(Modifier.fillMaxSize(),contentAlignment=Alignment.Center){
         Surface(shape=MaterialTheme.shapes.large,color=MaterialTheme.colorScheme.surface,border=BorderStroke(1.dp,MaterialTheme.colorScheme.outlineVariant),shadowElevation=3.dp){
             Column(Modifier.padding(horizontal=26.dp,vertical=24.dp).widthIn(max=340.dp),horizontalAlignment=Alignment.CenterHorizontally,verticalArrangement=Arrangement.spacedBy(10.dp)){
-                Surface(shape=CircleShape,color=MaterialTheme.colorScheme.secondaryContainer){LightBulbIcon(false,MaterialTheme.colorScheme.onSecondaryContainer,Modifier.padding(11.dp).size(28.dp))}
+                Surface(shape=CircleShape,color=MaterialTheme.colorScheme.secondaryContainer){Icon(Lucide.LightbulbOff,null,Modifier.padding(11.dp).size(28.dp),tint=MaterialTheme.colorScheme.onSecondaryContainer)}
                 Text(stringResource(R.string.no_lights),fontWeight=FontWeight.SemiBold,style=MaterialTheme.typography.titleMedium)
                 Text(stringResource(if(admin)R.string.no_lights_body_admin else R.string.no_lights_body),color=MaterialTheme.colorScheme.onSurfaceVariant,style=MaterialTheme.typography.bodyMedium,textAlign=androidx.compose.ui.text.style.TextAlign.Center)
             }
@@ -92,7 +88,6 @@ import com.ferforastieri.valkyris.core.model.*
  * liga ou desliga.
  */
 @Composable internal fun LightCard(light:LightDevice,busy:Boolean,onPower:()->Unit,onOpen:()->Unit,onRemove:(()->Unit)?,onFavorite:(()->Unit)?=null,onEdit:(()->Unit)?=null){
-    val bulbColor=if(light.state.mode=="color")Color.hsv(light.state.color.hue.toFloat(),light.state.color.saturation/100f,(light.state.color.value/100f).coerceAtLeast(.45f))else warmWhiteColor(light.state.temperatureKelvin)
     val on=light.state.power
     Card(onClick=onOpen,colors=CardDefaults.cardColors(containerColor=MaterialTheme.colorScheme.surface),border=BorderStroke(1.dp,MaterialTheme.colorScheme.outlineVariant)){
         Row(Modifier.fillMaxWidth().padding(16.dp),verticalAlignment=Alignment.CenterVertically){
@@ -101,7 +96,7 @@ import com.ferforastieri.valkyris.core.model.*
                 enabled=light.state.online,
                 shape=CircleShape,
                 color=MaterialTheme.colorScheme.secondaryContainer,
-            ){LightBulbIcon(on&&light.state.online,bulbColor,Modifier.padding(9.dp).size(30.dp))}
+            ){Icon(if(on)Lucide.Lightbulb else Lucide.LightbulbOff,null,Modifier.padding(9.dp).size(30.dp),tint=if(on&&light.state.online)MaterialTheme.colorScheme.secondary else MaterialTheme.colorScheme.onSecondaryContainer)}
             Spacer(Modifier.width(13.dp))
             Column(Modifier.weight(1f)){
                 Text(light.name,fontWeight=FontWeight.SemiBold)

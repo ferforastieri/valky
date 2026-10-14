@@ -51,6 +51,7 @@ import androidx.lifecycle.viewModelScope
 import com.composables.icons.lucide.Bell
 import com.composables.icons.lucide.Camera
 import com.composables.icons.lucide.Lightbulb
+import com.composables.icons.lucide.LightbulbOff
 import com.composables.icons.lucide.Lucide
 import com.composables.icons.lucide.Mic
 import com.composables.icons.lucide.Power
@@ -356,9 +357,9 @@ internal fun FavoriteGrid(
 }
 
 @Composable
-private fun FavoriteCard(item: FavoriteItem, modifier: Modifier, onClick: () -> Unit) {
+internal fun FavoriteCard(item: FavoriteItem, modifier: Modifier, onClick: () -> Unit) {
     val lamp = item.type == "light"
-    val bulbColor = if (item.power) Color(0xFFFFC46B) else MaterialTheme.colorScheme.onSurfaceVariant
+    val lit = lamp && item.power && item.online
     Card(
         onClick = onClick,
         modifier = modifier,
@@ -370,10 +371,15 @@ private fun FavoriteCard(item: FavoriteItem, modifier: Modifier, onClick: () -> 
         Row(Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 12.dp), verticalAlignment = Alignment.CenterVertically) {
             Surface(Modifier.size(36.dp), RoundedCornerShape(11.dp), color = com.ferforastieri.valkyris.core.design.ColorTokens.BrandTile) {
                 if (lamp) {
-                    com.ferforastieri.valkyris.core.design.LightBulbIcon(
-                        on = item.power && item.online,
-                        color = bulbColor,
-                        modifier = Modifier.padding(7.dp),
+                    Icon(
+                        if (lit) Lucide.Lightbulb else Lucide.LightbulbOff,
+                        null,
+                        Modifier.padding(9.dp),
+                        tint = when {
+                            lit -> MaterialTheme.colorScheme.secondary
+                            item.online -> MaterialTheme.colorScheme.onSurfaceVariant
+                            else -> MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = .5f)
+                        },
                     )
                 } else {
                     Icon(favoriteIcon(item.type), null, Modifier.padding(9.dp), tint = MaterialTheme.colorScheme.secondary)
