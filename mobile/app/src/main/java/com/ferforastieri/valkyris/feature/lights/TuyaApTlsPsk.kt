@@ -87,7 +87,14 @@ internal object TuyaApTlsPsk {
                 servidorAtual = servidor
                 falante.socket.use {
                     servidor.abre()
-                    return Entrega(true, true, "$endereco: " + responder(servidor.envia(quadroBytes), "tls-servidor"))
+                    // A geração dela PEDE os dados: ela manda um quadro (tipo 12)
+                    // e nós respondemos com o MESMO tipo carregando o JSON. Se
+                    // ela não pedir, oferecemos no tipo atual (0x14).
+                    val pedido = servidor.le(2_500)
+                    val tipo = pedido?.first ?: 0x14
+                    val resposta = servidor.envia(quadro(tipo, corpo))
+                    val visto = if (pedido != null) "pediu tipo $tipo; " else ""
+                    return Entrega(true, true, "$endereco: " + visto + responder(resposta, "tls-servidor"))
                 }
             }
             // 2) nós falamos primeiro (geração atual)
@@ -245,7 +252,7 @@ internal object TuyaApTlsPsk {
                     ((conteudo[2].toInt() and 0xFF) shl 8) or (conteudo[3].toInt() and 0xFF)
                 return (codigo == 0) to String.format("0x%08X", codigo)
             }
-            return false to "lvp35 tipo $tipo"
+            return false to ("lvp35 tipo $tipo " + conteudo.take(16).joinToString("") { "%02x".format(it) })
         }
         val inicio = procura(resposta, byteArrayOf(0x00, 0x00, 0x55, 0xAA.toByte()))
         if (inicio >= 0 && resposta.size >= inicio + 16) {
@@ -845,6 +852,18 @@ internal object TuyaApTlsPsk {
             enviaRegistro(20, byteArrayOf(1))
             val resumoFinal = MessageDigest.getInstance("SHA-256").digest(historico.toByteArray())
             enviaRegistroCifrado(22, mensagem(20, prf(mestra, "server finished".toByteArray() + resumoFinal, 12)))
+        }
+
+        /** Lê um quadro dela (se vier dentro do tempo). Devolve (tipo, conteúdo). */
+        fun le(millis: Int): Pair<Int, ByteArray>? {
+            val fim = System.currentTimeMillis() + millis
+            while (System.currentTimeMillis() < fim) {
+                val registro = runCatching { leRegistroCifrado() }.getOrNull() ?: return null
+                if (registro.first != 23) continue
+                val (tipo, conteudo) = lerQuadro(registro.second) ?: continue
+                return tipo to conteudo
+            }
+            return null
         }
 
         /** Manda os dados de aplicação e devolve a próxima resposta dela. */
