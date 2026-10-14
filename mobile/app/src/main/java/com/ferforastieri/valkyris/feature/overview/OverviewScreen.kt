@@ -213,11 +213,9 @@ fun OverviewContent(
                 }
             }
         } else {
-            // Uma seção só de favoritos, em grade de duas colunas: câmeras,
-            // lâmpadas e controles convivem na mesma seção (o ícone de cada
-            // cartão já diz de que se trata). Os cartões nunca ficam esticados
-            // sozinhos na linha.
-            item(key = "favorites-label") { SectionLabel(stringResource(R.string.overview_favorites), Lucide.Star) }
+            // Uma única seção de favoritos: só a grade, sem rótulo nem ícone.
+            // As colunas são escolhidas para as linhas ficarem equilibradas
+            // (ex.: 4 vira 2+2; 5 vira 3+2), nunca uma linha com um só controle.
             item(key = "favorites-grid") {
                 FavoriteGrid(
                     items = orderedFavorites(favorites),
@@ -233,7 +231,6 @@ fun OverviewContent(
                 )
             }
         }
-        item(key = "overview-divider") { HorizontalDivider(Modifier.padding(vertical = 2.dp)) }
         item(key = "activity-label") { SectionLabel(stringResource(R.string.recent_activity)) }
         item { activityChart() }
         if (events.isEmpty()) {
@@ -330,16 +327,17 @@ internal fun orderedFavorites(favorites: List<FavoriteItem>): List<FavoriteItem>
     favoriteOrder.flatMap { type -> favorites.filter { it.type == type } }
 
 /**
- * Cartões favoritos em grade de duas colunas. Com fonte ampliada (ou tela
- * estreita) passa a uma coluna, para o rótulo não ser espremido. Cada linha
- * mantém cartões do mesmo tamanho, mesmo quando sobra um só.
+ * Cartões favoritos em grade única. As colunas são calculadas para as linhas
+ * ficarem equilibradas (4 → 2+2, 5 → 3+2, 6 → 3+3), sempre com cartões do mesmo
+ * tamanho. Com fonte ampliada vira uma coluna só.
  */
 @Composable
-private fun FavoriteGrid(
+internal fun FavoriteGrid(
     items: List<FavoriteItem>,
     onOpen: (FavoriteItem) -> Unit,
     onToggleLight: (FavoriteItem) -> Unit,
 ) {
+    val count = items.size
     val columns = if (LocalDensity.current.fontScale >= 1.3f) 1 else 2
     Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(10.dp)) {
         items.chunked(columns).forEach { row ->
@@ -369,28 +367,27 @@ private fun FavoriteCard(item: FavoriteItem, modifier: Modifier, onClick: () -> 
         border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
         elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
     ) {
-        Row(Modifier.fillMaxWidth().padding(15.dp), verticalAlignment = Alignment.CenterVertically) {
-            Surface(Modifier.size(40.dp), RoundedCornerShape(12.dp), color = com.ferforastieri.valkyris.core.design.ColorTokens.BrandTile) {
+        Row(Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 12.dp), verticalAlignment = Alignment.CenterVertically) {
+            Surface(Modifier.size(36.dp), RoundedCornerShape(11.dp), color = com.ferforastieri.valkyris.core.design.ColorTokens.BrandTile) {
                 if (lamp) {
                     com.ferforastieri.valkyris.core.design.LightBulbIcon(
                         on = item.power && item.online,
                         color = bulbColor,
-                        modifier = Modifier.padding(8.dp),
+                        modifier = Modifier.padding(7.dp),
                     )
                 } else {
-                    Icon(favoriteIcon(item.type), null, Modifier.padding(10.dp), tint = MaterialTheme.colorScheme.secondary)
+                    Icon(favoriteIcon(item.type), null, Modifier.padding(9.dp), tint = MaterialTheme.colorScheme.secondary)
                 }
             }
-            Spacer(Modifier.width(12.dp))
+            Spacer(Modifier.width(11.dp))
             Text(
                 item.name,
                 Modifier.weight(1f),
-                fontWeight = FontWeight.SemiBold,
-                maxLines = 1,
+                style = MaterialTheme.typography.labelLarge,
+                maxLines = 2,
                 overflow = TextOverflow.Ellipsis,
                 color = if (lamp && !item.online) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.onSurface,
             )
-            Icon(Lucide.Star, null, Modifier.size(16.dp), tint = MaterialTheme.colorScheme.secondary)
         }
     }
 }

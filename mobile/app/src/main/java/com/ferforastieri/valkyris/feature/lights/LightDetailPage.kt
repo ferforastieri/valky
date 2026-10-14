@@ -37,11 +37,26 @@ import com.ferforastieri.valkyris.core.model.LightStatePatch
 
 /**
  * Página da lâmpada em tela cheia: cabeçalho com o nome e o liga/desliga, e um
- * painel com as abas "Cor" e "Branco", blocos arrastáveis e o brilho. Nada de
- * sliders de material nem de folha que sobe e desce.
+ * painel com as abas "Cor" e "Branco", blocos arrastáveis e o brilho.
  */
 @Composable
 fun LightDetailPage(
+    light: LightDevice,
+    busy: Boolean,
+    onDismiss: () -> Unit,
+    onRename: () -> Unit,
+    onFavorite: () -> Unit,
+    onChange: (LightStatePatch) -> Unit,
+) {
+    Dialog(onDismissRequest = onDismiss, properties = DialogProperties(usePlatformDefaultWidth = false, dismissOnClickOutside = false)) {
+        Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.surface) {
+            LightDetailContent(light, busy, onDismiss, onRename, onFavorite, onChange)
+        }
+    }
+}
+
+@Composable
+internal fun LightDetailContent(
     light: LightDevice,
     busy: Boolean,
     onDismiss: () -> Unit,
@@ -64,118 +79,119 @@ fun LightDetailPage(
     } else {
         warmWhiteColor(temperature.toInt())
     }
+    // Mexer em cor, branco ou brilho também acende a lâmpada: sem isso, escolher
+    // uma cor numa luz apagada não muda nada (parecia que ela tinha "apagado").
+    fun apply(patch: LightStatePatch) = onChange(if (light.state.power) patch else patch.copy(power = true))
 
-    Dialog(onDismissRequest = onDismiss, properties = DialogProperties(usePlatformDefaultWidth = false, dismissOnClickOutside = false)) {
-        Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.surface) {
-            Column(Modifier.fillMaxSize()) {
-                // Cabeçalho sobre um fundo ambiente na cor da lâmpada.
-                Box(
-                    Modifier.fillMaxWidth().height(232.dp)
-                        .background(Brush.verticalGradient(listOf(aura.copy(alpha = .55f), MaterialTheme.colorScheme.surface))),
-                ) {
-                    Column(Modifier.fillMaxSize().padding(horizontal = 18.dp)) {
-                        Spacer(Modifier.height(30.dp))
-                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                            LightBulbIcon(on, aura, Modifier.size(34.dp))
-                            Text(light.name, Modifier.weight(1f), style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.SemiBold, maxLines = 1)
-                            Box {
-                                IconButton(onClick = { menu = true }) { Icon(Lucide.EllipsisVertical, stringResource(R.string.light_more_actions)) }
-                                DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
-                                    DropdownMenuItem(
-                                        text = { Text(stringResource(if (light.favorite) R.string.unfavorite else R.string.favorite)) },
-                                        leadingIcon = { Icon(Lucide.Star, null) },
-                                        onClick = { menu = false; onFavorite() },
-                                    )
-                                    DropdownMenuItem(
-                                        text = { Text(stringResource(R.string.light_edit)) },
-                                        leadingIcon = { Icon(Lucide.Pencil, null) },
-                                        onClick = { menu = false; onRename() },
-                                    )
-                                }
-                            }
-                            IconButton(onClick = onDismiss) { Icon(Lucide.X, stringResource(R.string.close)) }
-                        }
-                        Spacer(Modifier.weight(1f))
-                        Text(stringResource(R.string.light_power_label), style = MaterialTheme.typography.bodyMedium)
-                        Spacer(Modifier.height(4.dp))
-                        Switch(
-                            checked = on,
-                            onCheckedChange = { onChange(LightStatePatch(power = it)) },
-                            enabled = reachable,
-                            modifier = Modifier.scale(1.18f),
-                            colors = SwitchDefaults.colors(
-                                checkedTrackColor = MaterialTheme.colorScheme.secondary,
-                                checkedThumbColor = Color.White,
-                                uncheckedTrackColor = MaterialTheme.colorScheme.surfaceVariant,
-                                uncheckedThumbColor = MaterialTheme.colorScheme.outline,
-                            ),
-                        )
-                        Spacer(Modifier.height(20.dp))
-                    }
-                }
-                // Painel de ajustes.
-                Surface(
-                    Modifier.fillMaxWidth().weight(1f),
-                    shape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp),
-                    color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = .35f),
-                ) {
-                    Column(
-                        Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = 18.dp, vertical = 18.dp),
-                        verticalArrangement = Arrangement.spacedBy(16.dp),
-                    ) {
-                        Row(
-                            Modifier.fillMaxWidth().clip(RoundedCornerShape(18.dp)).background(MaterialTheme.colorScheme.surface),
-                            horizontalArrangement = Arrangement.spacedBy(6.dp),
-                        ) {
-                            DetailTab(stringResource(R.string.light_tab_color), tab == 0, light.capabilities.color, Modifier.weight(1f)) { tab = 0 }
-                            DetailTab(stringResource(R.string.light_tab_white), tab == 1, light.capabilities.brightness || light.capabilities.colorTemperature, Modifier.weight(1f)) { tab = 1 }
-                        }
-                        if (!light.state.online) Text(stringResource(R.string.unavailable), color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
-                        if (tab == 0) {
-                            ColorPresets(hue, moreColors, { moreColors = !moreColors }, reachable) { preset ->
-                                hue = preset.toFloat(); saturation = 100f
-                                onChange(LightStatePatch(color = LightColor(preset, 100, brightness.toInt())))
-                            }
-                            GradientBar(
-                                brush = Brush.horizontalGradient(hueSpectrum),
-                                value = hue / 360f,
-                                enabled = reachable,
-                                badge = stringResource(R.string.light_hue_badge, hue.toInt()),
-                                onChange = { hue = it * 360f },
-                                onFinished = { onChange(LightStatePatch(color = LightColor(hue.toInt(), saturation.toInt(), brightness.toInt()))) },
+    Column(Modifier.fillMaxSize()) {
+        // Cabeçalho sobre um fundo ambiente na cor da lâmpada.
+        Box(
+            Modifier.fillMaxWidth().height(232.dp)
+                .background(Brush.verticalGradient(listOf(aura.copy(alpha = .55f), MaterialTheme.colorScheme.surface))),
+        ) {
+            Column(Modifier.fillMaxSize().padding(horizontal = 18.dp)) {
+                Spacer(Modifier.height(30.dp))
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    LightBulbIcon(on, aura, Modifier.size(34.dp))
+                    Text(light.name, Modifier.weight(1f), style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.SemiBold, maxLines = 1)
+                    Box {
+                        IconButton(onClick = { menu = true }) { Icon(Lucide.EllipsisVertical, stringResource(R.string.light_more_actions)) }
+                        DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
+                            DropdownMenuItem(
+                                text = { Text(stringResource(if (light.favorite) R.string.unfavorite else R.string.favorite)) },
+                                leadingIcon = { Icon(Lucide.Star, null) },
+                                onClick = { menu = false; onFavorite() },
                             )
-                        } else {
-                            WhitePresets(temperature.toInt(), reachable) { kelvin ->
-                                temperature = kelvin.toFloat()
-                                onChange(LightStatePatch(temperatureKelvin = kelvin))
-                            }
-                            GradientBar(
-                                brush = Brush.horizontalGradient(listOf(warmWhiteColor(2700), warmWhiteColor(4000), warmWhiteColor(6500))),
-                                value = (temperature - 2700f) / 3800f,
-                                enabled = reachable,
-                                badge = stringResource(R.string.light_kelvin_badge, temperature.toInt()),
-                                onChange = { temperature = 2700f + it * 3800f },
-                                onFinished = { onChange(LightStatePatch(temperatureKelvin = temperature.toInt())) },
+                            DropdownMenuItem(
+                                text = { Text(stringResource(R.string.light_edit)) },
+                                leadingIcon = { Icon(Lucide.Pencil, null) },
+                                onClick = { menu = false; onRename() },
                             )
                         }
-                        Text(stringResource(R.string.light_brightness), style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
-                        GradientBar(
-                            brush = Brush.horizontalGradient(listOf(MaterialTheme.colorScheme.surfaceVariant, aura)),
-                            value = (brightness - 1f) / 99f,
-                            enabled = reachable,
-                            height = 66.dp,
-                            onChange = { brightness = (1f + it * 99f).coerceIn(1f, 100f) },
-                            onFinished = { onChange(LightStatePatch(brightness = brightness.toInt())) },
-                            overlay = {
-                                Row(Modifier.align(Alignment.CenterStart).padding(start = 16.dp), verticalAlignment = Alignment.CenterVertically) {
-                                    Icon(Lucide.Sun, null, Modifier.size(22.dp), tint = Color.White.copy(alpha = .92f))
-                                    Spacer(Modifier.width(8.dp))
-                                    Text("${brightness.toInt()}%", color = Color.White, fontWeight = FontWeight.SemiBold)
-                                }
-                            },
-                        )
                     }
+                    IconButton(onClick = onDismiss) { Icon(Lucide.X, stringResource(R.string.close)) }
                 }
+                Spacer(Modifier.weight(1f))
+                Text(stringResource(R.string.light_power_label), style = MaterialTheme.typography.bodyMedium)
+                Spacer(Modifier.height(4.dp))
+                Switch(
+                    checked = on,
+                    onCheckedChange = { onChange(LightStatePatch(power = it)) },
+                    enabled = reachable,
+                    modifier = Modifier.scale(1.18f),
+                    colors = SwitchDefaults.colors(
+                        checkedTrackColor = MaterialTheme.colorScheme.secondary,
+                        checkedThumbColor = Color.White,
+                        uncheckedTrackColor = MaterialTheme.colorScheme.surfaceVariant,
+                        uncheckedThumbColor = MaterialTheme.colorScheme.outline,
+                    ),
+                )
+                Spacer(Modifier.height(20.dp))
+            }
+        }
+        // Painel de ajustes.
+        Surface(
+            Modifier.fillMaxWidth().weight(1f),
+            shape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp),
+            color = MaterialTheme.colorScheme.surfaceVariant,
+        ) {
+            Column(
+                Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = 18.dp, vertical = 18.dp),
+                verticalArrangement = Arrangement.spacedBy(16.dp),
+            ) {
+                Row(
+                    Modifier.fillMaxWidth().clip(RoundedCornerShape(18.dp)).background(MaterialTheme.colorScheme.surface),
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                ) {
+                    DetailTab(stringResource(R.string.light_tab_color), tab == 0, light.capabilities.color, Modifier.weight(1f)) { tab = 0 }
+                    DetailTab(stringResource(R.string.light_tab_white), tab == 1, light.capabilities.brightness || light.capabilities.colorTemperature, Modifier.weight(1f)) { tab = 1 }
+                }
+                if (!light.state.online) Text(stringResource(R.string.unavailable), color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
+                if (tab == 0) {
+                    ColorPresets(hue, moreColors, { moreColors = !moreColors }, reachable) { preset ->
+                        hue = preset.toFloat(); saturation = 100f
+                        apply(LightStatePatch(color = LightColor(preset, 100, brightness.toInt())))
+                    }
+                    GradientBar(
+                        brush = Brush.horizontalGradient(hueSpectrum),
+                        value = hue / 360f,
+                        enabled = reachable,
+                        height = 170.dp,
+                        badge = stringResource(R.string.light_hue_badge, hue.toInt()),
+                        onChange = { hue = it * 360f },
+                        onFinished = { apply(LightStatePatch(color = LightColor(hue.toInt(), saturation.toInt(), brightness.toInt()))) },
+                    )
+                } else {
+                    WhitePresets(temperature.toInt(), moreColors, { moreColors = !moreColors }, reachable) { kelvin ->
+                        temperature = kelvin.toFloat()
+                        apply(LightStatePatch(temperatureKelvin = kelvin))
+                    }
+                    GradientBar(
+                        brush = Brush.horizontalGradient(listOf(warmWhiteColor(2700), warmWhiteColor(4000), warmWhiteColor(6500))),
+                        value = (temperature - 2700f) / 3800f,
+                        enabled = reachable,
+                        height = 170.dp,
+                        badge = stringResource(R.string.light_kelvin_badge, temperature.toInt()),
+                        onChange = { temperature = 2700f + it * 3800f },
+                        onFinished = { apply(LightStatePatch(temperatureKelvin = temperature.toInt())) },
+                    )
+                }
+                Text(stringResource(R.string.light_brightness), style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
+                GradientBar(
+                    brush = Brush.horizontalGradient(listOf(MaterialTheme.colorScheme.surfaceVariant, aura)),
+                    value = (brightness - 1f) / 99f,
+                    enabled = reachable,
+                    height = 66.dp,
+                    onChange = { brightness = (1f + it * 99f).coerceIn(1f, 100f) },
+                    onFinished = { apply(LightStatePatch(brightness = brightness.toInt())) },
+                    overlay = {
+                        Row(Modifier.align(Alignment.CenterStart).padding(start = 16.dp), verticalAlignment = Alignment.CenterVertically) {
+                            Icon(Lucide.Sun, null, Modifier.size(22.dp), tint = Color.White.copy(alpha = .92f))
+                            Spacer(Modifier.width(8.dp))
+                            Text("${brightness.toInt()}%", color = Color.White, fontWeight = FontWeight.SemiBold)
+                        }
+                    },
+                )
             }
         }
     }
@@ -221,32 +237,31 @@ private fun ColorPresets(hue: Float, expanded: Boolean, onToggleMore: () -> Unit
             ) {}
         }
         Spacer(Modifier.weight(1f))
-        Surface(onClick = onToggleMore, enabled = enabled, modifier = Modifier.size(38.dp), shape = CircleShape, color = MaterialTheme.colorScheme.surfaceVariant) {
+        Surface(onClick = onToggleMore, enabled = enabled, modifier = Modifier.size(38.dp), shape = CircleShape, color = MaterialTheme.colorScheme.surface) {
             Icon(if (expanded) Lucide.Minus else Lucide.Plus, stringResource(R.string.light_more_colors), Modifier.padding(9.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
         }
     }
 }
 
 @Composable
-private fun WhitePresets(kelvin: Int, enabled: Boolean, onPick: (Int) -> Unit) {
+private fun WhitePresets(kelvin: Int, expanded: Boolean, onToggleMore: () -> Unit, enabled: Boolean, onPick: (Int) -> Unit) {
+    val base = listOf(2700, 4000, 6500)
+    val extra = listOf(3000, 5000)
     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp), verticalAlignment = Alignment.CenterVertically) {
-        listOf(2700 to R.string.light_white_warm, 4000 to R.string.light_white_neutral, 6500 to R.string.light_white_cool).forEach { (value, label) ->
-            val chosen = kotlin.math.abs(kelvin - value) < 250
+        (if (expanded) base + extra else base).forEach { value ->
+            val chosen = kotlin.math.abs(kelvin - value) < 200
             Surface(
                 onClick = { onPick(value) },
                 enabled = enabled,
-                shape = RoundedCornerShape(50),
+                modifier = Modifier.size(38.dp),
+                shape = CircleShape,
                 color = warmWhiteColor(value),
                 border = androidx.compose.foundation.BorderStroke(if (chosen) 2.dp else 0.dp, if (chosen) MaterialTheme.colorScheme.onSurface else Color.Transparent),
-            ) {
-                Text(
-                    stringResource(label),
-                    Modifier.padding(horizontal = 14.dp, vertical = 9.dp),
-                    style = MaterialTheme.typography.labelLarge,
-                    color = Color(0xFF1B1B1F),
-                    fontWeight = FontWeight.Medium,
-                )
-            }
+            ) {}
+        }
+        Spacer(Modifier.weight(1f))
+        Surface(onClick = onToggleMore, enabled = enabled, modifier = Modifier.size(38.dp), shape = CircleShape, color = MaterialTheme.colorScheme.surface) {
+            Icon(if (expanded) Lucide.Minus else Lucide.Plus, stringResource(R.string.light_more_colors), Modifier.padding(9.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
         }
     }
 }
@@ -261,7 +276,7 @@ private val hueSpectrum = listOf(
  * chega em 0..1 e o rótulo mostra a unidade do ajuste.
  */
 @Composable
-private fun GradientBar(
+internal fun GradientBar(
     brush: Brush,
     value: Float,
     enabled: Boolean,

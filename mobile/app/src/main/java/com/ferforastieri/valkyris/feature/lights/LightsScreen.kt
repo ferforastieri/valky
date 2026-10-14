@@ -77,7 +77,7 @@ import com.ferforastieri.valkyris.core.model.*
     Box(Modifier.fillMaxSize(),contentAlignment=Alignment.Center){
         Surface(shape=MaterialTheme.shapes.large,color=MaterialTheme.colorScheme.surface,border=BorderStroke(1.dp,MaterialTheme.colorScheme.outlineVariant),shadowElevation=3.dp){
             Column(Modifier.padding(horizontal=26.dp,vertical=24.dp).widthIn(max=340.dp),horizontalAlignment=Alignment.CenterHorizontally,verticalArrangement=Arrangement.spacedBy(10.dp)){
-                Surface(shape=CircleShape,color=MaterialTheme.colorScheme.secondaryContainer){LightBulbIcon(false,MaterialTheme.colorScheme.onSecondaryContainer,Modifier.padding(11.dp).size(28.dp),offColor=MaterialTheme.colorScheme.onSecondaryContainer,baseColor=MaterialTheme.colorScheme.onSecondaryContainer)}
+                Surface(shape=CircleShape,color=MaterialTheme.colorScheme.secondaryContainer){LightBulbIcon(false,MaterialTheme.colorScheme.onSecondaryContainer,Modifier.padding(11.dp).size(28.dp))}
                 Text(stringResource(R.string.no_lights),fontWeight=FontWeight.SemiBold,style=MaterialTheme.typography.titleMedium)
                 Text(stringResource(if(admin)R.string.no_lights_body_admin else R.string.no_lights_body),color=MaterialTheme.colorScheme.onSurfaceVariant,style=MaterialTheme.typography.bodyMedium,textAlign=androidx.compose.ui.text.style.TextAlign.Center)
             }
@@ -91,7 +91,7 @@ import com.ferforastieri.valkyris.core.model.*
  * o estado é o ícone da lâmpada. Tocar no card abre a página; tocar na lâmpada
  * liga ou desliga.
  */
-@Composable private fun LightCard(light:LightDevice,busy:Boolean,onPower:()->Unit,onOpen:()->Unit,onRemove:(()->Unit)?,onFavorite:(()->Unit)?=null,onEdit:(()->Unit)?=null){
+@Composable internal fun LightCard(light:LightDevice,busy:Boolean,onPower:()->Unit,onOpen:()->Unit,onRemove:(()->Unit)?,onFavorite:(()->Unit)?=null,onEdit:(()->Unit)?=null){
     val bulbColor=if(light.state.mode=="color")Color.hsv(light.state.color.hue.toFloat(),light.state.color.saturation/100f,(light.state.color.value/100f).coerceAtLeast(.45f))else warmWhiteColor(light.state.temperatureKelvin)
     val on=light.state.power
     Card(onClick=onOpen,colors=CardDefaults.cardColors(containerColor=MaterialTheme.colorScheme.surface),border=BorderStroke(1.dp,MaterialTheme.colorScheme.outlineVariant)){
