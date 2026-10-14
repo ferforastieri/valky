@@ -124,13 +124,21 @@ internal class WifiApConnector(context: Context) {
         }
     }
 
+    /**
+     * Entra numa rede Wi-Fi. Com a senha, serve para a rede de casa escolhida
+     * na folha (se a senha estiver errada, a entrada falha e o app avisa antes
+     * de envolver a lâmpada); sem a senha, serve para a rede aberta da lâmpada.
+     */
     @RequiresApi(Build.VERSION_CODES.Q)
-    suspend fun connect(ssid: String, timeoutMillis: Long = 60_000): LampNetwork? = withContext(Dispatchers.IO) {
+    suspend fun connect(ssid: String, password: String? = null, timeoutMillis: Long = 60_000): LampNetwork? = withContext(Dispatchers.IO) {
         val manager = connectivity ?: return@withContext null
+        val specifier = WifiNetworkSpecifier.Builder().setSsid(ssid).apply {
+            if (!password.isNullOrBlank()) setWpa2Passphrase(password)
+        }.build()
         val request = NetworkRequest.Builder()
             .addTransportType(NetworkCapabilities.TRANSPORT_WIFI)
             .removeCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)
-            .setNetworkSpecifier(WifiNetworkSpecifier.Builder().setSsid(ssid).build())
+            .setNetworkSpecifier(specifier)
             .build()
         withTimeoutOrNull(timeoutMillis) {
             suspendCancellableCoroutine { continuation ->

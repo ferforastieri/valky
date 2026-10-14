@@ -39,11 +39,10 @@
     <string name="light_setup_pending">Checking the bulb…</string>
     <string name="light_setup_failed">The bulb could not be reached</string>
     <string name="no_lights_body_admin">Tap + to put a bulb in pairing mode and set it up without any third-party app.</string>
-    <string name="light_pair_network_auto">Home network: %1$s</string>
-    <string name="light_pair_network_unknown">not identified</string>
-    <string name="light_pair_password_saved">Password stored</string>
-    <string name="light_pair_password_change">Change</string>
-    <string name="light_pair_location_needed">I need the Location permission to look for Wi-Fi networks. Allow it and tap Set up again.</string>
+    <string name="light_pair_send_to">Network the bulb will use:</string>
+    <string name="light_pair_scanning">Looking for networks…</string>
+    <string name="light_pair_refresh">Refresh list</string>
+    <string name="light_pair_location_needed">I need the Location permission to look for Wi-Fi networks. Allow it and try again.</string>
     <string name="light_pair_location_off">Your phone\'s Location is off. Turn it on and try again.</string>
     <string name="light_pair_open_location">Turn on Location</string>
     <string name="light_pair_open_wifi">Open Wi-Fi</string>

@@ -42,6 +42,9 @@ import com.composables.icons.lucide.Wifi
 import com.ferforastieri.valkyris.R
 import com.ferforastieri.valkyris.core.design.ValkyrisBottomSheet
 import com.ferforastieri.valkyris.core.model.*
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 @Composable fun LightsScreen(admin:Boolean,vm:LightsViewModel=hiltViewModel()){
     LifecycleResumeEffect(Unit){vm.refresh();vm.continueManual();onPauseOrDispose{vm.pausePairing()}}
@@ -51,31 +54,20 @@ import com.ferforastieri.valkyris.core.model.*
     var renaming by remember{mutableStateOf<LightDevice?>(null)}
     var pairing by remember{mutableStateOf(false)}
     val context=LocalContext.current
-    var pendingPairing by remember{mutableStateOf<PendingPairing?>(null)}
     val locationNeededNotice=stringResource(R.string.light_pair_location_needed)
-    val locationOffNotice=stringResource(R.string.light_pair_location_off)
     val neededPermissions=remember{
         if(android.os.Build.VERSION.SDK_INT>=33) arrayOf(Manifest.permission.ACCESS_FINE_LOCATION,Manifest.permission.NEARBY_WIFI_DEVICES)
         else arrayOf(Manifest.permission.ACCESS_FINE_LOCATION)
     }
+    var canScan by remember{mutableStateOf(vm.hasPairingPermissions())}
     val locationPermission=rememberLauncherForActivityResult(ActivityResultContracts.RequestMultiplePermissions()){granted->
-        val pending=pendingPairing
-        pendingPairing=null
-        when{
-            !neededPermissions.all{granted[it]==true}->vm.pairingNotice(locationNeededNotice)
-            pending==null->{}
-            !vm.locationEnabled()->vm.pairingNotice(locationOffNotice)
-            else->vm.configure(pending.ssid,pending.password,pending.remember,pending.lampSsid)
-        }
+        canScan=neededPermissions.all{granted[it]==true}
+        if(!canScan)vm.pairingNotice(locationNeededNotice)
     }
-    // O Android só deixa procurar redes com a Localização liberada: o pedido
-    // acontece aqui mesmo, na hora, e o fluxo continua sozinho após a resposta.
-    fun beginPairing(ssid:String,password:String,lampSsid:String?,remember:Boolean){
-        when{
-            !vm.hasPairingPermissions()->{pendingPairing=PendingPairing(ssid,password,lampSsid,remember);locationPermission.launch(neededPermissions)}
-            !vm.locationEnabled()->vm.pairingNotice(locationOffNotice)
-            else->vm.configure(ssid,password,remember,lampSsid)
-        }
+    // A lista de redes precisa da Localização liberada: o pedido acontece ao
+    // abrir a folha e a lista se carrega sozinha assim que a resposta chega.
+    LaunchedEffect(pairing){
+        if(pairing&&!canScan)locationPermission.launch(neededPermissions)
     }
     Box(Modifier.fillMaxSize()){
         Column(Modifier.fillMaxSize().padding(horizontal=18.dp)){
@@ -95,28 +87,19 @@ import com.ferforastieri.valkyris.core.model.*
             contentColor=MaterialTheme.colorScheme.onSecondary,
         ){Icon(Lucide.Plus,stringResource(R.string.add_light))}
     }
-    // Tudo automático: ao abrir a folha do +, se a senha do Wi-Fi já está
-    // guardada o pareamento começa sozinho — sem tocar em nada.
-    LaunchedEffect(pairing, state.pairing) {
-        val autoNetwork=vm.suggestedSsid().ifBlank{vm.savedNetwork()}
-        if(pairing&&state.pairing==null&&vm.savedPassword().isNotBlank()&&autoNetwork.isNotBlank()){
-            beginPairing(autoNetwork,vm.savedPassword(),null,true)
-        }
-    }
-    // Se o Android recusar a entrada automática na rede da lâmpada, a tela de
-    // Wi-Fi do sistema abre sozinha — sem precisar tocar em nada.
+    // Quando o app pede para conectar na rede da lâmpada, a tela de Wi-Fi do
+    // sistema abre sozinha — sem precisar tocar em nada.
     LaunchedEffect(state.pairing?.phase) {
         if(pairing&&state.pairing?.phase=="manual-wifi")openWifiSettings(context)
     }
     if(pairing)LightPairingSheet(
         progress=state.pairing,
-        network=remember{vm.suggestedSsid().ifBlank{vm.savedNetwork()}},
+        savedNetwork=remember{vm.savedNetwork()},
         savedPassword=remember{vm.savedPassword()},
-        lampNetworks=state.lampNetworks,
+        canScan=canScan,
         locationOff=!vm.locationEnabled(),
         manualWifi=state.pairing?.phase=="manual-wifi",
-        onConfigure={ssid,password->beginPairing(ssid,password,null,true)},
-        onPickLamp={lampSsid,password->beginPairing(state.network,password,lampSsid,false)},
+        onConfigure={ssid,password->vm.configurar(ssid,password)},
         onOpenLocation={runCatching{context.startActivity(Intent(Settings.ACTION_LOCATION_SOURCE_SETTINGS))}},
         onOpenWifi={openWifiSettings(context)},
         onDismiss={pairing=false;vm.dismissPairing()},
@@ -192,28 +175,46 @@ import com.ferforastieri.valkyris.core.model.*
 }
 
 /**
- * Folha do pareamento pelo caminho direto (modo AP) — a mais simples possível:
- * a rede do celular, a senha (pedida uma única vez e depois guardada) e o botão
- * de configurar. Sem texto explicativo.
+ * Folha do pareamento pelo caminho direto (modo AP), na ordem que o usuário
+ * pediu: a lista das redes visíveis (escolhe para onde enviar e digita a
+ * senha), a procura automática da lâmpada e a conexão manual na rede dela.
  */
 @Composable private fun LightPairingSheet(
     progress:PairingProgress?,
-    network:String,
+    savedNetwork:String,
     savedPassword:String,
-    lampNetworks:List<String>,
+    canScan:Boolean,
     locationOff:Boolean,
     manualWifi:Boolean,
     onConfigure:(String,String)->Unit,
-    onPickLamp:(String,String)->Unit,
     onOpenLocation:()->Unit,
     onOpenWifi:()->Unit,
     onDismiss:()->Unit,
 ){
-    var password by remember{mutableStateOf(savedPassword)}
-    var editingPassword by remember{mutableStateOf(savedPassword.isBlank())}
+    val context=LocalContext.current
+    val connector=remember{WifiApConnector(context)}
+    val scope=rememberCoroutineScope()
+    // A rede guardada só entra na lista se for mesmo de casa (nunca uma SmartLife-…).
+    val guardada=remember{savedNetwork.takeIf{!connector.looksLikeLamp(it)}.orEmpty()}
+    var redes by remember{mutableStateOf<List<String>>(emptyList())}
+    var escolhida by remember{mutableStateOf(guardada)}
+    var password by remember{mutableStateOf(if(guardada.isNotBlank())savedPassword else "")}
+    suspend fun carregar(){
+        connector.refreshScan(6_000)
+        val achadas=withContext(Dispatchers.IO){connector.visibleNetworks().filter{!connector.looksLikeLamp(it)}}
+        redes=achadas
+        if(escolhida.isBlank())escolhida=achadas.firstOrNull{it.equals(guardada,ignoreCase=true)}.orEmpty()
+    }
+    LaunchedEffect(canScan,locationOff){
+        if(canScan&&!locationOff)carregar()
+    }
+    fun escolher(nome:String){
+        escolhida=nome
+        password=if(nome.equals(guardada,ignoreCase=true))savedPassword else ""
+    }
     val paired=progress?.light
     val failed=progress?.phase=="failed"
-    val running=progress!=null&&!failed&&progress.phase!="paired"&&progress.phase!="choose-lamp"&&progress.phase!="manual-wifi"
+    val running=progress!=null&&!failed&&progress.phase!="paired"&&progress.phase!="manual-wifi"
     ValkyrisBottomSheet(
         title=stringResource(R.string.add_light),
         onDismiss=onDismiss,
@@ -226,8 +227,8 @@ import com.ferforastieri.valkyris.core.model.*
                 else->{
                     TextButton(onClick=onDismiss){Text(stringResource(R.string.cancel))}
                     Button(
-                        onClick={onConfigure(network,password)},
-                        enabled=network.isNotBlank()&&password.isNotBlank(),
+                        onClick={onConfigure(escolhida,password)},
+                        enabled=escolhida.isNotBlank()&&password.isNotBlank()&&canScan&&!locationOff,
                     ){Text(stringResource(R.string.light_pair_action))}
                 }
             }
@@ -242,47 +243,48 @@ import com.ferforastieri.valkyris.core.model.*
                 }
                 running->Column(verticalArrangement=Arrangement.spacedBy(8.dp)){
                     val fase=progress?.phase.orEmpty()
-                    ProgressStep(stringResource(R.string.light_step_find),done=fase in setOf("sending","waiting","paired"),current=fase in setOf("lamp-network","choose-lamp","manual-wifi"))
+                    ProgressStep(stringResource(R.string.light_step_find),done=fase in setOf("sending","waiting","paired"),current=fase in setOf("home-network","lamp-network"))
                     ProgressStep(stringResource(R.string.light_step_deliver),done=fase in setOf("waiting","paired"),current=fase=="sending")
                     ProgressStep(stringResource(R.string.light_step_confirm),done=fase=="paired",current=fase=="waiting")
                     Text(progress?.message.orEmpty().ifBlank{stringResource(R.string.light_pair_sending)},style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant)
                 }
-                progress?.phase=="choose-lamp"->Column(verticalArrangement=Arrangement.spacedBy(6.dp)){
-                    Text(progress.message,style=MaterialTheme.typography.bodyMedium)
-                    if(editingPassword)OutlinedTextField(
-                        password,{password=it},Modifier.fillMaxWidth(),
-                        label={Text(stringResource(R.string.light_pair_password))},
-                        visualTransformation=PasswordVisualTransformation(),
-                        keyboardOptions=KeyboardOptions(keyboardType=KeyboardType.Password),
-                        singleLine=true,
-                    )
-                    lampNetworks.forEach{name->
-                        Surface(onClick={if(password.isBlank())editingPassword=true else onPickLamp(name,password)},modifier=Modifier.fillMaxWidth(),shape=MaterialTheme.shapes.medium,color=MaterialTheme.colorScheme.surfaceVariant){
-                            Row(Modifier.fillMaxWidth().padding(horizontal=14.dp,vertical=12.dp),verticalAlignment=Alignment.CenterVertically){
-                                Icon(Lucide.Wifi,null,Modifier.size(18.dp),tint=MaterialTheme.colorScheme.secondary)
-                                Spacer(Modifier.width(10.dp))
-                                Text(name,Modifier.weight(1f),style=MaterialTheme.typography.bodyMedium)
-                                Icon(Lucide.ChevronRight,null,Modifier.size(18.dp),tint=MaterialTheme.colorScheme.onSurfaceVariant)
-                            }
-                        }
-                    }
+                manualWifi->Column(verticalArrangement=Arrangement.spacedBy(10.dp)){
+                    Text(progress?.message.orEmpty(),style=MaterialTheme.typography.bodyMedium)
+                    TextButton({onOpenWifi}){Text(stringResource(R.string.light_pair_open_wifi))}
                 }
                 else->Column(verticalArrangement=Arrangement.spacedBy(10.dp)){
-                    progress?.message?.takeIf{it.isNotBlank()&&(failed||manualWifi)}?.let{Text(it,color=if(failed)MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurface,style=MaterialTheme.typography.bodySmall)}
-                    if(failed&&locationOff)TextButton({onOpenLocation}){Text(stringResource(R.string.light_pair_open_location))}
-                    if(manualWifi)TextButton({onOpenWifi}){Text(stringResource(R.string.light_pair_open_wifi))}
-                    Text(stringResource(R.string.light_pair_network_auto,network.ifBlank{stringResource(R.string.light_pair_network_unknown)}),style=MaterialTheme.typography.bodyMedium)
-                    if(editingPassword)OutlinedTextField(
+                    if(failed)Text(progress?.message.orEmpty(),color=MaterialTheme.colorScheme.error,style=MaterialTheme.typography.bodySmall)
+                    Text(stringResource(R.string.light_pair_send_to),style=MaterialTheme.typography.bodyMedium,fontWeight=FontWeight.SemiBold)
+                    when{
+                        locationOff->{
+                            Text(stringResource(R.string.light_pair_location_off),style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant)
+                            TextButton({onOpenLocation}){Text(stringResource(R.string.light_pair_open_location))}
+                        }
+                        !canScan->Text(stringResource(R.string.light_pair_location_needed),style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant)
+                        redes.isEmpty()->Text(stringResource(R.string.light_pair_scanning),style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant)
+                        else->{
+                            redes.forEach{name->
+                                val aqui=name.equals(escolhida,ignoreCase=true)
+                                Surface(onClick={escolher(name)},modifier=Modifier.fillMaxWidth(),shape=MaterialTheme.shapes.medium,color=if(aqui)MaterialTheme.colorScheme.secondaryContainer else MaterialTheme.colorScheme.surfaceVariant){
+                                    Row(Modifier.fillMaxWidth().padding(horizontal=14.dp,vertical=12.dp),verticalAlignment=Alignment.CenterVertically){
+                                        Icon(Lucide.Wifi,null,Modifier.size(18.dp),tint=MaterialTheme.colorScheme.secondary)
+                                        Spacer(Modifier.width(10.dp))
+                                        Text(name,Modifier.weight(1f),style=MaterialTheme.typography.bodyMedium)
+                                        if(aqui)Icon(Lucide.Check,null,Modifier.size(18.dp),tint=MaterialTheme.colorScheme.secondary)
+                                    }
+                                }
+                            }
+                            TextButton({scope.launch{carregar()}}){Text(stringResource(R.string.light_pair_refresh))}
+                        }
+                    }
+                    if(escolhida.isNotBlank())OutlinedTextField(
                         password,{password=it},Modifier.fillMaxWidth(),
                         label={Text(stringResource(R.string.light_pair_password))},
                         visualTransformation=PasswordVisualTransformation(),
                         keyboardOptions=KeyboardOptions(keyboardType=KeyboardType.Password,imeAction=ImeAction.Done),
-                        keyboardActions=KeyboardActions(onDone={if(network.isNotBlank()&&password.isNotBlank())onConfigure(network,password)}),
+                        keyboardActions=KeyboardActions(onDone={if(escolhida.isNotBlank()&&password.isNotBlank())onConfigure(escolhida,password)}),
                         singleLine=true,
-                    ) else Row(verticalAlignment=Alignment.CenterVertically){
-                        Text(stringResource(R.string.light_pair_password_saved),Modifier.weight(1f),style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant)
-                        TextButton(onClick={editingPassword=true}){Text(stringResource(R.string.light_pair_password_change))}
-                    }
+                    )
                 }
             }
         }
@@ -316,9 +318,6 @@ private fun openWifiSettings(context: android.content.Context) {
         if (runCatching { context.startActivity(Intent(acao).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) }.isSuccess) return
     }
 }
-
-/** Dados guardados enquanto o Android pergunta a permissão de Localização. */
-private class PendingPairing(val ssid:String,val password:String,val lampSsid:String?,val remember:Boolean)
 
 @Composable private fun LightNameSheet(light:LightDevice,onDismiss:()->Unit,onSave:(String,String)->Unit){
     var name by remember(light.id){mutableStateOf(light.name)}

@@ -37,11 +37,10 @@
     <string name="light_setup_pending">Conferindo a lâmpada…</string>
     <string name="light_setup_failed">Não foi possível falar com a lâmpada</string>
     <string name="no_lights_body_admin">Toque em + para colocar uma lâmpada em modo de pareamento e configurá-la sem nenhum aplicativo de terceiros.</string>
-    <string name="light_pair_network_auto">Rede de casa: %1$s</string>
-    <string name="light_pair_network_unknown">não identificada</string>
-    <string name="light_pair_password_saved">Senha guardada</string>
-    <string name="light_pair_password_change">Trocar</string>
-    <string name="light_pair_location_needed">Preciso da permissão de Localização para procurar redes Wi-Fi. Autorize e toque em Configurar de novo.</string>
+    <string name="light_pair_send_to">Rede que a lâmpada vai usar:</string>
+    <string name="light_pair_scanning">Procurando as redes…</string>
+    <string name="light_pair_refresh">Atualizar lista</string>
+    <string name="light_pair_location_needed">Preciso da permissão de Localização para procurar redes Wi-Fi. Autorize e tente de novo.</string>
     <string name="light_pair_location_off">A Localização do celular está desligada. Ligue e tente de novo.</string>
     <string name="light_pair_open_location">Ligar Localização</string>
     <string name="light_pair_open_wifi">Abrir Wi-Fi</string>

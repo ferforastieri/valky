@@ -46,8 +46,6 @@ data class LightsState(
     val pairing: PairingProgress? = null,
     /** Rede usada no pareamento; vem da última vez ou do Wi-Fi atual. */
     val network: String = "",
-    /** Redes visíveis quando nenhuma se parece com uma lâmpada, para o usuário escolher. */
-    val lampNetworks: List<String> = emptyList(),
     /** Quando falso, a tela precisa da senha do Wi-Fi uma única vez. */
     val hasCredentials: Boolean = false,
 )
@@ -69,7 +67,6 @@ class LightsViewModel @Inject constructor(
     private var pendingLampSsid: String? = null
     private var pendingHomeSsid: String? = null
     private var pendingPassword: String? = null
-    private var savedSsid: String? = null
     /** Último relato que ainda não chegou ao servidor (fica para reenviar). */
     private var diagnosticoPendente: Pair<String, String>? = null
 
@@ -101,9 +98,6 @@ class LightsViewModel @Inject constructor(
             }
         }
     }
-
-    /** Nome da rede atual, quando o sistema permite ler (precisa de localização). */
-    fun suggestedSsid(): String = _state.value.network.ifBlank { savedSsid ?: currentSsid(context).also { savedSsid = it }.orEmpty() }
 
     /** Senha já guardada no aparelho, para o formulário vir preenchido. */
     fun savedPassword(): String = wifiSecrets.credentials()?.password.orEmpty()
@@ -173,25 +167,30 @@ class LightsViewModel @Inject constructor(
     }
 
     /**
-     * Configura uma lâmpada em modo de pareamento pelo caminho direto (modo AP):
-     * o celular entra na rede que a lâmpada cria, entrega os dados da rede de
-     * casa e volta. Não depende do roteador nem da faixa de 2,4 GHz.
+     * Pareamento direto (modo AP), na ordem escolhida na folha:
+     * 1) o celular entra na rede escolhida pelo usuário — se a senha estiver
+     *    errada, é aqui que descobrimos, antes de envolver a lâmpada;
+     * 2) o app procura a rede da lâmpada sozinho (sem lista);
+     * 3) o app abre o Wi-Fi do sistema e o usuário conecta na lâmpada;
+     * 4) o app entrega exatamente a rede e a senha escolhidas no passo 1.
      */
-    fun configure(ssid: String, password: String, remember: Boolean = true, lampSsid: String? = null) {
-        // Um toque novo sempre vale: cancela o que estiver em andamento (a
-        // lista que se atualiza sozinha segura o trabalho antigo).
+    fun configurar(redeCasa: String, senhaCasa: String) {
         pairingJob?.cancel()
         pairingJob = null
-        val network = ssid.trim()
-        if (network.isEmpty()) {
-            _state.update { it.copy(error = "Não identifiquei a rede do celular. Conecte o celular no Wi-Fi de casa e tente de novo.") }
+        val rede = redeCasa.trim()
+        if (rede.isEmpty()) {
+            _state.update { it.copy(error = "Escolha a rede que a lâmpada vai usar.") }
             return
         }
-        if (password.isBlank()) {
+        if (senhaCasa.isBlank()) {
             _state.update { it.copy(error = "Informe a senha do Wi-Fi.") }
             return
         }
-        if (remember) wifiSecrets.save(network, password)
+        if (WifiApConnector(context).looksLikeLamp(rede)) {
+            _state.update { it.copy(error = "“$rede” é a rede da própria lâmpada. Escolha a rede da sua casa.") }
+            return
+        }
+        wifiSecrets.save(rede, senhaCasa)
         pairingJob = viewModelScope.launch {
             val session = runCatching { repository.startLightPairing() }
                 .getOrElse { error ->
@@ -200,75 +199,53 @@ class LightsViewModel @Inject constructor(
                 }
             pairingSessionId = session.id
             pendingSession = session
-            pendingHomeSsid = network
-            pendingPassword = password
+            pendingHomeSsid = rede
+            pendingPassword = senhaCasa
             try {
-            _state.update {
-                it.copy(
-                    network = network,
-                    hasCredentials = true,
-                    pairing = PairingProgress("lamp-network", "Procurando a rede da lâmpada…"),
-                )
-            }
-            val connector = WifiApConnector(context)
-            if (!connector.supported()) {
-                _state.update {
-                    it.copy(pairing = PairingProgress("failed", "Este aparelho usa uma versão do Android anterior à 10, que não permite a conexão direta com a lâmpada. Atualize o sistema ou use outro celular."))
-                }
-                return@launch
-            }
-            // Varredura nova antes de procurar: a lista guardada pode ser antiga.
-            _state.update { it.copy(pairing = PairingProgress("lamp-network", "Procurando a rede da lâmpada…")) }
-            var candidates = emptyList<String>()
-            var visible = emptyList<String>()
-            repeat(4) { round ->
-                connector.refreshScan(if (round == 0) 9_000 else 6_000)
-                candidates = withContext(Dispatchers.IO) { connector.candidateNetworks() }
-                visible = withContext(Dispatchers.IO) { connector.visibleNetworks() }
-                if (candidates.isNotEmpty() || visible.isNotEmpty()) return@repeat
-                delay(2_500)
-            }
-            val lamp = lampSsid?.takeIf { it.isNotBlank() } ?: candidates.firstOrNull()
-            if (lamp == null) {
-                // Nenhum nome conhecido: oferece as redes visíveis para escolha.
-                val message = if (visible.isEmpty()) {
-                    "Ainda não vi nenhuma rede. Confirme que a lâmpada está piscando devagar e que a Localização do celular está ligada."
-                } else {
-                    "Escolha a rede que a lâmpada criou:"
-                }
-                _state.update { it.copy(lampNetworks = visible, pairing = PairingProgress("choose-lamp", message)) }
-                // A lista se atualiza sozinha: a lâmpada costuma aparecer
-                // alguns segundos depois, quando o sistema varre de novo.
-                repeat(20) {
-                    delay(7_000)
-                    if (_state.value.pairing?.phase != "choose-lamp") return@launch
-                    connector.refreshScan(6_000)
-                    val frescas = withContext(Dispatchers.IO) { connector.visibleNetworks() }
-                    val achadas = withContext(Dispatchers.IO) { connector.candidateNetworks() }
-                    if (frescas.isNotEmpty()) {
-                        val aviso = if (achadas.isNotEmpty()) "Achei a rede “${achadas.first()}” — toque nela para continuar:" else "Escolha a rede que a lâmpada criou:"
-                        _state.update { it.copy(lampNetworks = frescas, pairing = PairingProgress("choose-lamp", aviso)) }
+                val connector = WifiApConnector(context)
+                if (!connector.supported()) {
+                    _state.update {
+                        it.copy(pairing = PairingProgress("failed", "Este aparelho usa uma versão do Android anterior à 10, que não permite a conexão direta com a lâmpada. Atualize o sistema ou use outro celular."))
                     }
+                    return@launch
                 }
-                return@launch
-            }
-            _state.update { it.copy(pairing = PairingProgress("lamp-network", "Entrando na rede “$lamp” da lâmpada — aceite o aviso do Android.")) }
-            val connection = connector.connect(lamp) ?: connector.connect(lamp)
-            if (connection == null) {
-                // Caminho garantido quando a entrada automática é recusada: o
-                // usuário conecta pelo Wi-Fi do sistema e volta; o app detecta
-                // a rede e continua daqui (continueManual).
-                pendingSession = session
+                // 1) O celular entra na rede escolhida (quando já está nela, nada acontece).
+                val jaNela = currentSsid(context).orEmpty().equals(rede, ignoreCase = true)
+                if (!jaNela) {
+                    _state.update {
+                        it.copy(
+                            network = rede,
+                            hasCredentials = true,
+                            pairing = PairingProgress("home-network", "Entrando na rede “$rede” — aceite o aviso do Android."),
+                        )
+                    }
+                    val casa = connector.connect(rede, senhaCasa)
+                    if (casa == null) {
+                        _state.update {
+                            it.copy(pairing = PairingProgress("failed", "Não consegui entrar na rede “$rede”. Confira a senha e tente de novo."))
+                        }
+                        return@launch
+                    }
+                    casa.close()
+                }
+                _state.update { it.copy(network = rede, hasCredentials = true) }
+                // 2) Procura a rede da lâmpada sozinho.
+                _state.update { it.copy(pairing = PairingProgress("lamp-network", "Procurando a rede da lâmpada…")) }
+                var lamp: String? = null
+                repeat(4) { round ->
+                    connector.refreshScan(if (round == 0) 9_000 else 6_000)
+                    lamp = withContext(Dispatchers.IO) { connector.candidateNetworks() }.firstOrNull()
+                    if (lamp != null) return@repeat
+                    delay(2_000)
+                }
+                // 3) O usuário conecta na lâmpada pelo Wi-Fi do sistema (a tela
+                // abre sozinha) e o app continua no continueManual.
                 pendingLampSsid = lamp
-                pendingHomeSsid = network
-                pendingPassword = password
-                relatar(session.id, "não entrei sozinho na rede $lamp; aguardando conexão manual")
+                val onde = lamp?.let { "na rede “$it”" } ?: "na rede da lâmpada"
+                relatar(session.id, "aguardando conexão manual $onde")
                 _state.update {
-                    it.copy(pairing = PairingProgress("manual-wifi", "Não consegui entrar sozinho na rede “$lamp”. Toque em Abrir Wi-Fi, conecte nela e volte para cá — eu continuo daqui."))
+                    it.copy(pairing = PairingProgress("manual-wifi", "Conecte o celular $onde e volte para cá — eu continuo sozinho."))
                 }
-                return@launch
-            }
-            deliverAndWait(session, connection.network, network, password, connector.gatewayAddresses()) { connection.close() }
             } catch (error: Throwable) {
                 if (error is kotlinx.coroutines.CancellationException) throw error
                 // Qualquer falha inesperada vira aviso na folha, nunca um fechamento.
@@ -348,7 +325,7 @@ class LightsViewModel @Inject constructor(
     /** Continua quando o usuário conecta na rede da lâmpada pelo Wi-Fi do sistema. */
     fun continueManual() {
         val progress = _state.value.pairing ?: return
-        if (progress.phase != "manual-wifi" && progress.phase != "choose-lamp") return
+        if (progress.phase != "manual-wifi") return
         val session = pendingSession ?: return
         val home = pendingHomeSsid ?: return
         val password = pendingPassword ?: return
