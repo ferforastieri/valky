@@ -130,9 +130,9 @@ class LightsViewModel @Inject constructor(
     }
 
     /**
-     * Relata ao servidor e INSISTE até conseguir: depois do passo 2 o celular
-     * volta sozinho para a rede de casa e o relato sobe em segundos, sem o
-     * usuário precisar mexer em nada.
+     * Deixa o que o aplicativo viu no diagnóstico da sessão, no banco, e
+     * INSISTE até conseguir: depois do passo 2 o celular volta sozinho para a
+     * rede de casa e o relato sobe em segundos, sem o usuário mexer em nada.
      */
     private fun relatar(sessionId: String, detalhe: String) {
         diagnosticoPendente = sessionId to detalhe
@@ -140,7 +140,7 @@ class LightsViewModel @Inject constructor(
             repeat(40) {
                 val pendente = diagnosticoPendente ?: return@launch
                 val enviado = runCatching {
-                    repository.api.reportLightPairingDiagnostic(pendente.first, pendente.second)
+                    repository.lightPairingStatus(pendente.first, pendente.second)
                 }.isSuccess
                 if (enviado) {
                     if (diagnosticoPendente == pendente) diagnosticoPendente = null
@@ -155,7 +155,7 @@ class LightsViewModel @Inject constructor(
     private fun reenviarDiagnostico() {
         val pendente = diagnosticoPendente ?: return
         viewModelScope.launch {
-            runCatching { repository.api.reportLightPairingDiagnostic(pendente.first, pendente.second) }
+            runCatching { repository.lightPairingStatus(pendente.first, pendente.second) }
                 .onSuccess { if (diagnosticoPendente == pendente) diagnosticoPendente = null }
         }
     }
@@ -192,7 +192,7 @@ class LightsViewModel @Inject constructor(
         }
         wifiSecrets.save(rede, senhaCasa)
         pairingJob = viewModelScope.launch {
-            val session = runCatching { repository.startLightPairing() }
+            val session = runCatching { repository.startLightPairing(rede) }
                 .getOrElse { error ->
                     _state.update { it.copy(pairing = PairingProgress("failed", error.message ?: "Não foi possível abrir o pareamento.")) }
                     return@launch

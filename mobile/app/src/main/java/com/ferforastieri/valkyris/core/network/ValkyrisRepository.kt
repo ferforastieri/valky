@@ -64,9 +64,9 @@ class ValkyrisRepository @Inject constructor(
     suspend fun deleteLight(id: String) { api.deleteLight(id); _lights.update { list -> list.filterNot { it.id == id } } }
 
     /** Opens a local pairing window: the phone sends the credentials over the air. */
-    suspend fun startLightPairing(): LightPairingSession = api.startLightPairing()
+    suspend fun startLightPairing(network: String = ""): LightPairingSession = api.startLightPairing(network)
 
-    suspend fun lightPairingStatus(id: String): LightPairingSession = api.lightPairingStatus(id)
+    suspend fun lightPairingStatus(id: String, relato: String? = null): LightPairingSession = api.lightPairingStatus(id, relato)
 
     suspend fun cancelLightPairing(id: String) = api.cancelLightPairing(id)
 

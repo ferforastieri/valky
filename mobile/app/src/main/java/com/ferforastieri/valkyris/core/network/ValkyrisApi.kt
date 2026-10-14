@@ -17,6 +17,8 @@ import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.put
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.security.MessageDigest
@@ -238,17 +240,28 @@ class ValkyrisApi(
 
     suspend fun lights(): List<LightDevice> = get("/lights")
     /** Abre uma janela de pareamento local; o celular envia os dados pelo ar. */
-    suspend fun startLightPairing(): LightPairingSession = post("/lights/pairing-sessions", emptyMap<String, String>(), announceBackend = true)
-    suspend fun lightPairingStatus(id: String): LightPairingSession = get("/lights/pairing-sessions/$id")
-    /** Conta ao servidor o que aconteceu numa tentativa de pareamento. */
-    suspend fun reportLightPairingDiagnostic(sessionId: String, detail: String) {
-        // Silencioso de propósito: é acompanhamento interno, não um aviso para
-        // o usuário (a resposta do servidor não deve virar toast na tela).
-        post<JsonElement, Map<String, String>>(
-            "/lights/pairing-diagnostics",
-            mapOf("sessionId" to sessionId, "detail" to detail.take(300)),
-            announceBackend = false,
-        )
+    suspend fun startLightPairing(network: String = ""): LightPairingSession = post(
+        "/lights/pairing-sessions",
+        buildJsonObject {
+            put("network", network.take(64))
+            put("app", BuildConfig.VERSION_NAME)
+            put("android", android.os.Build.VERSION.SDK_INT)
+        },
+        announceBackend = true,
+    )
+
+    /**
+     * Consulta o estado da sessão. Com [relato], o servidor guarda no banco o
+     * que o aplicativo viu (códigos da lâmpada, redes) — é diagnóstico da
+     * sessão, não registro de servidor, e nunca leva a senha do Wi-Fi.
+     */
+    suspend fun lightPairingStatus(id: String, relato: String? = null): LightPairingSession {
+        val caminho = if (relato.isNullOrBlank()) {
+            "/lights/pairing-sessions/$id"
+        } else {
+            "/lights/pairing-sessions/$id?relato=" + Uri.encode(relato.take(300))
+        }
+        return get(caminho)
     }
     suspend fun cancelLightPairing(id: String) {
         val current = requireNotNull(session())

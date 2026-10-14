@@ -214,3 +214,44 @@ func TestPairingWithoutALocalAdapterIsReported(t *testing.T) {
 		t.Fatalf("adaptador ausente retornou %v", err)
 	}
 }
+
+func TestPairingDiagnosticsPersistInTheDatabase(t *testing.T) {
+	service, db, _ := newTestService(t, &ScriptedAdapter{})
+	ctx := context.Background()
+	if err := service.RecordPairingDiagnostic(ctx, "sessao-1", "aplicativo 3.0.42 (android 35); rede escolhida: VIVOFIBRA-B801"); err != nil {
+		t.Fatal(err)
+	}
+	if err := service.RecordPairingDiagnostic(ctx, "sessao-1", "192.168.176.1: 0 pacote aceito, 3 senha recusada"); err != nil {
+		t.Fatal(err)
+	}
+	var entries string
+	if err := db.DB.QueryRowContext(ctx, `SELECT entries FROM light_pairing_diagnostics WHERE session_id = ?`, "sessao-1").Scan(&entries); err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(entries, "VIVOFIBRA-B801") || !strings.Contains(entries, "senha recusada") {
+		t.Fatalf("relatos não guardados: %s", entries)
+	}
+	if strings.Index(entries, "VIVOFIBRA-B801") > strings.Index(entries, "senha recusada") {
+		t.Fatalf("relatos fora de ordem: %s", entries)
+	}
+}
+
+func TestPairingWindowRecordsItsMilestones(t *testing.T) {
+	adapter := &ScriptedAdapter{candidates: []Candidate{{Address: "192.168.1.60", DeviceID: "device-1", Version: 3.3}}, acceptAny: true}
+	service, db, _ := newTestService(t, adapter)
+	service.pairingWindow = 3 * time.Second
+	session, err := service.StartPairing(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	waitForStatus(t, service, session.ID, PairingPaired)
+	var entries string
+	if err := db.DB.QueryRowContext(context.Background(), `SELECT entries FROM light_pairing_diagnostics WHERE session_id = ?`, session.ID).Scan(&entries); err != nil {
+		t.Fatal(err)
+	}
+	for _, esperado := range []string{"janela de pareamento aberta", "lâmpada encontrada", "aceitou a chave"} {
+		if !strings.Contains(entries, esperado) {
+			t.Fatalf("marco %q ausente no diagnóstico: %s", esperado, entries)
+		}
+	}
+}

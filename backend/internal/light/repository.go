@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
+	"errors"
 	"time"
 
 	appcrypto "github.com/ferforastieri/valkyris/backend/internal/crypto"
@@ -199,6 +200,45 @@ func boolToInt(value bool) int {
 		return 1
 	}
 	return 0
+}
+
+// AppendPairingDiagnostic guarda um relato do pareamento na sessão, em ordem.
+// Tudo fica em uma coluna só (entries, um JSON), para o diagnóstico ser lido do
+// banco sem depender de registro de servidor.
+func (r *Repository) AppendPairingDiagnostic(ctx context.Context, sessionID, detail string, at time.Time) error {
+	type entry struct {
+		At     string `json:"at"`
+		Detail string `json:"detail"`
+	}
+	momento := at.UTC().Format(time.RFC3339Nano)
+	tx, err := r.store.DB.BeginTx(ctx, nil)
+	if err != nil {
+		return err
+	}
+	defer func() { _ = tx.Rollback() }()
+	var atual string
+	err = tx.QueryRowContext(ctx, `SELECT entries FROM light_pairing_diagnostics WHERE session_id = ?`, sessionID).Scan(&atual)
+	if err != nil && !errors.Is(err, sql.ErrNoRows) {
+		return err
+	}
+	entries := []entry{}
+	if atual != "" {
+		// Um valor estranho não pode derrubar o diagnóstico: recomeça a lista.
+		_ = json.Unmarshal([]byte(atual), &entries)
+	}
+	entries = append(entries, entry{At: momento, Detail: detail})
+	guardado, err := json.Marshal(entries)
+	if err != nil {
+		return err
+	}
+	_, err = tx.ExecContext(ctx,
+		`INSERT INTO light_pairing_diagnostics(session_id, entries, updated_at) VALUES(?, ?, ?)
+		 ON CONFLICT(session_id) DO UPDATE SET entries = excluded.entries, updated_at = excluded.updated_at`,
+		sessionID, string(guardado), momento)
+	if err != nil {
+		return err
+	}
+	return tx.Commit()
 }
 
 func mustJSON(value any) string {

@@ -236,14 +236,32 @@ paths:
         Returns the one-time values the phone sends over the air to a lamp that is
         blinking fast. The Wi-Fi credentials never reach the backend. While the
         window is open the backend watches the local network and registers the
-        first lamp that accepts the generated key.
+        first lamp that accepts the generated key. The optional body carries the
+        app's context (chosen network, version, Android level); it is kept in the
+        session diagnostics, in the database — never the Wi-Fi password.
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                network: {type: string, description: Network the app is sending to the lamp}
+                app: {type: string, description: App version}
+                android: {type: integer, description: Android API level}
       responses:
         '201': {description: Pairing session in APIResponse.data}
         '200': {description: An open session was reused instead of starting another one}
   /lights/pairing-sessions/{id}:
     get:
       summary: Follow a pairing window (administrator only)
-      parameters: [{$ref: '#/components/parameters/id'}]
+      description: |
+        Also accepts ?relato=…: what the app saw during the attempt (codes the lamp
+        reported, networks) is stored in the session diagnostics in the database,
+        never in the server logs, and never with the Wi-Fi password.
+      parameters:
+        - {$ref: '#/components/parameters/id'}
+        - {name: relato, in: query, required: false, schema: {type: string}, description: What the app saw during pairing, kept in the session diagnostics}
       responses:
         '200': {description: Pairing session in APIResponse.data}
         '404': {description: Unknown session}

@@ -131,6 +131,7 @@ func (s *Service) StartPairing(ctx context.Context) (PairingSession, error) {
 	// sessão quando a resposta sai.
 	snapshot := *session
 	s.pairingMu.Unlock()
+	s.recordDebug(session.ID, fmt.Sprintf("janela de pareamento aberta; região %s", session.Region))
 	go s.runPairing(session.ID)
 	return snapshot, nil
 }
@@ -148,12 +149,14 @@ func (s *Service) PairingStatus(id string) (PairingSession, error) {
 // CancelPairing closes the window without registering anything.
 func (s *Service) CancelPairing(id string) error {
 	s.pairingMu.Lock()
-	defer s.pairingMu.Unlock()
 	if s.pairing == nil || s.pairing.ID != id {
+		s.pairingMu.Unlock()
 		return errors.New("pareamento não encontrado")
 	}
 	s.pairing = nil
 	s.pairingTried = map[string]bool{}
+	s.pairingMu.Unlock()
+	s.recordDebug(id, "pareamento cancelado pelo aplicativo")
 	return nil
 }
 
@@ -174,6 +177,33 @@ func (s *Service) finishPairing(id, status, message string) {
 		session.EndedAt = &now
 		session.ExpiresAt = now
 	})
+	s.recordDebug(id, "fim: "+status+" — "+message)
+}
+
+// RecordPairingDiagnostic persiste o que o aplicativo viu durante o pareamento
+// (rede escolhida, códigos que a lâmpada reportou, resultado da entrega). Fica
+// no banco, junto com os marcos do servidor — nunca no log, e nunca com a senha
+// do Wi-Fi.
+func (s *Service) RecordPairingDiagnostic(ctx context.Context, sessionID, detail string) error {
+	sessionID = strings.TrimSpace(sessionID)
+	detail = strings.TrimSpace(detail)
+	if sessionID == "" || detail == "" {
+		return errors.New("relato de pareamento vazio")
+	}
+	return s.repo.AppendPairingDiagnostic(ctx, sessionID, detail, time.Now())
+}
+
+// recordDebug guarda um marco do pareamento no banco. É daqui que o
+// diagnóstico é lido; esses marcos não viram registro de servidor.
+func (s *Service) recordDebug(sessionID, detail string) {
+	if sessionID == "" || detail == "" {
+		return
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	if err := s.repo.AppendPairingDiagnostic(ctx, sessionID, detail, time.Now()); err != nil {
+		s.logger.Debug("pairing diagnostics", "error", err)
+	}
 }
 
 // runPairing watches the local network while the window is open.
@@ -240,6 +270,7 @@ func (s *Service) probePairingDevices(id string) {
 			session.Address = candidate.Address
 			session.Message = fmt.Sprintf("Lâmpada encontrada em %s. Testando o controle local…", candidate.Address)
 		})
+		s.recordDebug(id, fmt.Sprintf("lâmpada encontrada em %s (id %s)", candidate.Address, displayDeviceID(candidate)))
 		light, err := s.tryPairingKey(ctx, session, candidate)
 		if err != nil {
 			s.markPairingTried(candidate.Address)
@@ -252,6 +283,7 @@ func (s *Service) probePairingDevices(id string) {
 					candidate.Address, displayDeviceID(candidate), attempted,
 				)
 			})
+			s.recordDebug(id, fmt.Sprintf("recusou as %d chaves testadas em %s (id %s)", attempted, candidate.Address, displayDeviceID(candidate)))
 			continue
 		}
 		s.updatePairing(id, func(session *PairingSession) {
@@ -264,6 +296,7 @@ func (s *Service) probePairingDevices(id string) {
 			session.EndedAt = &now
 			session.ExpiresAt = now
 		})
+		s.recordDebug(id, fmt.Sprintf("aceitou a chave em %s (id %s) e foi cadastrada", candidate.Address, displayDeviceID(candidate)))
 		return
 	}
 }

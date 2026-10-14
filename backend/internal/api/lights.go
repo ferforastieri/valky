@@ -4,7 +4,9 @@ import (
 	"database/sql"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"net/http"
+	"strings"
 
 	"github.com/ferforastieri/valkyris/backend/internal/light"
 )
@@ -63,29 +65,34 @@ func (s *Server) discoverLights(w http.ResponseWriter, r *http.Request) {
 	writeSuccess(w, http.StatusOK, "Local lighting discovery finished", candidates)
 }
 
-// startLightPairing opens a local pairing window. The phone sends the Wi-Fi
-// credentials to the lamp over the air; the backend only supplies the one-time
-// values and then watches the network for the new device.
-// lightPairingDiagnostic registra o que o aplicativo viu durante o pareamento.
-// Assim o acompanhamento pode ser feito pelos registros do servidor, sem o
-// usuário precisar relatar cada tentativa.
-func (s *Server) lightPairingDiagnostic(w http.ResponseWriter, r *http.Request) {
-	var body struct {
-		SessionID string `json:"sessionId"`
-		Detail    string `json:"detail"`
+// lightPairingContext é o que o aplicativo conta ao abrir a janela de
+// pareamento: a rede que ele vai enviar e a própria versão. Nunca senha.
+type lightPairingContext struct {
+	Network string `json:"network"`
+	App     string `json:"app"`
+	Android int    `json:"android"`
+}
+
+func pairingContextSummary(in lightPairingContext) string {
+	partes := []string{}
+	if in.App != "" {
+		partes = append(partes, fmt.Sprintf("aplicativo %s (android %d)", in.App, in.Android))
 	}
-	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
-		writeError(w, http.StatusBadRequest, err)
-		return
+	if in.Network != "" {
+		partes = append(partes, "rede escolhida: "+in.Network)
 	}
-	s.logger.Info("pareamento: relato do aplicativo", "sessao", body.SessionID, "detalhe", body.Detail)
-	writeSuccess(w, http.StatusOK, "Registrado", map[string]bool{"ok": true})
+	return strings.Join(partes, "; ")
 }
 
 func (s *Server) startLightPairing(w http.ResponseWriter, r *http.Request) {
 	if _, ok := s.lights.Scanner(); !ok {
 		writeError(w, http.StatusServiceUnavailable, light.ErrNoLightingAdapter)
 		return
+	}
+	var contexto lightPairingContext
+	if r.ContentLength > 0 {
+		// Contexto opcional: um corpo estranho não impede o pareamento.
+		_ = json.NewDecoder(r.Body).Decode(&contexto)
 	}
 	session, err := s.lights.StartPairing(r.Context())
 	if errors.Is(err, light.ErrPairingInProgress) {
@@ -96,14 +103,25 @@ func (s *Server) startLightPairing(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadGateway, err)
 		return
 	}
+	// O diagnóstico fica no banco, na sessão — não vira registro de servidor.
+	if resumo := pairingContextSummary(contexto); resumo != "" {
+		_ = s.lights.RecordPairingDiagnostic(r.Context(), session.ID, resumo)
+	}
 	writeSuccess(w, http.StatusCreated, "Pairing window open", session)
 }
 
 func (s *Server) lightPairingStatus(w http.ResponseWriter, r *http.Request) {
-	session, err := s.lights.PairingStatus(r.PathValue("id"))
+	id := r.PathValue("id")
+	session, err := s.lights.PairingStatus(id)
 	if err != nil {
 		writeError(w, http.StatusNotFound, err)
 		return
+	}
+	// O aplicativo aproveita a consulta de estado para deixar o que viu
+	// (códigos que a lâmpada reportou, redes): vai para o diagnóstico da
+	// sessão, no banco.
+	if relato := strings.TrimSpace(r.URL.Query().Get("relato")); relato != "" {
+		_ = s.lights.RecordPairingDiagnostic(r.Context(), id, relato)
 	}
 	writeSuccess(w, http.StatusOK, "Pairing status", session)
 }
