@@ -135,12 +135,25 @@ class LightsViewModel @Inject constructor(
         }
     }
 
-    /** Relata ao servidor e guarda o relato para reenviar quando houver rede. */
+    /**
+     * Relata ao servidor e INSISTE até conseguir: depois do passo 2 o celular
+     * volta sozinho para a rede de casa e o relato sobe em segundos, sem o
+     * usuário precisar mexer em nada.
+     */
     private fun relatar(sessionId: String, detalhe: String) {
         diagnosticoPendente = sessionId to detalhe
         viewModelScope.launch {
-            runCatching { repository.api.reportLightPairingDiagnostic(sessionId, detalhe) }
-                .onSuccess { if (diagnosticoPendente == sessionId to detalhe) diagnosticoPendente = null }
+            repeat(40) {
+                val pendente = diagnosticoPendente ?: return@launch
+                val enviado = runCatching {
+                    repository.api.reportLightPairingDiagnostic(pendente.first, pendente.second)
+                }.isSuccess
+                if (enviado) {
+                    if (diagnosticoPendente == pendente) diagnosticoPendente = null
+                    return@launch
+                }
+                delay(3_000)
+            }
         }
     }
 
@@ -305,9 +318,9 @@ class LightsViewModel @Inject constructor(
         }
         _state.update {
             val texto = if (resultado.confirmado) {
-                "Dados aceitos pela lâmpada. Volte o celular para a rede de casa: ela entra sozinha e eu confirmo aqui."
+                "Dados aceitos! Pode voltar o celular para o Wi-Fi de casa — eu envio o relatório e confirmo sozinho."
             } else {
-                "Dados enviados para a lâmpada. Volte o celular para a rede de casa e aguarde: ela entra sozinha."
+                "Dados enviados! Pode voltar o celular para o Wi-Fi de casa — eu envio o relatório e confirmo sozinho."
             }
             it.copy(pairing = PairingProgress("waiting", texto))
         }
