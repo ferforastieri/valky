@@ -22,6 +22,7 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -52,7 +53,9 @@ import kotlinx.coroutines.withContext
     var selected by remember{mutableStateOf<LightDevice?>(null)}
     var removing by remember{mutableStateOf<LightDevice?>(null)}
     var renaming by remember{mutableStateOf<LightDevice?>(null)}
-    var pairing by remember{mutableStateOf(false)}
+    // rememberSaveable: a folha volta sozinha se o Android recriar o app (volta
+    // da tela de Wi-Fi, pouca memória). O pareamento em si vive no servidor.
+    var pairing by rememberSaveable{mutableStateOf(false)}
     val context=LocalContext.current
     val locationNeededNotice=stringResource(R.string.light_pair_location_needed)
     val neededPermissions=remember{
@@ -102,7 +105,8 @@ import kotlinx.coroutines.withContext
         onConfigure={ssid,password->vm.configurar(ssid,password)},
         onOpenLocation={runCatching{context.startActivity(Intent(Settings.ACTION_LOCATION_SOURCE_SETTINGS))}},
         onOpenWifi={openWifiSettings(context)},
-        onDismiss={pairing=false;vm.dismissPairing()},
+        onDismiss={pairing=false},
+        onCancel={pairing=false;vm.dismissPairing()},
     )
     selected?.let{light->LightControls(light,light.id in state.busy,{selected=null}){vm.control(light.id,it)}}
     renaming?.let{light->LightNameSheet(light,{renaming=null}){name,room->vm.rename(light.id,name,room){renaming=null}}}
@@ -190,6 +194,7 @@ import kotlinx.coroutines.withContext
     onOpenLocation:()->Unit,
     onOpenWifi:()->Unit,
     onDismiss:()->Unit,
+    onCancel:()->Unit,
 ){
     val context=LocalContext.current
     val connector=remember{WifiApConnector(context)}
@@ -223,9 +228,9 @@ import kotlinx.coroutines.withContext
         actions={
             when{
                 paired!=null->Button(onClick=onDismiss){Text(stringResource(R.string.close))}
-                running->TextButton(onClick=onDismiss){Text(stringResource(R.string.cancel))}
+                running->TextButton(onClick=onCancel){Text(stringResource(R.string.cancel))}
                 else->{
-                    TextButton(onClick=onDismiss){Text(stringResource(R.string.cancel))}
+                    TextButton(onClick=onCancel){Text(stringResource(R.string.cancel))}
                     Button(
                         onClick={onConfigure(escolhida,password)},
                         enabled=escolhida.isNotBlank()&&password.isNotBlank()&&canScan&&!locationOff,
