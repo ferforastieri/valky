@@ -33,7 +33,6 @@
     <string name="light_edit">Editar lâmpada</string>
     <string name="light_name">Nome</string>
     <string name="light_room">Cômodo</string>
-    <string name="light_options">Ajustes</string>
     <string name="light_setup_pending">Conferindo a lâmpada…</string>
     <string name="light_setup_failed">Não foi possível falar com a lâmpada</string>
     <string name="no_lights_body_admin">Toque em + para adicionar uma lâmpada que você já configurou no aplicativo do fabricante.</string>

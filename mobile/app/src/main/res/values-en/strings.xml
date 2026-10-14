@@ -35,7 +35,6 @@
     <string name="light_edit">Edit bulb</string>
     <string name="light_name">Name</string>
     <string name="light_room">Room</string>
-    <string name="light_options">Adjust</string>
     <string name="light_setup_pending">Checking the bulb…</string>
     <string name="light_setup_failed">The bulb could not be reached</string>
     <string name="no_lights_body_admin">Tap + to add a bulb you already set up in the manufacturer app.</string>

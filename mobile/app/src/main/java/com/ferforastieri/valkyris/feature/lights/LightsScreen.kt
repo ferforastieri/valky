@@ -86,11 +86,11 @@ import com.ferforastieri.valkyris.core.model.*
     val lit=light.state.power&&light.state.online
     val pulse=rememberInfiniteTransition(label="lamp")
     val glow by pulse.animateFloat(initialValue=.62f,targetValue=1f,animationSpec=infiniteRepeatable(tween(1400),RepeatMode.Reverse),label="glow")
-    // O toque no card liga ou desliga; o botão de ajustes abre cor e intensidade.
-    Card(onClick=onPower,colors=CardDefaults.cardColors(containerColor=MaterialTheme.colorScheme.surface),border=BorderStroke(1.dp,if(light.state.online)aura.copy(alpha=.7f)else MaterialTheme.colorScheme.outlineVariant)){
-        Row(Modifier.fillMaxWidth().background(aura.copy(alpha=if(light.state.power).12f else .03f)).padding(start=16.dp,top=10.dp,bottom=10.dp,end=6.dp),verticalAlignment=Alignment.CenterVertically){
-            Surface(shape=CircleShape,color=aura.copy(alpha=if(light.state.power).28f*glow else .08f)){Icon(if(light.state.power)Lucide.Lightbulb else Lucide.LightbulbOff,null,Modifier.padding(12.dp).size(24.dp).alpha(if(lit)glow else 1f).scale(if(lit)(.96f+.06f*glow)else 1f),tint=if(light.state.power)aura else MaterialTheme.colorScheme.onSurfaceVariant)}
-            Spacer(Modifier.width(13.dp));Column(Modifier.weight(1f)){
+    // O toque no card abre os detalhes; o toque na lâmpada liga ou desliga.
+    Card(onClick=onOpen,colors=CardDefaults.cardColors(containerColor=MaterialTheme.colorScheme.surface),border=BorderStroke(1.dp,if(light.state.online)aura.copy(alpha=.7f)else MaterialTheme.colorScheme.outlineVariant)){
+        Row(Modifier.fillMaxWidth().background(aura.copy(alpha=if(light.state.power).12f else .03f)).padding(start=10.dp,top=8.dp,bottom=8.dp,end=6.dp),verticalAlignment=Alignment.CenterVertically){
+            Surface(onClick=onPower,enabled=light.state.online,shape=CircleShape,color=aura.copy(alpha=if(light.state.power).28f*glow else .08f)){Icon(if(light.state.power)Lucide.Lightbulb else Lucide.LightbulbOff,stringResource(if(light.state.power)R.string.favorite_light_on else R.string.favorite_light_off),Modifier.padding(14.dp).size(26.dp).alpha(if(lit)glow else 1f).scale(if(lit)(.96f+.06f*glow)else 1f),tint=if(light.state.power)aura else MaterialTheme.colorScheme.onSurfaceVariant)}
+            Spacer(Modifier.width(11.dp));Column(Modifier.weight(1f)){
                 Text(light.name,fontWeight=FontWeight.SemiBold)
                 Text(
                     listOfNotNull(
@@ -111,7 +111,6 @@ import com.ferforastieri.valkyris.core.model.*
             onEdit?.let{IconButton(onClick=it){Icon(Lucide.Pencil,stringResource(R.string.edit),tint=MaterialTheme.colorScheme.onSurfaceVariant)}}
             onRemove?.let{IconButton(onClick=it){Icon(Lucide.Trash2,stringResource(R.string.remove),tint=MaterialTheme.colorScheme.onSurfaceVariant)}}
             if(busy)CircularProgressIndicator(Modifier.size(26.dp),strokeWidth=2.dp)
-            IconButton(onClick=onOpen,enabled=light.state.online){Icon(Lucide.SlidersHorizontal,stringResource(R.string.light_options),tint=if(light.state.online)MaterialTheme.colorScheme.secondary else MaterialTheme.colorScheme.outlineVariant)}
         }
     }
 }
