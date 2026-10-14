@@ -212,8 +212,11 @@ fun OverviewContent(
                 }
             }
         } else {
-            // Todos os favoritos em uma grade só, na ordem câmeras, luzes e
-            // controles: o ícone de cada cartão já diz de que se trata.
+            // Uma seção só de favoritos, em grade de duas colunas: câmeras,
+            // lâmpadas e controles convivem na mesma seção (o ícone de cada
+            // cartão já diz de que se trata). Os cartões nunca ficam esticados
+            // sozinhos na linha.
+            item(key = "favorites-label") { SectionLabel(stringResource(R.string.overview_favorites), Lucide.Star) }
             item(key = "favorites-grid") {
                 FavoriteGrid(
                     items = orderedFavorites(favorites),
@@ -324,8 +327,9 @@ internal fun orderedFavorites(favorites: List<FavoriteItem>): List<FavoriteItem>
     favoriteOrder.flatMap { type -> favorites.filter { it.type == type } }
 
 /**
- * Cartões favoritos em linhas de três. Com fonte ampliada (ou tela estreita) os
- * cartões passam a ocupar a linha inteira, para o rótulo não ser espremido.
+ * Cartões favoritos em grade de duas colunas. Com fonte ampliada (ou tela
+ * estreita) passa a uma coluna, para o rótulo não ser espremido. Cada linha
+ * mantém cartões do mesmo tamanho, mesmo quando sobra um só.
  */
 @Composable
 private fun FavoriteGrid(
@@ -333,13 +337,19 @@ private fun FavoriteGrid(
     onOpen: (FavoriteItem) -> Unit,
     onToggleLight: (FavoriteItem) -> Unit,
 ) {
-    com.ferforastieri.valkyris.core.design.AdaptiveRow(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-        items.forEach { favorite ->
-            FavoriteCard(
-                item = favorite,
-                modifier = Modifier.weight(1f),
-                onClick = { onOpen(favorite) },
-            )
+    val columns = if (LocalDensity.current.fontScale >= 1.3f) 1 else 2
+    Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        items.chunked(columns).forEach { row ->
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                row.forEach { favorite ->
+                    FavoriteCard(
+                        item = favorite,
+                        modifier = Modifier.weight(1f),
+                        onClick = { onOpen(favorite) },
+                    )
+                }
+                repeat(columns - row.size) { Spacer(Modifier.weight(1f)) }
+            }
         }
     }
 }

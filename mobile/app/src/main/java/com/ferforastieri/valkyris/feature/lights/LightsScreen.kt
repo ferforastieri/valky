@@ -17,9 +17,11 @@ import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.scale
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.luminance
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
@@ -35,7 +37,9 @@ import com.ferforastieri.valkyris.core.model.*
 @Composable fun LightsScreen(admin:Boolean,vm:LightsViewModel=hiltViewModel()){
     LifecycleResumeEffect(Unit){vm.refresh();onPauseOrDispose{}}
     val state by vm.state.collectAsStateWithLifecycle()
-    var selected by remember{mutableStateOf<LightDevice?>(null)}
+    // Guardamos só o identificador: a luz viva vem do estado, então a folha
+    // acompanha o aparelho sem ser recriada a cada atualização.
+    var selectedId by rememberSaveable{mutableStateOf<String?>(null)}
     var removing by remember{mutableStateOf<LightDevice?>(null)}
     var renaming by remember{mutableStateOf<LightDevice?>(null)}
     var adding by rememberSaveable{mutableStateOf(false)}
@@ -46,7 +50,7 @@ import com.ferforastieri.valkyris.core.model.*
                 state.loading->Box(Modifier.fillMaxSize(),contentAlignment=Alignment.Center){CircularProgressIndicator()}
                 state.lights.isEmpty()->EmptyLighting(admin)
                 else->LazyColumn(verticalArrangement=Arrangement.spacedBy(12.dp),contentPadding=PaddingValues(top=12.dp,bottom=96.dp)){
-                    items(state.lights,key={it.id}){light->LightCard(light,light.id in state.busy,{vm.control(light.id,LightStatePatch(power=!light.state.power))},{selected=light},if(admin){{removing=light}}else null,{vm.toggleFavorite(light.id,!light.favorite)},if(admin){{renaming=light}}else null)}
+                    items(state.lights,key={it.id}){light->LightCard(light,light.id in state.busy,{vm.control(light.id,LightStatePatch(power=!light.state.power))},{selectedId=light.id},if(admin){{removing=light}}else null,{vm.toggleFavorite(light.id,!light.favorite)},if(admin){{renaming=light}}else null)}
                 }
             }
         }
@@ -63,7 +67,9 @@ import com.ferforastieri.valkyris.core.model.*
         onSubmit={input,done->vm.register(input,done)},
         onDismiss={adding=false;vm.clearRegistration()},
     )
-    selected?.let{light->LightControls(light,light.id in state.busy,{selected=null}){vm.control(light.id,it)}}
+    state.lights.firstOrNull{it.id==selectedId}?.let{light->
+        LightControls(light,light.id in state.busy,{selectedId=null}){vm.control(light.id,it)}
+    }
     renaming?.let{light->LightNameSheet(light,{renaming=null}){name,room->vm.rename(light.id,name,room){renaming=null}}}
     removing?.let{light->AlertDialog(onDismissRequest={removing=null},title={Text(stringResource(R.string.remove_light_title))},text={Text(stringResource(R.string.remove_light_body,light.name))},dismissButton={TextButton(onClick={removing=null}){Text(stringResource(R.string.cancel))}},confirmButton={Button(onClick={vm.delete(light.id){removing=null}},colors=ButtonDefaults.buttonColors(containerColor=MaterialTheme.colorScheme.error)){Text(stringResource(R.string.remove))}})}
 }
@@ -80,17 +86,33 @@ import com.ferforastieri.valkyris.core.model.*
     }
 }
 
+/**
+ * Card da lâmpada no mesmo padrão dos outros dispositivos: ícone à esquerda,
+ * nome e situação no meio, ações à direita. Tocar no card abre os ajustes;
+ * tocar na lâmpada (o ícone) liga ou desliga.
+ */
 @Composable private fun LightCard(light:LightDevice,busy:Boolean,onPower:()->Unit,onOpen:()->Unit,onRemove:(()->Unit)?,onFavorite:(()->Unit)?=null,onEdit:(()->Unit)?=null){
-    val aura=if(light.state.mode=="color")Color.hsv(light.state.color.hue.toFloat(),light.state.color.saturation/100f,light.state.color.value/100f)else Color(0xFFFFD7A0)
-    // Acesa, a lâmpada respira: o brilho do ícone pulsa na cor atual.
-    val lit=light.state.power&&light.state.online
+    val colorMode=light.state.mode=="color"
+    val aura=if(colorMode)Color.hsv(light.state.color.hue.toFloat(),light.state.color.saturation/100f,(light.state.color.value/100f).coerceAtLeast(.4f))else warmWhite(light.state.temperatureKelvin)
+    val on=light.state.power
+    val lit=on&&light.state.online
     val pulse=rememberInfiniteTransition(label="lamp")
-    val glow by pulse.animateFloat(initialValue=.62f,targetValue=1f,animationSpec=infiniteRepeatable(tween(1400),RepeatMode.Reverse),label="glow")
-    // O toque no card abre os detalhes; o toque na lâmpada liga ou desliga.
-    Card(onClick=onOpen,colors=CardDefaults.cardColors(containerColor=MaterialTheme.colorScheme.surface),border=BorderStroke(1.dp,if(light.state.online)aura.copy(alpha=.7f)else MaterialTheme.colorScheme.outlineVariant)){
-        Row(Modifier.fillMaxWidth().background(aura.copy(alpha=if(light.state.power).12f else .03f)).padding(start=10.dp,top=8.dp,bottom=8.dp,end=6.dp),verticalAlignment=Alignment.CenterVertically){
-            Surface(onClick=onPower,enabled=light.state.online,shape=CircleShape,color=aura.copy(alpha=if(light.state.power).28f*glow else .08f)){Icon(if(light.state.power)Lucide.Lightbulb else Lucide.LightbulbOff,stringResource(if(light.state.power)R.string.favorite_light_on else R.string.favorite_light_off),Modifier.padding(14.dp).size(26.dp).alpha(if(lit)glow else 1f).scale(if(lit)(.96f+.06f*glow)else 1f),tint=if(light.state.power)aura else MaterialTheme.colorScheme.onSurfaceVariant)}
-            Spacer(Modifier.width(11.dp));Column(Modifier.weight(1f)){
+    val glow by pulse.animateFloat(initialValue=.78f,targetValue=1f,animationSpec=infiniteRepeatable(tween(1400),RepeatMode.Reverse),label="glow")
+    Card(onClick=onOpen,colors=CardDefaults.cardColors(containerColor=MaterialTheme.colorScheme.surface),border=BorderStroke(1.dp,if(light.state.online&&on)aura.copy(alpha=.6f)else MaterialTheme.colorScheme.outlineVariant)){
+        Row(Modifier.fillMaxWidth().padding(16.dp),verticalAlignment=Alignment.CenterVertically){
+            Surface(
+                onClick=onPower,
+                enabled=light.state.online,
+                shape=CircleShape,
+                color=if(on)aura.copy(alpha=.22f*glow)else MaterialTheme.colorScheme.secondaryContainer,
+            ){Icon(
+                if(on)Lucide.Lightbulb else Lucide.LightbulbOff,
+                stringResource(if(on)R.string.favorite_light_on else R.string.favorite_light_off),
+                Modifier.padding(12.dp).size(24.dp).alpha(if(lit)glow else 1f).scale(if(lit)(.96f+.06f*glow)else 1f),
+                tint=if(on)aura else MaterialTheme.colorScheme.onSecondaryContainer,
+            )}
+            Spacer(Modifier.width(13.dp))
+            Column(Modifier.weight(1f)){
                 Text(light.name,fontWeight=FontWeight.SemiBold)
                 Text(
                     listOfNotNull(
@@ -98,7 +120,7 @@ import com.ferforastieri.valkyris.core.model.*
                         when{
                             light.setupStatus=="failed"->light.setupError.ifBlank{stringResource(R.string.light_setup_failed)}
                             light.setupStatus!="ready"->stringResource(R.string.light_setup_pending)
-                            light.state.online->"${stringResource(R.string.available)} · ${light.state.brightness}%"
+                            light.state.online->"${stringResource(if(on)R.string.favorite_light_on else R.string.favorite_light_off)} · ${light.state.brightness}%"
                             else->stringResource(R.string.unavailable)
                         },
                     ).joinToString(" · "),
@@ -109,38 +131,115 @@ import com.ferforastieri.valkyris.core.model.*
             }
             onFavorite?.let{IconButton(onClick=it){Icon(Lucide.Star,stringResource(if(light.favorite)R.string.unfavorite else R.string.favorite),tint=if(light.favorite)MaterialTheme.colorScheme.secondary else MaterialTheme.colorScheme.onSurfaceVariant)}}
             onEdit?.let{IconButton(onClick=it){Icon(Lucide.Pencil,stringResource(R.string.edit),tint=MaterialTheme.colorScheme.onSurfaceVariant)}}
-            onRemove?.let{IconButton(onClick=it){Icon(Lucide.Trash2,stringResource(R.string.remove),tint=MaterialTheme.colorScheme.onSurfaceVariant)}}
-            if(busy)CircularProgressIndicator(Modifier.size(26.dp),strokeWidth=2.dp)
+            onRemove?.let{IconButton(onClick=it){Icon(Lucide.Trash2,stringResource(R.string.remove),tint=MaterialTheme.colorScheme.error)}}
+            if(busy)CircularProgressIndicator(Modifier.size(24.dp),strokeWidth=2.dp)
         }
     }
 }
 
-@Composable private fun LightControls(light:LightDevice,busy:Boolean,onDismiss:()->Unit,onChange:(LightStatePatch)->Unit){
-    var brightness by remember(light.id,light.state.brightness){mutableFloatStateOf(light.state.brightness.coerceIn(1,100).toFloat())};var temperature by remember(light.id,light.state.temperatureKelvin){mutableFloatStateOf(light.state.temperatureKelvin.coerceIn(2700,6500).toFloat())};var hue by remember(light.id,light.state.color.hue){mutableFloatStateOf(light.state.color.hue.coerceIn(0,360).toFloat())};var saturation by remember(light.id,light.state.color.saturation){mutableFloatStateOf(light.state.color.saturation.coerceIn(0,100).toFloat())};val preview=Color.hsv(hue,saturation/100f,brightness/100f)
-    // A folha já rola sozinha: nada de um segundo verticalScroll aqui (isso
-    // derrubava o app ao abrir os ajustes).
-    ValkyrisBottomSheet(title=light.name,onDismiss=onDismiss,dismissEnabled=!busy,actions={TextButton(onClick=onDismiss){Text(stringResource(R.string.close))}}){Column(Modifier.fillMaxWidth(),verticalArrangement=Arrangement.spacedBy(14.dp)){
-        Row(verticalAlignment=Alignment.CenterVertically){Text(stringResource(if(light.state.online)R.string.available else R.string.unavailable),Modifier.weight(1f),color=if(light.state.online)MaterialTheme.colorScheme.secondary else MaterialTheme.colorScheme.error);Switch(light.state.power,{onChange(LightStatePatch(power=it))},enabled=light.state.online&&!busy)}
-        light.setupError.takeIf{it.isNotBlank()&&light.setupStatus=="failed"}?.let{Text(it,color=MaterialTheme.colorScheme.error,style=MaterialTheme.typography.bodySmall)}
-        if(light.capabilities.brightness){
-            Text(stringResource(R.string.brightness_value,brightness.toInt()),fontWeight=FontWeight.SemiBold);Slider(brightness,{brightness=it},valueRange=1f..100f,onValueChangeFinished={onChange(LightStatePatch(brightness=brightness.toInt()))},enabled=light.state.online)
-        }
-        if(light.capabilities.colorTemperature){
-            Text(stringResource(R.string.white_temperature,temperature.toInt()),fontWeight=FontWeight.SemiBold);Slider(temperature,{temperature=it},valueRange=2700f..6500f,onValueChangeFinished={onChange(LightStatePatch(temperatureKelvin=temperature.toInt()))},enabled=light.state.online)
-        }
-        if(light.capabilities.color){
-            HorizontalDivider();Row(verticalAlignment=Alignment.CenterVertically){Surface(Modifier.size(44.dp),shape=CircleShape,color=preview){};Spacer(Modifier.width(12.dp));Text(stringResource(R.string.color),fontWeight=FontWeight.SemiBold)}
-            Text(stringResource(R.string.hue_value,hue.toInt()));Slider(hue,{hue=it},valueRange=0f..360f,onValueChangeFinished={onChange(LightStatePatch(color=LightColor(hue.toInt(),saturation.toInt(),brightness.toInt())))},enabled=light.state.online)
-            Text(stringResource(R.string.saturation_value,saturation.toInt()));Slider(saturation,{saturation=it},valueRange=0f..100f,onValueChangeFinished={onChange(LightStatePatch(color=LightColor(hue.toInt(),saturation.toInt(),brightness.toInt())))},enabled=light.state.online)
-        }
-    }}
-}
+/** Cores pré-definidas para toque rápido no modo cor. */
+private val presetHues = listOf(0, 30, 55, 120, 180, 220, 275, 320)
 
 /**
- * Cadastro de uma lâmpada já configurada em outro aplicativo (por exemplo o
- * Tuya Smart). O celular informa endereço, identificador e a chave local; a
- * busca na rede acontece no servidor e só ajuda a preencher o formulário.
+ * Folha de ajustes da lâmpada: prévia na cor atual, um controle de liga/desliga
+ * claro (não um switch) e os ajustes de intensidade, branco e cor. Os valores
+ * ficam presos ao identificador da lâmpada, então a folha não "recarrega" a cada
+ * toque.
  */
+@Composable private fun LightControls(light:LightDevice,busy:Boolean,onDismiss:()->Unit,onChange:(LightStatePatch)->Unit){
+    var brightness by remember(light.id){mutableFloatStateOf(light.state.brightness.coerceIn(1,100).toFloat())}
+    var temperature by remember(light.id){mutableFloatStateOf(light.state.temperatureKelvin.coerceIn(2700,6500).toFloat())}
+    var hue by remember(light.id){mutableFloatStateOf(light.state.color.hue.coerceIn(0,360).toFloat())}
+    var saturation by remember(light.id){mutableFloatStateOf(light.state.color.saturation.coerceIn(0,100).toFloat())}
+    val on=light.state.power
+    val reachable=light.state.online&&!busy
+    val preview=if(light.state.mode=="color")Color.hsv(hue,saturation/100f,(brightness/100f).coerceAtLeast(.12f))else warmWhite(temperature.toInt())
+    ValkyrisBottomSheet(title=light.name,onDismiss=onDismiss,dismissEnabled=!busy,actions={TextButton(onClick=onDismiss){Text(stringResource(R.string.close))}}){
+        Column(Modifier.fillMaxWidth(),verticalArrangement=Arrangement.spacedBy(16.dp)){
+            Box(Modifier.fillMaxWidth(),contentAlignment=Alignment.Center){
+                Surface(
+                    Modifier.size(132.dp),
+                    CircleShape,
+                    color=if(on)preview else MaterialTheme.colorScheme.surfaceVariant,
+                    border=BorderStroke(2.dp,MaterialTheme.colorScheme.outlineVariant),
+                    shadowElevation=if(on)8.dp else 0.dp,
+                ){Icon(if(on)Lucide.Lightbulb else Lucide.LightbulbOff,null,Modifier.padding(38.dp),tint=if(on)onColorFor(preview) else MaterialTheme.colorScheme.onSurfaceVariant)}
+            }
+            light.setupError.takeIf{it.isNotBlank()&&light.setupStatus=="failed"}?.let{Text(it,color=MaterialTheme.colorScheme.error,style=MaterialTheme.typography.bodySmall)}
+            // Liga/desliga explícito: um botão grande que muda de cor, no lugar do switch.
+            Surface(
+                onClick={onChange(LightStatePatch(power=!on))},
+                enabled=reachable,
+                modifier=Modifier.fillMaxWidth(),
+                shape=MaterialTheme.shapes.large,
+                color=if(on)MaterialTheme.colorScheme.secondaryContainer else MaterialTheme.colorScheme.surfaceVariant,
+                border=BorderStroke(1.dp,if(on)MaterialTheme.colorScheme.secondary.copy(alpha=.5f)else MaterialTheme.colorScheme.outlineVariant),
+            ){
+                Row(Modifier.fillMaxWidth().padding(horizontal=16.dp,vertical=14.dp),verticalAlignment=Alignment.CenterVertically){
+                    Icon(Lucide.Power,null,Modifier.size(22.dp),tint=if(on)MaterialTheme.colorScheme.onSecondaryContainer else MaterialTheme.colorScheme.onSurfaceVariant)
+                    Spacer(Modifier.width(12.dp))
+                    Text(stringResource(if(on)R.string.favorite_light_on else R.string.favorite_light_off),Modifier.weight(1f),fontWeight=FontWeight.SemiBold,color=if(on)MaterialTheme.colorScheme.onSecondaryContainer else MaterialTheme.colorScheme.onSurfaceVariant)
+                    if(reachable)Text(stringResource(if(on)R.string.light_turn_off else R.string.light_turn_on),style=MaterialTheme.typography.labelLarge,color=if(on)MaterialTheme.colorScheme.onSecondaryContainer else MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+            }
+            if(!light.state.online)Text(stringResource(R.string.unavailable),color=MaterialTheme.colorScheme.error,style=MaterialTheme.typography.bodySmall)
+            if(light.capabilities.brightness){
+                LightSlider(Lucide.Sun,stringResource(R.string.brightness_value,brightness.toInt()),brightness,1f..100f,reachable,{brightness=it}){onChange(LightStatePatch(brightness=brightness.toInt()))}
+            }
+            if(light.capabilities.colorTemperature){
+                LightSlider(Lucide.ThermometerSun,stringResource(R.string.white_temperature,temperature.toInt()),temperature,2700f..6500f,reachable,{temperature=it}){onChange(LightStatePatch(temperatureKelvin=temperature.toInt()))}
+            }
+            if(light.capabilities.color){
+                Column(Modifier.fillMaxWidth(),verticalArrangement=Arrangement.spacedBy(8.dp)){
+                    Row(verticalAlignment=Alignment.CenterVertically){
+                        Icon(Lucide.Palette,null,Modifier.size(18.dp),tint=MaterialTheme.colorScheme.onSurfaceVariant)
+                        Spacer(Modifier.width(8.dp))
+                        Text(stringResource(R.string.color),style=MaterialTheme.typography.bodyMedium,color=MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                    Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.spacedBy(6.dp)){
+                        presetHues.forEach{ preset ->
+                            val chosen= hue.toInt()==preset && saturation>=90f
+                            Surface(
+                                onClick={hue=preset.toFloat();saturation=100f;onChange(LightStatePatch(color=LightColor(preset,100,brightness.toInt())))},
+                                enabled=reachable,
+                                modifier=Modifier.weight(1f).aspectRatio(1f),
+                                shape=CircleShape,
+                                color=Color.hsv(preset.toFloat(),1f,(brightness/100f).coerceAtLeast(.35f)),
+                                border=BorderStroke(if(chosen)2.dp else 0.dp,if(chosen)MaterialTheme.colorScheme.onSurface else Color.Transparent),
+                            ){}
+                        }
+                    }
+                    LightSlider(Lucide.Palette,stringResource(R.string.hue_value,hue.toInt()),hue,0f..360f,reachable,{hue=it}){onChange(LightStatePatch(color=LightColor(hue.toInt(),saturation.toInt(),brightness.toInt())))}
+                }
+            }
+        }
+    }
+}
+
+@Composable private fun LightSlider(icon:ImageVector,label:String,value:Float,range:ClosedFloatingPointRange<Float>,enabled:Boolean,onValue:(Float)->Unit,onFinished:()->Unit){
+    Column(Modifier.fillMaxWidth(),verticalArrangement=Arrangement.spacedBy(4.dp)){
+        Row(verticalAlignment=Alignment.CenterVertically){
+            Icon(icon,null,Modifier.size(18.dp),tint=MaterialTheme.colorScheme.onSurfaceVariant)
+            Spacer(Modifier.width(8.dp))
+            Text(label,style=MaterialTheme.typography.bodyMedium,color=MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+        Slider(value,onValue,valueRange=range,enabled=enabled,onValueChangeFinished=onFinished)
+    }
+}
+
+/** Branco: interpola entre âmbar quente e branco frio. */
+private fun warmWhite(kelvin:Int):Color{
+    val t=((kelvin-2700).coerceIn(0,3800))/3800f
+    return Color(
+        red=(0xFF/255f)+(0xDC/255f-0xFF/255f)*t,
+        green=(0xD7/255f)+(0xE9/255f-0xD7/255f)*t,
+        blue=(0xA0/255f)+(0xFF/255f-0xA0/255f)*t,
+    )
+}
+
+/** Contraste do ícone sobre a cor da lâmpada. */
+private fun onColorFor(background:Color)=if(background.luminance()>0.55f)Color(0xFF1B1B1F)else Color.White
+
 @Composable private fun LightRegisterSheet(
     state:LightsState,
     onScan:()->Unit,
