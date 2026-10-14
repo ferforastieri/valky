@@ -50,8 +50,9 @@ func (a *ScriptedAdapter) Provision(_ context.Context, _ Light, cred Credentials
 	a.mu.Lock()
 	a.attempts = append(a.attempts, cred.Secret)
 	attempts := len(a.attempts)
+	acceptAny, acceptAfter := a.acceptAny, a.acceptAfter
 	a.mu.Unlock()
-	if a.acceptAny || (attempts > a.acceptAfter && a.acceptAfter > 0) {
+	if acceptAny || (attempts > acceptAfter && acceptAfter > 0) {
 		return ProvisionResult{
 			State:        State{Online: true, Power: true},
 			Capabilities: modernProfile.capabilities(),
@@ -131,14 +132,18 @@ func TestPairingRegistersALampThatAcceptedTheGeneratedToken(t *testing.T) {
 func TestPairingWalksTheKeyCandidatesUntilOneAnswers(t *testing.T) {
 	// A lâmpada aceita apenas uma chave derivada, não o token: o serviço deve
 	// continuar tentando em vez de desistir na primeira recusa.
-	adapter := &ScriptedAdapter{candidates: []Candidate{{Address: "192.168.1.61", DeviceID: "device-abc", Version: 3.3}}}
+	// O token é a primeira tentativa; a lâmpada aceita a partir da terceira.
+	// O campo é definido antes de a janela abrir: o adaptador é lido pela
+	// rotina do pareamento.
+	adapter := &ScriptedAdapter{
+		candidates:  []Candidate{{Address: "192.168.1.61", DeviceID: "device-abc", Version: 3.3}},
+		acceptAfter: 2,
+	}
 	service := newPairingService(t, adapter)
 	session, err := service.StartPairing(context.Background())
 	if err != nil {
 		t.Fatal(err)
 	}
-	// O token é a primeira tentativa; a lâmpada aceita a partir da terceira.
-	adapter.acceptAfter = 2
 	final := waitForStatus(t, service, session.ID, PairingPaired)
 	if final.Light == nil {
 		t.Fatalf("pareamento não concluiu: %+v", final)
