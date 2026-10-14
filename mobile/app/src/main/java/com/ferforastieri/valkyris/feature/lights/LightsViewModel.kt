@@ -280,8 +280,15 @@ class LightsViewModel @Inject constructor(
                 secret = session.secret,
                 region = session.region,
                 gateways = gateways,
-            ) { format ->
-                _state.update { state -> state.copy(pairing = PairingProgress("sending", "Entregando os dados do Wi-Fi ($format)…")) }
+            ) { aviso ->
+                _state.update { state ->
+                    val texto = if (aviso.startsWith("pareamento")) {
+                        "Entregando os dados do Wi-Fi…"
+                    } else {
+                        "A lâmpada reportou: $aviso"
+                    }
+                    state.copy(pairing = PairingProgress("sending", texto))
+                }
             }
         } finally {
             closeLink?.invoke()
@@ -293,11 +300,21 @@ class LightsViewModel @Inject constructor(
             }
             return
         }
+        // Veredito dela sobre a entrada na rede: 2 = não achou a rede,
+        // 3 = senha recusada, 4 = não conseguiu entrar, 5 = sem endereço,
+        // 6/7 = servidor, 8 = ativação falhou, 9 = ativada.
+        val veredito = resultado.veredito
+        if (veredito != null && veredito != 9) {
+            _state.update {
+                it.copy(pairing = PairingProgress("failed", "A lâmpada reportou: ${TuyaApTlsPsk.nomeDoCodigo(veredito)}. Deixe-a piscando devagar e tente de novo."))
+            }
+            return
+        }
         _state.update {
-            val texto = if (resultado.confirmado) {
-                "Dados aceitos! Pode voltar o celular para o Wi-Fi de casa — eu envio o relatório e confirmo sozinho."
-            } else {
-                "Dados enviados! Pode voltar o celular para o Wi-Fi de casa — eu envio o relatório e confirmo sozinho."
+            val texto = when {
+                veredito == 9 -> "Ativada! Ela entrou na rede e pegou a chave. Pode voltar o celular para o Wi-Fi de casa."
+                resultado.confirmado -> "Dados aceitos! Pode voltar o celular para o Wi-Fi de casa — eu envio o relatório e confirmo sozinho."
+                else -> "Dados enviados! Pode voltar o celular para o Wi-Fi de casa — eu envio o relatório e confirmo sozinho."
             }
             it.copy(pairing = PairingProgress("waiting", texto))
         }

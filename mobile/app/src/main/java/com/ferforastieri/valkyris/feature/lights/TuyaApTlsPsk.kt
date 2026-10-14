@@ -44,16 +44,37 @@ internal object TuyaApTlsPsk {
     private const val CIFRA_ECDHE_PSK_CBC_SHA = 0xC035
     private const val CIFRA_PSK_GCM_SHA256 = 0x00A8
 
+    /** Pergunta de estado do pareamento (extensão 0x1E do firmware). */
+    private const val PERGUNTA_ESTADO = "{\"reqType\":\"query_netcfg_stat\"}"
+
     private val aleatorio = SecureRandom()
 
     /**
      * O que aconteceu numa tentativa: [enviado] diz que a mensagem saiu do
-     * celular; [confirmado] que a própria lâmpada respondeu código 0.
+     * celular; [confirmado] que a lâmpada aceitou o pacote (código 0);
+     * [veredito] é o resultado da entrada na rede, que ela avisa em seguida:
+     * 2 = não achou a rede, 3 = senha recusada, 4 = não conseguiu entrar,
+     * 5 = sem endereço, 6/7 = servidor, 8 = ativação falhou, 9 = ativada.
      */
-    data class Entrega(val enviado: Boolean, val confirmado: Boolean, val detalhe: String) {
+    data class Entrega(val enviado: Boolean, val confirmado: Boolean, val detalhe: String, val veredito: Int? = null) {
         companion object {
             fun falhou(endereco: String, motivo: String) = Entrega(false, false, "$endereco: $motivo")
         }
+    }
+
+    /** O nome de cada código que a lâmpada reporta (SDK: AP_CFG_ERR_CODE). */
+    internal fun nomeDoCodigo(codigo: Int): String = when (codigo) {
+        0 -> "pacote aceito"
+        1 -> "pacote com erro"
+        2 -> "não achou a rede"
+        3 -> "senha recusada"
+        4 -> "não conseguiu entrar na rede"
+        5 -> "não recebeu endereço de rede"
+        6 -> "não achou a nuvem"
+        7 -> "não achou o endereço do servidor"
+        8 -> "ativação falhou"
+        9 -> "ativada"
+        else -> "código $codigo"
     }
 
     /**
@@ -76,7 +97,7 @@ internal object TuyaApTlsPsk {
      *    trava esperando um registro inválido) e completamos como servidor;
      * 2) Geração atual: nós falamos primeiro, como cliente TLS.
      */
-    fun entrega(network: android.net.Network, endereco: String, corpo: String): Entrega {
+    fun entrega(network: android.net.Network, endereco: String, corpo: String, onRelato: (String) -> Unit = {}): Entrega {
         val quadroBytes = quadro(0x14, corpo)
         var servidorAtual: Servidor? = null
         return runCatching {
@@ -89,12 +110,25 @@ internal object TuyaApTlsPsk {
                     servidor.abre()
                     // A geração dela PEDE os dados: ela manda um quadro (tipo 12)
                     // e nós respondemos com o MESMO tipo carregando o JSON. Se
-                    // ela não pedir, oferecemos no tipo atual (0x14).
+                    // ela não pedir, oferecemos no tipo do SDK (0x14).
                     val pedido = servidor.le(2_500)
                     val tipo = pedido?.first ?: 0x14
                     val resposta = servidor.envia(quadro(tipo, corpo))
+                    val (aceito, primeiro) = resposta?.let { respostaCodigo(it) } ?: (false to "sem resposta")
+                    // Aceite é só o começo: a lâmpada AVISA o resultado da
+                    // entrada na rede neste mesmo canal. Ficamos ouvindo até o
+                    // veredito (2..9) — é o que diz senha recusada, rede não
+                    // achada, ativada e assim por diante.
+                    val codigos = mutableListOf<Int>()
+                    if (aceito) {
+                        codigos += 0
+                        codigos += acompanhar(servidor, onRelato)
+                    }
                     val visto = if (pedido != null) "pediu tipo $tipo; " else ""
-                    return Entrega(true, true, "$endereco: " + visto + responder(resposta, "tls-servidor"))
+                    val resumo = codigos.takeIf { it.isNotEmpty() }
+                        ?.joinToString(", ") { "$it ${nomeDoCodigo(it)}" }
+                        ?: primeiro
+                    return Entrega(true, aceito, "$endereco: $visto$resumo", codigos.lastOrNull { it >= 2 })
                 }
             }
             // 2) nós falamos primeiro (geração atual)
@@ -241,16 +275,60 @@ internal object TuyaApTlsPsk {
     }.getOrNull()
 
     /**
+     * O código que a lâmpada reporta: nos avisos diretos são os 4 primeiros
+     * bytes do conteúdo; na resposta da pergunta de estado ele vem no campo
+     * "status" do JSON.
+     */
+    private fun codigoDe(tipo: Int, conteudo: ByteArray): Int? {
+        if (conteudo.size < 4) return null
+        if (tipo == 0x1E) {
+            val texto = conteudo.copyOfRange(4, conteudo.size).toString(Charsets.UTF_8)
+            return Regex("\"status\"\\s*:\\s*(\\d+)").find(texto)?.groupValues?.get(1)?.toIntOrNull()
+        }
+        val codigo = ((conteudo[0].toInt() and 0xFF) shl 24) or ((conteudo[1].toInt() and 0xFF) shl 16) or
+            ((conteudo[2].toInt() and 0xFF) shl 8) or (conteudo[3].toInt() and 0xFF)
+        return codigo.takeIf { it in 0..9 }
+    }
+
+    /**
+     * Fica ouvindo a lâmpada depois do aceite: ela avisa o resultado da
+     * entrada na rede (2 = não achou a rede, 3 = senha recusada, …,
+     * 9 = ativada). De tempo em tempo também pergunta o estado
+     * (reqType query_netcfg_stat). Para no veredito ou no limite de tempo.
+     */
+    private fun acompanhar(servidor: Servidor, onRelato: (String) -> Unit, limiteMillis: Long = 90_000): List<Int> {
+        val vistos = mutableListOf<Int>()
+        val fim = System.currentTimeMillis() + limiteMillis
+        var proximaPergunta = System.currentTimeMillis() + 3_000
+        while (System.currentTimeMillis() < fim) {
+            val lido = servidor.le(3_000)
+            if (lido != null) {
+                codigoDe(lido.first, lido.second)?.let { codigo ->
+                    if (codigo !in vistos) {
+                        vistos += codigo
+                        onRelato("$codigo ${nomeDoCodigo(codigo)}")
+                    }
+                    if (codigo >= 2) return vistos
+                }
+            }
+            if (System.currentTimeMillis() >= proximaPergunta) {
+                val perguntou = runCatching { servidor.envia(quadro(0x1E, PERGUNTA_ESTADO)) }.isSuccess
+                if (!perguntou) return vistos
+                proximaPergunta = System.currentTimeMillis() + 5_000
+            }
+        }
+        return vistos
+    }
+
+    /**
      * Lê a resposta do aparelho: (aceitou, descrição). Entende o quadro
      * LPV3.5, o quadro clássico 55 AA e, quando não reconhece, descreve os
      * bytes recebidos.
      */
     private fun respostaCodigo(resposta: ByteArray): Pair<Boolean, String> {
         lerQuadro(resposta)?.let { (tipo, conteudo) ->
-            if (tipo == 0x14 && conteudo.size >= 4) {
-                val codigo = ((conteudo[0].toInt() and 0xFF) shl 24) or ((conteudo[1].toInt() and 0xFF) shl 16) or
-                    ((conteudo[2].toInt() and 0xFF) shl 8) or (conteudo[3].toInt() and 0xFF)
-                return (codigo == 0) to String.format("0x%08X", codigo)
+            codigoDe(tipo, conteudo)?.let { codigo ->
+                return (codigo == 0) to "$codigo (${nomeDoCodigo(codigo)})"
             }
             return false to ("lvp35 tipo $tipo " + conteudo.take(16).joinToString("") { "%02x".format(it) })
         }

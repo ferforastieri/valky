@@ -13,7 +13,7 @@ import kotlinx.coroutines.withContext
  */
 internal object TuyaApConfig {
     /** O que aconteceu na entrega, para mostrar ao usuário. */
-    data class Resultado(val enviado: Boolean, val confirmado: Boolean, val detalhe: String) {
+    data class Resultado(val enviado: Boolean, val confirmado: Boolean, val detalhe: String, val veredito: Int? = null) {
         val aceito: Boolean get() = confirmado
     }
 
@@ -35,8 +35,8 @@ internal object TuyaApConfig {
         onAttempt("pareamento")
         var ultimo = Resultado(false, false, "sem resposta")
         for (endereco in gateways.distinct()) {
-            val entrega = TuyaApTlsPsk.entrega(network, endereco, corpo)
-            ultimo = Resultado(entrega.enviado, entrega.confirmado, entrega.detalhe)
+            val entrega = TuyaApTlsPsk.entrega(network, endereco, corpo) { relato -> onAttempt(relato) }
+            ultimo = Resultado(entrega.enviado, entrega.confirmado, entrega.detalhe, entrega.veredito)
             if (entrega.confirmado) return@withContext ultimo
         }
         ultimo
@@ -56,7 +56,8 @@ internal object TuyaApConfig {
         var ultimo = Resultado(false, false, "sem resposta")
         repeat(rounds) { rodada ->
             ultimo = deliver(network, ssid, password, appToken, secret, region, gateways, onAttempt)
-            if (ultimo.confirmado) return ultimo
+            // Veredito é resposta final: repetir com os mesmos dados não muda nada.
+            if (ultimo.confirmado || ultimo.veredito != null) return ultimo
             if (rodada < rounds - 1) delay(3_000)
         }
         return ultimo
