@@ -181,6 +181,14 @@ func gcmOpen(key, nonce, sealed, aad []byte) ([]byte, error) {
 	return aead.Open(nil, nonce, sealed, aad)
 }
 
+// hmacSHA256 is the keyed digest the device uses to prove it holds the same
+// local key during the 3.5 session handshake.
+func hmacSHA256(key, message []byte) []byte {
+	mac := hmac.New(sha256.New, key)
+	mac.Write(message)
+	return mac.Sum(nil)
+}
+
 // ---------------------------------------------------------------------------
 // Protocol version handling
 // ---------------------------------------------------------------------------
@@ -246,8 +254,9 @@ func packFrame(seq, cmd uint32, body []byte, version float64, key []byte) ([]byt
 		binary.BigEndian.PutUint32(header[0:4], prefix6699)
 		binary.BigEndian.PutUint32(header[6:10], seq)
 		binary.BigEndian.PutUint32(header[10:14], cmd)
-		// length = nonce (12) + ciphertext + tag (16) + suffix (4)
-		binary.BigEndian.PutUint32(header[14:18], uint32(len(body)+32))
+		// length = nonce (12) + ciphertext + tag (16); the 4 byte suffix is not
+		// counted (it is added on top when framing).
+		binary.BigEndian.PutUint32(header[14:18], uint32(len(body)+28))
 		nonce := make([]byte, 12)
 		if _, err := rand.Read(nonce); err != nil {
 			return nil, err
@@ -317,8 +326,8 @@ func unpackFrame(data []byte, version float64, key []byte) (frame, error) {
 			return frame{}, ErrBadKey
 		}
 		length := int(binary.BigEndian.Uint32(data[14:18]))
-		total := 18 + length
-		if length < 32 || length > MaxPayload+64 {
+		total := 18 + length + 4
+		if length < 28 || length > MaxPayload+64 {
 			return frame{}, ErrBadPayload
 		}
 		if len(data) < total {
@@ -406,7 +415,7 @@ func frameLength(data []byte) (int, error) {
 		if length > MaxPayload+64 {
 			return 0, ErrBadPayload
 		}
-		return 18 + length, nil
+		return 18 + length + 4, nil
 	}
 	return 0, ErrBadPrefix
 }
