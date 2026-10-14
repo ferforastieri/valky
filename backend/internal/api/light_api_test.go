@@ -18,10 +18,10 @@ import (
 	"github.com/ferforastieri/valkyris/backend/internal/store"
 )
 
-// lightAdapter answers without a device on the network so the pairing flow can
-// be exercised end to end. acceptKeys models a lamp that stored the key it was
-// configured with; a false value models a firmware that only accepts the key the
-// vendor cloud issued.
+// lightAdapter answers without a device on the network so the registration flow
+// can be exercised end to end. acceptKeys models a lamp that stored the key it
+// was configured with; a false value models a lamp that answers but refuses the
+// key (wrong key, or one only the vendor cloud knows).
 type lightAdapter struct {
 	acceptKeys bool
 	candidates []light.Candidate
@@ -138,95 +138,74 @@ func TestLightDiscoveryListsCandidatesForAdministrators(t *testing.T) {
 	}
 }
 
-func TestLightPairingRegistersTheLampWithTheGeneratedKey(t *testing.T) {
-	adapter := &lightAdapter{acceptKeys: true, candidates: []light.Candidate{{Address: "192.168.1.60", DeviceID: "device-1", Version: 3.3}}}
+func TestRegisterLightAdoptsAnAlreadyConfiguredLamp(t *testing.T) {
+	adapter := &lightAdapter{acceptKeys: true}
 	fixture := newLightFixture(t, adapter)
-	session := decodeEnvelope[light.PairingSession](t, fixture.do(t, http.MethodPost, "/lights/pairing-sessions", ""))
-	if session.Token == "" || session.Secret == "" || session.Region == "" {
-		t.Fatalf("sessão sem material de pareamento: %+v", session)
+	body := `{"name":"Pera da sala","room":"Sala","address":"192.168.1.60","deviceId":"device-1","localKey":"0123456789abcdef"}`
+	res := fixture.do(t, http.MethodPost, "/lights", body)
+	if res.Code != http.StatusCreated {
+		t.Fatalf("cadastro retornou %d: %s", res.Code, res.Body.String())
 	}
-	if len(session.Token) != 16 {
-		t.Fatalf("token com %d caracteres", len(session.Token))
+	created := decodeEnvelope[light.Light](t, res)
+	if created.Name != "Pera da sala" || created.SetupStatus != "ready" || created.DeviceID != "device-1" {
+		t.Fatalf("lâmpada cadastrada inesperada: %+v", created)
 	}
-	// O aplicativo envia os dados pelo ar e acompanha o estado.
-	deadline := time.Now().Add(5 * time.Second)
-	var status light.PairingSession
-	for time.Now().Before(deadline) {
-		status = decodeEnvelope[light.PairingSession](t, fixture.do(t, http.MethodGet, "/lights/pairing-sessions/"+session.ID, ""))
-		if status.Status == light.PairingPaired {
-			break
-		}
-		time.Sleep(50 * time.Millisecond)
+	if !created.Capabilities.Color || created.ProtocolVersion != 3.3 {
+		t.Fatalf("capacidades não detectadas: %+v", created)
 	}
-	if status.Status != light.PairingPaired {
-		t.Fatalf("pareamento ficou em %q: %s", status.Status, status.Message)
+	// A chave informada é a que fica guardada, endereço incluído.
+	if adapter.lastKey != "0123456789abcdef" {
+		t.Fatalf("a chave validada foi %q", adapter.lastKey)
 	}
-	if status.Light == nil || status.Light.Name == "" {
-		t.Fatalf("pareamento não devolveu a lâmpada: %+v", status)
-	}
-	if status.Light.SetupStatus != "ready" || !status.Light.Capabilities.Color {
-		t.Fatalf("lâmpada pareada sem capacidades: %+v", status.Light)
-	}
-	// A chave guardada é o token gerado para este pareamento.
-	_, credentials, err := fixture.repo.Get(context.Background(), status.Light.ID)
+	_, credentials, err := fixture.repo.Get(context.Background(), created.ID)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if credentials.Secret != session.Token {
-		t.Fatalf("chave guardada = %q, esperado o token do pareamento", credentials.Secret)
+	if credentials.Secret != "0123456789abcdef" || credentials.Address != "192.168.1.60" {
+		t.Fatalf("credenciais não guardadas: %+v", credentials)
 	}
-	// A listagem mostra a lâmpada e nunca a chave.
+	// A chave local nunca aparece nas respostas.
 	list := fixture.do(t, http.MethodGet, "/lights", "")
-	if list.Code != http.StatusOK || !strings.Contains(list.Body.String(), status.Light.Name) {
-		t.Fatalf("listagem retornou %d: %s", list.Code, list.Body.String())
-	}
-	if strings.Contains(list.Body.String(), session.Token) {
+	if strings.Contains(list.Body.String(), "0123456789abcdef") {
 		t.Fatal("a chave local apareceu na listagem")
 	}
-	// A lâmpada pareceada pode ser renomeada e controlada.
-	renamed := decodeEnvelope[light.Light](t, fixture.do(t, http.MethodPut, "/lights/"+status.Light.ID, `{"name":"Pera da sala","room":"Sala"}`))
-	if renamed.Name != "Pera da sala" || renamed.Room != "Sala" {
-		t.Fatalf("edição não aplicada: %+v", renamed)
-	}
-	controlled := fixture.do(t, http.MethodPut, "/lights/"+status.Light.ID+"/state", `{"power":true}`)
+	// A lâmpada cadastrada pode ser controlada.
+	controlled := fixture.do(t, http.MethodPut, "/lights/"+created.ID+"/state", `{"power":true}`)
 	if controlled.Code != http.StatusOK {
 		t.Fatalf("controle retornou %d: %s", controlled.Code, controlled.Body.String())
 	}
-	if strings.Contains(controlled.Body.String(), session.Token) {
+	if strings.Contains(controlled.Body.String(), "0123456789abcdef") {
 		t.Fatal("a chave local apareceu na resposta de controle")
 	}
 }
 
-func TestLightPairingKeepsASingleWindowAndCanBeCancelled(t *testing.T) {
-	fixture := newLightFixture(t, &lightAdapter{candidates: []light.Candidate{{Address: "192.168.1.60", DeviceID: "device-1", Version: 3.3}}})
-	first := decodeEnvelope[light.PairingSession](t, fixture.do(t, http.MethodPost, "/lights/pairing-sessions", ""))
-	second := fixture.do(t, http.MethodPost, "/lights/pairing-sessions", "")
-	if second.Code != http.StatusOK {
-		t.Fatalf("segunda janela retornou %d: %s", second.Code, second.Body.String())
+func TestRegisterLightValidatesTheInputAndTheDevice(t *testing.T) {
+	fixture := newLightFixture(t, &lightAdapter{acceptKeys: false})
+	// A chave precisa ter 16 caracteres.
+	short := fixture.do(t, http.MethodPost, "/lights", `{"address":"192.168.1.60","deviceId":"device-1","localKey":"curta"}`)
+	if short.Code != http.StatusBadRequest {
+		t.Fatalf("chave curta retornou %d: %s", short.Code, short.Body.String())
 	}
-	if reused := decodeEnvelope[light.PairingSession](t, second); reused.ID != first.ID {
-		t.Fatalf("abriu uma segunda janela: %s != %s", reused.ID, first.ID)
+	// Sem endereço não dá para chegar na lâmpada.
+	missing := fixture.do(t, http.MethodPost, "/lights", `{"deviceId":"device-1","localKey":"0123456789abcdef"}`)
+	if missing.Code != http.StatusBadRequest {
+		t.Fatalf("sem endereço retornou %d: %s", missing.Code, missing.Body.String())
 	}
-	cancelled := fixture.do(t, http.MethodDelete, "/lights/pairing-sessions/"+first.ID, "")
-	if cancelled.Code != http.StatusOK {
-		t.Fatalf("cancelamento retornou %d: %s", cancelled.Code, cancelled.Body.String())
-	}
-	if missing := fixture.do(t, http.MethodGet, "/lights/pairing-sessions/"+first.ID, ""); missing.Code != http.StatusNotFound {
-		t.Fatalf("status após cancelar retornou %d", missing.Code)
-	}
-	// Uma nova janela pode ser aberta depois de cancelar.
-	third := fixture.do(t, http.MethodPost, "/lights/pairing-sessions", "")
-	if third.Code != http.StatusCreated {
-		t.Fatalf("nova janela retornou %d: %s", third.Code, third.Body.String())
+	// A lâmpada que recusa a chave vira um erro claro do servidor.
+	refused := fixture.do(t, http.MethodPost, "/lights", `{"address":"192.168.1.60","deviceId":"device-1","localKey":"0123456789abcdef"}`)
+	if refused.Code != http.StatusBadGateway {
+		t.Fatalf("chave recusada retornou %d: %s", refused.Code, refused.Body.String())
 	}
 }
 
-func TestLightPairingStatusIsUnknownForOtherIdentifiers(t *testing.T) {
-	fixture := newLightFixture(t, &lightAdapter{})
-	if res := fixture.do(t, http.MethodGet, "/lights/pairing-sessions/desconhecido", ""); res.Code != http.StatusNotFound {
-		t.Fatalf("identificador desconhecido retornou %d", res.Code)
+func TestRegisterLightRefusesTheSameDeviceTwice(t *testing.T) {
+	fixture := newLightFixture(t, &lightAdapter{acceptKeys: true})
+	body := `{"address":"192.168.1.60","deviceId":"device-1","localKey":"0123456789abcdef"}`
+	if first := fixture.do(t, http.MethodPost, "/lights", body); first.Code != http.StatusCreated {
+		t.Fatalf("primeiro cadastro retornou %d: %s", first.Code, first.Body.String())
 	}
-	if res := fixture.do(t, http.MethodDelete, "/lights/pairing-sessions/desconhecido", ""); res.Code != http.StatusNotFound {
-		t.Fatalf("cancelamento desconhecido retornou %d", res.Code)
+	second := fixture.do(t, http.MethodPost, "/lights", body)
+	if second.Code != http.StatusBadRequest {
+		t.Fatalf("duplicado retornou %d: %s", second.Code, second.Body.String())
 	}
 }

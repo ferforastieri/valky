@@ -95,7 +95,7 @@ func TestEveryProtectedRouteRejectsAnonymous(t *testing.T) {
 	if _, err := db.DB.Exec(`UPDATE users SET is_admin=0 WHERE id=(SELECT user_id FROM devices WHERE id=?)`, member.DeviceID); err != nil {
 		t.Fatal(err)
 	}
-	for _, route := range []string{"GET /rules", "POST /rules", "PUT /rules/other", "DELETE /rules/other", "GET /admin/users", "PUT /admin/users/other", "DELETE /admin/users/other", "POST /pairing-sessions", "POST /cameras", "PUT /cameras/other", "DELETE /cameras/other", "POST /lights/discovery", "POST /lights/pairing-sessions", "GET /lights/pairing-sessions/other", "DELETE /lights/pairing-sessions/other", "PUT /lights/other", "DELETE /lights/other", "POST /remotes", "PUT /remotes/other", "DELETE /remotes/other", "POST /remotes/other/pair", "PUT /settings/push", "PUT /settings/retention", "PUT /settings/location-alerts"} {
+	for _, route := range []string{"GET /rules", "POST /rules", "PUT /rules/other", "DELETE /rules/other", "GET /admin/users", "PUT /admin/users/other", "DELETE /admin/users/other", "POST /pairing-sessions", "POST /cameras", "PUT /cameras/other", "DELETE /cameras/other", "POST /lights", "POST /lights/discovery", "PUT /lights/other", "DELETE /lights/other", "POST /remotes", "PUT /remotes/other", "DELETE /remotes/other", "POST /remotes/other/pair", "PUT /settings/push", "PUT /settings/retention", "PUT /settings/location-alerts"} {
 		parts := strings.SplitN(route, " ", 2)
 		req := httptest.NewRequest(parts[0], "/api/v1"+parts[1], strings.NewReader(`{"isAdmin":true}`))
 		req.Header.Set("Authorization", "Bearer "+member.Token)

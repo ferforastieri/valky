@@ -53,15 +53,6 @@ CREATE TABLE IF NOT EXISTS lights (
 );
 CREATE INDEX IF NOT EXISTS idx_lights_name ON lights(name COLLATE NOCASE);
 
--- O que aconteceu em cada pareamento de lâmpada, em ordem: o que o aplicativo
--- viu e o que o servidor viu. É daqui que o diagnóstico é lido — os relatos do
--- aplicativo não viram registro de servidor. Nunca guarda senha de Wi-Fi.
-CREATE TABLE IF NOT EXISTS light_pairing_diagnostics (
-  session_id TEXT PRIMARY KEY,
-  entries TEXT NOT NULL,
-  updated_at TEXT NOT NULL
-);
-
 -- Remote controls (smart TVs today). token_enc holds the access token the TV
 -- issues after the on-screen authorization prompt.
 CREATE TABLE IF NOT EXISTS remotes (

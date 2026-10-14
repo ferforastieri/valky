@@ -3,8 +3,10 @@ package light
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"math"
+	"net"
 	"strings"
 	"time"
 
@@ -358,7 +360,7 @@ func (d *TuyaDriver) Provision(ctx context.Context, item Light, cred Credentials
 		Timeout:  d.timeout,
 	})
 	if err != nil {
-		return ProvisionResult{}, err
+		return ProvisionResult{}, provisionFailure(err)
 	}
 	profile := detectProfile(dps)
 	state := profile.stateFromDPS(dps, State{})
@@ -369,6 +371,26 @@ func (d *TuyaDriver) Provision(ctx context.Context, item Light, cred Credentials
 		Version:      version,
 		Mapping:      profile.encode(),
 	}, nil
+}
+
+// provisionFailure traduz a falha do protocolo para algo que o aplicativo possa
+// explicar. Uma lâmpada que respondeu e recusou a chave (integridade do quadro
+// não confere) é um problema diferente de uma que nunca respondeu (porta
+// fechada ou tempo esgotado).
+func provisionFailure(err error) error {
+	var netErr net.Error
+	switch {
+	case errors.Is(err, tuya.ErrBadKey),
+		errors.Is(err, tuya.ErrBadCRC),
+		errors.Is(err, tuya.ErrDeviceReject):
+		return fmt.Errorf("%w: %v", ErrLightKeyRefused, err)
+	case errors.Is(err, tuya.ErrNoResponse),
+		errors.Is(err, context.DeadlineExceeded),
+		errors.As(err, &netErr):
+		return fmt.Errorf("%w: %v", ErrLightUnreachable, err)
+	default:
+		return err
+	}
 }
 
 // Discover finds the current address of a registered device. The device ID is

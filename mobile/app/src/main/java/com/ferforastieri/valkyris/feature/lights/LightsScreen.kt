@@ -1,10 +1,5 @@
 package com.ferforastieri.valkyris.feature.lights
 
-import android.Manifest
-import android.content.Intent
-import android.provider.Settings
-import androidx.activity.compose.rememberLauncherForActivityResult
-import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.infiniteRepeatable
@@ -17,7 +12,6 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.*
@@ -28,50 +22,25 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.scale
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
-import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.LifecycleResumeEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.composables.icons.lucide.*
-import com.composables.icons.lucide.Wifi
 import com.ferforastieri.valkyris.R
 import com.ferforastieri.valkyris.core.design.ValkyrisBottomSheet
 import com.ferforastieri.valkyris.core.model.*
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
 
 @Composable fun LightsScreen(admin:Boolean,vm:LightsViewModel=hiltViewModel()){
-    LifecycleResumeEffect(Unit){vm.refresh();vm.continueManual();onPauseOrDispose{vm.pausePairing()}}
+    LifecycleResumeEffect(Unit){vm.refresh();onPauseOrDispose{}}
     val state by vm.state.collectAsStateWithLifecycle()
     var selected by remember{mutableStateOf<LightDevice?>(null)}
     var removing by remember{mutableStateOf<LightDevice?>(null)}
     var renaming by remember{mutableStateOf<LightDevice?>(null)}
-    // rememberSaveable: a folha volta sozinha se o Android recriar o app (volta
-    // da tela de Wi-Fi, pouca memória). O pareamento em si vive no servidor.
-    var pairing by rememberSaveable{mutableStateOf(false)}
-    val context=LocalContext.current
-    val locationNeededNotice=stringResource(R.string.light_pair_location_needed)
-    val neededPermissions=remember{
-        if(android.os.Build.VERSION.SDK_INT>=33) arrayOf(Manifest.permission.ACCESS_FINE_LOCATION,Manifest.permission.NEARBY_WIFI_DEVICES)
-        else arrayOf(Manifest.permission.ACCESS_FINE_LOCATION)
-    }
-    var canScan by remember{mutableStateOf(vm.hasPairingPermissions())}
-    val locationPermission=rememberLauncherForActivityResult(ActivityResultContracts.RequestMultiplePermissions()){granted->
-        canScan=neededPermissions.all{granted[it]==true}
-        if(!canScan)vm.pairingNotice(locationNeededNotice)
-    }
-    // A lista de redes precisa da Localização liberada: o pedido acontece ao
-    // abrir a folha e a lista se carrega sozinha assim que a resposta chega.
-    LaunchedEffect(pairing){
-        if(pairing&&!canScan)locationPermission.launch(neededPermissions)
-    }
+    var adding by rememberSaveable{mutableStateOf(false)}
     Box(Modifier.fillMaxSize()){
         Column(Modifier.fillMaxSize().padding(horizontal=18.dp)){
             state.error?.let{ /* errors surface as a toast */ }
@@ -84,29 +53,17 @@ import kotlinx.coroutines.withContext
             }
         }
         if(admin)FloatingActionButton(
-            onClick={pairing=true},
+            onClick={adding=true},
             modifier=Modifier.align(Alignment.BottomEnd).padding(end=20.dp,bottom=18.dp),
             containerColor=MaterialTheme.colorScheme.secondary,
             contentColor=MaterialTheme.colorScheme.onSecondary,
         ){Icon(Lucide.Plus,stringResource(R.string.add_light))}
     }
-    // Quando o app pede para conectar na rede da lâmpada, a tela de Wi-Fi do
-    // sistema abre sozinha — sem precisar tocar em nada.
-    LaunchedEffect(state.pairing?.phase) {
-        if(pairing&&state.pairing?.phase=="manual-wifi")openWifiSettings(context)
-    }
-    if(pairing)LightPairingSheet(
-        progress=state.pairing,
-        savedNetwork=remember{vm.savedNetwork()},
-        savedPassword=remember{vm.savedPassword()},
-        canScan=canScan,
-        locationOff=!vm.locationEnabled(),
-        manualWifi=state.pairing?.phase=="manual-wifi",
-        onConfigure={ssid,password->vm.configurar(ssid,password)},
-        onOpenLocation={runCatching{context.startActivity(Intent(Settings.ACTION_LOCATION_SOURCE_SETTINGS))}},
-        onOpenWifi={openWifiSettings(context)},
-        onDismiss={pairing=false},
-        onCancel={pairing=false;vm.dismissPairing()},
+    if(adding)LightRegisterSheet(
+        state=state,
+        onScan={vm.scanForLights()},
+        onSubmit={input,done->vm.register(input,done)},
+        onDismiss={adding=false;vm.clearRegistration()},
     )
     selected?.let{light->LightControls(light,light.id in state.busy,{selected=null}){vm.control(light.id,it)}}
     renaming?.let{light->LightNameSheet(light,{renaming=null}){name,room->vm.rename(light.id,name,room){renaming=null}}}
@@ -179,148 +136,64 @@ import kotlinx.coroutines.withContext
 }
 
 /**
- * Folha do pareamento pelo caminho direto (modo AP), na ordem que o usuário
- * pediu: a lista das redes visíveis (escolhe para onde enviar e digita a
- * senha), a procura automática da lâmpada e a conexão manual na rede dela.
+ * Cadastro de uma lâmpada já configurada em outro aplicativo (por exemplo o
+ * Tuya Smart). O celular informa endereço, identificador e a chave local; a
+ * busca na rede acontece no servidor e só ajuda a preencher o formulário.
  */
-@Composable private fun LightPairingSheet(
-    progress:PairingProgress?,
-    savedNetwork:String,
-    savedPassword:String,
-    canScan:Boolean,
-    locationOff:Boolean,
-    manualWifi:Boolean,
-    onConfigure:(String,String)->Unit,
-    onOpenLocation:()->Unit,
-    onOpenWifi:()->Unit,
+@Composable private fun LightRegisterSheet(
+    state:LightsState,
+    onScan:()->Unit,
+    onSubmit:(LightRegistration,(Boolean)->Unit)->Unit,
     onDismiss:()->Unit,
-    onCancel:()->Unit,
 ){
-    val context=LocalContext.current
-    val connector=remember{WifiApConnector(context)}
-    val scope=rememberCoroutineScope()
-    // A rede guardada só entra na lista se for mesmo de casa (nunca uma SmartLife-…).
-    val guardada=remember{savedNetwork.takeIf{!connector.looksLikeLamp(it)}.orEmpty()}
-    var redes by remember{mutableStateOf<List<String>>(emptyList())}
-    var escolhida by remember{mutableStateOf(guardada)}
-    var password by remember{mutableStateOf(if(guardada.isNotBlank())savedPassword else "")}
-    suspend fun carregar(){
-        connector.refreshScan(6_000)
-        val achadas=withContext(Dispatchers.IO){connector.visibleNetworks().filter{!connector.looksLikeLamp(it)}}
-        redes=achadas
-        if(escolhida.isBlank())escolhida=achadas.firstOrNull{it.equals(guardada,ignoreCase=true)}.orEmpty()
-    }
-    LaunchedEffect(canScan,locationOff){
-        if(canScan&&!locationOff)carregar()
-    }
-    fun escolher(nome:String){
-        escolhida=nome
-        password=if(nome.equals(guardada,ignoreCase=true))savedPassword else ""
-    }
-    val paired=progress?.light
-    val failed=progress?.phase=="failed"
-    val running=progress!=null&&!failed&&progress.phase!="paired"&&progress.phase!="manual-wifi"
+    val running=state.registering
+    var name by rememberSaveable{mutableStateOf("")}
+    var room by rememberSaveable{mutableStateOf("")}
+    var address by rememberSaveable{mutableStateOf("")}
+    var deviceId by rememberSaveable{mutableStateOf("")}
+    var localKey by rememberSaveable{mutableStateOf("")}
+    val ready=address.isNotBlank()&&deviceId.isNotBlank()&&localKey.trim().length==16&&!running
     ValkyrisBottomSheet(
         title=stringResource(R.string.add_light),
         onDismiss=onDismiss,
         dismissEnabled=!running,
         dismissByOutsideTap=false,
         actions={
-            when{
-                paired!=null->Button(onClick=onDismiss){Text(stringResource(R.string.close))}
-                running->TextButton(onClick=onCancel){Text(stringResource(R.string.cancel))}
-                else->{
-                    TextButton(onClick=onCancel){Text(stringResource(R.string.cancel))}
-                    Button(
-                        onClick={onConfigure(escolhida,password)},
-                        enabled=escolhida.isNotBlank()&&password.isNotBlank()&&canScan&&!locationOff,
-                    ){Text(stringResource(R.string.light_pair_action))}
-                }
-            }
+            TextButton(onClick=onDismiss,enabled=!running){Text(stringResource(R.string.cancel))}
+            Button(
+                onClick={onSubmit(LightRegistration(address=address.trim(),deviceId=deviceId.trim(),localKey=localKey.trim(),name=name.trim(),room=room.trim())){ok->if(ok)onDismiss()}},
+                enabled=ready,
+            ){if(running)CircularProgressIndicator(Modifier.size(18.dp),strokeWidth=2.dp)else Text(stringResource(R.string.save))}
         },
     ){
         Column(Modifier.fillMaxWidth().heightIn(max=560.dp).verticalScroll(rememberScrollState()),verticalArrangement=Arrangement.spacedBy(10.dp)){
-            when{
-                paired!=null->Row(verticalAlignment=Alignment.CenterVertically){
-                    Surface(shape=CircleShape,color=MaterialTheme.colorScheme.secondaryContainer){Icon(Lucide.Lightbulb,null,Modifier.padding(10.dp).size(22.dp),tint=MaterialTheme.colorScheme.onSecondaryContainer)}
-                    Spacer(Modifier.width(12.dp))
-                    Text(stringResource(R.string.light_pair_done),fontWeight=FontWeight.SemiBold)
-                }
-                running->Column(verticalArrangement=Arrangement.spacedBy(8.dp)){
-                    val fase=progress?.phase.orEmpty()
-                    ProgressStep(stringResource(R.string.light_step_find),done=fase in setOf("sending","waiting","paired"),current=fase in setOf("home-network","lamp-network"))
-                    ProgressStep(stringResource(R.string.light_step_deliver),done=fase in setOf("waiting","paired"),current=fase=="sending")
-                    ProgressStep(stringResource(R.string.light_step_confirm),done=fase=="paired",current=fase=="waiting")
-                    Text(progress?.message.orEmpty().ifBlank{stringResource(R.string.light_pair_sending)},style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant)
-                }
-                manualWifi->Column(verticalArrangement=Arrangement.spacedBy(10.dp)){
-                    Text(progress?.message.orEmpty(),style=MaterialTheme.typography.bodyMedium)
-                    TextButton({onOpenWifi}){Text(stringResource(R.string.light_pair_open_wifi))}
-                }
-                else->Column(verticalArrangement=Arrangement.spacedBy(10.dp)){
-                    if(failed)Text(progress?.message.orEmpty(),color=MaterialTheme.colorScheme.error,style=MaterialTheme.typography.bodySmall)
-                    Text(stringResource(R.string.light_pair_send_to),style=MaterialTheme.typography.bodyMedium,fontWeight=FontWeight.SemiBold)
-                    when{
-                        locationOff->{
-                            Text(stringResource(R.string.light_pair_location_off),style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant)
-                            TextButton({onOpenLocation}){Text(stringResource(R.string.light_pair_open_location))}
-                        }
-                        !canScan->Text(stringResource(R.string.light_pair_location_needed),style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant)
-                        redes.isEmpty()->Text(stringResource(R.string.light_pair_scanning),style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant)
-                        else->{
-                            redes.forEach{name->
-                                val aqui=name.equals(escolhida,ignoreCase=true)
-                                Surface(onClick={escolher(name)},modifier=Modifier.fillMaxWidth(),shape=MaterialTheme.shapes.medium,color=if(aqui)MaterialTheme.colorScheme.secondaryContainer else MaterialTheme.colorScheme.surfaceVariant){
-                                    Row(Modifier.fillMaxWidth().padding(horizontal=14.dp,vertical=12.dp),verticalAlignment=Alignment.CenterVertically){
-                                        Icon(Lucide.Wifi,null,Modifier.size(18.dp),tint=MaterialTheme.colorScheme.secondary)
-                                        Spacer(Modifier.width(10.dp))
-                                        Text(name,Modifier.weight(1f),style=MaterialTheme.typography.bodyMedium)
-                                        if(aqui)Icon(Lucide.Check,null,Modifier.size(18.dp),tint=MaterialTheme.colorScheme.secondary)
-                                    }
-                                }
-                            }
-                            TextButton({scope.launch{carregar()}}){Text(stringResource(R.string.light_pair_refresh))}
-                        }
-                    }
-                    if(escolhida.isNotBlank())OutlinedTextField(
-                        password,{password=it},Modifier.fillMaxWidth(),
-                        label={Text(stringResource(R.string.light_pair_password))},
-                        visualTransformation=PasswordVisualTransformation(),
-                        keyboardOptions=KeyboardOptions(keyboardType=KeyboardType.Password,imeAction=ImeAction.Done),
-                        keyboardActions=KeyboardActions(onDone={if(escolhida.isNotBlank()&&password.isNotBlank())onConfigure(escolhida,password)}),
-                        singleLine=true,
-                    )
+            Text(stringResource(R.string.light_register_intro),style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant)
+            state.registrationError?.let{Text(it,color=MaterialTheme.colorScheme.error,style=MaterialTheme.typography.bodySmall)}
+            OutlinedTextField(name,{name=it},Modifier.fillMaxWidth(),label={Text(stringResource(R.string.light_name))},singleLine=true,enabled=!running)
+            OutlinedTextField(room,{room=it},Modifier.fillMaxWidth(),label={Text(stringResource(R.string.light_room))},singleLine=true,enabled=!running)
+            Row(verticalAlignment=Alignment.CenterVertically){
+                Text(stringResource(R.string.light_register_network),Modifier.weight(1f),fontWeight=FontWeight.SemiBold,style=MaterialTheme.typography.bodyMedium)
+                TextButton(onClick=onScan,enabled=!running&&!state.scanning){
+                    if(state.scanning)CircularProgressIndicator(Modifier.size(16.dp),strokeWidth=2.dp)else Text(stringResource(R.string.light_register_scan))
                 }
             }
+            state.candidates.forEach{candidate->
+                Surface(onClick={address=candidate.address;if(candidate.deviceId.isNotBlank())deviceId=candidate.deviceId},modifier=Modifier.fillMaxWidth(),shape=MaterialTheme.shapes.medium,color=MaterialTheme.colorScheme.surfaceVariant){
+                    Row(Modifier.fillMaxWidth().padding(horizontal=14.dp,vertical=10.dp),verticalAlignment=Alignment.CenterVertically){
+                        Icon(Lucide.Wifi,null,Modifier.size(18.dp),tint=MaterialTheme.colorScheme.secondary)
+                        Spacer(Modifier.width(10.dp))
+                        Column(Modifier.weight(1f)){
+                            Text(candidate.address,style=MaterialTheme.typography.bodyMedium)
+                            if(candidate.deviceId.isNotBlank())Text(candidate.deviceId,style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant)
+                        }
+                    }
+                }
+            }
+            OutlinedTextField(address,{address=it},Modifier.fillMaxWidth(),label={Text(stringResource(R.string.light_register_address))},singleLine=true,enabled=!running,keyboardOptions=KeyboardOptions(keyboardType=KeyboardType.Uri))
+            OutlinedTextField(deviceId,{deviceId=it},Modifier.fillMaxWidth(),label={Text(stringResource(R.string.light_register_device_id))},singleLine=true,enabled=!running)
+            OutlinedTextField(localKey,{localKey=it},Modifier.fillMaxWidth(),label={Text(stringResource(R.string.light_register_key))},singleLine=true,enabled=!running)
+            Text(stringResource(R.string.light_register_hint),style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant)
         }
-    }
-}
-
-/** Uma linha da lista de progresso: concluída, em andamento ou ainda não. */
-@Composable private fun ProgressStep(label:String,done:Boolean,current:Boolean){
-    Row(Modifier.fillMaxWidth(),verticalAlignment=Alignment.CenterVertically){
-        when{
-            done->Icon(Lucide.Check,null,Modifier.size(18.dp),tint=MaterialTheme.colorScheme.secondary)
-            current->CircularProgressIndicator(Modifier.size(18.dp),strokeWidth=2.dp)
-            else->Box(Modifier.size(18.dp),contentAlignment=Alignment.Center){Surface(Modifier.size(8.dp),shape=CircleShape,color=MaterialTheme.colorScheme.outlineVariant){}}
-        }
-        Spacer(Modifier.width(10.dp))
-        Text(label,style=MaterialTheme.typography.bodyMedium,color=if(done||current)MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant)
-    }
-}
-
-/** Abre o Wi-Fi do sistema; alguns aparelhos exigem outra porta de entrada. */
-private fun openWifiSettings(context: android.content.Context) {
-    val destinos = listOf(
-        Settings.ACTION_WIFI_SETTINGS,
-        Settings.ACTION_WIRELESS_SETTINGS,
-        Settings.ACTION_SETTINGS,
-    )
-    // Primeiro como um aplicativo comum (sem bandeira); depois com as
-    // bandeiras que alguns aparelhos exigem.
-    destinos.forEach { acao ->
-        if (runCatching { context.startActivity(Intent(acao)) }.isSuccess) return
-        if (runCatching { context.startActivity(Intent(acao).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) }.isSuccess) return
     }
 }
 

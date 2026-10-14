@@ -76,10 +76,6 @@ func main() {
 	hub := api.NewHub()
 	lightRepo := light.NewRepository(db, vault)
 	lightService := light.NewService(lightRepo, light.NewTuyaDriver(), hub, logger)
-	// O "reg" (centro de registro) fica desligado de propósito: com ele a
-	// lâmpada desta geração aceita o quadro e não entra na rede — sem ele ela
-	// entra. O formato que o aplicativo oficial usa ainda precisa ser
-	// confirmado antes de ligar de novo (ver SetRegisterCenter).
 	remoteRepo := remote.NewRepository(db, vault)
 	remoteService := remote.NewService(remoteRepo, remote.NewSmartTVDriver(logger), hub, logger)
 	application := &app.Service{Rules: rulesService, Events: eventService, Media: mediaManager, Notify: notifyService, Hub: hub, DataDir: cfg.DataDir, Logger: logger, Preferences: preferencesService}

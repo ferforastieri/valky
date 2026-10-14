@@ -81,3 +81,16 @@ type DiscoveryInput struct {
 	// Probe also tries the control port on every address of the local subnets.
 	Probe bool `json:"probe,omitempty"`
 }
+
+// RegisterInput adopts a lamp that another application already configured. The
+// administrator supplies what the local protocol needs — the address, the device
+// identifier and the 16 character local key — and Valkyris validates them
+// against the device before storing anything.
+type RegisterInput struct {
+	Name            string  `json:"name,omitempty"`
+	Room            string  `json:"room,omitempty"`
+	Address         string  `json:"address"`
+	DeviceID        string  `json:"deviceId"`
+	LocalKey        string  `json:"localKey"`
+	ProtocolVersion float64 `json:"protocolVersion,omitempty"`
+}

@@ -1,52 +1,72 @@
 # Iluminação local
 
-O Valkyris controla lâmpadas Wi-Fi compatíveis com Tuya (protocolos locais 3.1 a 3.5) diretamente na rede local, e configura uma lâmpada nova **sem nenhum aplicativo ou conta de fabricante**. Depois de configurada, é possível ligar, desligar e, quando o dispositivo oferecer essas capacidades, alterar brilho, temperatura do branco e cor RGB.
+O Valkyris controla lâmpadas Wi-Fi compatíveis com Tuya (protocolos locais 3.1 a 3.5) diretamente na rede de casa, na porta TCP 6668. Depois de cadastrada, é possível ligar, desligar e, quando o dispositivo oferecer essas capacidades, alterar brilho, temperatura do branco e cor RGB.
 
-Nada aqui conversa com a internet: a descoberta, a configuração da lâmpada e o controle acontecem na rede de casa, com o backend falando direto com a lâmpada na porta TCP 6668.
+Nada aqui conversa com a internet: a descoberta e o controle acontecem na rede local, com o backend falando direto com a lâmpada.
 
 ## Arquitetura
 
 O domínio de iluminação não depende de conta ou protocolo de um fabricante. O backend expõe uma fronteira de driver local com quatro operações:
 
 - descoberta do dispositivo na rede;
-- validação das credenciais e leitura das capacidades (pareamento);
+- validação das credenciais e leitura das capacidades (cadastro);
 - leitura do estado atual;
 - aplicação de uma alteração de estado.
 
 `internal/light/tuya` implementa essa fronteira para os protocolos Tuya LAN 3.1 a 3.5. O formato dos quadros e da descoberta foi documentado pela comunidade em [tinytuya](https://github.com/jasonacox/tinytuya) e [tuyapi](https://github.com/codetheweb/tuyapi) (ambos MIT); a implementação do Valkyris é própria, cobre apenas descoberta e leitura/escrita de pontos de controle, e é verificada contra quadros de referência gravados, sem depender de bibliotecas de terceiros.
 
-O pareamento é conduzido por dois lados: o **aplicativo Android** tem o rádio Wi-Fi e envia as credenciais da rede para a lâmpada; o **backend** gera os valores de uso único, acompanha a rede e registra o dispositivo. A senha do Wi-Fi nunca chega ao servidor.
+## Como cadastrar uma lâmpada
 
-## Como configurar uma lâmpada
+O cadastro adota uma lâmpada que **já está configurada no aplicativo da Tuya** (Tuya Smart ou Smart Life). Não é preciso parear de novo, nem mexer na configuração de rede: a lâmpada só precisa estar ligada e acessível na rede de casa.
 
-A configuração é **direta entre o celular e a lâmpada**, sem depender do roteador, da faixa de 2,4 GHz ou de mexer em configuração de rede:
+1. Pareie a lâmpada no aplicativo **Tuya Smart** ou **Smart Life**, como de costume.
+2. Obtenha o **identificador (Device ID)** e a **chave local (local key)** — veja abaixo.
+3. Abra **Dispositivos → Iluminação** e toque em **+** (apenas administradores).
+4. Informe o nome (opcional), o endereço na rede, o Device ID e a chave local. O botão **Buscar na rede** preenche o endereço e, quando a lâmpada anuncia, também o identificador.
+5. Toque em **Salvar**. O backend valida a chave contra a lâmpada antes de gravar; se a chave estiver errada, a mensagem explica o motivo.
 
-1. Abra **Dispositivos → Iluminação** e toque em **+** (apenas administradores).
-2. Deixe a lâmpada **piscando rápido**: ligue e desligue três vezes até ela entrar em modo de pareamento. Nesse estado ela cria a própria rede Wi-Fi.
-3. Toque em **Configurar**. O Android pergunta se o aplicativo pode entrar na rede da lâmpada — aceite.
-4. O aplicativo entra nessa rede, entrega o nome e a senha do seu Wi-Fi, e volta sozinho para a rede de casa.
-5. A lâmpada conecta-se ao seu Wi-Fi, recebe a chave na ativação local (abaixo) e aparece na lista. Dê um nome e escolha o cômodo.
+Depois disso o controle é local e não depende de nuvem. A chave local é fixa: não muda com o tempo.
 
-A senha do Wi-Fi é pedida **uma única vez** e fica guardada no aparelho, cifrada; o servidor nunca a recebe. O caminho direto exige Android 10 ou mais novo.
+### De onde vêm o Device ID e a chave local
 
-### Ativação local (por que existe um serviço a mais)
+A chave local é entregue pelo servidor do fabricante quando a lâmpada é
+configurada, e fica vinculada à conta. Você só precisa dela **uma vez**; o
+Valkyris não guarda a conta da Tuya nem faz login no fabricante.
 
-Uma lâmpada Tuya não aceita controle local antes de ser ativada uma vez, e a chave local é **entregue pelo servidor do fabricante** nesse momento (campo `localKey` da resposta de ativação). O Valkyris faz esse papel dentro de casa, com o serviço `activation` do `compose.yaml`:
+A lâmpada precisa estar pareada em um aplicativo **Tuya Smart** ou **Smart Life**
+(os dois usam a mesma conta Tuya). O aplicativo da marca própria não serve para
+este passo: a autorização por QR code só funciona com as contas do Tuya Smart ou
+Smart Life.
 
-- a lâmpada recebe a rede e a senha pelo celular e procura os endereços do fabricante;
-- os redirecionamentos de DNS da casa apontam esses nomes para o servidor do Valkyris;
-- o serviço responde a ativação com **a chave que o backend está usando na janela de pareamento** (lida do próprio banco), em HTTP e no canal protegido TLS-PSK que as lâmpadas usam;
-- a chave roda depois de cada lâmpada configurada, então cada uma guarda a sua.
+Há duas formas de obter a chave. A primeira não depende do portal `iot.tuya.com`:
 
-Nada sai da rede local e nenhuma conta é usada. Para os redirecionamentos, adicione no seu resolvedor de DNS (AdGuard Home, Pi-hole ou o roteador) apontando para o endereço do servidor Valkyris:
+**Pelo utilitário do repositório (recomendado)**
 
-```text
-*.tuyaus.com      -> <endereço do servidor Valkyris>
-*.tuya.com        -> <endereço do servidor Valkyris>
-stream.tuyaus.com -> <endereço real do fabricante>   # mantém as lâmpadas já existentes funcionando
+Usa o SDK oficial da Tuya com autorização por QR code — o mesmo mecanismo do
+Home Assistant. Rode em qualquer máquina com internet:
+
+```bash
+python3 -m venv /tmp/tuya && /tmp/tuya/bin/pip install tuya-device-sharing-sdk cryptography qrcode
+/tmp/tuya/bin/python scripts/tuya-local-key.py
 ```
 
-Lâmpadas que já foram configuradas por um aplicativo do fabricante carregam o endereço antigo em cache e podem não pedir ativação de novo; nesse caso o fluxo informa que ela respondeu na rede mas recusou a chave. Lâmpadas novas (ou depois de um reset de fábrica) pedem ativação e são adotadas com a chave local.
+1. No aplicativo, pegue o **User Code**: aba **Meu** → ícone de engrenagem (⚙️) → **Conta e Segurança** → **User Code**.
+2. Informe o código quando o script pedir; ele mostra um QR code no terminal.
+3. No aplicativo, toque em **+ (adicionar) → Escanear** e aponte para o QR.
+4. O script lista cada dispositivo com **Device ID**, **chave local** e IP.
+
+**Pelo painel de desenvolvedor (quando o `iot.tuya.com` estiver acessível)**
+
+1. Crie uma conta gratuita em [iot.tuya.com](https://iot.tuya.com) (a mesma região do aplicativo; no Brasil costuma ser *Western America*).
+2. Crie um **Cloud project** e ative o *IoT Core* (o plano de avaliação gratuito precisa ser renovado a cada seis meses).
+3. Em **Devices → Link App Account**, vincule a conta do aplicativo onde a lâmpada foi pareada.
+4. Em **API Explorer → Device Management → Query Device Details**, informe o Device ID e leia o campo `local_key`.
+
+> O portal `iot.tuya.com` pode ficar inacessível de algumas redes; por isso o
+> utilitário acima costuma ser o caminho mais confiável.
+
+Se a chave mudar (por exemplo ao remover e adicionar a lâmpada de novo no
+aplicativo), remova e cadastre a lâmpada novamente no Valkyris.
 
 ## Descoberta de endereço
 
@@ -74,28 +94,10 @@ go run ./cmd/lightscan            # lista o que responde na rede local
 go run ./cmd/lightscan -probe     # também testa a porta de controle de cada endereço
 ```
 
-Uma lâmpada ainda em modo de pareamento não aparece nessa lista: ela só entra na rede depois de receber as credenciais.
-
 ## Segurança
 
 - A chave local é cifrada no SQLite com a chave mestra AES-256-GCM da instalação.
 - A API nunca devolve a chave para Android ou navegador.
-- A senha do Wi-Fi sai do celular direto para a lâmpada; o backend não a recebe.
 - Todos os comandos passam pelo backend autenticado; o navegador nunca acessa a lâmpada diretamente.
-- Somente administradores podem configurar, renomear, remover ou disparar um pareamento. Qualquer usuário autenticado pode operar uma lâmpada já cadastrada.
+- Somente administradores podem cadastrar, renomear, remover ou controlar a configuração de uma lâmpada. Qualquer usuário autenticado pode operar uma lâmpada já cadastrada.
 - A descoberta só envia tráfego para as sub-redes locais às quais o host está conectado, e jamais para a internet.
-
-## Compatibilidade entre gerações (pareamento AP)
-
-O diálogo do pareamento muda de transporte conforme a geração do firmware; o
-conteúdo (quadro LPV3.5 com o JSON `ssid`/`passwd`/`token`/`reg`) é o mesmo:
-
-| Geração | Transporte |
-| --- | --- |
-| TuyaOS atual | TLS 1.2 com chave pré-compartilhada (PSK `123456`, identidade `psk_identity`), porta TCP 6668 |
-| Geração anterior | O mesmo quadro LPV3.5 enviado cru no TCP 6668, sem TLS |
-| Clássico | O quadro por datagrama UDP na porta 6667 (lâmpada e broadcast) |
-
-Cada caminho abre uma conexão própria — o quadro cru nunca vai pelo mesmo canal
-onde o TLS foi tentado. O aplicativo relata ao servidor qual caminho respondeu
-(`tls-psk`, `tcp-direto`, `udp`) e o código devolvido pela lâmpada.

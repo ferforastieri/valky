@@ -81,32 +81,6 @@ jobs:
           cache-from: type=gha,scope=release-${{ matrix.arch }}
           cache-to: type=gha,mode=max,scope=release-${{ matrix.arch }}
 
-  activation:
-    name: Imagem do servidor de ativação
-    needs: prepare
-    runs-on: ubuntu-24.04
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          ref: ${{ needs.prepare.outputs.commit }}
-      - uses: docker/setup-buildx-action@v3
-      - uses: docker/login-action@v3
-        with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-      - name: Publicar imagem do servidor de ativação
-        uses: docker/build-push-action@v6
-        with:
-          context: backend/activation
-          platforms: linux/amd64
-          push: true
-          tags: ${{ env.IMAGE }}-activation:${{ needs.prepare.outputs.version }}
-          provenance: mode=min
-          sbom: true
-          cache-from: type=gha,scope=activation
-          cache-to: type=gha,mode=max,scope=activation
-
   manifest:
     name: Manifesto multiarch
     runs-on: ubuntu-latest

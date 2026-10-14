@@ -9,6 +9,8 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/google/uuid"
 )
 
 type Broadcaster interface{ Broadcast(any) }
@@ -21,24 +23,12 @@ type Service struct {
 	mu     sync.RWMutex
 	states map[string]State
 	locks  sync.Map
-
-	// Local pairing keeps one short lived window at a time.
-	pairingMu     sync.Mutex
-	pairing       *PairingSession
-	pairingTried  map[string]bool
-	pairingWindow time.Duration
-	pairingProbed time.Time
-	// registerCenter é o "reg" entregue à lâmpada: o endereço de ativação e o
-	// certificado. Definido uma vez na partida, antes de qualquer pareamento.
-	registerCenter []byte
 }
 
 func NewService(repo *Repository, driver Driver, hub Broadcaster, logger *slog.Logger) *Service {
 	return &Service{
 		repo: repo, driver: driver, hub: hub, logger: logger,
-		states:        map[string]State{},
-		pairingTried:  map[string]bool{},
-		pairingWindow: PairingWindow,
+		states: map[string]State{},
 	}
 }
 
@@ -67,7 +57,7 @@ func (s *Service) Scan(ctx context.Context, in DiscoveryInput) ([]Candidate, err
 }
 
 // Update renames a light, moves it to another room or stops polling it. The
-// local credentials are owned by the pairing flow.
+// local credentials belong to the registration flow and are never edited by hand.
 func (s *Service) Update(ctx context.Context, id string, in UpdateInput) (Light, error) {
 	unlock := s.lock(id)
 	defer unlock()
@@ -90,54 +80,93 @@ func (s *Service) Update(ctx context.Context, id string, in UpdateInput) (Light,
 	return s.Get(ctx, id)
 }
 
-// EnsureProvisioned validates a light in the background and stores what the
-// device reported: the working protocol version, the data point layout and the
-// capabilities it exposes.
-func (s *Service) provision(id string) {
-	go func() {
-		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
-		defer cancel()
-		unlock := s.lock(id)
-		defer unlock()
-		item, credentials, err := s.repo.Get(ctx, id)
-		if err != nil {
-			return
+// Register adopts a lamp that another application already configured (for
+// example the manufacturer app). The administrator supplies what the local
+// protocol needs — the address, the device identifier and the 16 character
+// local key — and the adapter validates them against the device before anything
+// is stored, so a wrong key is reported instead of creating a broken record.
+func (s *Service) Register(ctx context.Context, in RegisterInput) (Light, error) {
+	scanner, ok := s.Scanner()
+	if !ok {
+		return Light{}, ErrNoLightingAdapter
+	}
+	address := strings.TrimSpace(in.Address)
+	deviceID := strings.TrimSpace(in.DeviceID)
+	localKey := strings.TrimSpace(in.LocalKey)
+	switch {
+	case address == "":
+		return Light{}, fmt.Errorf("%w: informe o endereço da lâmpada na rede", ErrInvalidRegistration)
+	case deviceID == "":
+		return Light{}, fmt.Errorf("%w: informe o identificador (device id) da lâmpada", ErrInvalidRegistration)
+	case len(localKey) != 16:
+		return Light{}, fmt.Errorf("%w: a chave local tem 16 caracteres", ErrInvalidRegistration)
+	}
+	existing, err := s.repo.List(ctx)
+	if err != nil {
+		return Light{}, err
+	}
+	for _, item := range existing {
+		if item.DeviceID == deviceID {
+			return Light{}, fmt.Errorf("%w: essa lâmpada já está cadastrada", ErrInvalidRegistration)
 		}
-		scanner, ok := s.Scanner()
-		if !ok {
-			return
-		}
-		_ = s.repo.SetSetupStatus(ctx, id, "pending", "")
-		result, err := scanner.Provision(ctx, item, credentials)
-		if err != nil {
-			s.markOffline(id)
-			_ = s.repo.SetSetupStatus(ctx, id, "failed", provisionError(err))
-			if updated, getErr := s.Get(ctx, id); getErr == nil {
-				s.hub.Broadcast(map[string]any{"type": "light.updated", "light": updated})
-			}
-			return
-		}
-		_ = s.repo.SetCapabilities(ctx, id, result.Capabilities, result.Mapping)
-		if result.Version > 0 && result.Version != item.ProtocolVersion {
-			_ = s.repo.SetProtocolVersion(ctx, id, result.Version)
-		}
-		s.storeState(id, result.State)
-		_ = s.repo.SetConnection(ctx, id, credentials.Address, "ready", "", true)
-		if updated, getErr := s.Get(ctx, id); getErr == nil {
-			s.hub.Broadcast(map[string]any{"type": "light.updated", "light": updated})
-		}
-	}()
+	}
+	result, err := scanner.Provision(ctx, Light{DeviceID: deviceID, ProtocolVersion: in.ProtocolVersion}, Credentials{Secret: localKey, Address: address})
+	if err != nil {
+		return Light{}, registrationError(err)
+	}
+	name := strings.TrimSpace(in.Name)
+	if name == "" {
+		name = s.nextLightName(ctx)
+	}
+	created, err := s.repo.Create(ctx, Light{
+		ID:              uuid.NewString(),
+		Name:            name,
+		Room:            strings.TrimSpace(in.Room),
+		DeviceID:        deviceID,
+		ProtocolVersion: result.Version,
+		Capabilities:    result.Capabilities,
+		DPMapping:       result.Mapping,
+		SetupStatus:     "ready",
+		Enabled:         true,
+	}, Credentials{Secret: localKey, Address: address})
+	if err != nil {
+		return Light{}, err
+	}
+	state := result.State
+	state.Online = true
+	s.storeState(created.ID, state)
+	_ = s.repo.SetConnection(ctx, created.ID, address, "ready", "", true)
+	registered, err := s.Get(ctx, created.ID)
+	if err != nil {
+		registered = created
+	}
+	s.broadcast("light.created", registered)
+	s.logger.Info("lamp registered from an existing configuration", "light", registered.ID, "address", address)
+	return registered, nil
 }
 
-func provisionError(err error) string {
+// registrationError turns a failed validation into something the administrator
+// can act on. A lamp that answered and refused the key is a different problem
+// from one that never answered.
+func registrationError(err error) error {
 	switch {
-	case errors.Is(err, sql.ErrNoRows):
-		return "Lâmpada não encontrada."
+	case errors.Is(err, ErrLightKeyRefused):
+		return errors.New("A lâmpada respondeu, mas recusou a chave local. Confira se copiou a chave certa (16 caracteres).")
+	case errors.Is(err, ErrLightUnreachable):
+		return errors.New("A lâmpada não respondeu no endereço informado. Confira o IP, se ela está ligada e na mesma rede de casa.")
 	case errors.Is(err, ErrNoLightingAdapter):
-		return "Nenhum adaptador de iluminação local está ativo."
+		return ErrNoLightingAdapter
 	default:
-		return "Não foi possível falar com a lâmpada: confira a chave local, o endereço na rede e se ela está ligada."
+		return fmt.Errorf("não foi possível falar com a lâmpada: %w", err)
 	}
+}
+
+func (s *Service) nextLightName(ctx context.Context) string {
+	items, err := s.repo.List(ctx)
+	if err != nil {
+		return "Lâmpada"
+	}
+	return fmt.Sprintf("Lâmpada %d", len(items)+1)
 }
 
 func (s *Service) List(ctx context.Context) ([]Light, error) {

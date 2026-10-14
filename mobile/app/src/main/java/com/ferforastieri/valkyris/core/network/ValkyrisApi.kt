@@ -17,8 +17,6 @@ import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonElement
-import kotlinx.serialization.json.buildJsonObject
-import kotlinx.serialization.json.put
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.security.MessageDigest
@@ -239,39 +237,10 @@ class ValkyrisApi(
     )
 
     suspend fun lights(): List<LightDevice> = get("/lights")
-    /** Abre uma janela de pareamento local; o celular envia os dados pelo ar. */
-    suspend fun startLightPairing(network: String = ""): LightPairingSession = post(
-        "/lights/pairing-sessions",
-        buildJsonObject {
-            put("network", network.take(64))
-            put("app", BuildConfig.VERSION_NAME)
-            put("android", android.os.Build.VERSION.SDK_INT)
-        },
-        announceBackend = true,
-    )
-
-    /**
-     * Consulta o estado da sessão. Com [relato], o servidor guarda no banco o
-     * que o aplicativo viu (códigos da lâmpada, redes) — é diagnóstico da
-     * sessão, não registro de servidor, e nunca leva a senha do Wi-Fi.
-     */
-    suspend fun lightPairingStatus(id: String, relato: String? = null): LightPairingSession {
-        val caminho = if (relato.isNullOrBlank()) {
-            "/lights/pairing-sessions/$id"
-        } else {
-            "/lights/pairing-sessions/$id?relato=" + Uri.encode(relato.take(300))
-        }
-        return get(caminho)
-    }
-    suspend fun cancelLightPairing(id: String) {
-        val current = requireNotNull(session())
-        executeUnit(current.fingerprint) {
-            it.delete(base() + "/lights/pairing-sessions/$id") {
-                bearerAuth(current.token)
-                header(HttpHeaders.AcceptLanguage, Locale.getDefault().toLanguageTag())
-            }
-        }
-    }
+    /** Adota uma lâmpada já pareada em outro aplicativo (chave local). */
+    suspend fun registerLight(input: LightRegistration): LightDevice = post("/lights", input, announceBackend = true)
+    /** Procura lâmpadas na rede local para preencher o cadastro. */
+    suspend fun discoverLights(): List<LightCandidate> = post("/lights/discovery", emptyMap<String, String>())
     suspend fun updateLight(id: String, input: LightUpdate): LightDevice = put("/lights/$id", input, announceBackend = true)
     suspend fun controlLight(id: String, patch: LightStatePatch): LightDevice = put("/lights/$id/state", patch)
     suspend fun deleteLight(id: String) {

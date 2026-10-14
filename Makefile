@@ -2,7 +2,6 @@
 
 test:
 	cd backend && go test -race ./...
-	cd backend/activation && python3 -m unittest
 	cd web && pnpm test
 	cd mobile && ./gradlew lintDebug testDebugUnitTest
 

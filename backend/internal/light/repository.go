@@ -4,7 +4,6 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
-	"errors"
 	"time"
 
 	appcrypto "github.com/ferforastieri/valkyris/backend/internal/crypto"
@@ -24,7 +23,7 @@ func NewRepository(s *store.Store, v *appcrypto.Vault) *Repository {
 	return &Repository{store: s, vault: v}
 }
 
-const lightColumns = `id,name,room,capabilities_json,setup_status,setup_error,enabled,last_seen_at,created_at,updated_at,favorite,dp_mapping_json,protocol_version`
+const lightColumns = `id,name,room,capabilities_json,setup_status,setup_error,enabled,last_seen_at,created_at,updated_at,favorite,dp_mapping_json,protocol_version,device_id`
 
 func (r *Repository) List(ctx context.Context) ([]Light, error) {
 	rows, err := r.store.DB.QueryContext(ctx, `SELECT `+lightColumns+` FROM lights ORDER BY room COLLATE NOCASE,name COLLATE NOCASE`)
@@ -44,7 +43,7 @@ func (r *Repository) List(ctx context.Context) ([]Light, error) {
 }
 
 func (r *Repository) Get(ctx context.Context, id string) (Light, Credentials, error) {
-	row := r.store.DB.QueryRowContext(ctx, `SELECT `+lightColumns+`,local_key_enc,last_ip,device_id FROM lights WHERE id=?`, id)
+	row := r.store.DB.QueryRowContext(ctx, `SELECT `+lightColumns+`,local_key_enc,last_ip FROM lights WHERE id=?`, id)
 	return scanLightWithCredentials(row, r.vault)
 }
 
@@ -91,29 +90,6 @@ func (r *Repository) Update(ctx context.Context, id string, in UpdateInput) (Lig
 	return updated, err
 }
 
-// SetProtocolVersion stores the protocol version detected while pairing.
-func (r *Repository) SetProtocolVersion(ctx context.Context, id string, version float64) error {
-	now := time.Now().UTC().Format(time.RFC3339Nano)
-	_, err := r.store.DB.ExecContext(ctx, `UPDATE lights SET protocol_version=?,updated_at=? WHERE id=?`, version, now, id)
-	return err
-}
-
-// SetSetupStatus stores the pairing outcome so the app can show progress or the
-// reason a light could not be reached.
-func (r *Repository) SetSetupStatus(ctx context.Context, id, status, setupError string) error {
-	now := time.Now().UTC().Format(time.RFC3339Nano)
-	_, err := r.store.DB.ExecContext(ctx, `UPDATE lights SET setup_status=?,setup_error=?,updated_at=? WHERE id=?`, status, setupError, now, id)
-	return err
-}
-
-// SetCapabilities stores the data point layout learned while pairing together
-// with the capabilities it produces.
-func (r *Repository) SetCapabilities(ctx context.Context, id string, capabilities Capabilities, mapping string) error {
-	now := time.Now().UTC().Format(time.RFC3339Nano)
-	_, err := r.store.DB.ExecContext(ctx, `UPDATE lights SET capabilities_json=?,dp_mapping_json=?,updated_at=? WHERE id=?`, mustJSON(capabilities), mapping, now, id)
-	return err
-}
-
 func (r *Repository) Delete(ctx context.Context, id string) error {
 	result, err := r.store.DB.ExecContext(ctx, `DELETE FROM lights WHERE id=?`, id)
 	if err != nil {
@@ -143,7 +119,7 @@ func scanLight(s rowScanner) (Light, error) {
 	var lastSeen sql.NullString
 	var enabled, favorite int
 	var version float64
-	err := s.Scan(&item.ID, &item.Name, &item.Room, &capsJSON, &item.SetupStatus, &item.SetupError, &enabled, &lastSeen, &created, &updated, &favorite, &mapping, &version)
+	err := s.Scan(&item.ID, &item.Name, &item.Room, &capsJSON, &item.SetupStatus, &item.SetupError, &enabled, &lastSeen, &created, &updated, &favorite, &mapping, &version, &item.DeviceID)
 	if err != nil {
 		return item, err
 	}
@@ -153,19 +129,18 @@ func scanLight(s rowScanner) (Light, error) {
 
 func scanLightWithCredentials(s rowScanner, vault *appcrypto.Vault) (Light, Credentials, error) {
 	var item Light
-	var capsJSON, created, updated, mapping, deviceID string
+	var capsJSON, created, updated, mapping string
 	var lastSeen sql.NullString
 	var enabled, favorite int
 	var version float64
 	var sealed []byte
 	var cred Credentials
-	err := s.Scan(&item.ID, &item.Name, &item.Room, &capsJSON, &item.SetupStatus, &item.SetupError, &enabled, &lastSeen, &created, &updated, &favorite, &mapping, &version, &sealed, &cred.Address, &deviceID)
+	err := s.Scan(&item.ID, &item.Name, &item.Room, &capsJSON, &item.SetupStatus, &item.SetupError, &enabled, &lastSeen, &created, &updated, &favorite, &mapping, &version, &item.DeviceID, &sealed, &cred.Address)
 	if err != nil {
 		return item, cred, err
 	}
 	populateLight(&item, capsJSON, enabled, favorite, lastSeen, created, updated, mapping, version)
 	item.LastAddress = cred.Address
-	item.DeviceID = deviceID
 	cred.Secret, err = vault.DecryptString(sealed)
 	return item, cred, err
 }
@@ -200,45 +175,6 @@ func boolToInt(value bool) int {
 		return 1
 	}
 	return 0
-}
-
-// AppendPairingDiagnostic guarda um relato do pareamento na sessão, em ordem.
-// Tudo fica em uma coluna só (entries, um JSON), para o diagnóstico ser lido do
-// banco sem depender de registro de servidor.
-func (r *Repository) AppendPairingDiagnostic(ctx context.Context, sessionID, detail string, at time.Time) error {
-	type entry struct {
-		At     string `json:"at"`
-		Detail string `json:"detail"`
-	}
-	momento := at.UTC().Format(time.RFC3339Nano)
-	tx, err := r.store.DB.BeginTx(ctx, nil)
-	if err != nil {
-		return err
-	}
-	defer func() { _ = tx.Rollback() }()
-	var atual string
-	err = tx.QueryRowContext(ctx, `SELECT entries FROM light_pairing_diagnostics WHERE session_id = ?`, sessionID).Scan(&atual)
-	if err != nil && !errors.Is(err, sql.ErrNoRows) {
-		return err
-	}
-	entries := []entry{}
-	if atual != "" {
-		// Um valor estranho não pode derrubar o diagnóstico: recomeça a lista.
-		_ = json.Unmarshal([]byte(atual), &entries)
-	}
-	entries = append(entries, entry{At: momento, Detail: detail})
-	guardado, err := json.Marshal(entries)
-	if err != nil {
-		return err
-	}
-	_, err = tx.ExecContext(ctx,
-		`INSERT INTO light_pairing_diagnostics(session_id, entries, updated_at) VALUES(?, ?, ?)
-		 ON CONFLICT(session_id) DO UPDATE SET entries = excluded.entries, updated_at = excluded.updated_at`,
-		sessionID, string(guardado), momento)
-	if err != nil {
-		return err
-	}
-	return tx.Commit()
 }
 
 func mustJSON(value any) string {
