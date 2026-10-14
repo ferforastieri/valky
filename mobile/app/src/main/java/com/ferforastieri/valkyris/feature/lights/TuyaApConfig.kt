@@ -3,6 +3,9 @@ package com.ferforastieri.valkyris.feature.lights
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
+import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.put
 
 /**
  * Entrega os dados da rede de casa para a lâmpada em modo de configuração,
@@ -24,14 +27,22 @@ internal object TuyaApConfig {
         appToken: String,
         secret: String,
         region: String,
+        reg: JsonElement?,
         gateways: List<String>,
         onAttempt: (String) -> Unit = {},
     ): Resultado = withContext(Dispatchers.IO) {
         if (gateways.isEmpty()) return@withContext Resultado(false, false, "não achei o endereço da lâmpada")
         // O aparelho recebe região, token e segredo juntos (authToken), como o
-        // aplicativo oficial monta na API de pareamento da nuvem.
+        // aplicativo oficial monta na API de pareamento da nuvem. O "reg" é o
+        // centro de registro: para onde ela liga depois de entrar na rede e o
+        // certificado que deve confiar — o SDK espera um objeto, não um texto.
         val auth = region + appToken + secret
-        val corpo = """{"ssid":"$ssid","passwd":"$password","token":"$auth","reg":"$region"}"""
+        val corpo = buildJsonObject {
+            put("ssid", ssid)
+            put("passwd", password)
+            put("token", auth)
+            if (reg != null) put("reg", reg)
+        }.toString()
         onAttempt("pareamento")
         var ultimo = Resultado(false, false, "sem resposta")
         for (endereco in gateways.distinct()) {
@@ -49,13 +60,14 @@ internal object TuyaApConfig {
         appToken: String,
         secret: String,
         region: String,
+        reg: JsonElement?,
         gateways: List<String>,
         rounds: Int = 2,
         onAttempt: (String) -> Unit = {},
     ): Resultado {
         var ultimo = Resultado(false, false, "sem resposta")
         repeat(rounds) { rodada ->
-            ultimo = deliver(network, ssid, password, appToken, secret, region, gateways, onAttempt)
+            ultimo = deliver(network, ssid, password, appToken, secret, region, reg, gateways, onAttempt)
             // Veredito é resposta final: repetir com os mesmos dados não muda nada.
             if (ultimo.confirmado || ultimo.veredito != null) return ultimo
             if (rodada < rounds - 1) delay(3_000)

@@ -76,6 +76,13 @@ func main() {
 	hub := api.NewHub()
 	lightRepo := light.NewRepository(db, vault)
 	lightService := light.NewService(lightRepo, light.NewTuyaDriver(), hub, logger)
+	// O pareamento entrega à lâmpada o endereço de ativação e o certificado do
+	// servidor: é por onde ela recebe a chave local depois de entrar na rede.
+	if certPEM, err := os.ReadFile(cfg.TLSCert); err != nil {
+		logger.Warn("read tls certificate for pairing register", "error", err)
+	} else {
+		lightService.SetRegisterCenter(light.RegisterCenterURL, certPEM)
+	}
 	remoteRepo := remote.NewRepository(db, vault)
 	remoteService := remote.NewService(remoteRepo, remote.NewSmartTVDriver(logger), hub, logger)
 	application := &app.Service{Rules: rulesService, Events: eventService, Media: mediaManager, Notify: notifyService, Hub: hub, DataDir: cfg.DataDir, Logger: logger, Preferences: preferencesService}

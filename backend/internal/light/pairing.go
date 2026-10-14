@@ -5,6 +5,7 @@ import (
 	"crypto/md5"
 	"crypto/rand"
 	"encoding/hex"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"strings"
@@ -35,6 +36,11 @@ type PairingSession struct {
 	ExpiresAt time.Time  `json:"expiresAt"`
 	StartedAt time.Time  `json:"startedAt"`
 	EndedAt   *time.Time `json:"endedAt,omitempty"`
+
+	// Reg é o "centro de registro" entregue à lâmpada no quadro: para onde ela
+	// liga depois de entrar na rede e o certificado que deve confiar. O SDK do
+	// fabricante espera um objeto (source, pub, url0/urlX, ca), não um texto.
+	Reg json.RawMessage `json:"reg,omitempty"`
 }
 
 const (
@@ -94,6 +100,34 @@ func (s *Service) rotatePendingToken(ctx context.Context) (string, string, error
 
 var ErrPairingInProgress = errors.New("já existe um pareamento em andamento")
 
+// RegisterCenterURL é o endereço que a lâmpada usa depois de entrar na rede.
+// Em casa o DNS local aponta este nome para o servidor de ativação, que
+// entrega a chave local combinada no pareamento.
+const RegisterCenterURL = "a1.tuyaus.com"
+
+// SetRegisterCenter define o endereço e o certificado que a lâmpada recebe no
+// "reg" do quadro de pareamento. É por onde ela "liga para casa" e recebe a
+// chave local; sem isso o centro de registro dela fica vazio e ela não chama
+// ninguém. O SDK espera um objeto com source, pub, url0/urlX e ca.
+func (s *Service) SetRegisterCenter(url string, caPEM []byte) {
+	if strings.TrimSpace(url) == "" || len(caPEM) == 0 {
+		return
+	}
+	reg, err := json.Marshal(map[string]any{
+		"source": 0, // RCS_APP
+		"pub":    0,
+		"url0":   url,
+		"url1":   url,
+		"url2":   url,
+		"url3":   url,
+		"ca":     string(caPEM),
+	})
+	if err != nil {
+		return
+	}
+	s.registerCenter = reg
+}
+
 // StartPairing opens a pairing window and returns the one-time values the phone
 // must send over the air.
 func (s *Service) StartPairing(ctx context.Context) (PairingSession, error) {
@@ -124,6 +158,7 @@ func (s *Service) StartPairing(ctx context.Context) (PairingSession, error) {
 		Message:   "Envie os dados do Wi-Fi para a lâmpada pelo aplicativo.",
 		StartedAt: time.Now(),
 		ExpiresAt: time.Now().Add(window),
+		Reg:       json.RawMessage(s.registerCenter),
 	}
 	s.pairing = session
 	s.pairingTried = map[string]bool{}
@@ -246,7 +281,10 @@ func (s *Service) probePairingDevices(id string) {
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), 6*time.Second)
 	defer cancel()
-	candidates, err := scanner.Scan(ctx, 2*time.Second, false)
+	// A sondagem de porta é o caminho que funciona com a lâmpada já configurada:
+	// ela não responde ao anúncio de descoberta (e a resposta seria descartada
+	// pelo firewall), mas aceita a conexão na porta de controle.
+	candidates, err := scanner.Scan(ctx, 2*time.Second, true)
 	if err != nil {
 		return
 	}

@@ -28,6 +28,9 @@ type Service struct {
 	pairingTried  map[string]bool
 	pairingWindow time.Duration
 	pairingProbed time.Time
+	// registerCenter é o "reg" entregue à lâmpada: o endereço de ativação e o
+	// certificado. Definido uma vez na partida, antes de qualquer pareamento.
+	registerCenter []byte
 }
 
 func NewService(repo *Repository, driver Driver, hub Broadcaster, logger *slog.Logger) *Service {

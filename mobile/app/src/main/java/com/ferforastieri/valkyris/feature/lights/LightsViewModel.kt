@@ -279,6 +279,7 @@ class LightsViewModel @Inject constructor(
                 appToken = session.token,
                 secret = session.secret,
                 region = session.region,
+                reg = session.reg,
                 gateways = gateways,
             ) { aviso ->
                 _state.update { state ->

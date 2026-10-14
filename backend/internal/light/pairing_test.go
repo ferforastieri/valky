@@ -2,6 +2,7 @@ package light
 
 import (
 	"context"
+	"encoding/json"
 	"strings"
 	"sync"
 	"testing"
@@ -258,5 +259,27 @@ func TestPairingWindowRecordsItsMilestones(t *testing.T) {
 		if !strings.Contains(entries, esperado) {
 			t.Fatalf("marco %q ausente no diagnóstico: %s", esperado, entries)
 		}
+	}
+}
+
+func TestPairingSessionCarriesTheRegisterCenter(t *testing.T) {
+	adapter := &ScriptedAdapter{candidates: []Candidate{{Address: "192.168.1.60", DeviceID: "device-1", Version: 3.3}}, acceptAny: true}
+	service := newPairingService(t, adapter)
+	service.SetRegisterCenter("a1.tuyaus.com", []byte("-----BEGIN CERTIFICATE-----\nMIIB\n-----END CERTIFICATE-----\n"))
+	session, err := service.StartPairing(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	var reg map[string]any
+	if err := json.Unmarshal(session.Reg, &reg); err != nil {
+		t.Fatalf("reg inválido: %v (%s)", err, session.Reg)
+	}
+	for campo, esperado := range map[string]any{"source": float64(0), "pub": float64(0), "url0": "a1.tuyaus.com", "url2": "a1.tuyaus.com"} {
+		if reg[campo] != esperado {
+			t.Fatalf("reg.%s = %v, esperado %v", campo, reg[campo], esperado)
+		}
+	}
+	if ca, _ := reg["ca"].(string); !strings.Contains(ca, "BEGIN CERTIFICATE") {
+		t.Fatalf("reg sem certificado: %v", reg)
 	}
 }

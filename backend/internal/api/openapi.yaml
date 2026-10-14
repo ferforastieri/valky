@@ -739,6 +739,20 @@ components:
         message: {type: string, description: Human readable progress or the reason a lamp was refused}
         deviceId: {type: string, description: Identifier of the lamp that answered}
         address: {type: string, description: Address of the lamp that answered}
+        reg:
+          type: object
+          description: |
+            Register center handed to the lamp over the air: where it calls after
+            joining the network and the certificate it should trust (source, pub,
+            url0/urlX, ca). The phone forwards it as an object inside the frame.
+          properties:
+            source: {type: integer}
+            pub: {type: integer}
+            url0: {type: string}
+            url1: {type: string}
+            url2: {type: string}
+            url3: {type: string}
+            ca: {type: string, description: PEM certificate}
         light: {$ref: '#/components/schemas/Light'}
         startedAt: {type: string, format: date-time}
         expiresAt: {type: string, format: date-time}
