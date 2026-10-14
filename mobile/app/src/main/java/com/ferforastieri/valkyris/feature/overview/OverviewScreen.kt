@@ -21,6 +21,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -223,7 +224,8 @@ fun OverviewContent(
                     onOpen = { favorite ->
                         when (favorite.type) {
                             "camera" -> onCamera(favorite.id)
-                            "light" -> onLight()
+                            // A lâmpada é acionada aqui mesmo, sem sair da visão geral.
+                            "light" -> onToggleLight(favorite)
                             else -> onFavorite(favorite)
                         }
                     },
@@ -231,8 +233,9 @@ fun OverviewContent(
                 )
             }
         }
+        item(key = "overview-divider") { HorizontalDivider(Modifier.padding(vertical = 2.dp)) }
+        item(key = "activity-label") { SectionLabel(stringResource(R.string.recent_activity)) }
         item { activityChart() }
-        item { SectionLabel(stringResource(R.string.recent_activity)) }
         if (events.isEmpty()) {
             item {
                 Surface(Modifier.fillMaxWidth(), RoundedCornerShape(18.dp), color = MaterialTheme.colorScheme.surface) {
@@ -357,22 +360,26 @@ private fun FavoriteGrid(
 @Composable
 private fun FavoriteCard(item: FavoriteItem, modifier: Modifier, onClick: () -> Unit) {
     val lamp = item.type == "light"
-    val tint = when {
-        !lamp -> MaterialTheme.colorScheme.secondary
-        item.power -> Color(0xFFFFC46B)
-        else -> MaterialTheme.colorScheme.onSurfaceVariant
-    }
+    val bulbColor = if (item.power) Color(0xFFFFC46B) else MaterialTheme.colorScheme.onSurfaceVariant
     Card(
         onClick = onClick,
         modifier = modifier,
         shape = RoundedCornerShape(16.dp),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-        border = BorderStroke(1.dp, if (lamp && item.online) tint.copy(alpha = .55f) else MaterialTheme.colorScheme.outlineVariant),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
         elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
     ) {
         Row(Modifier.fillMaxWidth().padding(15.dp), verticalAlignment = Alignment.CenterVertically) {
             Surface(Modifier.size(40.dp), RoundedCornerShape(12.dp), color = com.ferforastieri.valkyris.core.design.ColorTokens.BrandTile) {
-                Icon(favoriteIcon(item.type), null, Modifier.padding(10.dp), tint = tint)
+                if (lamp) {
+                    com.ferforastieri.valkyris.core.design.LightBulbIcon(
+                        on = item.power && item.online,
+                        color = bulbColor,
+                        modifier = Modifier.padding(8.dp),
+                    )
+                } else {
+                    Icon(favoriteIcon(item.type), null, Modifier.padding(10.dp), tint = MaterialTheme.colorScheme.secondary)
+                }
             }
             Spacer(Modifier.width(12.dp))
             Text(

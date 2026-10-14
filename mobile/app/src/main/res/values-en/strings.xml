@@ -37,6 +37,17 @@
     <string name="light_room">Room</string>
     <string name="light_turn_on">Turn on</string>
     <string name="light_turn_off">Turn off</string>
+    <string name="light_more_actions">More actions</string>
+    <string name="light_power_label">On/Off</string>
+    <string name="light_tab_color">Color</string>
+    <string name="light_tab_white">White</string>
+    <string name="light_brightness">Brightness</string>
+    <string name="light_more_colors">More colors</string>
+    <string name="light_white_warm">Warm</string>
+    <string name="light_white_neutral">Neutral</string>
+    <string name="light_white_cool">Cool</string>
+    <string name="light_hue_badge">%1$d°</string>
+    <string name="light_kelvin_badge">%1$d K</string>
     <string name="light_setup_pending">Checking the bulb…</string>
     <string name="light_setup_failed">The bulb could not be reached</string>
     <string name="no_lights_body_admin">Tap + to add a bulb you already set up in the manufacturer app.</string>

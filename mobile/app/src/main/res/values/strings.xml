@@ -35,6 +35,17 @@
     <string name="light_room">Cômodo</string>
     <string name="light_turn_on">Ligar</string>
     <string name="light_turn_off">Desligar</string>
+    <string name="light_more_actions">Mais ações</string>
+    <string name="light_power_label">Ligar/Desligar</string>
+    <string name="light_tab_color">Cor</string>
+    <string name="light_tab_white">Branco</string>
+    <string name="light_brightness">Brilho</string>
+    <string name="light_more_colors">Mais cores</string>
+    <string name="light_white_warm">Quente</string>
+    <string name="light_white_neutral">Natural</string>
+    <string name="light_white_cool">Fria</string>
+    <string name="light_hue_badge">%1$d°</string>
+    <string name="light_kelvin_badge">%1$d K</string>
     <string name="light_setup_pending">Conferindo a lâmpada…</string>
     <string name="light_setup_failed">Não foi possível falar com a lâmpada</string>
     <string name="no_lights_body_admin">Toque em + para adicionar uma lâmpada que você já configurou no aplicativo do fabricante.</string>

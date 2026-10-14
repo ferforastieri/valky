@@ -26,6 +26,9 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
@@ -55,9 +58,13 @@ fun ValkyrisBottomSheet(
     actions: (@Composable FlowRowScope.() -> Unit)? = null,
     content: @Composable ColumnScope.() -> Unit,
 ) {
+    // O lambda de confirmação precisa ter identidade estável: se ele muda a cada
+    // recomposição, o estado da folha é recriado e ela reabre sozinha a cada
+    // comando (o "abre, fecha e abre" que aparecia).
+    val swipeAllowed by rememberUpdatedState(dismissEnabled && swipeToDismissEnabled)
     val sheetState = rememberModalBottomSheetState(
         skipPartiallyExpanded = true,
-        confirmValueChange = { (dismissEnabled && swipeToDismissEnabled) || it != SheetValue.Hidden },
+        confirmValueChange = remember { { value: SheetValue -> swipeAllowed || value != SheetValue.Hidden } },
     )
     ModalBottomSheet(
         onDismissRequest = {
