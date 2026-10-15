@@ -16,3 +16,14 @@ fun warmWhiteColor(kelvin: Int): Color {
 /** Cor do ícone que fica legível sobre a cor da lâmpada. */
 fun onColorFor(background: Color): Color =
     if (background.luminance() > 0.55f) Color(0xFF1B1B1F) else Color.White
+
+/**
+ * Cor atual de uma lâmpada: no modo cor, o HSV escolhido; no branco, a
+ * temperatura convertida. É o que pinta o ícone e o cabeçalho.
+ */
+fun lightTint(mode: String, hue: Int, saturation: Int, value: Int, kelvin: Int): Color =
+    if (mode == "color") {
+        Color.hsv(hue.toFloat(), (saturation / 100f).coerceIn(0f, 1f), (value / 100f).coerceIn(0.12f, 1f))
+    } else {
+        warmWhiteColor(kelvin)
+    }

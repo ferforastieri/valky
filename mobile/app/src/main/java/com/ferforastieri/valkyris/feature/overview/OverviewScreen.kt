@@ -83,6 +83,11 @@ data class FavoriteItem(
     val subtitle: String,
     val online: Boolean = false,
     val power: Boolean = false,
+    val mode: String = "white",
+    val hue: Int = 0,
+    val saturation: Int = 100,
+    val value: Int = 100,
+    val kelvin: Int = 4000,
 )
 
 data class OverviewState(
@@ -130,7 +135,12 @@ class OverviewViewModel @Inject constructor(private val repository: ValkyrisRepo
         val items = mutableListOf<FavoriteItem>()
         cameras.filter { it.favorite }.forEach { items += FavoriteItem("camera", it.id, it.name, it.host) }
         lights.filter { it.favorite }.forEach {
-            items += FavoriteItem("light", it.id, it.name, it.room.ifBlank { "Iluminação" }, it.state.online, it.state.power)
+            items += FavoriteItem(
+                type = "light", id = it.id, name = it.name, subtitle = it.room.ifBlank { "Iluminação" },
+                online = it.state.online, power = it.state.power,
+                mode = it.state.mode, hue = it.state.color.hue, saturation = it.state.color.saturation,
+                value = it.state.color.value, kelvin = it.state.temperatureKelvin,
+            )
         }
         remotes.filter { it.favorite }.forEach { items += FavoriteItem("remote", it.id, it.name, it.host) }
         return items
@@ -371,15 +381,11 @@ internal fun FavoriteCard(item: FavoriteItem, modifier: Modifier, onClick: () ->
         Row(Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 12.dp), verticalAlignment = Alignment.CenterVertically) {
             Surface(Modifier.size(36.dp), RoundedCornerShape(11.dp), color = com.ferforastieri.valkyris.core.design.ColorTokens.BrandTile) {
                 if (lamp) {
-                    Icon(
-                        if (lit) Lucide.Lightbulb else Lucide.LightbulbOff,
-                        null,
-                        Modifier.padding(9.dp),
-                        tint = when {
-                            lit -> MaterialTheme.colorScheme.secondary
-                            item.online -> MaterialTheme.colorScheme.onSurfaceVariant
-                            else -> MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = .5f)
-                        },
+                    com.ferforastieri.valkyris.core.design.AnimatedBulbIcon(
+                        on = lit,
+                        color = com.ferforastieri.valkyris.core.design.lightTint(item.mode, item.hue, item.saturation, item.value, item.kelvin),
+                        offTint = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(7.dp),
                     )
                 } else {
                     Icon(favoriteIcon(item.type), null, Modifier.padding(9.dp), tint = MaterialTheme.colorScheme.secondary)

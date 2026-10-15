@@ -29,7 +29,7 @@ import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import com.composables.icons.lucide.*
 import com.ferforastieri.valkyris.R
-import com.ferforastieri.valkyris.core.design.onColorFor
+import com.ferforastieri.valkyris.core.design.AnimatedBulbIcon
 import com.ferforastieri.valkyris.core.design.warmWhiteColor
 import com.ferforastieri.valkyris.core.model.LightColor
 import com.ferforastieri.valkyris.core.model.LightDevice
@@ -86,11 +86,11 @@ internal fun LightDetailContent(
             Column(Modifier.fillMaxSize().padding(horizontal = 18.dp)) {
                 Spacer(Modifier.height(30.dp))
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                    Icon(
-                        if (on) Lucide.Lightbulb else Lucide.LightbulbOff,
-                        null,
-                        Modifier.size(28.dp),
-                        tint = if (on) onColorFor(aura) else MaterialTheme.colorScheme.onSurfaceVariant,
+                    AnimatedBulbIcon(
+                        on = on,
+                        color = aura,
+                        offTint = MaterialTheme.colorScheme.onSurfaceVariant,
+                        size = 30.dp,
                     )
                     Text(light.name, Modifier.weight(1f), style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.SemiBold, maxLines = 1)
                     IconButton(onClick = onDismiss) { Icon(Lucide.X, stringResource(R.string.close)) }
@@ -132,27 +132,31 @@ internal fun LightDetailContent(
                 }
                 if (!light.state.online) Text(stringResource(R.string.unavailable), color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
                 if (tab == 0) {
-                    // Sem sugestões: o bloco de matiz é o controle. Ao arrastar a
-                    // saturação vai a 100 — sem isso, uma lâmpada que estava no
-                    // branco (saturação 0) continuaria branca e a cor não aparecia.
-                    GradientBar(
-                        brush = Brush.horizontalGradient(hueSpectrum),
-                        value = hue / 360f,
+                    // Bloco livre: X = matiz, Y = saturação. A saturação nunca
+                    // sai zerada (senão a lâmpada ficaria branca).
+                    FreeBlock(
+                        horizontal = Brush.horizontalGradient(hueSpectrum),
+                        overlay = Brush.verticalGradient(listOf(Color.Transparent, Color.White)),
+                        x = hue / 360f,
+                        y = 1f - saturation / 100f,
                         enabled = reachable,
-                        height = 170.dp,
                         badge = stringResource(R.string.light_hue_badge, hue.toInt()),
-                        onChange = { hue = it * 360f; saturation = 100f },
-                        onFinished = { apply(LightStatePatch(color = LightColor(hue.toInt(), saturation.toInt().coerceAtLeast(100), brightness.toInt()))) },
+                        onPick = { px, py -> hue = px * 360f; saturation = (1f - py) * 100f },
+                        onFinished = {
+                            apply(LightStatePatch(color = LightColor(hue.toInt(), saturation.toInt().coerceAtLeast(1), brightness.toInt())))
+                        },
                     )
                 } else {
-                    GradientBar(
-                        brush = Brush.horizontalGradient(listOf(warmWhiteColor(2700), warmWhiteColor(4000), warmWhiteColor(6500))),
-                        value = (temperature - 2700f) / 3800f,
+                    // Bloco livre: X = temperatura do branco, Y = brilho.
+                    FreeBlock(
+                        horizontal = Brush.horizontalGradient(listOf(warmWhiteColor(2700), warmWhiteColor(4000), warmWhiteColor(6500))),
+                        overlay = Brush.verticalGradient(listOf(Color.Transparent, Color.Black.copy(alpha = .82f))),
+                        x = (temperature - 2700f) / 3800f,
+                        y = 1f - (brightness - 1f) / 99f,
                         enabled = reachable,
-                        height = 170.dp,
                         badge = stringResource(R.string.light_kelvin_badge, temperature.toInt()),
-                        onChange = { temperature = 2700f + it * 3800f },
-                        onFinished = { apply(LightStatePatch(temperatureKelvin = temperature.toInt())) },
+                        onPick = { px, py -> temperature = 2700f + px * 3800f; brightness = (1f - py) * 99f + 1f },
+                        onFinished = { apply(LightStatePatch(temperatureKelvin = temperature.toInt(), brightness = brightness.toInt())) },
                     )
                 }
                 Text(stringResource(R.string.light_brightness), style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
@@ -203,6 +207,69 @@ private val hueSpectrum = listOf(
     Color.hsv(0f, 1f, 1f), Color.hsv(60f, 1f, 1f), Color.hsv(120f, 1f, 1f),
     Color.hsv(180f, 1f, 1f), Color.hsv(240f, 1f, 1f), Color.hsv(300f, 1f, 1f), Color.hsv(360f, 1f, 1f),
 )
+
+/**
+ * Bloco de seleção livre: o toque ou o arrasto escolhe as duas coordenadas
+ * (0..1 cada). Em cima entra o gradiente do eixo X e por cima dele o véu do
+ * eixo Y, então qualquer ponto do bloco é uma combinação válida.
+ */
+@Composable
+internal fun FreeBlock(
+    horizontal: Brush,
+    overlay: Brush,
+    x: Float,
+    y: Float,
+    enabled: Boolean,
+    onPick: (Float, Float) -> Unit,
+    onFinished: () -> Unit,
+    modifier: Modifier = Modifier,
+    height: Dp = 220.dp,
+    badge: String? = null,
+) {
+    var widthPx by remember { mutableFloatStateOf(1f) }
+    var heightPx by remember { mutableFloatStateOf(1f) }
+    Box(
+        modifier.fillMaxWidth().height(height)
+            .clip(RoundedCornerShape(18.dp))
+            .background(horizontal)
+            .onSizeChanged {
+                widthPx = it.width.toFloat().coerceAtLeast(1f)
+                heightPx = it.height.toFloat().coerceAtLeast(1f)
+            }
+            .pointerInput(enabled) {
+                if (!enabled) return@pointerInput
+                detectTapGestures { offset ->
+                    onPick((offset.x / widthPx).coerceIn(0f, 1f), (offset.y / heightPx).coerceIn(0f, 1f))
+                    onFinished()
+                }
+            }
+            .pointerInput(enabled) {
+                if (!enabled) return@pointerInput
+                detectDragGestures(onDragEnd = { onFinished() }, onDragCancel = { onFinished() }) { change, _ ->
+                    change.consume()
+                    onPick((change.position.x / widthPx).coerceIn(0f, 1f), (change.position.y / heightPx).coerceIn(0f, 1f))
+                }
+            },
+    ) {
+        Box(Modifier.matchParentSize().background(overlay))
+        Canvas(Modifier.fillMaxSize()) {
+            val radius = 14.dp.toPx()
+            val px = (x.coerceIn(0f, 1f) * size.width).coerceIn(radius, size.width - radius)
+            val py = (y.coerceIn(0f, 1f) * size.height).coerceIn(radius, size.height - radius)
+            val center = Offset(px, py)
+            drawCircle(Color.White, radius = radius, center = center)
+            drawCircle(Color.Black.copy(alpha = .20f), radius = radius, center = center, style = Stroke(2f))
+        }
+        badge?.let {
+            Surface(
+                Modifier.align(Alignment.TopEnd).padding(10.dp),
+                shape = RoundedCornerShape(50),
+                color = Color.Black.copy(alpha = .30f),
+            ) { Text(it, Modifier.padding(horizontal = 10.dp, vertical = 4.dp), style = MaterialTheme.typography.labelMedium, color = Color.White) }
+        }
+        if (!enabled) Box(Modifier.matchParentSize().background(MaterialTheme.colorScheme.surface.copy(alpha = .35f)))
+    }
+}
 
 /**
  * Bloco em gradiente com um indicador arrastável (ou toque direto). O valor

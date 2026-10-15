@@ -21,7 +21,9 @@ import androidx.lifecycle.compose.LifecycleResumeEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.composables.icons.lucide.*
 import com.ferforastieri.valkyris.R
+import com.ferforastieri.valkyris.core.design.AnimatedBulbIcon
 import com.ferforastieri.valkyris.core.design.ValkyrisBottomSheet
+import com.ferforastieri.valkyris.core.design.lightTint
 import com.ferforastieri.valkyris.core.model.*
 
 @Composable fun LightsScreen(admin:Boolean,vm:LightsViewModel=hiltViewModel()){
@@ -96,7 +98,7 @@ import com.ferforastieri.valkyris.core.model.*
                 enabled=light.state.online,
                 shape=CircleShape,
                 color=MaterialTheme.colorScheme.secondaryContainer,
-            ){Icon(if(on)Lucide.Lightbulb else Lucide.LightbulbOff,null,Modifier.padding(9.dp).size(30.dp),tint=if(on&&light.state.online)MaterialTheme.colorScheme.secondary else MaterialTheme.colorScheme.onSecondaryContainer)}
+            ){AnimatedBulbIcon(on&&light.state.online,lightTint(light.state.mode,light.state.color.hue,light.state.color.saturation,light.state.color.value,light.state.temperatureKelvin),offTint=MaterialTheme.colorScheme.onSecondaryContainer,modifier=Modifier.padding(7.dp),size=34.dp)}
             Spacer(Modifier.width(13.dp))
             Column(Modifier.weight(1f)){
                 Text(light.name,fontWeight=FontWeight.SemiBold)

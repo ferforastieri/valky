@@ -8,7 +8,15 @@ import kotlinx.serialization.json.JsonElement
 @OptIn(kotlinx.serialization.ExperimentalSerializationApi::class)
 @Serializable data class CreateCameraRequest(val name:String,val icon:String="camera",val host:String,val port:Int=2020,val username:String,val password:String,@kotlinx.serialization.EncodeDefault val alerts:AlertPresentation=AlertPresentation())
 @Serializable data class LightCapabilities(val brightness:Boolean=true,val color:Boolean=true,val colorTemperature:Boolean=true)
-@Serializable data class LightColor(val hue:Int=0,val saturation:Int=100,val value:Int=100)
+// A cor precisa ir SEMPRE completa: o serializador omite valores iguais ao
+// padrão, e a saturação padrão (100) era justamente a que sumia — o backend
+// recebia saturação 0 e a lâmpada ficava branca.
+@OptIn(kotlinx.serialization.ExperimentalSerializationApi::class)
+@Serializable data class LightColor(
+    @kotlinx.serialization.EncodeDefault val hue:Int=0,
+    @kotlinx.serialization.EncodeDefault val saturation:Int=100,
+    @kotlinx.serialization.EncodeDefault val value:Int=100,
+)
 @Serializable data class LightState(val online:Boolean=false,val power:Boolean=false,val mode:String="white",val brightness:Int=100,val temperatureKelvin:Int=4000,val color:LightColor=LightColor(),val updatedAt:String="")
 @Serializable data class LightDevice(val id:String,val name:String,val room:String="",val capabilities:LightCapabilities=LightCapabilities(),val setupStatus:String="pending",val setupError:String="",val favorite:Boolean=false,val enabled:Boolean=true,val lastSeenAt:String?=null,val state:LightState=LightState(),val deviceId:String="",val protocolVersion:Double=0.0,val lastAddress:String="")
 @Serializable data class LightStatePatch(val power:Boolean?=null,val mode:String?=null,val brightness:Int?=null,val temperatureKelvin:Int?=null,val color:LightColor?=null)
