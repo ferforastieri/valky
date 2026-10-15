@@ -406,6 +406,25 @@ func (d *TuyaDriver) Discover(ctx context.Context, item Light, cred Credentials)
 			return device.Address, nil
 		}
 	}
+	// O broadcast não atravessa a rede do container: quando ele não encontra,
+	// varremos a faixa do último endereço conhecido e conferimos cada candidato
+	// com a chave da lâmpada (chave errada não responde estado). É isso que traz
+	// a lâmpada de volta sozinha quando o roteador troca o IP dela.
+	if known := strings.TrimSpace(item.LastAddress); known != "" {
+		scanCtx, cancel := context.WithTimeout(ctx, 12*time.Second)
+		candidates := tuya.ScanAddresses(scanCtx, known, 6668, 300*time.Millisecond)
+		cancel()
+		for _, candidate := range candidates {
+			try := cred
+			try.Address = candidate
+			probeCtx, probeCancel := context.WithTimeout(ctx, 5*time.Second)
+			_, statusErr := d.Status(probeCtx, item, try)
+			probeCancel()
+			if statusErr == nil {
+				return candidate, nil
+			}
+		}
+	}
 	if credential := strings.TrimSpace(item.LastAddress); credential != "" {
 		return credential, nil
 	}
