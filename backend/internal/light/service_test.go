@@ -87,7 +87,7 @@ func TestServiceControlsALightThroughTheProviderNeutralDriver(t *testing.T) {
 		t.Fatal(err)
 	}
 	now := time.Now().UTC().Format(time.RFC3339Nano)
-	_, err = db.DB.Exec(`INSERT INTO lights(id,name,room,device_id,local_key_enc,protocol_version,last_ip,capabilities_json,dp_mapping_json,setup_status,enabled,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?)`, "light-1", "Sala", "Sala", "legacy-id", secret, 0, "", `{"brightness":true,"color":true,"colorTemperature":true}`, `{}`, "pending", 1, now, now)
+	_, err = db.DB.Exec(`INSERT INTO lights(id,name,device_id,local_key_enc,protocol_version,last_ip,capabilities_json,dp_mapping_json,setup_status,enabled,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?)`, "light-1", "Sala", "legacy-id", secret, 0, "", `{"brightness":true,"color":true,"colorTemperature":true}`, `{}`, "pending", 1, now, now)
 	if err != nil {
 		t.Fatal(err)
 	}

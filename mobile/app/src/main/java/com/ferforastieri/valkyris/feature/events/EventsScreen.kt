@@ -1,12 +1,11 @@
 package com.ferforastieri.valkyris.feature.events
 
 import androidx.compose.foundation.BorderStroke
-import androidx.compose.foundation.horizontalScroll
-import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -23,13 +22,13 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.composables.icons.lucide.Bell
 import com.composables.icons.lucide.BellOff
 import com.composables.icons.lucide.Check
-import com.composables.icons.lucide.Eye
 import com.composables.icons.lucide.ListFilter
 import com.composables.icons.lucide.Lucide
 import com.composables.icons.lucide.MapPin
 import com.composables.icons.lucide.Mic
 import com.composables.icons.lucide.Video
 import com.ferforastieri.valkyris.R
+import com.ferforastieri.valkyris.core.design.ValkyrisBottomSheet
 import com.ferforastieri.valkyris.core.model.ValkyrisEvent
 import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.jsonPrimitive
@@ -40,53 +39,77 @@ import java.time.format.DateTimeFormatter
 @Composable
 fun EventsScreen(onEvent: (String) -> Unit = {}, onCamera: (String) -> Unit = {}, vm: EventsViewModel = hiltViewModel()) {
     val events by vm.events.collectAsStateWithLifecycle()
-    EventsContent(events, onEvent, onCamera, onAcknowledge = vm::acknowledge, onAcknowledgeAll = vm::acknowledgeAll)
+    EventsContent(events, onEvent, onCamera)
 }
 
+/**
+ * Notificações. Tudo o que chega é marcado como visto ao abrir o aplicativo, sem
+ * precisar tocar em check nenhum; aqui sobram só os filtros por tipo, dentro de
+ * uma folha para não ocupar a tela.
+ */
 @Composable
 fun EventsContent(
     events: List<ValkyrisEvent>,
     onEvent: (String) -> Unit = {},
     onCamera: (String) -> Unit = {},
-    onAcknowledge: (ValkyrisEvent) -> Unit = {},
-    onAcknowledgeAll: () -> Unit = {},
 ) {
-    var unreadOnly by rememberSaveable { mutableStateOf(false) }
     var category by rememberSaveable { mutableStateOf<Int?>(null) }
-    val hasUnread = events.any { it.acknowledgedAt == null }
-    val visibleEvents = events.filter { (!unreadOnly || it.acknowledgedAt == null) && (category == null || eventCategoryRes(it) == category) }
+    var filtering by rememberSaveable { mutableStateOf(false) }
+    val visibleEvents = events.filter { category == null || eventCategoryRes(it) == category }
     Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
         Column(Modifier.fillMaxSize().padding(horizontal = 18.dp)) {
             Spacer(Modifier.height(10.dp))
             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    FilterChip(selected = !unreadOnly, onClick = { unreadOnly = false }, label = { Text(stringResource(R.string.all_notifications)) }, leadingIcon = { Icon(Lucide.ListFilter, null, Modifier.size(16.dp)) })
-                    FilterChip(selected = unreadOnly, onClick = { unreadOnly = true }, label = { Text(stringResource(R.string.unread_notifications)) }, leadingIcon = { Icon(Lucide.Eye, null, Modifier.size(16.dp)) })
+                Text(stringResource(R.string.events), Modifier.weight(1f), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+                Surface(
+                    onClick = { filtering = true },
+                    shape = CircleShape,
+                    color = if (category != null) MaterialTheme.colorScheme.secondaryContainer else MaterialTheme.colorScheme.surface,
+                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+                ) {
+                    Row(Modifier.padding(horizontal = 14.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+                        Icon(Lucide.ListFilter, null, Modifier.size(18.dp), tint = if (category != null) MaterialTheme.colorScheme.onSecondaryContainer else MaterialTheme.colorScheme.onSurfaceVariant)
+                        Spacer(Modifier.width(8.dp))
+                        Text(
+                            category?.let { stringResource(it) } ?: stringResource(R.string.filter_all_types),
+                            style = MaterialTheme.typography.labelLarge,
+                            color = if (category != null) MaterialTheme.colorScheme.onSecondaryContainer else MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
                 }
-                Spacer(Modifier.weight(1f))
-                IconButton(onClick = onAcknowledgeAll, enabled = hasUnread) { Icon(Lucide.Check, contentDescription = stringResource(R.string.mark_all_read)) }
             }
-            Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                FilterChip(selected = category == null, onClick = { category = null }, label = { Text("Todos os tipos") })
-                listOf(R.string.event_category_location, R.string.event_category_audio, R.string.event_category_camera).forEach { item ->
-                    FilterChip(selected = category == item, onClick = { category = item }, label = { Text(stringResource(item)) })
-                }
-            }
-            Spacer(Modifier.height(8.dp))
+            Spacer(Modifier.height(10.dp))
             if (visibleEvents.isEmpty()) {
                 Box(Modifier.fillMaxSize()) {
                     Column(Modifier.align(Alignment.Center), horizontalAlignment = Alignment.CenterHorizontally) {
                         Icon(Lucide.BellOff, null, Modifier.size(42.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
                         Spacer(Modifier.height(12.dp))
-                        Text(stringResource(if (unreadOnly) R.string.no_unread_notifications else R.string.no_events), fontWeight = FontWeight.SemiBold)
-                        Text(stringResource(if (unreadOnly) R.string.no_unread_notifications_body else R.string.no_events_body), color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Text(stringResource(R.string.no_events), fontWeight = FontWeight.SemiBold)
+                        Text(stringResource(R.string.no_events_body), color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
                 }
             } else {
                 LazyColumn(verticalArrangement = Arrangement.spacedBy(10.dp), contentPadding = PaddingValues(bottom = 24.dp)) {
                     items(visibleEvents, key = { it.id }) { event ->
-                        EventCard(event, onOpen = { onEvent(event.id) }, onCamera = { onCamera(event.cameraId) }, onAck = { onAcknowledge(event) })
+                        EventCard(event, onOpen = { onEvent(event.id) }, onCamera = { onCamera(event.cameraId) })
                     }
+                }
+            }
+        }
+    }
+    if (filtering) {
+        ValkyrisBottomSheet(
+            title = stringResource(R.string.filter_notifications),
+            onDismiss = { filtering = false },
+            actions = {
+                TextButton(onClick = { category = null; filtering = false }) { Text(stringResource(R.string.filter_clear)) }
+                Button(onClick = { filtering = false }) { Text(stringResource(R.string.close)) }
+            },
+        ) {
+            Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                FilterRow(stringResource(R.string.filter_all_types), category == null) { category = null; filtering = false }
+                listOf(R.string.event_category_camera, R.string.event_category_audio, R.string.event_category_location).forEach { item ->
+                    FilterRow(stringResource(item), category == item) { category = item; filtering = false }
                 }
             }
         }
@@ -94,11 +117,32 @@ fun EventsContent(
 }
 
 @Composable
-private fun EventCard(event: ValkyrisEvent, onOpen: () -> Unit, onCamera: () -> Unit, onAck: () -> Unit) {
+private fun FilterRow(label: String, selected: Boolean, onClick: () -> Unit) {
+    Surface(
+        onClick = onClick,
+        modifier = Modifier.fillMaxWidth(),
+        shape = MaterialTheme.shapes.medium,
+        color = if (selected) MaterialTheme.colorScheme.secondaryContainer else MaterialTheme.colorScheme.surface,
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+    ) {
+        Row(Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 12.dp), verticalAlignment = Alignment.CenterVertically) {
+            Text(
+                label,
+                Modifier.weight(1f),
+                color = if (selected) MaterialTheme.colorScheme.onSecondaryContainer else MaterialTheme.colorScheme.onSurface,
+                fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
+            )
+            if (selected) Icon(Lucide.Check, null, Modifier.size(18.dp), tint = MaterialTheme.colorScheme.secondary)
+        }
+    }
+}
+
+@Composable
+private fun EventCard(event: ValkyrisEvent, onOpen: () -> Unit, onCamera: () -> Unit) {
     Card(onClick = onOpen, modifier = Modifier.fillMaxWidth(), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface), border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant), elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)) {
         Row(Modifier.padding(14.dp), verticalAlignment = Alignment.CenterVertically) {
-            Box(Modifier.size(44.dp).background(if (event.acknowledgedAt == null) MaterialTheme.colorScheme.error.copy(alpha = .12f) else MaterialTheme.colorScheme.secondary.copy(alpha = .15f), MaterialTheme.shapes.small)) {
-                Icon(eventIcon(event.type), null, Modifier.size(21.dp).align(Alignment.Center), tint = if (event.acknowledgedAt == null) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.secondary)
+            Box(Modifier.size(44.dp).background(MaterialTheme.colorScheme.secondary.copy(alpha = .15f), MaterialTheme.shapes.small)) {
+                Icon(eventIcon(event.type), null, Modifier.size(21.dp).align(Alignment.Center), tint = MaterialTheme.colorScheme.secondary)
             }
             Spacer(Modifier.width(12.dp))
             Column(Modifier.weight(1f)) {
@@ -106,10 +150,7 @@ private fun EventCard(event: ValkyrisEvent, onOpen: () -> Unit, onCamera: () -> 
                 Text(formatTime(event.occurredAt), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 Text(stringResource(eventCategoryRes(event)), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
-            Row(horizontalArrangement = Arrangement.spacedBy(2.dp), verticalAlignment = Alignment.CenterVertically) {
-                if (event.cameraId.isNotBlank()) IconButton(onCamera) { Icon(Lucide.Video, stringResource(R.string.open_camera)) }
-                if (event.acknowledgedAt == null) IconButton(onAck) { Icon(Lucide.Check, stringResource(R.string.acknowledge)) }
-            }
+            if (event.cameraId.isNotBlank()) IconButton(onCamera) { Icon(Lucide.Video, stringResource(R.string.open_camera)) }
         }
     }
 }

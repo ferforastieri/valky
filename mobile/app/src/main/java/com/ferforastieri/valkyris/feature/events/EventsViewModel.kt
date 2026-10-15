@@ -51,6 +51,12 @@ class EventsViewModel @Inject constructor(
         }
     }
 
+    /** Marca tudo como visto ao abrir o aplicativo; nada de tocar em check. */
+    fun markAllSeen() {
+        if (events.value.none { it.acknowledgedAt == null }) return
+        acknowledgeAll()
+    }
+
     fun acknowledgeAll() {
         if (!actionGate.tryAcquire()) return
         viewModelScope.launch {

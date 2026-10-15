@@ -20,11 +20,13 @@ class WidgetActionReceiver : BroadcastReceiver() {
         CoroutineScope(SupervisorJob() + Dispatchers.IO).launch {
             try {
                 when (action) {
-                    ACTION_REFRESH, ValkyrisWidgetProvider.ACTION_ALARM -> Unit
                     ACTION_TOGGLE_LIGHT -> intent.getStringExtra(EXTRA_ID)?.let { WidgetBridge.toggleLight(app, it) }
                     ACTION_REMOTE_KEY -> intent.getStringExtra(EXTRA_KEY)?.let { WidgetBridge.sendKey(app, it) }
+                    // Só a imagem da câmera: mantém o widget perto do tempo real
+                    // sem repetir todas as chamadas do estado.
+                    ACTION_PHOTO_ALARM -> WidgetBridge.refreshPhoto(app)
+                    else -> WidgetBridge.refresh(app)
                 }
-                if (action != ACTION_TOGGLE_LIGHT && action != ACTION_REMOTE_KEY) WidgetBridge.refresh(app)
                 refreshWidgetViews(app)
             } finally {
                 pending.finish()
@@ -34,6 +36,7 @@ class WidgetActionReceiver : BroadcastReceiver() {
 
     companion object {
         const val ACTION_REFRESH = "com.ferforastieri.valkyris.widget.REFRESH"
+        const val ACTION_PHOTO_ALARM = "com.ferforastieri.valkyris.widget.PHOTO_ALARM"
         const val ACTION_TOGGLE_LIGHT = "com.ferforastieri.valkyris.widget.TOGGLE_LIGHT"
         const val ACTION_REMOTE_KEY = "com.ferforastieri.valkyris.widget.REMOTE_KEY"
         const val EXTRA_ID = "id"

@@ -1,7 +1,6 @@
 package com.ferforastieri.valkyris.core.design
 
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.luminance
 
 /** Branco da lâmpada: interpola entre âmbar quente (2700 K) e branco frio (6500 K). */
 fun warmWhiteColor(kelvin: Int): Color {
@@ -12,10 +11,6 @@ fun warmWhiteColor(kelvin: Int): Color {
         blue = (0xA0 / 255f) + (0xFF / 255f - 0xA0 / 255f) * t,
     )
 }
-
-/** Cor do ícone que fica legível sobre a cor da lâmpada. */
-fun onColorFor(background: Color): Color =
-    if (background.luminance() > 0.55f) Color(0xFF1B1B1F) else Color.White
 
 /**
  * Cor atual de uma lâmpada: no modo cor, o HSV escolhido; no branco, a

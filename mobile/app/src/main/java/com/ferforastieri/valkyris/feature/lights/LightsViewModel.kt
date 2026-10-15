@@ -15,7 +15,6 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
-import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 
 data class LightsState(
@@ -44,7 +43,6 @@ class LightsViewModel @Inject constructor(
     init {
         viewModelScope.launch { repository.lights.collect { value -> _state.update { it.copy(lights = value, loading = false) } } }
         refresh(); connectRealtime()
-        viewModelScope.launch { while (isActive) { delay(20_000); runCatching { repository.refreshLights() } } }
     }
 
     private fun connectRealtime() {
@@ -56,11 +54,11 @@ class LightsViewModel @Inject constructor(
     fun toggleFavorite(id: String, favorite: Boolean) = viewModelScope.launch { runCatching { repository.api.setFavorite("light", id, favorite) }.onSuccess { repository.refreshLights() }.onFailure { error -> _state.update { it.copy(error = error.message) } } }
     fun delete(id: String, done: () -> Unit = {}) = guarded(id) { repository.deleteLight(id); done() }
 
-    fun rename(id: String, name: String, room: String, done: (Boolean) -> Unit = {}) {
+    fun rename(id: String, name: String, done: (Boolean) -> Unit = {}) {
         if (!actionGate.tryAcquire()) return
         viewModelScope.launch {
             try {
-                runCatching { repository.updateLight(id, LightUpdate(name = name, room = room)) }
+                runCatching { repository.updateLight(id, LightUpdate(name = name)) }
                     .onSuccess { done(true) }
                     .onFailure { error -> _state.update { it.copy(error = error.message) } }
             } finally {

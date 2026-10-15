@@ -27,7 +27,6 @@ type State struct {
 type Light struct {
 	ID           string       `json:"id"`
 	Name         string       `json:"name"`
-	Room         string       `json:"room"`
 	Capabilities Capabilities `json:"capabilities"`
 	SetupStatus  string       `json:"setupStatus"`
 	SetupError   string       `json:"setupError,omitempty"`
@@ -70,7 +69,6 @@ type StatePatch struct {
 // belong to the pairing flow and are never edited by hand.
 type UpdateInput struct {
 	Name    *string `json:"name,omitempty"`
-	Room    *string `json:"room,omitempty"`
 	Enabled *bool   `json:"enabled,omitempty"`
 }
 
@@ -88,7 +86,6 @@ type DiscoveryInput struct {
 // against the device before storing anything.
 type RegisterInput struct {
 	Name            string  `json:"name,omitempty"`
-	Room            string  `json:"room,omitempty"`
 	Address         string  `json:"address"`
 	DeviceID        string  `json:"deviceId"`
 	LocalKey        string  `json:"localKey"`

@@ -30,6 +30,7 @@ import com.ferforastieri.valkyris.feature.cameras.CameraLiveScreen
 import com.ferforastieri.valkyris.feature.cameras.CamerasScreen
 import com.ferforastieri.valkyris.feature.devices.DevicesScreen
 import com.ferforastieri.valkyris.feature.devices.RemoteControlScreen
+import com.ferforastieri.valkyris.feature.lights.LightDetailScreen
 import com.ferforastieri.valkyris.feature.lights.LightsScreen
 import com.ferforastieri.valkyris.feature.events.EventDetailScreen
 import com.ferforastieri.valkyris.feature.events.EventsScreen
@@ -103,7 +104,11 @@ private fun ConnectedValkyrisApp(main: MainViewModel) {
     val updating by main.updating.collectAsStateWithLifecycle()
     var updateDismissed by remember { mutableStateOf(false) }
     // The notice is dismissible but re-opens every time the app is opened.
-    LifecycleEventEffect(Lifecycle.Event.ON_RESUME) { updateDismissed = false }
+    LifecycleEventEffect(Lifecycle.Event.ON_RESUME) {
+        updateDismissed = false
+        // Entrar no aplicativo já marca as notificações como vistas.
+        eventsViewModel.markAllSeen()
+    }
     StartupAlertPermissions()
     update?.takeIf { !updateDismissed }?.let { info ->
         UpdateAvailableSheet(
@@ -116,7 +121,7 @@ private fun ConnectedValkyrisApp(main: MainViewModel) {
     val entry by nav.currentBackStackEntryAsState()
     val currentRoute = entry?.destination?.route
     val selectedIndex = destinations.indexOfFirst { it.route == currentRoute }
-    val showBottomBar = selectedIndex >= 0 || currentRoute == "events" || currentRoute == "event/{id}" || currentRoute == "camera/{id}" || currentRoute == "lights" || currentRoute == "remote/{id}" || currentRoute == "person/{id}"
+    val showBottomBar = selectedIndex >= 0 || currentRoute == "events" || currentRoute == "event/{id}" || currentRoute == "camera/{id}" || currentRoute == "lights" || currentRoute == "light/{id}" || currentRoute == "remote/{id}" || currentRoute == "person/{id}"
     val showTopBar = selectedIndex >= 0 || currentRoute == "events" || currentRoute == "event/{id}" || currentRoute == "lights"
     val pendingEvent by main.pendingEvent.collectAsStateWithLifecycle()
     val pendingCamera by main.pendingCamera.collectAsStateWithLifecycle()
@@ -209,7 +214,8 @@ private fun ConnectedValkyrisApp(main: MainViewModel) {
                     },
                 )
             }
-            composable("lights") { LightsScreen(admin = admin) }
+            composable("lights") { LightsScreen(admin = admin, onLight = { nav.navigate("light/$it") }) }
+            composable("light/{id}") { LightDetailScreen(lightId = it.arguments?.getString("id").orEmpty(), onBack = { nav.popBackStack() }) }
             composable("devices") { DevicesScreen(admin = admin, onCamera = { nav.navigate("camera/$it") }, onRemote = { nav.navigate("remote/$it") }) }
             composable("cameras") { DevicesScreen(admin = admin, onCamera = { nav.navigate("camera/$it") }, onRemote = { nav.navigate("remote/$it") }, initialPage = 0) }
             composable("camera/{id}") { CameraLiveScreen(cameraId = it.arguments?.getString("id").orEmpty(), onEvent = { id -> nav.navigate("event/$id") }) }

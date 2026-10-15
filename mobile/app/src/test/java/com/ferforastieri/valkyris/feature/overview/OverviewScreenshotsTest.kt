@@ -34,14 +34,13 @@ class OverviewScreenshotsTest {
                     Column(Modifier.padding(18.dp)) {
                         FavoriteGrid(
                             items = listOf(
-                                FavoriteItem("camera", "1", "Câmera Portão", "192.0.2.100"),
-                                FavoriteItem("light", "2", "Luz Suíte", "", online = true, power = true),
-                                FavoriteItem("light", "3", "Sala de TV", "", online = true, power = false),
-                                FavoriteItem("light", "4", "Quarto bebê", "", online = true, power = true),
-                                FavoriteItem("remote", "5", "TV Sala", "192.0.2.105"),
+                                FavoriteItem("camera", "1", "Câmera Portão"),
+                                FavoriteItem("light", "2", "Luz Suíte", online = true, power = true),
+                                FavoriteItem("light", "3", "Sala de TV", online = true, power = false),
+                                FavoriteItem("light", "4", "Quarto bebê", online = true, power = true),
+                                FavoriteItem("remote", "5", "TV Sala"),
                             ),
                             onOpen = {},
-                            onToggleLight = {},
                         )
                     }
                 }

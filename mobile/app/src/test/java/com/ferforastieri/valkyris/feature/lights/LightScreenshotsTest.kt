@@ -40,7 +40,6 @@ class LightScreenshotsTest {
     ) = LightDevice(
         id = "luz-1",
         name = "Luz Suíte",
-        room = "Sala",
         capabilities = LightCapabilities(brightness = true, color = true, colorTemperature = true),
         setupStatus = "ready",
         favorite = true,

@@ -6,5 +6,8 @@
     <color name="widget_ink">#FFF1F4EF</color>
     <color name="widget_muted">#FFA6AFA5</color>
     <color name="widget_signal">#FF8AE07D</color>
+    <color name="widget_surface_variant">#FF222822</color>
+    <color name="widget_outline">#FF2B312B</color>
+    <color name="widget_secondary_container">#FF293D29</color>
     <color name="widget_alarm">#FFFF766E</color>
 </resources>

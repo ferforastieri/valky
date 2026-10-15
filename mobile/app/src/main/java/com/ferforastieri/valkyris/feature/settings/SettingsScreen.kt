@@ -117,14 +117,40 @@ fun SettingsScreen(main: MainViewModel, viewModel: SettingsViewModel = hiltViewM
         }
     }
 
-    SettingsContent(
-        admin = admin,
+    val permissionList = permissionEntries(
         notificationsAllowed = notificationsAllowed,
         fullScreenAllowed = fullScreenAllowed,
         dndAllowed = dndAllowed,
+        locationAllowed = locationAllowed,
+        firebaseConfigured = pushConfiguration.configured,
+        batteryUnrestricted = batteryUnrestricted,
+        onNotifications = {
+            if (Build.VERSION.SDK_INT >= 33 && !notificationsAllowed) {
+                notificationRequest.launch(Manifest.permission.POST_NOTIFICATIONS)
+            } else {
+                context.startActivity(
+                    Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS)
+                        .putExtra(Settings.EXTRA_APP_PACKAGE, context.packageName),
+                )
+            }
+        },
+        onFullScreen = {
+            if (Build.VERSION.SDK_INT >= 34) context.startActivity(
+                Intent(Settings.ACTION_MANAGE_APP_USE_FULL_SCREEN_INTENT)
+                    .setData(android.net.Uri.parse("package:${context.packageName}")),
+            )
+        },
+        onDnd = { context.startActivity(Intent(Settings.ACTION_NOTIFICATION_POLICY_ACCESS_SETTINGS)) },
+        onLocation = ::configureLocation,
+        onFirebase = { firebaseAccountPicker.launch(arrayOf("application/json", "text/json")) },
+        onBattery = { requestIgnoreBatteryOptimizations(context) },
+    )
+    SettingsContent(
+        admin = admin,
+        permissionsReady = permissionList.count { it.allowed },
+        permissionsTotal = permissionList.size,
         language = language,
         theme = theme,
-        locationAllowed = locationAllowed,
         retention = retention.value,
         onUsers = { showUsers = true; viewModel.refreshUsers() },
         onInvite = { showInvitation = true },
@@ -159,35 +185,7 @@ fun SettingsScreen(main: MainViewModel, viewModel: SettingsViewModel = hiltViewM
         )
     }
     if (showPermissions) {
-        PermissionsSheet(
-            notificationsAllowed = notificationsAllowed,
-            fullScreenAllowed = fullScreenAllowed,
-            dndAllowed = dndAllowed,
-            locationAllowed = locationAllowed,
-            firebaseConfigured = pushConfiguration.configured,
-            batteryUnrestricted = batteryUnrestricted,
-            onNotifications = {
-                if (Build.VERSION.SDK_INT >= 33 && !notificationsAllowed) {
-                    notificationRequest.launch(Manifest.permission.POST_NOTIFICATIONS)
-                } else {
-                    context.startActivity(
-                        Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS)
-                            .putExtra(Settings.EXTRA_APP_PACKAGE, context.packageName),
-                    )
-                }
-            },
-            onFullScreen = {
-                if (Build.VERSION.SDK_INT >= 34) context.startActivity(
-                    Intent(Settings.ACTION_MANAGE_APP_USE_FULL_SCREEN_INTENT)
-                        .setData(android.net.Uri.parse("package:${context.packageName}")),
-                )
-            },
-            onDnd = { context.startActivity(Intent(Settings.ACTION_NOTIFICATION_POLICY_ACCESS_SETTINGS)) },
-            onLocation = ::configureLocation,
-            onFirebase = { firebaseAccountPicker.launch(arrayOf("application/json", "text/json")) },
-            onBattery = { requestIgnoreBatteryOptimizations(context) },
-            onDismiss = { showPermissions = false },
-        )
+        PermissionsSheet(entries = permissionList, onDismiss = { showPermissions = false })
     }
     if (showTheme) {
         ThemeSheet(
@@ -212,12 +210,10 @@ fun SettingsScreen(main: MainViewModel, viewModel: SettingsViewModel = hiltViewM
 @Composable
 fun SettingsContent(
     admin: Boolean,
-    notificationsAllowed: Boolean,
-    fullScreenAllowed: Boolean,
-    dndAllowed: Boolean,
+    permissionsReady: Int,
+    permissionsTotal: Int,
     language: String,
     theme: String,
-    locationAllowed: Boolean = false,
     retention: RetentionSettings = RetentionSettings(),
     version: String = BuildConfig.VERSION_NAME,
     onUsers: () -> Unit = {},
@@ -235,8 +231,6 @@ fun SettingsContent(
             .padding(18.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-        val permissions = listOf(notificationsAllowed, fullScreenAllowed, dndAllowed, locationAllowed)
-        val readyCount = permissions.count { it }
         if (admin) {
             SettingsCard(Lucide.UserPlus, "Gerenciar usuários", "Perfis, administradores e acesso ao sistema", onClick = onUsers)
             SettingsCard(
@@ -248,7 +242,7 @@ fun SettingsContent(
         SettingsCard(
             Lucide.ShieldCheck,
             stringResource(R.string.permissions),
-            stringResource(R.string.permissions_summary, readyCount, permissions.size),
+            stringResource(R.string.permissions_summary, permissionsReady, permissionsTotal),
         ) { onPermissions() }
         SettingsCard(Lucide.Languages, stringResource(R.string.language), languageLabel(language), onClick = onLanguage)
         SettingsCard(Lucide.Moon, stringResource(R.string.theme), themeLabel(theme), onClick = onTheme)
@@ -347,19 +341,8 @@ fun RetentionSheet(
 }
 
 @Composable
-fun PermissionsSheet(
-    notificationsAllowed: Boolean,
-    fullScreenAllowed: Boolean,
-    dndAllowed: Boolean,
-    locationAllowed: Boolean = false,
-    firebaseConfigured: Boolean = false,
-    batteryUnrestricted: Boolean = false,
-    onNotifications: () -> Unit = {},
-    onFullScreen: () -> Unit = {},
-    onDnd: () -> Unit = {},
-    onLocation: () -> Unit = {},
-    onFirebase: () -> Unit = {},
-    onBattery: () -> Unit = {},
+internal fun PermissionsSheet(
+    entries: List<PermissionEntry>,
     onDismiss: () -> Unit = {},
 ) {
     ValkyrisBottomSheet(
@@ -373,51 +356,50 @@ fun PermissionsSheet(
         )
         Spacer(Modifier.height(16.dp))
         Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            PermissionOption(
-                icon = Lucide.Bell,
-                title = stringResource(R.string.notification_permission),
-                status = stringResource(if (notificationsAllowed) R.string.permission_allowed else R.string.permission_required),
-                allowed = notificationsAllowed,
-                onClick = onNotifications,
-            )
-            PermissionOption(
-                icon = Lucide.AlarmClock,
-                title = stringResource(R.string.full_screen_alarms),
-                status = stringResource(if (fullScreenAllowed) R.string.permission_allowed else R.string.permission_required),
-                allowed = fullScreenAllowed,
-                onClick = onFullScreen,
-            )
-            PermissionOption(
-                icon = Lucide.MapPin,
-                title = stringResource(R.string.permission_location),
-                status = stringResource(if (locationAllowed) R.string.permission_allowed else R.string.permission_location_needed),
-                allowed = locationAllowed,
-                onClick = onLocation,
-            )
-            PermissionOption(
-                icon = Lucide.BellRing,
-                title = stringResource(R.string.firebase_service_account),
-                status = stringResource(if (firebaseConfigured) R.string.permission_allowed else R.string.permission_required),
-                allowed = firebaseConfigured,
-                onClick = onFirebase,
-            )
-            PermissionOption(
-                icon = Lucide.Battery,
-                title = stringResource(R.string.battery_optimization),
-                status = stringResource(if (batteryUnrestricted) R.string.permission_allowed else R.string.permission_required),
-                allowed = batteryUnrestricted,
-                onClick = onBattery,
-            )
-            PermissionOption(
-                icon = Lucide.BellOff,
-                title = stringResource(R.string.do_not_disturb_access),
-                status = stringResource(if (dndAllowed) R.string.permission_allowed else R.string.permission_optional),
-                allowed = dndAllowed,
-                onClick = onDnd,
-            )
+            entries.forEach { entry ->
+                PermissionOption(
+                    icon = entry.icon,
+                    title = entry.title,
+                    status = entry.status,
+                    allowed = entry.allowed,
+                    onClick = entry.onClick,
+                )
+            }
         }
     }
 }
+
+/** Um acesso da lista: o cartão e a folha usam exatamente esta lista. */
+internal data class PermissionEntry(
+    val icon: androidx.compose.ui.graphics.vector.ImageVector,
+    val title: String,
+    val status: String,
+    val allowed: Boolean,
+    val onClick: () -> Unit,
+)
+
+@Composable
+private fun permissionEntries(
+    notificationsAllowed: Boolean,
+    fullScreenAllowed: Boolean,
+    dndAllowed: Boolean,
+    locationAllowed: Boolean,
+    firebaseConfigured: Boolean,
+    batteryUnrestricted: Boolean,
+    onNotifications: () -> Unit,
+    onFullScreen: () -> Unit,
+    onDnd: () -> Unit,
+    onLocation: () -> Unit,
+    onFirebase: () -> Unit,
+    onBattery: () -> Unit,
+): List<PermissionEntry> = listOf(
+    PermissionEntry(Lucide.Bell, stringResource(R.string.notification_permission), stringResource(if (notificationsAllowed) R.string.permission_allowed else R.string.permission_required), notificationsAllowed, onNotifications),
+    PermissionEntry(Lucide.AlarmClock, stringResource(R.string.full_screen_alarms), stringResource(if (fullScreenAllowed) R.string.permission_allowed else R.string.permission_required), fullScreenAllowed, onFullScreen),
+    PermissionEntry(Lucide.MapPin, stringResource(R.string.permission_location), stringResource(if (locationAllowed) R.string.permission_allowed else R.string.permission_location_needed), locationAllowed, onLocation),
+    PermissionEntry(Lucide.BellRing, stringResource(R.string.firebase_service_account), stringResource(if (firebaseConfigured) R.string.permission_allowed else R.string.permission_required), firebaseConfigured, onFirebase),
+    PermissionEntry(Lucide.Battery, stringResource(R.string.battery_optimization), stringResource(if (batteryUnrestricted) R.string.permission_allowed else R.string.permission_required), batteryUnrestricted, onBattery),
+    PermissionEntry(Lucide.BellOff, stringResource(R.string.do_not_disturb_access), stringResource(if (dndAllowed) R.string.permission_allowed else R.string.permission_optional), dndAllowed, onDnd),
+)
 
 @Composable
 private fun PermissionOption(

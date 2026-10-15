@@ -141,7 +141,7 @@ func TestLightDiscoveryListsCandidatesForAdministrators(t *testing.T) {
 func TestRegisterLightAdoptsAnAlreadyConfiguredLamp(t *testing.T) {
 	adapter := &lightAdapter{acceptKeys: true}
 	fixture := newLightFixture(t, adapter)
-	body := `{"name":"Pera da sala","room":"Sala","address":"192.168.1.60","deviceId":"device-1","localKey":"0123456789abcdef"}`
+	body := `{"name":"Pera da sala","address":"192.168.1.60","deviceId":"device-1","localKey":"0123456789abcdef"}`
 	res := fixture.do(t, http.MethodPost, "/lights", body)
 	if res.Code != http.StatusCreated {
 		t.Fatalf("cadastro retornou %d: %s", res.Code, res.Body.String())

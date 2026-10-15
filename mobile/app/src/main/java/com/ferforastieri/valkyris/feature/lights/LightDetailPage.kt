@@ -1,5 +1,6 @@
 package com.ferforastieri.valkyris.feature.lights
 
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.detectDragGestures
@@ -14,7 +15,6 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.scale
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
@@ -25,8 +25,9 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.window.Dialog
-import androidx.compose.ui.window.DialogProperties
+import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
+import androidx.lifecycle.compose.LifecycleResumeEffect
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.composables.icons.lucide.*
 import com.ferforastieri.valkyris.R
 import com.ferforastieri.valkyris.core.design.AnimatedBulbIcon
@@ -36,21 +37,26 @@ import com.ferforastieri.valkyris.core.model.LightDevice
 import com.ferforastieri.valkyris.core.model.LightStatePatch
 
 /**
- * Página da lâmpada em tela cheia: cabeçalho com o nome e o liga/desliga, e um
- * painel com as abas "Cor" e "Branco", blocos arrastáveis e o brilho.
+ * Página da lâmpada: uma tela de verdade, com a barra de navegação do app
+ * embaixo e o cabeçalho no padrão da aplicação. O painel tem as abas Cor e
+ * Branco, blocos de seleção livres (duas dimensões) e o brilho — que é
+ * independente em cada modo.
  */
 @Composable
-fun LightDetailPage(
-    light: LightDevice,
-    busy: Boolean,
-    onDismiss: () -> Unit,
-    onChange: (LightStatePatch) -> Unit,
+fun LightDetailScreen(
+    lightId: String,
+    onBack: () -> Unit,
+    vm: LightDetailViewModel = hiltViewModel(),
 ) {
-    Dialog(onDismissRequest = onDismiss, properties = DialogProperties(usePlatformDefaultWidth = false, dismissOnClickOutside = false)) {
-        Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.surface) {
-            LightDetailContent(light, busy, onDismiss, onChange)
-        }
+    val lights by vm.lights.collectAsStateWithLifecycle()
+    val busy by vm.busy.collectAsStateWithLifecycle()
+    LifecycleResumeEffect(Unit) { vm.refresh(); onPauseOrDispose {} }
+    val light = lights.firstOrNull { it.id == lightId }
+    if (light == null) {
+        Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { CircularProgressIndicator() }
+        return
     }
+    LightDetailContent(light, busy, onBack) { vm.control(light.id, it) }
 }
 
 @Composable
@@ -60,57 +66,69 @@ internal fun LightDetailContent(
     onDismiss: () -> Unit,
     onChange: (LightStatePatch) -> Unit,
 ) {
-    var brightness by remember(light.id) { mutableFloatStateOf(light.state.brightness.coerceIn(1, 100).toFloat()) }
+    // O brilho do branco (ponto 22) e o brilho da cor (o valor dentro da cor)
+    // são independentes: mexer num não pode derrubar o outro modo.
+    var whiteBrightness by remember(light.id) { mutableFloatStateOf(light.state.brightness.coerceIn(1, 100).toFloat()) }
+    var colorValue by remember(light.id) { mutableFloatStateOf(light.state.color.value.coerceIn(1, 100).toFloat()) }
     var temperature by remember(light.id) { mutableFloatStateOf(light.state.temperatureKelvin.coerceIn(2700, 6500).toFloat()) }
     var hue by remember(light.id) { mutableFloatStateOf(light.state.color.hue.coerceIn(0, 360).toFloat()) }
-    var saturation by remember(light.id) { mutableFloatStateOf(light.state.color.saturation.coerceIn(0, 100).toFloat()) }
+    var saturation by remember(light.id) { mutableFloatStateOf(light.state.color.saturation.coerceIn(1, 100).toFloat()) }
     // 0 = Cor, 1 = Branco
     var tab by remember(light.id) { mutableIntStateOf(if (light.state.mode == "color") 0 else 1) }
+    val colorTab = tab == 0
     val on = light.state.power
     val reachable = light.state.online && !busy
-    val aura = if (light.state.mode == "color") {
-        Color.hsv(hue, saturation / 100f, (brightness / 100f).coerceAtLeast(.45f))
+    val aura = if (colorTab) {
+        Color.hsv(hue, saturation / 100f, (colorValue / 100f).coerceAtLeast(.25f))
     } else {
         warmWhiteColor(temperature.toInt())
     }
-    // Mexer em cor, branco ou brilho também acende a lâmpada: sem isso, escolher
-    // uma cor numa luz apagada não muda nada (parecia que ela tinha "apagado").
+    // Mexer em cor, branco ou brilho também acende a lâmpada.
     fun apply(patch: LightStatePatch) = onChange(if (light.state.power) patch else patch.copy(power = true))
 
     Column(Modifier.fillMaxSize()) {
-        // Cabeçalho sobre um fundo ambiente na cor da lâmpada.
-        Box(
-            Modifier.fillMaxWidth().height(232.dp)
-                .background(Brush.verticalGradient(listOf(aura.copy(alpha = .55f), MaterialTheme.colorScheme.surface))),
+        // Cabeçalho no padrão do app: ícone, nome e fechar.
+        Row(
+            Modifier.fillMaxWidth().padding(start = 18.dp, end = 6.dp, top = 20.dp, bottom = 4.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(10.dp),
         ) {
-            Column(Modifier.fillMaxSize().padding(horizontal = 18.dp)) {
-                Spacer(Modifier.height(30.dp))
-                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                    AnimatedBulbIcon(
-                        on = on,
-                        color = aura,
-                        offTint = MaterialTheme.colorScheme.onSurfaceVariant,
-                        size = 30.dp,
+            AnimatedBulbIcon(
+                on = on,
+                color = aura,
+                offTint = MaterialTheme.colorScheme.onSurfaceVariant,
+                size = 30.dp,
+            )
+            Text(light.name, Modifier.weight(1f), style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold, maxLines = 1)
+            IconButton(onClick = onDismiss) { Icon(Lucide.X, stringResource(R.string.close)) }
+        }
+        // Energia num cartão igual aos outros do app.
+        Surface(
+            Modifier.fillMaxWidth().padding(horizontal = 18.dp, vertical = 6.dp),
+            shape = MaterialTheme.shapes.large,
+            color = MaterialTheme.colorScheme.surface,
+            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+        ) {
+            Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 14.dp), verticalAlignment = Alignment.CenterVertically) {
+                Column(Modifier.weight(1f)) {
+                    Text(stringResource(R.string.light_power_label), fontWeight = FontWeight.SemiBold)
+                    Text(
+                        stringResource(if (on) R.string.favorite_light_on else R.string.favorite_light_off),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
-                    Text(light.name, Modifier.weight(1f), style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.SemiBold, maxLines = 1)
-                    IconButton(onClick = onDismiss) { Icon(Lucide.X, stringResource(R.string.close)) }
                 }
-                Spacer(Modifier.weight(1f))
-                Text(stringResource(R.string.light_power_label), style = MaterialTheme.typography.bodyMedium)
-                Spacer(Modifier.height(4.dp))
                 Switch(
                     checked = on,
                     onCheckedChange = { onChange(LightStatePatch(power = it)) },
                     enabled = reachable,
-                    modifier = Modifier.scale(1.18f),
                     colors = SwitchDefaults.colors(
                         checkedTrackColor = MaterialTheme.colorScheme.secondary,
-                        checkedThumbColor = Color.White,
+                        checkedThumbColor = MaterialTheme.colorScheme.onSecondary,
                         uncheckedTrackColor = MaterialTheme.colorScheme.surfaceVariant,
                         uncheckedThumbColor = MaterialTheme.colorScheme.outline,
                     ),
                 )
-                Spacer(Modifier.height(20.dp))
             }
         }
         // Painel de ajustes.
@@ -127,13 +145,12 @@ internal fun LightDetailContent(
                     Modifier.fillMaxWidth().clip(RoundedCornerShape(18.dp)).background(MaterialTheme.colorScheme.surface),
                     horizontalArrangement = Arrangement.spacedBy(6.dp),
                 ) {
-                    DetailTab(stringResource(R.string.light_tab_color), tab == 0, light.capabilities.color, Modifier.weight(1f)) { tab = 0; if (saturation < 5f) saturation = 100f }
-                    DetailTab(stringResource(R.string.light_tab_white), tab == 1, light.capabilities.brightness || light.capabilities.colorTemperature, Modifier.weight(1f)) { tab = 1 }
+                    DetailTab(stringResource(R.string.light_tab_color), colorTab, light.capabilities.color, Modifier.weight(1f)) { tab = 0 }
+                    DetailTab(stringResource(R.string.light_tab_white), !colorTab, light.capabilities.brightness || light.capabilities.colorTemperature, Modifier.weight(1f)) { tab = 1 }
                 }
                 if (!light.state.online) Text(stringResource(R.string.unavailable), color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
-                if (tab == 0) {
-                    // Bloco livre: X = matiz, Y = saturação. A saturação nunca
-                    // sai zerada (senão a lâmpada ficaria branca).
+                if (colorTab) {
+                    // Livre: X = matiz, Y = saturação.
                     FreeBlock(
                         horizontal = Brush.horizontalGradient(hueSpectrum),
                         overlay = Brush.verticalGradient(listOf(Color.Transparent, Color.White)),
@@ -141,37 +158,41 @@ internal fun LightDetailContent(
                         y = 1f - saturation / 100f,
                         enabled = reachable,
                         badge = stringResource(R.string.light_hue_badge, hue.toInt()),
-                        onPick = { px, py -> hue = px * 360f; saturation = (1f - py) * 100f },
-                        onFinished = {
-                            apply(LightStatePatch(color = LightColor(hue.toInt(), saturation.toInt().coerceAtLeast(1), brightness.toInt())))
-                        },
+                        onPick = { px, py -> hue = px * 360f; saturation = ((1f - py) * 100f).coerceAtLeast(1f) },
+                        onFinished = { apply(LightStatePatch(color = LightColor(hue.toInt(), saturation.toInt(), colorValue.toInt()))) },
                     )
                 } else {
-                    // Bloco livre: X = temperatura do branco, Y = brilho.
+                    // Livre: X = temperatura do branco, Y = brilho do branco.
                     FreeBlock(
                         horizontal = Brush.horizontalGradient(listOf(warmWhiteColor(2700), warmWhiteColor(4000), warmWhiteColor(6500))),
                         overlay = Brush.verticalGradient(listOf(Color.Transparent, Color.Black.copy(alpha = .82f))),
                         x = (temperature - 2700f) / 3800f,
-                        y = 1f - (brightness - 1f) / 99f,
+                        y = 1f - (whiteBrightness - 1f) / 99f,
                         enabled = reachable,
                         badge = stringResource(R.string.light_kelvin_badge, temperature.toInt()),
-                        onPick = { px, py -> temperature = 2700f + px * 3800f; brightness = (1f - py) * 99f + 1f },
-                        onFinished = { apply(LightStatePatch(temperatureKelvin = temperature.toInt(), brightness = brightness.toInt())) },
+                        onPick = { px, py -> temperature = 2700f + px * 3800f; whiteBrightness = (1f - py) * 99f + 1f },
+                        onFinished = { apply(LightStatePatch(temperatureKelvin = temperature.toInt(), brightness = whiteBrightness.toInt())) },
                     )
                 }
                 Text(stringResource(R.string.light_brightness), style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
+                // O brilho edita o valor do modo escolhido: na cor, o próprio
+                // valor da cor (sem voltar para o branco); no branco, o ponto 22.
+                val shown = if (colorTab) colorValue else whiteBrightness
                 GradientBar(
-                    brush = Brush.horizontalGradient(listOf(MaterialTheme.colorScheme.surfaceVariant, aura)),
-                    value = (brightness - 1f) / 99f,
+                    brush = Brush.horizontalGradient(listOf(MaterialTheme.colorScheme.surface, aura)),
+                    value = (shown - 1f) / 99f,
                     enabled = reachable,
                     height = 66.dp,
-                    onChange = { brightness = (1f + it * 99f).coerceIn(1f, 100f) },
-                    onFinished = { apply(LightStatePatch(brightness = brightness.toInt())) },
+                    onChange = { fraction -> val pct = (1f + fraction * 99f).coerceIn(1f, 100f); if (colorTab) colorValue = pct else whiteBrightness = pct },
+                    onFinished = {
+                        if (colorTab) apply(LightStatePatch(color = LightColor(hue.toInt(), saturation.toInt(), colorValue.toInt())))
+                        else apply(LightStatePatch(brightness = whiteBrightness.toInt()))
+                    },
                     overlay = {
                         Row(Modifier.align(Alignment.CenterStart).padding(start = 16.dp), verticalAlignment = Alignment.CenterVertically) {
-                            Icon(Lucide.Sun, null, Modifier.size(22.dp), tint = Color.White.copy(alpha = .92f))
+                            Icon(Lucide.Sun, null, Modifier.size(22.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
                             Spacer(Modifier.width(8.dp))
-                            Text("${brightness.toInt()}%", color = Color.White, fontWeight = FontWeight.SemiBold)
+                            Text("${shown.toInt()}%", fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.onSurface)
                         }
                     },
                 )
@@ -187,7 +208,7 @@ private fun DetailTab(label: String, selected: Boolean, enabled: Boolean, modifi
         enabled = enabled,
         modifier = modifier,
         shape = RoundedCornerShape(18.dp),
-        color = if (selected) MaterialTheme.colorScheme.surfaceVariant else Color.Transparent,
+        color = if (selected) MaterialTheme.colorScheme.secondaryContainer else Color.Transparent,
     ) {
         Text(
             label,
@@ -196,7 +217,7 @@ private fun DetailTab(label: String, selected: Boolean, enabled: Boolean, modifi
             fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Medium,
             color = when {
                 !enabled -> MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = .4f)
-                selected -> MaterialTheme.colorScheme.secondary
+                selected -> MaterialTheme.colorScheme.onSecondaryContainer
                 else -> MaterialTheme.colorScheme.onSurfaceVariant
             },
         )
@@ -272,7 +293,7 @@ internal fun FreeBlock(
 }
 
 /**
- * Bloco em gradiente com um indicador arrastável (ou toque direto). O valor
+ * Barra em gradiente com um indicador arrastável (ou toque direto). O valor
  * chega em 0..1 e o rótulo mostra a unidade do ajuste.
  */
 @Composable

@@ -261,7 +261,7 @@ paths:
       parameters: [{$ref: '#/components/parameters/id'}]
       responses: {'200': {description: Light in APIResponse.data}}
     put:
-      summary: Rename a light or move it to another room (administrator only)
+      summary: Rename a light (administrator only)
       parameters: [{$ref: '#/components/parameters/id'}]
       requestBody: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/LightUpdate'}}}}
       responses:
@@ -674,7 +674,6 @@ components:
       properties:
         id: {type: string, format: uuid}
         name: {type: string}
-        room: {type: string}
         deviceId: {type: string, readOnly: true, description: Identifier the device announces on the local network}
         protocolVersion: {type: number, description: Local protocol version detected while registering}
         lastAddress: {type: string, readOnly: true, description: Last address that answered on the local network}
@@ -694,10 +693,9 @@ components:
         colorTemperature: {type: boolean}
     LightUpdate:
       type: object
-      description: Changes the name, the room or whether Valkyris keeps polling the lamp.
+      description: Changes the name or whether Valkyris keeps polling the lamp.
       properties:
         name: {type: string}
-        room: {type: string}
         enabled: {type: boolean}
     LightRegistration:
       type: object
@@ -705,7 +703,6 @@ components:
       description: What the local adapter needs to control a lamp that another application already configured.
       properties:
         name: {type: string, description: Friendly name; a default is chosen when omitted}
-        room: {type: string}
         address: {type: string, description: Address of the lamp on the local network}
         deviceId: {type: string, description: Identifier the device announces on the local network}
         localKey: {type: string, minLength: 16, maxLength: 16, description: 16 character local key issued when the lamp was configured}

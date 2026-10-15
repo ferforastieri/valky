@@ -66,9 +66,11 @@ import com.ferforastieri.valkyris.core.model.LightDevice
 import com.ferforastieri.valkyris.core.model.RemoteDevice
 import com.ferforastieri.valkyris.core.network.ValkyrisRepository
 import com.ferforastieri.valkyris.feature.cameras.CameraFailureSheet
+import com.ferforastieri.valkyris.feature.events.eventCategoryRes
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.launch
 import java.time.Instant
@@ -80,7 +82,6 @@ data class FavoriteItem(
     val type: String,
     val id: String,
     val name: String,
-    val subtitle: String,
     val online: Boolean = false,
     val power: Boolean = false,
     val mode: String = "white",
@@ -112,37 +113,42 @@ class OverviewViewModel @Inject constructor(private val repository: ValkyrisRepo
             }.collect { _state.value = it }
         }
         viewModelScope.launch {
-            runCatching { repository.refreshCameras() }
-            runCatching { repository.refreshEvents() }
-            runCatching { repository.refreshRules() }
-            runCatching { repository.refreshLights() }
-            runCatching { repository.refreshRemotes() }
+            // Pedidos independentes: saem juntos, não um atrás do outro.
+            coroutineScope {
+                launch { runCatching { repository.refreshCameras() } }
+                launch { runCatching { repository.refreshEvents() } }
+                launch { runCatching { repository.refreshRules() } }
+                launch { runCatching { repository.refreshLights() } }
+                launch { runCatching { repository.refreshRemotes() } }
+            }
         }
     }
 
     fun refresh() {
         viewModelScope.launch {
-            runCatching { repository.refreshCameras() }
-            runCatching { repository.refreshEvents() }
-            runCatching { repository.refreshRules() }
-            runCatching { repository.refreshUsers() }
-            runCatching { repository.refreshLights() }
-            runCatching { repository.refreshRemotes() }
+            coroutineScope {
+                launch { runCatching { repository.refreshCameras() } }
+                launch { runCatching { repository.refreshEvents() } }
+                launch { runCatching { repository.refreshRules() } }
+                launch { runCatching { repository.refreshUsers() } }
+                launch { runCatching { repository.refreshLights() } }
+                launch { runCatching { repository.refreshRemotes() } }
+            }
         }
     }
 
     private fun favoritesOf(cameras: List<CameraModel>, lights: List<LightDevice>, remotes: List<RemoteDevice>): List<FavoriteItem> {
         val items = mutableListOf<FavoriteItem>()
-        cameras.filter { it.favorite }.forEach { items += FavoriteItem("camera", it.id, it.name, it.host) }
+        cameras.filter { it.favorite }.forEach { items += FavoriteItem("camera", it.id, it.name) }
         lights.filter { it.favorite }.forEach {
             items += FavoriteItem(
-                type = "light", id = it.id, name = it.name, subtitle = it.room.ifBlank { "Iluminação" },
+                type = "light", id = it.id, name = it.name,
                 online = it.state.online, power = it.state.power,
                 mode = it.state.mode, hue = it.state.color.hue, saturation = it.state.color.saturation,
                 value = it.state.color.value, kelvin = it.state.temperatureKelvin,
             )
         }
-        remotes.filter { it.favorite }.forEach { items += FavoriteItem("remote", it.id, it.name, it.host) }
+        remotes.filter { it.favorite }.forEach { items += FavoriteItem("remote", it.id, it.name) }
         return items
     }
 
@@ -238,7 +244,6 @@ fun OverviewContent(
                             else -> onFavorite(favorite)
                         }
                     },
-                    onToggleLight = onToggleLight,
                 )
             }
         }
@@ -281,7 +286,11 @@ private fun RecentEventCard(event: com.ferforastieri.valkyris.core.model.Valkyri
                 Text(com.ferforastieri.valkyris.feature.events.eventTitle(event), fontWeight = FontWeight.Medium, maxLines = 1, overflow = TextOverflow.Ellipsis)
                 Text(overviewTime(event.occurredAt), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
-            Text("${(event.confidence * 100).toInt()}%", style = MaterialTheme.typography.labelMedium)
+            // Bateria e localização não têm "confiança": só detecções mostram o
+            // percentual.
+            if (eventCategoryRes(event) != R.string.event_category_location) {
+                Text("${(event.confidence * 100).toInt()}%", style = MaterialTheme.typography.labelMedium)
+            }
         }
     }
 }
@@ -346,7 +355,6 @@ internal fun orderedFavorites(favorites: List<FavoriteItem>): List<FavoriteItem>
 internal fun FavoriteGrid(
     items: List<FavoriteItem>,
     onOpen: (FavoriteItem) -> Unit,
-    onToggleLight: (FavoriteItem) -> Unit,
 ) {
     val count = items.size
     val columns = if (LocalDensity.current.fontScale >= 1.3f) 1 else 2

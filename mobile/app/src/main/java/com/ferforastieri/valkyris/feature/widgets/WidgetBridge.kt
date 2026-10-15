@@ -26,7 +26,6 @@ import java.io.ByteArrayOutputStream
 internal data class WidgetLight(
     val id: String,
     val name: String,
-    val room: String = "",
     val power: Boolean = false,
     val online: Boolean = false,
     val brightness: Int = 0,
@@ -114,7 +113,6 @@ internal object WidgetBridge {
     private fun LightDevice.toWidget() = WidgetLight(
         id = id,
         name = name,
-        room = room,
         power = state.power,
         online = state.online,
         brightness = state.brightness,
@@ -128,6 +126,12 @@ internal object WidgetBridge {
     )
 
     private fun photoFile(context: Context) = File(context.applicationContext.filesDir, "widget_camera.jpg")
+
+    /** Só a imagem da câmera: é o que dá sensação de tempo real sem repetir o resto. */
+    suspend fun refreshPhoto(context: Context) {
+        if (!signedIn(context)) return
+        fetchPhoto(context)
+    }
 
     private suspend fun fetchPhoto(context: Context) {
         val camera = state(context).camera ?: return
@@ -207,17 +211,22 @@ abstract class ValkyrisWidgetProvider : AppWidgetProvider() {
     override fun onEnabled(context: Context) {
         super.onEnabled(context)
         scheduleRefresh(context)
+        schedulePhotoRefresh(context)
         requestRefresh(context)
     }
 
     override fun onDisabled(context: Context) {
         super.onDisabled(context)
         cancelRefresh(context)
+        cancelPhotoRefresh(context)
     }
 
     companion object {
         const val ACTION_ALARM = "com.ferforastieri.valkyris.widget.ALARM"
         private const val INTERVAL = AlarmManager.INTERVAL_FIFTEEN_MINUTES
+        // A imagem da câmera roda num alarme próprio e curto: o estado completo
+        // continua de quinze em quinze minutos.
+        private const val PHOTO_INTERVAL = 2 * 60 * 1000L
 
         /** Refreshes right away, used when a widget appears or its data is old. */
         fun requestRefresh(context: Context) {
@@ -232,6 +241,21 @@ abstract class ValkyrisWidgetProvider : AppWidgetProvider() {
         fun cancelRefresh(context: Context) {
             val manager = context.getSystemService(AlarmManager::class.java) ?: return
             manager.cancel(alarmIntent(context))
+        }
+
+        fun schedulePhotoRefresh(context: Context) {
+            val manager = context.getSystemService(AlarmManager::class.java) ?: return
+            manager.setInexactRepeating(AlarmManager.RTC_WAKEUP, System.currentTimeMillis() + 30_000L, PHOTO_INTERVAL, photoAlarmIntent(context))
+        }
+
+        fun cancelPhotoRefresh(context: Context) {
+            val manager = context.getSystemService(AlarmManager::class.java) ?: return
+            manager.cancel(photoAlarmIntent(context))
+        }
+
+        private fun photoAlarmIntent(context: Context): PendingIntent {
+            val intent = Intent(context, WidgetActionReceiver::class.java).setAction(WidgetActionReceiver.ACTION_PHOTO_ALARM)
+            return PendingIntent.getBroadcast(context, 1, intent, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
         }
 
         private fun alarmIntent(context: Context): PendingIntent {

@@ -8,6 +8,7 @@ import com.ferforastieri.valkyris.core.model.TrackedPerson
 import com.ferforastieri.valkyris.core.model.TrackedPlace
 import com.ferforastieri.valkyris.core.network.ValkyrisRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
@@ -64,9 +65,11 @@ class PeopleViewModel @Inject constructor(
         )
     }
     fun refresh() = viewModelScope.launch {
-        runCatching { repository.refreshUsers() }
-        runCatching { repository.refreshMe() }
-        runCatching { repository.refreshPlaces() }
+        coroutineScope {
+            launch { runCatching { repository.refreshUsers() } }
+            launch { runCatching { repository.refreshMe() } }
+            launch { runCatching { repository.refreshPlaces() } }
+        }
     }
     suspend fun locationAlerts(): com.ferforastieri.valkyris.core.model.AlertPresentation = repository.api.locationAlerts()
 

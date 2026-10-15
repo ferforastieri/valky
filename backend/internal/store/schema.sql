@@ -36,7 +36,6 @@ CREATE TABLE IF NOT EXISTS cameras (
 CREATE TABLE IF NOT EXISTS lights (
   id TEXT PRIMARY KEY,
   name TEXT NOT NULL,
-  room TEXT NOT NULL DEFAULT '',
   device_id TEXT NOT NULL UNIQUE,
   local_key_enc BLOB NOT NULL,
   protocol_version REAL NOT NULL DEFAULT 3.3,

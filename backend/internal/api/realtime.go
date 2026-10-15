@@ -39,6 +39,15 @@ func (h *Hub) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 }
+
+// Watchers reports how many clients are following changes right now. The
+// background pollers use it to avoid waking devices when nobody is looking.
+func (h *Hub) Watchers() int {
+	h.mu.RLock()
+	defer h.mu.RUnlock()
+	return len(h.clients)
+}
+
 func (h *Hub) Broadcast(value any) {
 	payload, err := json.Marshal(value)
 	if err != nil {

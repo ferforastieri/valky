@@ -37,6 +37,7 @@ import com.ferforastieri.valkyris.core.model.LocationReport
 import com.ferforastieri.valkyris.core.network.ValkyrisApi
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
@@ -182,8 +183,10 @@ class LocationTrackingService : Service() {
                     if (owner != sessionKey()) return@withLock
                     persistReportedLocation(location, result.pendingConfirmations > 0)
                     LocationTrackingStatus.set(LocationTrackingStatus.State.Updated)
-                    runCatching { repository.refreshUsers() }
-                    runCatching { repository.refreshMe() }
+                    coroutineScope {
+                        launch { runCatching { repository.refreshUsers() } }
+                        launch { runCatching { repository.refreshMe() } }
+                    }
                 } catch (cancelled: CancellationException) { throw cancelled }
                 catch (error: Exception) {
                     LocationTrackingStatus.set(LocationTrackingStatus.State.SendFailed)

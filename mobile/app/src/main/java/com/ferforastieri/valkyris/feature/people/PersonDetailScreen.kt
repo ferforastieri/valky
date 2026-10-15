@@ -50,6 +50,7 @@ import com.ferforastieri.valkyris.core.model.PersonLocation
 import com.ferforastieri.valkyris.core.network.ValkyrisRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
@@ -79,8 +80,10 @@ class PersonDetailViewModel @Inject constructor(
 
     init {
         viewModelScope.launch {
-            runCatching { repository.refreshUsers() }
-            runCatching { repository.refreshPlaces() }
+            coroutineScope {
+                launch { runCatching { repository.refreshUsers() } }
+                launch { runCatching { repository.refreshPlaces() } }
+            }
         }
         load()
     }

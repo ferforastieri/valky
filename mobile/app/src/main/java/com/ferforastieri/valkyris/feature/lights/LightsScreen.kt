@@ -26,12 +26,9 @@ import com.ferforastieri.valkyris.core.design.ValkyrisBottomSheet
 import com.ferforastieri.valkyris.core.design.lightTint
 import com.ferforastieri.valkyris.core.model.*
 
-@Composable fun LightsScreen(admin:Boolean,vm:LightsViewModel=hiltViewModel()){
+@Composable fun LightsScreen(admin:Boolean,onLight:(String)->Unit={},vm:LightsViewModel=hiltViewModel()){
     LifecycleResumeEffect(Unit){vm.refresh();onPauseOrDispose{}}
     val state by vm.state.collectAsStateWithLifecycle()
-    // Guardamos só o identificador: a luz viva vem do estado, então a página
-    // acompanha o aparelho sem ser recriada a cada atualização.
-    var selectedId by rememberSaveable{mutableStateOf<String?>(null)}
     var removing by remember{mutableStateOf<LightDevice?>(null)}
     var renaming by remember{mutableStateOf<LightDevice?>(null)}
     var adding by rememberSaveable{mutableStateOf(false)}
@@ -42,7 +39,7 @@ import com.ferforastieri.valkyris.core.model.*
                 state.loading->Box(Modifier.fillMaxSize(),contentAlignment=Alignment.Center){CircularProgressIndicator()}
                 state.lights.isEmpty()->EmptyLighting(admin)
                 else->LazyColumn(verticalArrangement=Arrangement.spacedBy(12.dp),contentPadding=PaddingValues(top=12.dp,bottom=96.dp)){
-                    items(state.lights,key={it.id}){light->LightCard(light,light.id in state.busy,{vm.control(light.id,LightStatePatch(power=!light.state.power))},{selectedId=light.id},if(admin){{removing=light}}else null,{vm.toggleFavorite(light.id,!light.favorite)},if(admin){{renaming=light}}else null)}
+                    items(state.lights,key={it.id}){light->LightCard(light,light.id in state.busy,{vm.control(light.id,LightStatePatch(power=!light.state.power))},{onLight(light.id)},if(admin){{removing=light}}else null,{vm.toggleFavorite(light.id,!light.favorite)},if(admin){{renaming=light}}else null)}
                 }
             }
         }
@@ -59,15 +56,7 @@ import com.ferforastieri.valkyris.core.model.*
         onSubmit={input,done->vm.register(input,done)},
         onDismiss={adding=false;vm.clearRegistration()},
     )
-    state.lights.firstOrNull{it.id==selectedId}?.let{light->
-        LightDetailPage(
-            light=light,
-            busy=light.id in state.busy,
-            onDismiss={selectedId=null},
-            onChange={vm.control(light.id,it)},
-        )
-    }
-    renaming?.let{light->LightNameSheet(light,{renaming=null}){name,room->vm.rename(light.id,name,room){renaming=null}}}
+    renaming?.let{light->LightNameSheet(light,{renaming=null}){name->vm.rename(light.id,name){renaming=null}}}
     removing?.let{light->AlertDialog(onDismissRequest={removing=null},title={Text(stringResource(R.string.remove_light_title))},text={Text(stringResource(R.string.remove_light_body,light.name))},dismissButton={TextButton(onClick={removing=null}){Text(stringResource(R.string.cancel))}},confirmButton={Button(onClick={vm.delete(light.id){removing=null}},colors=ButtonDefaults.buttonColors(containerColor=MaterialTheme.colorScheme.error)){Text(stringResource(R.string.remove))}})}
 }
 
@@ -104,7 +93,6 @@ import com.ferforastieri.valkyris.core.model.*
                 Text(light.name,fontWeight=FontWeight.SemiBold)
                 Text(
                     listOfNotNull(
-                        light.room.takeIf(String::isNotBlank),
                         when{
                             light.setupStatus=="failed"->light.setupError.ifBlank{stringResource(R.string.light_setup_failed)}
                             light.setupStatus!="ready"->stringResource(R.string.light_setup_pending)
@@ -133,7 +121,6 @@ import com.ferforastieri.valkyris.core.model.*
 ){
     val running=state.registering
     var name by rememberSaveable{mutableStateOf("")}
-    var room by rememberSaveable{mutableStateOf("")}
     var address by rememberSaveable{mutableStateOf("")}
     var deviceId by rememberSaveable{mutableStateOf("")}
     var localKey by rememberSaveable{mutableStateOf("")}
@@ -146,7 +133,7 @@ import com.ferforastieri.valkyris.core.model.*
         actions={
             TextButton(onClick=onDismiss,enabled=!running){Text(stringResource(R.string.cancel))}
             Button(
-                onClick={onSubmit(LightRegistration(address=address.trim(),deviceId=deviceId.trim(),localKey=localKey.trim(),name=name.trim(),room=room.trim())){ok->if(ok)onDismiss()}},
+                onClick={onSubmit(LightRegistration(address=address.trim(),deviceId=deviceId.trim(),localKey=localKey.trim(),name=name.trim())){ok->if(ok)onDismiss()}},
                 enabled=ready,
             ){if(running)CircularProgressIndicator(Modifier.size(18.dp),strokeWidth=2.dp)else Text(stringResource(R.string.save))}
         },
@@ -155,7 +142,6 @@ import com.ferforastieri.valkyris.core.model.*
             Text(stringResource(R.string.light_register_intro),style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant)
             state.registrationError?.let{Text(it,color=MaterialTheme.colorScheme.error,style=MaterialTheme.typography.bodySmall)}
             OutlinedTextField(name,{name=it},Modifier.fillMaxWidth(),label={Text(stringResource(R.string.light_name))},singleLine=true,enabled=!running)
-            OutlinedTextField(room,{room=it},Modifier.fillMaxWidth(),label={Text(stringResource(R.string.light_room))},singleLine=true,enabled=!running)
             Row(verticalAlignment=Alignment.CenterVertically){
                 Text(stringResource(R.string.light_register_network),Modifier.weight(1f),fontWeight=FontWeight.SemiBold,style=MaterialTheme.typography.bodyMedium)
                 TextButton(onClick=onScan,enabled=!running&&!state.scanning){
@@ -182,16 +168,14 @@ import com.ferforastieri.valkyris.core.model.*
     }
 }
 
-@Composable private fun LightNameSheet(light:LightDevice,onDismiss:()->Unit,onSave:(String,String)->Unit){
+@Composable private fun LightNameSheet(light:LightDevice,onDismiss:()->Unit,onSave:(String)->Unit){
     var name by remember(light.id){mutableStateOf(light.name)}
-    var room by remember(light.id){mutableStateOf(light.room)}
     ValkyrisBottomSheet(title=stringResource(R.string.light_edit),onDismiss=onDismiss,actions={
         TextButton(onClick=onDismiss){Text(stringResource(R.string.cancel))}
-        Button(onClick={onSave(name.trim(),room.trim())},enabled=name.isNotBlank()){Text(stringResource(R.string.save))}
+        Button(onClick={onSave(name.trim())},enabled=name.isNotBlank()){Text(stringResource(R.string.save))}
     }){
         Column(Modifier.fillMaxWidth(),verticalArrangement=Arrangement.spacedBy(10.dp)){
             OutlinedTextField(name,{name=it},Modifier.fillMaxWidth(),label={Text(stringResource(R.string.light_name))},singleLine=true)
-            OutlinedTextField(room,{room=it},Modifier.fillMaxWidth(),label={Text(stringResource(R.string.light_room))},singleLine=true)
         }
     }
 }

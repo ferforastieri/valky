@@ -15,6 +15,10 @@ import (
 
 type Broadcaster interface{ Broadcast(any) }
 
+// Watchers reports how many clients are following changes right now. It is
+// optional: a hub that cannot answer is treated as "somebody is watching".
+type Watchers interface{ Watchers() int }
+
 type Service struct {
 	repo   *Repository
 	driver Driver
@@ -56,7 +60,7 @@ func (s *Service) Scan(ctx context.Context, in DiscoveryInput) ([]Candidate, err
 	return scanner.Scan(ctx, duration, in.Probe)
 }
 
-// Update renames a light, moves it to another room or stops polling it. The
+// Update renames a light or stops polling it. The
 // local credentials belong to the registration flow and are never edited by hand.
 func (s *Service) Update(ctx context.Context, id string, in UpdateInput) (Light, error) {
 	unlock := s.lock(id)
@@ -67,10 +71,6 @@ func (s *Service) Update(ctx context.Context, id string, in UpdateInput) (Light,
 			return Light{}, errors.New("o nome da lâmpada não pode ficar vazio")
 		}
 		in.Name = &name
-	}
-	if in.Room != nil {
-		room := strings.TrimSpace(*in.Room)
-		in.Room = &room
 	}
 	updated, err := s.repo.Update(ctx, id, in)
 	if err != nil {
@@ -121,7 +121,6 @@ func (s *Service) Register(ctx context.Context, in RegisterInput) (Light, error)
 	created, err := s.repo.Create(ctx, Light{
 		ID:              uuid.NewString(),
 		Name:            name,
-		Room:            strings.TrimSpace(in.Room),
 		DeviceID:        deviceID,
 		ProtocolVersion: result.Version,
 		Capabilities:    result.Capabilities,
@@ -294,7 +293,11 @@ func (s *Service) Refresh(ctx context.Context, id string) (Light, error) {
 		return item, err
 	}
 	s.storeState(id, state)
-	_ = s.repo.SetConnection(ctx, id, cred.Address, "ready", "", true)
+	// Só grava quando algo mudou de verdade: sem isso eram cinco UPDATEs a
+	// cada vinte segundos por lâmpada, sem necessidade.
+	if item.LastAddress != cred.Address || item.SetupStatus != "ready" {
+		_ = s.repo.SetConnection(ctx, id, cred.Address, "ready", "", true)
+	}
 	return s.Get(ctx, id)
 }
 
@@ -307,21 +310,49 @@ func (s *Service) discover(ctx context.Context, item Light, cred Credentials) (s
 	return address, err
 }
 
+// QuietInterval is how often the lamps are polled while nobody is following the
+// realtime channel. With a client connected the cadence is PollInterval.
+const (
+	PollInterval  = 20 * time.Second
+	QuietInterval = 5 * time.Minute
+)
+
 func (s *Service) Run(ctx context.Context) {
 	if !s.Available() {
 		return
 	}
-	ticker := time.NewTicker(20 * time.Second)
+	ticker := time.NewTicker(PollInterval)
 	defer ticker.Stop()
 	s.refreshAll(ctx)
+	quiet := 0
 	for {
 		select {
 		case <-ctx.Done():
 			return
 		case <-ticker.C:
-			s.refreshAll(ctx)
+			if s.watched() {
+				quiet = 0
+				s.refreshAll(ctx)
+				continue
+			}
+			// Ninguém está olhando: a ronda espaça para não acordar as
+			// lâmpadas à toa, mas continua viva para o estado não envelhecer.
+			quiet++
+			if time.Duration(quiet)*PollInterval >= QuietInterval {
+				quiet = 0
+				s.refreshAll(ctx)
+			}
 		}
 	}
+}
+
+// watched reports whether any client is following the realtime channel.
+func (s *Service) watched() bool {
+	watchers, ok := s.hub.(Watchers)
+	if !ok {
+		return true
+	}
+	return watchers.Watchers() > 0
 }
 func (s *Service) refreshAll(ctx context.Context) {
 	items, err := s.repo.List(ctx)

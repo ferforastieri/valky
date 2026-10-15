@@ -98,6 +98,23 @@ func Open(path string) (*Store, error) {
 			}
 		}
 	}
+	// O campo "cômodo" das lâmpadas saiu da interface; a coluna antiga é
+	// removida das instalações que já existiam.
+	for _, drop := range []struct{ table, column string }{
+		{"lights", "room"},
+	} {
+		exists, dropErr := columnExists(ctx, db, drop.table, drop.column)
+		if dropErr != nil {
+			db.Close()
+			return nil, dropErr
+		}
+		if exists {
+			if _, dropErr = db.ExecContext(ctx, fmt.Sprintf("ALTER TABLE %s DROP COLUMN %s", drop.table, drop.column)); dropErr != nil {
+				db.Close()
+				return nil, fmt.Errorf("drop %s.%s: %w", drop.table, drop.column, dropErr)
+			}
+		}
+	}
 	if _, err = db.ExecContext(ctx, `CREATE INDEX IF NOT EXISTS idx_devices_user_id ON devices(user_id)`); err != nil {
 		db.Close()
 		return nil, fmt.Errorf("index device users: %w", err)
