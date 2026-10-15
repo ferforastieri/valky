@@ -217,11 +217,32 @@ private fun ConnectedValkyrisApp(main: MainViewModel) {
                 )
             }
             composable("lights") { LightsScreen(admin = admin, onLight = { nav.navigate("light/$it") }) }
-            composable("light/{id}") { LightDetailScreen(lightId = it.arguments?.getString("id").orEmpty(), onBack = { nav.popBackStack() }) }
+            composable("light/{id}") {
+                LightDetailScreen(
+                    lightId = it.arguments?.getString("id").orEmpty(),
+                    onBack = { nav.popBackStack() },
+                    onNotifications = { nav.navigate("events") { launchSingleTop = true } },
+                    unreadNotifications = unreadNotifications,
+                )
+            }
             composable("devices") { DevicesScreen(admin = admin, onCamera = { nav.navigate("camera/$it") }, onRemote = { nav.navigate("remote/$it") }, onLight = { nav.navigate("light/$it") }) }
             composable("cameras") { DevicesScreen(admin = admin, onCamera = { nav.navigate("camera/$it") }, onRemote = { nav.navigate("remote/$it") }, onLight = { nav.navigate("light/$it") }, initialPage = 0) }
-            composable("camera/{id}") { CameraLiveScreen(cameraId = it.arguments?.getString("id").orEmpty(), onEvent = { id -> nav.navigate("event/$id") }) }
-            composable("remote/{id}") { RemoteControlScreen(onBack = { nav.popBackStack() }) }
+            composable("camera/{id}") {
+                CameraLiveScreen(
+                    cameraId = it.arguments?.getString("id").orEmpty(),
+                    onEvent = { id -> nav.navigate("event/$id") },
+                    onBack = { nav.popBackStack() },
+                    onNotifications = { nav.navigate("events") { launchSingleTop = true } },
+                    unreadNotifications = unreadNotifications,
+                )
+            }
+            composable("remote/{id}") {
+                RemoteControlScreen(
+                    onBack = { nav.popBackStack() },
+                    onNotifications = { nav.navigate("events") { launchSingleTop = true } },
+                    unreadNotifications = unreadNotifications,
+                )
+            }
             composable("events") {
                 EventsScreen(
                     onEvent = { nav.navigate("event/$it") },

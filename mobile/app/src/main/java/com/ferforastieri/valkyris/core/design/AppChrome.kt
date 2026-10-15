@@ -37,6 +37,7 @@ fun ValkyrisTopBar(
     notificationsSelected: Boolean = false,
     unreadNotifications: Int = 0,
     modifier: Modifier = Modifier,
+    actions: (@Composable () -> Unit)? = null,
 ) {
     Surface(
         modifier = modifier.fillMaxWidth(),
@@ -59,6 +60,7 @@ fun ValkyrisTopBar(
                 maxLines = 3,
                 overflow = TextOverflow.Ellipsis,
             )
+            actions?.invoke()
             Box(
                 modifier = Modifier.size(40.dp).clickable(onClick = onNotifications),
                 contentAlignment = Alignment.Center,

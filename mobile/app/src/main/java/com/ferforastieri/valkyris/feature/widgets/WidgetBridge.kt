@@ -71,6 +71,18 @@ internal object WidgetBridge {
     @Volatile private var lastRefreshAt = 0L
     private val json = Json { ignoreUnknownKeys = true; encodeDefaults = true }
 
+    /**
+     * Entrega ao widget o estado que o aplicativo acabou de ver. Sem pedir nada
+     * ao servidor: é o mesmo dado, e o widget acompanha na hora.
+     */
+    fun publishLights(context: Context, lights: List<LightDevice>) {
+        val app = context.applicationContext
+        val widgetIds = AppWidgetManager.getInstance(app).getAppWidgetIds(ComponentName(app, LightsWidgetProvider::class.java))
+        if (widgetIds.isEmpty()) return
+        save(context, state(context).copy(lights = lights.map { it.toWidget() }.sortedBy { light -> light.name.lowercase() }))
+        refreshWidgetViews(app)
+    }
+
     fun api(context: Context): ValkyrisApi {
         val app = context.applicationContext
         val store = SessionStore(app)

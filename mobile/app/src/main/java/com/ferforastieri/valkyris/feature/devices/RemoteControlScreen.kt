@@ -21,6 +21,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
@@ -53,6 +54,7 @@ import com.composables.icons.lucide.House
 import com.composables.icons.lucide.Link
 import com.composables.icons.lucide.List
 import com.composables.icons.lucide.Lucide
+import com.composables.icons.lucide.X
 import com.composables.icons.lucide.Power
 import com.composables.icons.lucide.Settings
 import com.composables.icons.lucide.Tv
@@ -60,6 +62,7 @@ import com.composables.icons.lucide.Volume1
 import com.composables.icons.lucide.Volume2
 import com.composables.icons.lucide.VolumeX
 import com.ferforastieri.valkyris.R
+import com.ferforastieri.valkyris.core.design.ValkyrisTopBar
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -74,12 +77,25 @@ private val KeyGap = 8.dp
  * mute key between + and − — and home/back underneath. Keys repeat while held.
  */
 @Composable
-fun RemoteControlScreen(onBack: () -> Unit, vm: RemoteControlViewModel = hiltViewModel()) {
+fun RemoteControlScreen(
+    onBack: () -> Unit,
+    onNotifications: () -> Unit = {},
+    unreadNotifications: Int = 0,
+    vm: RemoteControlViewModel = hiltViewModel(),
+) {
     val state by vm.state.collectAsStateWithLifecycle()
     val remote = state.remote
     var qwerty by remember { mutableStateOf(false) }
-    Column(Modifier.fillMaxSize().padding(horizontal = 18.dp)) {
-        Spacer(Modifier.height(40.dp))
+    Column(Modifier.fillMaxSize()) {
+        // Mesma barra das outras telas do app.
+        ValkyrisTopBar(
+            title = remote?.name ?: stringResource(R.string.remote_control),
+            onNotifications = onNotifications,
+            unreadNotifications = unreadNotifications,
+            actions = { IconButton(onClick = onBack) { Icon(Lucide.X, stringResource(R.string.close)) } },
+        )
+        // Conteúdo com a mesma margem lateral das outras telas.
+        Column(Modifier.fillMaxSize().padding(horizontal = 18.dp)) {
         if (remote?.tokenConfigured == true) {
             Column(Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
                 PowerButton(powering = state.powering, onPower = vm::power)
@@ -93,6 +109,7 @@ fun RemoteControlScreen(onBack: () -> Unit, vm: RemoteControlViewModel = hiltVie
             remote == null -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { CircularProgressIndicator() }
             !remote.tokenConfigured -> PairingPanel(pairing = state.pairing, onPair = vm::pair)
             else -> ConnectedRemote(state, vm, qwerty)
+        }
         }
     }
 }

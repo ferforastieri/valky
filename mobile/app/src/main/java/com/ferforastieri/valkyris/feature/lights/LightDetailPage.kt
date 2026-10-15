@@ -30,6 +30,7 @@ import androidx.lifecycle.compose.LifecycleResumeEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.composables.icons.lucide.*
 import com.ferforastieri.valkyris.R
+import com.ferforastieri.valkyris.core.design.ValkyrisTopBar
 import com.ferforastieri.valkyris.core.design.AnimatedBulbIcon
 import com.ferforastieri.valkyris.core.design.warmWhiteColor
 import com.ferforastieri.valkyris.core.model.LightColor
@@ -46,6 +47,8 @@ import com.ferforastieri.valkyris.core.model.LightStatePatch
 fun LightDetailScreen(
     lightId: String,
     onBack: () -> Unit,
+    onNotifications: () -> Unit = {},
+    unreadNotifications: Int = 0,
     vm: LightDetailViewModel = hiltViewModel(),
 ) {
     val lights by vm.lights.collectAsStateWithLifecycle()
@@ -56,7 +59,7 @@ fun LightDetailScreen(
         Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { CircularProgressIndicator() }
         return
     }
-    LightDetailContent(light, busy, onBack) { vm.control(light.id, it) }
+    LightDetailContent(light, busy, onBack, onNotifications, unreadNotifications) { vm.control(light.id, it) }
 }
 
 @Composable
@@ -64,6 +67,8 @@ internal fun LightDetailContent(
     light: LightDevice,
     busy: Boolean,
     onDismiss: () -> Unit,
+    onNotifications: () -> Unit = {},
+    unreadNotifications: Int = 0,
     onChange: (LightStatePatch) -> Unit,
 ) {
     // O brilho do branco (ponto 22) e o brilho da cor (o valor dentro da cor)
@@ -87,21 +92,14 @@ internal fun LightDetailContent(
     fun apply(patch: LightStatePatch) = onChange(if (light.state.power) patch else patch.copy(power = true))
 
     Column(Modifier.fillMaxSize()) {
-        // Cabeçalho no padrão do app: ícone, nome e fechar.
-        Row(
-            Modifier.fillMaxWidth().padding(start = 18.dp, end = 6.dp, top = 20.dp, bottom = 4.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(10.dp),
-        ) {
-            AnimatedBulbIcon(
-                on = on,
-                color = aura,
-                offTint = MaterialTheme.colorScheme.onSurfaceVariant,
-                size = 30.dp,
-            )
-            Text(light.name, Modifier.weight(1f), style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold, maxLines = 1)
-            IconButton(onClick = onDismiss) { Icon(Lucide.X, stringResource(R.string.close)) }
-        }
+        // Mesma barra das outras telas do app (marca, título e sino), com o X
+        // para fechar — antes esta tela tinha um cabeçalho próprio.
+        ValkyrisTopBar(
+            title = light.name,
+            onNotifications = onNotifications,
+            unreadNotifications = unreadNotifications,
+            actions = { IconButton(onClick = onDismiss) { Icon(Lucide.X, stringResource(R.string.close)) } },
+        )
         // Energia num cartão igual aos outros do app.
         Surface(
             Modifier.fillMaxWidth().padding(horizontal = 18.dp, vertical = 6.dp),
@@ -133,8 +131,8 @@ internal fun LightDetailContent(
         }
         // Painel de ajustes.
         Surface(
-            Modifier.fillMaxWidth().weight(1f),
-            shape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp),
+            Modifier.fillMaxWidth().weight(1f).padding(horizontal = 18.dp, vertical = 6.dp),
+            shape = MaterialTheme.shapes.large,
             color = MaterialTheme.colorScheme.surfaceVariant,
         ) {
             Column(
@@ -159,7 +157,7 @@ internal fun LightDetailContent(
                         enabled = reachable,
                         badge = stringResource(R.string.light_hue_badge, hue.toInt()),
                         onPick = { px, py -> hue = px * 360f; saturation = ((1f - py) * 100f).coerceAtLeast(1f) },
-                        onFinished = { apply(LightStatePatch(color = LightColor(hue.toInt(), saturation.toInt(), colorValue.toInt()))) },
+                        onFinished = { apply(LightStatePatch(mode = "color", color = LightColor(hue.toInt(), saturation.toInt(), colorValue.toInt()))) },
                     )
                 } else {
                     // Livre: X = temperatura do branco, Y = brilho do branco.
@@ -171,7 +169,7 @@ internal fun LightDetailContent(
                         enabled = reachable,
                         badge = stringResource(R.string.light_kelvin_badge, temperature.toInt()),
                         onPick = { px, py -> temperature = 2700f + px * 3800f; whiteBrightness = (1f - py) * 99f + 1f },
-                        onFinished = { apply(LightStatePatch(temperatureKelvin = temperature.toInt(), brightness = whiteBrightness.toInt())) },
+                        onFinished = { apply(LightStatePatch(mode = "white", temperatureKelvin = temperature.toInt(), brightness = whiteBrightness.toInt())) },
                     )
                 }
                 Text(stringResource(R.string.light_brightness), style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
@@ -185,8 +183,8 @@ internal fun LightDetailContent(
                     height = 66.dp,
                     onChange = { fraction -> val pct = (1f + fraction * 99f).coerceIn(1f, 100f); if (colorTab) colorValue = pct else whiteBrightness = pct },
                     onFinished = {
-                        if (colorTab) apply(LightStatePatch(color = LightColor(hue.toInt(), saturation.toInt(), colorValue.toInt())))
-                        else apply(LightStatePatch(brightness = whiteBrightness.toInt()))
+                        if (colorTab) apply(LightStatePatch(mode = "color", color = LightColor(hue.toInt(), saturation.toInt(), colorValue.toInt())))
+                        else apply(LightStatePatch(mode = "white", brightness = whiteBrightness.toInt()))
                     },
                     overlay = {
                         Row(Modifier.align(Alignment.CenterStart).padding(start = 16.dp), verticalAlignment = Alignment.CenterVertically) {

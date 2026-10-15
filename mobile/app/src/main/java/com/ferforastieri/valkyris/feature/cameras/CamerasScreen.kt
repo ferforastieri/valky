@@ -49,6 +49,7 @@ import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.compose.LifecycleResumeEffect
 import com.ferforastieri.valkyris.R
+import com.ferforastieri.valkyris.core.design.ValkyrisTopBar
 import com.ferforastieri.valkyris.core.design.SignalLine
 import com.ferforastieri.valkyris.core.design.ColorTokens
 import com.ferforastieri.valkyris.core.design.cameraIcon
@@ -345,7 +346,18 @@ private val cameraIconOptions = listOf(
 @Composable private fun EmptyCameras(){Box(Modifier.fillMaxSize()){Column(Modifier.align(Alignment.Center),horizontalAlignment=Alignment.CenterHorizontally){Icon(Lucide.VideoOff,null,Modifier.size(42.dp),tint=MaterialTheme.colorScheme.onSurfaceVariant);Spacer(Modifier.height(12.dp));Text(stringResource(R.string.no_cameras),fontWeight=FontWeight.SemiBold);Text(stringResource(R.string.add_camera_hint),color=MaterialTheme.colorScheme.onSurfaceVariant)}}}
 
 @Composable
-fun CameraLiveScreen(cameraId:String,onEvent:(String)->Unit={},vm:CameraLiveViewModel=hiltViewModel()) {
+fun CameraLiveScreen(
+    cameraId:String,
+    onEvent:(String)->Unit={},
+    onBack: () -> Unit = {},
+    onNotifications: () -> Unit = {},
+    unreadNotifications: Int = 0,
+    vm:CameraLiveViewModel=hiltViewModel(),
+) {
+    // O canal e a busca da câmera sobem AQUI, antes de qualquer "carregando":
+    // antes isso ficava lá dentro do conteúdo pronto, que só aparece quando a
+    // câmera já chegou — e a tela ficava girando para sempre.
+    LifecycleResumeEffect(cameraId) { vm.setActive(true); onPauseOrDispose { vm.setActive(false) } }
     val camera by vm.camera.collectAsStateWithLifecycle()
     val context = androidx.compose.ui.platform.LocalContext.current
     val activity = remember(context) { context.findActivity() }
@@ -355,19 +367,24 @@ fun CameraLiveScreen(cameraId:String,onEvent:(String)->Unit={},vm:CameraLiveView
         onDispose { if (previousOrientation != null) activity.requestedOrientation = previousOrientation }
     }
     Column(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
-        Row(Modifier.fillMaxWidth().padding(horizontal = 18.dp, vertical = 10.dp), verticalAlignment = Alignment.CenterVertically) {
-            Column(Modifier.weight(1f)) {
-                Text(camera?.name ?: stringResource(R.string.live), style=MaterialTheme.typography.titleLarge,fontWeight = FontWeight.SemiBold)
-                Text(if (camera?.setupStatus == "ready") stringResource(R.string.stream_private) else stringResource(R.string.camera_setup_saved), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            }
-            camera?.takeIf { it.setupStatus=="ready" }?.let {
-                Surface(shape=RoundedCornerShape(12.dp),color=MaterialTheme.colorScheme.secondaryContainer) {
-                    Row(Modifier.padding(horizontal=10.dp,vertical=7.dp),verticalAlignment=Alignment.CenterVertically) {
-                        Box(Modifier.size(7.dp).background(MaterialTheme.colorScheme.secondary,CircleShape));Spacer(Modifier.width(6.dp));Text(stringResource(R.string.live),style=MaterialTheme.typography.labelMedium,fontWeight=FontWeight.SemiBold)
+        // Mesma barra das outras telas do app.
+        ValkyrisTopBar(
+            title = camera?.name ?: stringResource(R.string.live),
+            onNotifications = onNotifications,
+            unreadNotifications = unreadNotifications,
+            actions = {
+                if (camera?.setupStatus == "ready") {
+                    Surface(shape = RoundedCornerShape(12.dp), color = MaterialTheme.colorScheme.secondaryContainer) {
+                        Row(Modifier.padding(horizontal = 10.dp, vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
+                            Box(Modifier.size(7.dp).background(MaterialTheme.colorScheme.secondary, CircleShape))
+                            Spacer(Modifier.width(6.dp))
+                            Text(stringResource(R.string.live), style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.SemiBold)
+                        }
                     }
                 }
-            }
-        }
+                IconButton(onClick = onBack) { Icon(Lucide.X, stringResource(R.string.close)) }
+            },
+        )
         when (camera?.setupStatus) {
             "ready" -> ReadyCameraContent(requireNotNull(camera), vm, onEvent)
             "failed" -> CameraSetupContent(requireNotNull(camera), failed = true)

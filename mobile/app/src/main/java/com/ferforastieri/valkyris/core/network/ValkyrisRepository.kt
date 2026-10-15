@@ -19,6 +19,7 @@ import kotlinx.coroutines.flow.update
 class ValkyrisRepository @Inject constructor(
     val api: ValkyrisApi,
     private val notifier: com.ferforastieri.valkyris.core.alarm.AlarmNotifier,
+    @dagger.hilt.android.qualifiers.ApplicationContext private val appContext: android.content.Context,
 ) {
     private val _cameras = MutableStateFlow<List<Camera>>(emptyList())
     val cameras = _cameras.asStateFlow()
@@ -58,9 +59,16 @@ class ValkyrisRepository @Inject constructor(
         _cameras.update { current -> current.filterNot { it.id == id } }
     }
 
-    suspend fun refreshLights() = api.lights().also { _lights.value = it }
+    suspend fun refreshLights() = api.lights().also { lights ->
+        _lights.value = lights
+        // O widget de lâmpadas vê o mesmo estado sem pedir nada a mais.
+        runCatching { com.ferforastieri.valkyris.feature.widgets.WidgetBridge.publishLights(appContext, lights) }
+    }
     suspend fun refreshRemotes() = api.remotes().also { _remotes.value = it }
-    suspend fun controlLight(id: String, patch: LightStatePatch) = api.controlLight(id, patch).also { updated -> _lights.update { list -> list.map { if (it.id == id) updated else it } } }
+    suspend fun controlLight(id: String, patch: LightStatePatch) = api.controlLight(id, patch).also { updated ->
+        _lights.update { list -> list.map { if (it.id == id) updated else it } }
+        runCatching { com.ferforastieri.valkyris.feature.widgets.WidgetBridge.publishLights(appContext, _lights.value) }
+    }
     suspend fun deleteLight(id: String) { api.deleteLight(id); _lights.update { list -> list.filterNot { it.id == id } } }
 
     /** Adota uma lâmpada já pareada no aplicativo do fabricante. */

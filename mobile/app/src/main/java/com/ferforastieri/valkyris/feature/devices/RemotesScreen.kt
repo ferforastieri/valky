@@ -246,9 +246,9 @@ private fun RemoteCard(
                 Text(
                     when {
                         busy -> stringResource(R.string.remote_pairing)
-                        ready -> "${remote.host}:${remote.port} · ${stringResource(R.string.remote_paired)}"
+                        ready -> stringResource(R.string.remote_paired)
                         remote.setupError.isNotBlank() -> remote.setupError
-                        else -> "${remote.host}:${remote.port} · ${stringResource(R.string.remote_not_paired)}"
+                        else -> stringResource(R.string.remote_not_paired)
                     },
                     style = MaterialTheme.typography.bodySmall,
                     color = if (ready) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.error,
