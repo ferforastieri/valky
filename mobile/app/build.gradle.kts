@@ -54,6 +54,15 @@ android {
     testOptions.unitTests.isIncludeAndroidResources = true
 }
 
+// Os testes de screenshot renderizam as telas no JVM (Roborazzi/Robolectric) e
+// baixam o runtime do Android na primeira execução; ficam fora do CI. Para
+// gravar as imagens: ./gradlew :app:recordRoborazziDebug -Pscreenshots
+tasks.withType<Test>().configureEach {
+    if (!providers.gradleProperty("screenshots").isPresent) {
+        useJUnit { excludeCategories("com.ferforastieri.valkyris.ScreenshotTest") }
+    }
+}
+
 dependencies {
     val composeBom = platform("androidx.compose:compose-bom:2025.08.01")
     implementation(composeBom)

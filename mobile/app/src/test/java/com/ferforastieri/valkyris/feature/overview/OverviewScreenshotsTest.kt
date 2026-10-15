@@ -9,6 +9,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.unit.dp
+import com.ferforastieri.valkyris.ScreenshotTest
 import com.ferforastieri.valkyris.core.design.ValkyrisTheme
 import com.github.takahirom.roborazzi.captureRoboImage
 import org.junit.Rule
@@ -20,6 +21,7 @@ import org.robolectric.annotation.GraphicsMode
 
 @RunWith(RobolectricTestRunner::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
+@org.junit.experimental.categories.Category(ScreenshotTest::class)
 @Config(sdk = [34], qualifiers = "w411dp-h891dp-xxhdpi", application = android.app.Application::class)
 class OverviewScreenshotsTest {
     @get:Rule val compose = createComposeRule()
