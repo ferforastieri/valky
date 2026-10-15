@@ -1308,3 +1308,26 @@ dialog::backdrop {
   .remote-bottom { flex-wrap: wrap; }
   .remote-bottom button { flex: 1; min-width: 96px; }
 }
+
+/* ---- seções separadas e controle que cabe sem rolar ---- */
+.section-title { margin-top: 18px; }
+.remote-grid, .light-grid, .camera-grid { margin-top: 10px; }
+.remote-grid + .section-title, .light-grid + .section-title, .camera-grid + .section-title { margin-top: 26px; }
+.remote-sheet { gap: 8px; }
+.remote-pad { gap: 4px; }
+.remote-pad button { padding: 8px 0; font-size: 14px; border-radius: 10px; }
+.remote-power, .remote-mode { width: 52px; height: 52px; }
+.remote-power { font-size: 22px; }
+.remote-rocker { padding: 6px; gap: 4px; }
+.remote-rocker button { width: 46px; padding: 8px 0; font-size: 12px; }
+.remote-dpad button { font-size: 13px; }
+.remote-dpad .ok { width: 54px; height: 54px; font-size: 14px; }
+.remote-bottom { padding: 6px; }
+.remote-bottom button { padding: 10px 14px; }
+.lamp-block { height: 170px; }
+@media (max-height: 720px), (max-width: 720px) {
+  .remote-pad button { padding: 6px 0; font-size: 13px; }
+  .remote-power, .remote-mode { width: 46px; height: 46px; }
+  .remote-dpad .ok { width: 48px; height: 48px; }
+  .lamp-block { height: 140px; }
+}

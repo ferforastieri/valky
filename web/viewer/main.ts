@@ -475,6 +475,7 @@ function lightDetails(id: string) {
   lightModeValues.set(id, memory);
   let tab = light.state.mode === "color" ? "color" : "white";
   let hue = light.state.color.hue, saturation = light.state.color.saturation, temperature = light.state.temperatureKelvin;
+  let whitePinX = Math.max(0, Math.min(1, (light.state.temperatureKelvin - 2700) / 3800)), whitePinY = 0.5;
   const power = light.state.power;
 
   $("#detail-body").innerHTML = '<div class="lamp-sheet">' +
@@ -501,7 +502,7 @@ function lightDetails(id: string) {
   const paint = (): void => {
     const colourPin = $("#lamp-color-pin"), whitePin = $("#lamp-white-pin");
     if (colourPin) { colourPin.style.left = (hue / 360) * 100 + "%"; colourPin.style.top = (1 - saturation / 100) * 100 + "%"; }
-    if (whitePin) { whitePin.style.left = ((temperature - 2700) / 3800) * 100 + "%"; }
+    if (whitePin) { whitePin.style.left = whitePinX * 100 + "%"; whitePin.style.top = whitePinY * 100 + "%"; }
     const colourValue = $("#lamp-value-color") as HTMLOutputElement | null, colour = $("#lamp-brightness-color") as HTMLInputElement | null;
     if (colourValue && colour) { colour.value = String(Math.round(memory.color)); colourValue.textContent = Math.round(memory.color) + "%"; }
     const whiteValue = $("#lamp-value-white") as HTMLOutputElement | null, white = $("#lamp-brightness-white") as HTMLInputElement | null;
@@ -538,7 +539,7 @@ function lightDetails(id: string) {
   };
 
   const colourBlock = $("#lamp-color"); if (colourBlock) track(colourBlock as HTMLElement, (px, py) => { hue = Math.max(0, Math.min(360, px * 360)); saturation = Math.max(1, Math.min(100, (1 - py) * 100)); paint(); }, () => void run({ mode: "color", color: { hue: Math.round(hue), saturation: Math.round(saturation), value: Math.round(memory.color) } }));
-  const whiteBlock = $("#lamp-white"); if (whiteBlock) track(whiteBlock as HTMLElement, (px, py) => { temperature = Math.max(2700, Math.min(6500, 2700 + ((px + (1 - py)) / 2) * 3800)); paint(); }, () => void run({ mode: "white", temperatureKelvin: Math.round(temperature) }));
+  const whiteBlock = $("#lamp-white"); if (whiteBlock) track(whiteBlock as HTMLElement, (px, py) => { whitePinX = Math.max(0, Math.min(1, px)); whitePinY = Math.max(0, Math.min(1, py)); temperature = Math.max(2700, Math.min(6500, 2700 + ((px + (1 - py)) / 2) * 3800)); paint(); }, () => void run({ mode: "white", temperatureKelvin: Math.round(temperature) }));
   const colourSlider = $("#lamp-brightness-color") as HTMLInputElement | null;
   if (colourSlider) {
     colourSlider.addEventListener("input", () => { memory.color = Number(colourSlider.value); paint(); });

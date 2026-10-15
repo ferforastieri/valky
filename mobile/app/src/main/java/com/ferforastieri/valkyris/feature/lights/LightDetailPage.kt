@@ -83,6 +83,9 @@ internal fun LightDetailContent(
     var whiteBrightness by remember(light.id) { mutableFloatStateOf(light.state.brightness.coerceIn(1, 100).toFloat()) }
     var colorValue by remember(light.id) { mutableFloatStateOf(light.state.color.value.coerceIn(1, 100).toFloat()) }
     var temperature by remember(light.id) { mutableFloatStateOf(light.state.temperatureKelvin.coerceIn(2700, 6500).toFloat()) }
+    // Onde o marcador do branco está: ele segue o dedo em qualquer direção.
+    var whitePinX by remember(light.id) { mutableFloatStateOf(((light.state.temperatureKelvin.coerceIn(2700, 6500) - 2700) / 3800f)) }
+    var whitePinY by remember(light.id) { mutableFloatStateOf(.5f) }
     var hue by remember(light.id) { mutableFloatStateOf(light.state.color.hue.coerceIn(0, 360).toFloat()) }
     var saturation by remember(light.id) { mutableFloatStateOf(light.state.color.saturation.coerceIn(1, 100).toFloat()) }
     // 0 = Cor, 1 = Branco
@@ -166,15 +169,16 @@ internal fun LightDetailContent(
                         onFinished = { apply(LightStatePatch(mode = "color", color = LightColor(hue.toInt(), saturation.toInt(), colorValue.toInt()))) },
                     )
                 } else {
-                    // Livre: X = temperatura do branco, Y = brilho do branco.
+                    // Livre: arrastar em QUALQUER direção muda só o tom do branco
+                    // (o brilho é o controle de baixo).
                     FreeBlock(
                         horizontal = Brush.horizontalGradient(listOf(warmWhiteColor(2700), warmWhiteColor(4000), warmWhiteColor(6500))),
                         overlay = Brush.verticalGradient(listOf(Color.Transparent, Color.Black.copy(alpha = .82f))),
-                        x = (temperature - 2700f) / 3800f,
-                        y = 1f - ((temperature - 2700f) / 3800f),
+                        x = whitePinX,
+                        y = whitePinY,
                         enabled = reachable,
                         badge = stringResource(R.string.light_kelvin_badge, temperature.toInt()),
-                        onPick = { px, py -> temperature = 2700f + (((px + (1f - py)) / 2f).coerceIn(0f, 1f)) * 3800f },
+                        onPick = { px, py -> whitePinX = px; whitePinY = py; temperature = 2700f + (((px + (1f - py)) / 2f).coerceIn(0f, 1f)) * 3800f },
                         onFinished = { apply(LightStatePatch(mode = "white", temperatureKelvin = temperature.toInt())) },
                     )
                 }

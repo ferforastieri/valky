@@ -26,6 +26,7 @@ data class ApkDownload(val url: String, val version: String)
 @HiltViewModel
 class MainViewModel @Inject constructor(
     private val api: ValkyrisApi,
+    private val repository: com.ferforastieri.valkyris.core.network.ValkyrisRepository,
     private val sessions: SessionStore,
     private val preferences: AppPreferences,
     private val push: FcmRegistration,
@@ -56,6 +57,9 @@ class MainViewModel @Inject constructor(
     // Home screen widgets can ask the app to open a specific screen.
     private val _pendingSection = MutableStateFlow<String?>(null)
     val pendingSection = _pendingSection.asStateFlow()
+    // Puxar a tela de cima para baixo atualiza tudo, em qualquer tela.
+    private val _refreshing = MutableStateFlow(false)
+    val refreshing = _refreshing.asStateFlow()
     private val _updateInfo = MutableStateFlow<UpdateInfo?>(null)
     val updateInfo = _updateInfo.asStateFlow()
     private val _updating = MutableStateFlow(false)
@@ -89,6 +93,14 @@ class MainViewModel @Inject constructor(
         _pendingCamera.value = cameraId?.takeIf(String::isNotBlank) ?: sectionCameraId?.takeIf(String::isNotBlank) ?: deepCameraId?.takeIf(String::isNotBlank)
         _pendingEvent.value = if (_pendingCamera.value == null) eventId?.takeIf(String::isNotBlank) ?: deepLinkId?.takeIf(String::isNotBlank) else null
         _pendingSection.value = if (_pendingCamera.value == null) sectionRoute?.takeIf(String::isNotBlank) else null
+    }
+
+    fun refreshEverything() {
+        if (_refreshing.value) return
+        _refreshing.value = true
+        viewModelScope.launch {
+            try { repository.refreshAll() } finally { _refreshing.value = false }
+        }
     }
 
     fun eventOpened() { _pendingEvent.value = null }

@@ -12,6 +12,7 @@ import javax.inject.Singleton
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.launch
 import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.decodeFromJsonElement
 import kotlinx.serialization.json.jsonObject
@@ -44,6 +45,19 @@ class ValkyrisRepository @Inject constructor(
     val lights = _lights.asStateFlow()
     private val _remotes = MutableStateFlow<List<RemoteDevice>>(emptyList())
     val remotes = _remotes.asStateFlow()
+
+    /** Atualiza tudo de uma vez; é o "puxar para atualizar" do aplicativo. */
+    suspend fun refreshAll() = kotlinx.coroutines.coroutineScope {
+        listOf(
+            launch { runCatching { refreshCameras() } },
+            launch { runCatching { refreshLights() } },
+            launch { runCatching { refreshRemotes() } },
+            launch { runCatching { refreshEvents() } },
+            launch { runCatching { refreshUsers() } },
+            launch { runCatching { refreshMe() } },
+            launch { runCatching { refreshPlaces() } },
+        ).forEach { it.join() }
+    }
 
     suspend fun refreshCameras(): List<Camera> {
         return api.cameras().also { _cameras.value = it }

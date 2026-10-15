@@ -1,9 +1,11 @@
+@file:OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
 package com.ferforastieri.valkyris.navigation
 
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.clickable
 import androidx.compose.animation.EnterTransition
 import androidx.compose.animation.ExitTransition
+import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -151,6 +153,7 @@ private fun ConnectedValkyrisApp(main: MainViewModel) {
             main.sectionOpened()
         }
     }
+    val refreshing by main.refreshing.collectAsStateWithLifecycle()
     Scaffold(
         modifier = Modifier.fillMaxSize().imePadding(),
         containerColor = MaterialTheme.colorScheme.background,
@@ -189,6 +192,12 @@ private fun ConnectedValkyrisApp(main: MainViewModel) {
         },
     ) { padding ->
         val contentModifier = Modifier.padding(padding)
+        // Puxar de cima para baixo atualiza tudo, em qualquer tela do app.
+        PullToRefreshBox(
+            isRefreshing = refreshing,
+            onRefresh = { main.refreshEverything() },
+            modifier = Modifier.fillMaxSize(),
+        ) {
         NavHost(
             navController = nav,
             startDestination = "overview",
@@ -255,6 +264,7 @@ private fun ConnectedValkyrisApp(main: MainViewModel) {
             composable("person/{id}") { PersonDetailScreen(onBack = { nav.popBackStack() }) }
             composable("profile") { ProfileScreen(admin = admin) }
             composable("settings") { SettingsScreen(main) }
+        }
         }
     }
 }
