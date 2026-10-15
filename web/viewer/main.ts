@@ -462,13 +462,99 @@ async function cameraDetails(id: string) {
 function hsvToHex(h:number,s:number,v:number){s/=100;v/=100;const c=v*s,x=c*(1-Math.abs((h/60)%2-1)),m=v-c;let r=0,g=0,b=0;if(h<60){r=c;g=x}else if(h<120){r=x;g=c}else if(h<180){g=c;b=x}else if(h<240){g=x;b=c}else if(h<300){r=x;b=c}else{r=c;b=x}return `#${[r,g,b].map(n=>Math.round((n+m)*255).toString(16).padStart(2,'0')).join('')}`}
 function hexToHsv(hex:string){const [r,g,b]=[1,3,5].map(i=>parseInt(hex.slice(i,i+2),16)/255);const max=Math.max(r,g,b),min=Math.min(r,g,b),d=max-min;let h=0;if(d){if(max===r)h=60*(((g-b)/d)%6);else if(max===g)h=60*((b-r)/d+2);else h=60*((r-g)/d+4)}if(h<0)h+=360;return{hue:Math.round(h),saturation:max?Math.round(d/max*100):0,value:Math.round(max*100)}}
 async function applyLight(id:string,patch:Record<string,unknown>){const updated=await api.mutate<LightDevice>(`/lights/${key(id)}/state`,'PUT',patch);lights=lights.map(item=>item.id===id?updated:item);signature='';render();return updated}
-function lightDetails(id:string){const light=lights.find(item=>item.id===id);if(!light)return;openDetails(light.name,'ILUMINAÇÃO');const color=hsvToHex(light.state.color.hue,light.state.color.saturation,light.state.color.value);const caps=light.capabilities||{brightness:true,colorTemperature:true,color:true};const disabled=light.state.online?'':'disabled';$('#detail-body').innerHTML=`<div class="light-detail" style="--light-color:${e(lightColor(light))}"><div class="light-detail-head"><span class="light-orb large">${icon('light')}</span><div><strong>${light.state.power ? 'Ligada' : 'Desligada'}</strong><small>${light.state.online?'Disponível na rede local':'Indisponível'}</small></div><button id="light-toggle" class="${light.state.power?'primary':''}" ${disabled}>${light.state.power?'Desligar':'Ligar'}</button></div>${caps.brightness?`<label>Brilho <output id="brightness-value">${light.state.brightness}%</output><input id="light-brightness" type="range" min="1" max="100" value="${light.state.brightness}" ${disabled}></label>`:''}${caps.colorTemperature?`<label>Branco <output id="temperature-value">${light.state.temperatureKelvin} K</output><input id="light-temperature" type="range" min="2700" max="6500" step="50" value="${light.state.temperatureKelvin}" ${disabled}></label>`:''}${caps.color?`<label>Cor <input id="light-color" type="color" value="${color}" ${disabled}></label>`:''}<p id="light-result" class="error" role="status"></p></div>`;
- const run=async(patch:Record<string,unknown>)=>{try{await applyLight(id,patch);if(dialog.open)lightDetails(id)}catch(error){if(dialog.open)$('#light-result').textContent=(error as Error).message}};
- $('#light-toggle').onclick=()=>void run({power:!light.state.power});
- const brightness=$<HTMLInputElement>('#light-brightness');if(brightness){brightness.oninput=()=>{$('#brightness-value').textContent=`${brightness.value}%`};brightness.onchange=()=>void run({brightness:Number(brightness.value)})}
- const temperature=$<HTMLInputElement>('#light-temperature');if(temperature){temperature.oninput=()=>{$('#temperature-value').textContent=`${temperature.value} K`};temperature.onchange=()=>void run({temperatureKelvin:Number(temperature.value)})}
- const colourInput=$<HTMLInputElement>('#light-color');if(colourInput)colourInput.onchange=event=>void run({color:hexToHsv((event.target as HTMLInputElement).value)});
+// Brilho de cada modo lembrado no navegador: mexer na cor não muda o do branco.
+const lightModeValues = new Map<string, { color: number; white: number }>();
+
+function lightDetails(id: string) {
+  const light = lights.find((item) => item.id === id);
+  if (!light) return;
+  openDetails(light.name, "ILUMINAÇÃO");
+  const caps = light.capabilities || { brightness: true, colorTemperature: true, color: true };
+  const disabled = light.state.online ? "" : "disabled";
+  const memory = lightModeValues.get(id) || { color: light.state.color.value || light.state.brightness, white: light.state.brightness };
+  lightModeValues.set(id, memory);
+  let tab = light.state.mode === "color" ? "color" : "white";
+  let hue = light.state.color.hue, saturation = light.state.color.saturation, temperature = light.state.temperatureKelvin;
+  const power = light.state.power;
+
+  $("#detail-body").innerHTML = '<div class="lamp-sheet">' +
+    '<div class="lamp-head">' +
+      '<span class="lamp-orb">' + icon("light") + '</span>' +
+      '<div class="lamp-name"><strong>' + e(light.name) + '</strong><small id="lamp-state">' + (light.state.online ? (power ? "Ligada" : "Desligada") + " · " + light.state.brightness + "%" : "Indisponível") + '</small></div>' +
+      '<button id="light-toggle" class="lamp-switch ' + (power ? "on" : "") + '" ' + disabled + '>' + (power ? "Desligar" : "Ligar") + '</button>' +
+    '</div>' +
+    '<div class="lamp-tabs"><button id="lamp-tab-color">Cor</button><button id="lamp-tab-white">Branco</button></div>' +
+    '<div id="lamp-panel-color" class="lamp-panel">' +
+      (caps.color ? '<div class="lamp-block" id="lamp-color"><span class="lamp-veil"></span><span class="lamp-pin" id="lamp-color-pin"></span></div>' : "") +
+      (caps.brightness ? '<label class="lamp-slider">Brilho <output id="lamp-value-color"></output><input id="lamp-brightness-color" type="range" min="1" max="100" ' + disabled + '></label>' : "") +
+    '</div>' +
+    '<div id="lamp-panel-white" class="lamp-panel">' +
+      (caps.colorTemperature ? '<div class="lamp-block white" id="lamp-white"><span class="lamp-pin" id="lamp-white-pin"></span></div>' : "") +
+      (caps.brightness ? '<label class="lamp-slider">Brilho <output id="lamp-value-white"></output><input id="lamp-brightness-white" type="range" min="1" max="100" ' + disabled + '></label>' : "") +
+    '</div>' +
+    '<p id="light-result" class="error" role="status"></p></div>';
+
+  const orb = (): void => {
+    const sheet = $("#detail-body .lamp-sheet") as HTMLElement | null;
+    if (sheet) sheet.style.setProperty("--lamp", lightColor(Object.assign({}, light, { state: Object.assign({}, light.state, { mode: tab, color: { hue, saturation, value: memory.color }, temperatureKelvin: temperature, power }) })));
+  };
+  const paint = (): void => {
+    const colourPin = $("#lamp-color-pin"), whitePin = $("#lamp-white-pin");
+    if (colourPin) { colourPin.style.left = (hue / 360) * 100 + "%"; colourPin.style.top = (1 - saturation / 100) * 100 + "%"; }
+    if (whitePin) { whitePin.style.left = ((temperature - 2700) / 3800) * 100 + "%"; }
+    const colourValue = $("#lamp-value-color") as HTMLOutputElement | null, colour = $("#lamp-brightness-color") as HTMLInputElement | null;
+    if (colourValue && colour) { colour.value = String(Math.round(memory.color)); colourValue.textContent = Math.round(memory.color) + "%"; }
+    const whiteValue = $("#lamp-value-white") as HTMLOutputElement | null, white = $("#lamp-brightness-white") as HTMLInputElement | null;
+    if (whiteValue && white) { white.value = String(Math.round(memory.white)); whiteValue.textContent = Math.round(memory.white) + "%"; }
+    const colourPanel = $("#lamp-panel-color"), whitePanel = $("#lamp-panel-white");
+    if (colourPanel && whitePanel) { colourPanel.toggleAttribute("hidden", tab !== "color"); whitePanel.toggleAttribute("hidden", tab !== "white"); }
+    const tabColour = $("#lamp-tab-color"), tabWhite = $("#lamp-tab-white");
+    if (tabColour) tabColour.classList.toggle("active", tab === "color");
+    if (tabWhite) tabWhite.classList.toggle("active", tab === "white");
+    orb();
+  };
+  const run = async (patch: Record<string, unknown>): Promise<void> => {
+    try {
+      const updated = await applyLight(id, patch);
+      Object.assign(light, updated);
+      const state = $("#lamp-state");
+      if (state) state.textContent = light.state.online ? (light.state.power ? "Ligada" : "Desligada") + " · " + light.state.brightness + "%" : "Indisponível";
+      const toggle = $("#light-toggle");
+      if (toggle) { toggle.textContent = light.state.power ? "Desligar" : "Ligar"; toggle.classList.toggle("on", light.state.power); }
+      paint();
+    } catch (error) {
+      if (dialog.open) $("#light-result").textContent = (error as Error).message;
+    }
+  };
+  const track = (element: HTMLElement, handler: (px: number, py: number) => void, commit: () => void): void => {
+    const place = (event: PointerEvent): void => {
+      const rect = element.getBoundingClientRect();
+      if (!rect.width || !rect.height) return;
+      handler((event.clientX - rect.left) / rect.width, (event.clientY - rect.top) / rect.height);
+    };
+    element.addEventListener("pointerdown", (event) => { element.setPointerCapture(event.pointerId); place(event); });
+    element.addEventListener("pointermove", (event) => { if (element.hasPointerCapture(event.pointerId)) place(event); });
+    element.addEventListener("pointerup", (event) => { if (element.hasPointerCapture(event.pointerId)) { place(event); commit(); } });
+  };
+
+  const colourBlock = $("#lamp-color"); if (colourBlock) track(colourBlock as HTMLElement, (px, py) => { hue = Math.max(0, Math.min(360, px * 360)); saturation = Math.max(1, Math.min(100, (1 - py) * 100)); paint(); }, () => void run({ mode: "color", color: { hue: Math.round(hue), saturation: Math.round(saturation), value: Math.round(memory.color) } }));
+  const whiteBlock = $("#lamp-white"); if (whiteBlock) track(whiteBlock as HTMLElement, (px) => { temperature = Math.max(2700, Math.min(6500, 2700 + px * 3800)); paint(); }, () => void run({ mode: "white", temperatureKelvin: Math.round(temperature), brightness: Math.round(memory.white) }));
+  const colourSlider = $("#lamp-brightness-color") as HTMLInputElement | null;
+  if (colourSlider) {
+    colourSlider.addEventListener("input", () => { memory.color = Number(colourSlider.value); paint(); });
+    colourSlider.addEventListener("change", () => void run({ mode: "color", color: { hue: Math.round(hue), saturation: Math.round(saturation), value: Math.round(memory.color) } }));
+  }
+  const whiteSlider = $("#lamp-brightness-white") as HTMLInputElement | null;
+  if (whiteSlider) {
+    whiteSlider.addEventListener("input", () => { memory.white = Number(whiteSlider.value); paint(); });
+    whiteSlider.addEventListener("change", () => void run({ mode: "white", brightness: Math.round(memory.white) }));
+  }
+  const colourTab = $("#lamp-tab-color"); if (colourTab) colourTab.addEventListener("click", () => { tab = "color"; paint(); });
+  const whiteTab = $("#lamp-tab-white"); if (whiteTab) whiteTab.addEventListener("click", () => { tab = "white"; paint(); });
+  const toggle = $("#light-toggle"); if (toggle) toggle.addEventListener("click", () => void run({ power: !light.state.power }));
+  paint();
 }
+
 const remoteKeypad: [string, string][] = [
   ["POWER", "Energia"],
   ["KEY_VOLUP", "Volume +"],
@@ -502,12 +588,60 @@ function remoteDetails(id: string) {
   if (!remote) return;
   openDetails(remote.name, "CONTROLE REMOTO");
   const ready = remote.tokenConfigured;
+  const digits = "1234567890".split("").map((digit) => '<button data-remote-key="KEY_' + digit + '">' + digit + '</button>').join("");
+  const letters = "qwertyuiop".split("").map((letter) => '<button data-remote-key="TEXT:' + letter + '">' + letter + '</button>').join("")
+    + "asdfghjkl".split("").map((letter) => '<button data-remote-key="TEXT:' + letter + '">' + letter + '</button>').join("")
+    + "zxcvbnm".split("").map((letter) => '<button data-remote-key="TEXT:' + letter + '">' + letter + '</button>').join("")
+    + '<button class="wide" data-remote-key="TEXT:ESPACO">espaço</button>'
+    + '<button data-remote-key="TEXT:APAGAR">⌫</button>'
+    + '<button data-remote-key="TEXT:ENTER">⏎</button>';
   const pairAction = ready
     ? ""
     : api.admin
       ? '<button id="remote-pair" class="primary">Parear</button>'
       : '<p class="muted">Peça a um administrador para parear o controle no aplicativo.</p>';
-  $("#detail-body").innerHTML = `<div class="remote-detail"><div class="remote-detail-head"><span class="tile-icon">${icon("tv")}</span><div><strong>${e(remote.name)}</strong><small>${ready ? "Pareado" : "Não pareado"}</small></div>${pairAction}</div>${ready ? `<div class="remote-keypad">${remoteKeypad.map(([k, l]) => `<button data-remote-key="${k}">${e(l)}</button>`).join("")}</div><p class="muted">Teclado de letras (digita no campo da TV)</p><div class="remote-keypad letters">${remoteLetters.map(([k, l]) => `<button data-remote-key="${k}">${e(l)}</button>`).join("")}</div>` : ""}<p id="remote-result" class="error" role="status"></p></div>`;
+  // Mesma ordem do aplicativo: energia grande, teclado (números/letras),
+  // volume | direcional | canais e, embaixo, voltar/casa/menu.
+  $("#detail-body").innerHTML = '<div class="remote-sheet">' +
+    '<div class="remote-head"><span class="tile-icon">' + icon("tv") + '</span><div><strong>' + e(remote.name) + '</strong><small>' + (ready ? "Pareado" : "Não pareado") + '</small></div>' + pairAction + '</div>' +
+    (ready ? '' +
+      '<button class="remote-power" data-remote-key="POWER" aria-label="Energia">&#9211;</button>' +
+      '<button id="remote-mode" class="remote-mode">ABC</button>' +
+      '<div id="remote-digits" class="remote-pad">' + digits + '</div>' +
+      '<div id="remote-letters" class="remote-pad letters" hidden>' + letters + '</div>' +
+      '<div class="remote-mid">' +
+        '<div class="remote-rocker">' +
+          '<button data-remote-key="KEY_VOLUP" aria-label="Volume mais">+</button>' +
+          '<button data-remote-key="KEY_MUTE" aria-label="Mudo">Mudo</button>' +
+          '<button data-remote-key="KEY_VOLDOWN" aria-label="Volume menos">&minus;</button>' +
+        '</div>' +
+        '<div class="remote-dpad">' +
+          '<button class="up" data-remote-key="KEY_UP" aria-label="Cima">&#9650;</button>' +
+          '<button class="left" data-remote-key="KEY_LEFT" aria-label="Esquerda">&#9664;</button>' +
+          '<button class="ok" data-remote-key="KEY_ENTER">OK</button>' +
+          '<button class="right" data-remote-key="KEY_RIGHT" aria-label="Direita">&#9654;</button>' +
+          '<button class="down" data-remote-key="KEY_DOWN" aria-label="Baixo">&#9660;</button>' +
+        '</div>' +
+        '<div class="remote-rocker">' +
+          '<button data-remote-key="KEY_CHUP" aria-label="Canal mais">+</button>' +
+          '<button data-remote-key="KEY_CH_LIST" aria-label="Canais">Canais</button>' +
+          '<button data-remote-key="KEY_CHDOWN" aria-label="Canal menos">&minus;</button>' +
+        '</div>' +
+      '</div>' +
+      '<div class="remote-bottom">' +
+        '<button data-remote-key="KEY_RETURN">Voltar</button>' +
+        '<button data-remote-key="KEY_HOME">Início</button>' +
+        '<button data-remote-key="KEY_MENU">Menu</button>' +
+      '</div>' : "") +
+    '<p id="remote-result" class="error" role="status"></p></div>';
+  const mode = $("#remote-mode");
+  if (mode) mode.addEventListener("click", () => {
+    const digitsPad = $("#remote-digits"), lettersPad = $("#remote-letters");
+    const showingLetters = lettersPad ? !lettersPad.hasAttribute("hidden") : false;
+    if (digitsPad) digitsPad.toggleAttribute("hidden", !showingLetters);
+    if (lettersPad) lettersPad.toggleAttribute("hidden", showingLetters);
+    mode.textContent = showingLetters ? "ABC" : "123";
+  });
   const pair = $("#remote-pair");
   if (pair) pair.onclick = async () => {
     pair.setAttribute("disabled", "");
