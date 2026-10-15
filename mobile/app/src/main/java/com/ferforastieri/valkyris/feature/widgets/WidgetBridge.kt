@@ -61,6 +61,14 @@ internal object WidgetBridge {
     private const val KEY_STATE = "state"
     private const val KEY_PHOTO = "photo"
     private const val KEY_KEYPAD = "keypad_letters"
+
+    /**
+     * Intervalo mínimo entre duas buscas completas. O widget é redesenhado com
+     * frequência (e cada redesenho podia pedir uma atualização); sem esta
+     * trava, uma resposta ruim do servidor virava um vaivém sem fim.
+     */
+    private const val MIN_REFRESH_MS = 20_000L
+    @Volatile private var lastRefreshAt = 0L
     private val json = Json { ignoreUnknownKeys = true; encodeDefaults = true }
 
     fun api(context: Context): ValkyrisApi {
@@ -84,6 +92,9 @@ internal object WidgetBridge {
 
     /** Asks the backend for the current bulbs, cameras and remotes. */
     suspend fun refresh(context: Context): Boolean = withContext(Dispatchers.IO) {
+        val now = System.currentTimeMillis()
+        if (now - lastRefreshAt < MIN_REFRESH_MS) return@withContext false
+        lastRefreshAt = now
         if (!signedIn(context)) {
             save(context, WidgetSnapshot(available = false, updatedAt = System.currentTimeMillis(), message = "conecte o aplicativo"))
             return@withContext true
@@ -93,8 +104,13 @@ internal object WidgetBridge {
         val cameras = runCatching { api.cameras() }.getOrNull()
         val remotes = runCatching { api.remotes() }.getOrNull()
         if (lights == null && cameras == null && remotes == null) {
-            val previous = state(context)
-            save(context, previous.copy(message = "sem conexão com o Valkyris"))
+            // Guarda a hora da tentativa: sem isso o widget continuava "velho",
+            // pedia outra atualização no redesenho seguinte e entrava em laço
+            // (era o que multiplicava os pedidos de câmera).
+            save(
+                context,
+                state(context).copy(message = "sem conexão com o Valkyris", updatedAt = now),
+            )
             return@withContext false
         }
         val snapshot = WidgetSnapshot(
@@ -177,6 +193,25 @@ internal object WidgetBridge {
                 lights = state(context).lights.map { if (it.id == id) it.copy(power = !light.power) else it },
                 updatedAt = System.currentTimeMillis(),
             ),
+        )
+    }
+
+    /**
+     * Toque numa linha do widget de lâmpadas: a lâmpada acende ou a tela dela
+     * abre, exatamente como no aplicativo.
+     */
+    suspend fun lightItem(context: Context, action: String, id: String) {
+        if (id.isBlank()) return
+        if (action == WidgetActionReceiver.ITEM_OPEN) openLight(context, id) else toggleLight(context, id)
+    }
+
+    private fun openLight(context: Context, id: String) {
+        val launcher = context.packageManager.getLaunchIntentForPackage(context.packageName) ?: return
+        context.startActivity(
+            Intent(launcher)
+                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                .setPackage(context.packageName)
+                .putExtra(ValkyrisWidgetProvider.EXTRA_SECTION, "light:$id"),
         )
     }
 
@@ -293,6 +328,13 @@ abstract class ValkyrisWidgetProvider : AppWidgetProvider() {
         fun pendingRemoteKey(context: Context, key: String, requestCode: Int): PendingIntent {
             val intent = Intent(context, WidgetActionReceiver::class.java).setAction(WidgetActionReceiver.ACTION_REMOTE_KEY).putExtra(WidgetActionReceiver.EXTRA_KEY, key)
             return PendingIntent.getBroadcast(context, requestCode, intent, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
+        }
+
+        fun pendingLightItem(context: Context): PendingIntent {
+            val intent = Intent(context, WidgetActionReceiver::class.java).setAction(WidgetActionReceiver.ACTION_LIGHT_ITEM)
+            // Mutável de propósito: é o modelo que recebe os dados do toque da
+            // linha (qual lâmpada e o que fazer).
+            return PendingIntent.getBroadcast(context, 13, intent, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_MUTABLE)
         }
 
         fun pendingRemoteText(context: Context, text: String, requestCode: Int): PendingIntent {

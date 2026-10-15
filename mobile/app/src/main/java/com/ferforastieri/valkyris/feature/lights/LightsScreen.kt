@@ -26,8 +26,8 @@ import com.ferforastieri.valkyris.core.design.ValkyrisBottomSheet
 import com.ferforastieri.valkyris.core.design.lightTint
 import com.ferforastieri.valkyris.core.model.*
 
-@Composable fun LightsScreen(admin:Boolean,onLight:(String)->Unit={},vm:LightsViewModel=hiltViewModel()){
-    LifecycleResumeEffect(Unit){vm.refresh();onPauseOrDispose{}}
+@Composable fun LightsScreen(admin:Boolean,onLight:(String)->Unit,vm:LightsViewModel=hiltViewModel()){
+    LifecycleResumeEffect(Unit){vm.setActive(true);onPauseOrDispose{vm.setActive(false)}}
     val state by vm.state.collectAsStateWithLifecycle()
     var removing by remember{mutableStateOf<LightDevice?>(null)}
     var renaming by remember{mutableStateOf<LightDevice?>(null)}

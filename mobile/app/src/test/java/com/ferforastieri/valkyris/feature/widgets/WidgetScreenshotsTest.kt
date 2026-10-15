@@ -5,6 +5,7 @@ import android.graphics.Canvas
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
+import android.widget.LinearLayout
 import android.widget.ImageView
 import android.widget.TextView
 import androidx.test.core.app.ApplicationProvider
@@ -71,12 +72,20 @@ class WidgetScreenshotsTest {
 
     @Test
     fun lightRows() {
-        val widget = inflate(R.layout.widget_lights)
-        val list = widget.findViewById<ViewGroup>(R.id.widget_lights_list)
-        list.addView(lightRow("Luz Suíte", "Ligada · 99%", on = true, offline = false, color = 0xFFFFC98A.toInt()))
-        list.addView(lightRow("Sala de TV", "Ligada · 40%", on = true, offline = false, color = 0xFF7EC8FF.toInt()))
-        list.addView(lightRow("Sala de Jantar", "Desligada", on = false, offline = false, color = 0xFFFFFFFF.toInt()))
-        list.addView(lightRow("Quarto bebê", "Indisponível", on = false, offline = true, color = 0xFFFFFFFF.toInt()))
+        // A lista é uma coleção (ListView) alimentada pelo serviço; para a
+        // imagem de comparação, as linhas entram numa coluna comum.
+        val widget = inflate(R.layout.widget_lights) as ViewGroup
+        val list = widget.findViewById<View>(R.id.widget_lights_list)
+        val list2 = LinearLayout(context).apply {
+            orientation = LinearLayout.VERTICAL
+            layoutParams = list.layoutParams
+        }
+        widget.removeView(list)
+        widget.addView(list2)
+        list2.addView(lightRow("Luz Suíte", "Ligada · 99%", on = true, offline = false, color = 0xFFFFC98A.toInt()))
+        list2.addView(lightRow("Sala de TV", "Ligada · 40%", on = true, offline = false, color = 0xFF7EC8FF.toInt()))
+        list2.addView(lightRow("Sala de Jantar", "Desligada", on = false, offline = false, color = 0xFFFFFFFF.toInt()))
+        list2.addView(lightRow("Quarto bebê", "Indisponível", on = false, offline = true, color = 0xFFFFFFFF.toInt()))
         widget.sized(dp(360), dp(430)).save("widget-light-rows.png")
     }
 

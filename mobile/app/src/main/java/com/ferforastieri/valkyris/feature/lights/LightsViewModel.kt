@@ -38,11 +38,26 @@ class LightsViewModel @Inject constructor(
     private val _state = MutableStateFlow(LightsState())
     val state = _state.asStateFlow()
     private var realtime: okhttp3.WebSocket? = null
-    private var active = true
+    // O canal só fica de pé enquanto a tela está à frente. Antes ele subia junto
+    // com o aplicativo e seguia aberto em segundo plano, recarregando as listas
+    // de minuto em minuto a noite inteira.
+    private var active = false
 
     init {
         viewModelScope.launch { repository.lights.collect { value -> _state.update { it.copy(lights = value, loading = false) } } }
-        refresh(); connectRealtime()
+        refresh()
+    }
+
+    /** Liga o canal quando a tela aparece e o desliga quando ela sai de vista. */
+    fun setActive(value: Boolean) {
+        if (value == active) return
+        active = value
+        if (value) {
+            connectRealtime(); refresh()
+        } else {
+            realtime?.close(1000, "tela fora de vista")
+            realtime = null
+        }
     }
 
     private fun connectRealtime() {

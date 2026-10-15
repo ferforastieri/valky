@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Cabeçalho e lista de lâmpadas favoritas. As linhas são adicionadas pelo
-     provider com RemoteViews.addView. -->
+<!-- Cabeçalho e lista de lâmpadas. A lista é uma coleção (ListView) alimentada
+     pelo LightsWidgetService: rola e mostra todas as lâmpadas. -->
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools"
     android:id="@+id/widget_lights_root"
@@ -56,13 +56,15 @@
         android:paddingBottom="6dp"
         android:text="@string/widget_lights_empty"
         android:textColor="@color/widget_muted"
-        android:textSize="12sp"
-        android:visibility="gone" />
+        android:textSize="12sp" />
 
-    <LinearLayout
+    <ListView
         android:id="@+id/widget_lights_list"
         android:layout_width="match_parent"
-        android:layout_height="wrap_content"
+        android:layout_height="0dp"
         android:layout_marginTop="8dp"
-        android:orientation="vertical" />
+        android:layout_weight="1"
+        android:divider="@null"
+        android:dividerHeight="0dp"
+        android:scrollbars="none" />
 </LinearLayout>

@@ -27,6 +27,7 @@ import com.composables.icons.lucide.Lucide
 import com.composables.icons.lucide.MapPin
 import com.composables.icons.lucide.Mic
 import com.composables.icons.lucide.Video
+import androidx.lifecycle.compose.LifecycleResumeEffect
 import com.ferforastieri.valkyris.R
 import com.ferforastieri.valkyris.core.design.ValkyrisBottomSheet
 import com.ferforastieri.valkyris.core.model.ValkyrisEvent
@@ -37,7 +38,9 @@ import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 
 @Composable
-fun EventsScreen(onEvent: (String) -> Unit = {}, onCamera: (String) -> Unit = {}, vm: EventsViewModel = hiltViewModel()) {
+fun EventsScreen(onEvent: (String) -> Unit, onCamera: (String) -> Unit, vm: EventsViewModel = hiltViewModel()) {
+    // O canal das notificações só fica de pé com a tela à vista.
+    LifecycleResumeEffect(Unit) { vm.setActive(true); onPauseOrDispose { vm.setActive(false) } }
     val events by vm.events.collectAsStateWithLifecycle()
     EventsContent(events, onEvent, onCamera)
 }

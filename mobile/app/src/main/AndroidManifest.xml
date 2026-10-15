@@ -100,6 +100,11 @@
             <meta-data android:name="android.appwidget.provider" android:resource="@xml/widget_remote_info" />
         </receiver>
         <receiver android:name=".feature.widgets.WidgetActionReceiver" android:exported="false" />
+        <!-- Alimenta a lista (que rola) do widget de lâmpadas. -->
+        <service
+            android:name=".feature.widgets.LightsWidgetService"
+            android:exported="false"
+            android:permission="android.permission.BIND_REMOTEVIEWS" />
         <service
             android:name="androidx.appcompat.app.AppLocalesMetadataHolderService"
             android:enabled="false"

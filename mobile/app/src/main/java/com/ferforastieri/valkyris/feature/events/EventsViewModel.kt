@@ -22,11 +22,23 @@ class EventsViewModel @Inject constructor(
 ) : ViewModel() {
     val events = repository.events
     private var realtime: okhttp3.WebSocket? = null
-    private var active = true
+    // Só conversa com o servidor enquanto as notificações estão à vista.
+    private var active = false
 
     init {
         refresh()
-        connectRealtime()
+    }
+
+    /** Liga o canal quando a tela aparece e o desliga quando ela sai de vista. */
+    fun setActive(value: Boolean) {
+        if (value == active) return
+        active = value
+        if (value) {
+            connectRealtime(); refresh()
+        } else {
+            realtime?.close(1000, "tela fora de vista")
+            realtime = null
+        }
     }
 
     private fun connectRealtime() {

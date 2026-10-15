@@ -62,12 +62,25 @@ class CamerasViewModel @Inject constructor(
             }
         }
         refresh()
-        connectRealtime()
+        // Ronda de segurança: só com a tela à frente (o canal já avisa das
+        // mudanças; isto é para o caso de o canal cair).
         viewModelScope.launch {
             while (isActive) {
                 delay(STATUS_REFRESH_MS)
-                runCatching { repository.refreshCameras() }
+                if (active) runCatching { repository.refreshCameras() }
             }
+        }
+    }
+
+    /** Liga o canal quando a tela aparece e o desliga quando ela sai de vista. */
+    fun setActive(value: Boolean) {
+        if (value == active) return
+        active = value
+        if (value) {
+            connectRealtime(); refresh()
+        } else {
+            realtime?.close(1000, "tela fora de vista")
+            realtime = null
         }
     }
 
@@ -185,18 +198,35 @@ class CameraLiveViewModel @Inject constructor(
     val statsLoading = _statsLoading.asStateFlow()
     private val ptzMutex = Mutex()
     private var realtime: okhttp3.WebSocket? = null
+    private var active = false
 
     init {
-        realtime = api.realtime({ refresh() }, eventPrefix = "camera.")
         viewModelScope.launch {
             while (isActive) {
+                if (!active) {
+                    delay(2_000)
+                    continue
+                }
                 runCatching { api.cameras().firstOrNull { it.id == id } }.onSuccess { _camera.value = it }
                 if (_camera.value?.setupStatus in setOf("ready", "failed")) {
                     if (_camera.value?.setupStatus == "ready") loadPreview()
                     break
                 }
-                delay(1_000)
+                delay(2_000)
             }
+        }
+    }
+
+    /** O canal e a busca da prévia só valem com a tela da câmera à frente. */
+    fun setActive(value: Boolean) {
+        if (value == active) return
+        active = value
+        if (value) {
+            realtime = api.realtime({ refresh() }, eventPrefix = "camera.")
+            refresh()
+        } else {
+            realtime?.close(1000, "tela fora de vista")
+            realtime = null
         }
     }
 

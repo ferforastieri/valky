@@ -21,6 +21,16 @@ class WidgetActionReceiver : BroadcastReceiver() {
             try {
                 when (action) {
                     ACTION_TOGGLE_LIGHT -> intent.getStringExtra(EXTRA_ID)?.let { WidgetBridge.toggleLight(app, it) }
+                    // Toque numa linha da lista do widget: acende ou abre a luz.
+                    // O que fazer e qual lâmpada vêm nos extras ou no endereço.
+                    ACTION_LIGHT_ITEM -> {
+                        val segments = intent.data?.pathSegments.orEmpty()
+                        WidgetBridge.lightItem(
+                            app,
+                            intent.getStringExtra(EXTRA_ITEM_ACTION) ?: segments.getOrNull(0).orEmpty(),
+                            intent.getStringExtra(EXTRA_ID) ?: segments.getOrNull(1).orEmpty(),
+                        )
+                    }
                     ACTION_REMOTE_KEY -> intent.getStringExtra(EXTRA_KEY)?.let { WidgetBridge.sendKey(app, it) }
                     // Igual ao botão do app: uma tecla, um texto digitado.
                     ACTION_REMOTE_TEXT -> intent.getStringExtra(EXTRA_TEXT)?.let { WidgetBridge.sendText(app, it) }
@@ -45,6 +55,7 @@ class WidgetActionReceiver : BroadcastReceiver() {
         const val ACTION_REFRESH = "com.ferforastieri.valkyris.widget.REFRESH"
         const val ACTION_PHOTO_ALARM = "com.ferforastieri.valkyris.widget.PHOTO_ALARM"
         const val ACTION_TOGGLE_LIGHT = "com.ferforastieri.valkyris.widget.TOGGLE_LIGHT"
+        const val ACTION_LIGHT_ITEM = "com.ferforastieri.valkyris.widget.LIGHT_ITEM"
         const val ACTION_REMOTE_KEY = "com.ferforastieri.valkyris.widget.REMOTE_KEY"
         const val ACTION_REMOTE_TEXT = "com.ferforastieri.valkyris.widget.REMOTE_TEXT"
         const val ACTION_REMOTE_POWER = "com.ferforastieri.valkyris.widget.REMOTE_POWER"
@@ -52,5 +63,10 @@ class WidgetActionReceiver : BroadcastReceiver() {
         const val EXTRA_ID = "id"
         const val EXTRA_KEY = "key"
         const val EXTRA_TEXT = "text"
+        const val EXTRA_ITEM_ACTION = "itemAction"
+
+        /** Toques da linha da lâmpada no widget. */
+        const val ITEM_TOGGLE = "toggle"
+        const val ITEM_OPEN = "open"
     }
 }

@@ -94,7 +94,7 @@ internal data class CameraListStream(
 )
 
 @Composable fun CamerasScreen(onCamera:(String)->Unit,canManage:Boolean=true,vm:CamerasViewModel=hiltViewModel()){
-    LifecycleResumeEffect(Unit) { vm.refresh();onPauseOrDispose {} }
+    LifecycleResumeEffect(Unit) { vm.setActive(true);onPauseOrDispose { vm.setActive(false) } }
     val state by vm.state.collectAsStateWithLifecycle()
     var showAdd by remember{mutableStateOf(false)}
     var failedCameraId by remember{mutableStateOf<String?>(null)}
@@ -424,9 +424,11 @@ private fun ReadyCameraContent(camera: Camera, vm: CameraLiveViewModel, onEvent:
     }
     LifecycleResumeEffect(camera.id) {
         streamForeground = true
+        vm.setActive(true)
         onPauseOrDispose {
             streamForeground = false
             showFullscreen = false
+            vm.setActive(false)
         }
     }
     val controller = remember(vm.whepUrl(), streamForeground) {
