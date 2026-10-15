@@ -248,8 +248,11 @@ internal object WidgetBridge {
         runCatching { api(context).sendRemoteKey(remote.id, key) }
     }
 
-    suspend fun toggleRemotePower(context: Context) {
-        val remote = state(context).remotes.firstOrNull() ?: return
+    suspend fun toggleRemotePower(context: Context, id: String = "") {
+        // O controle que está na tela é o que liga/desliga (o id vem do toque);
+        // sem id, vale o primeiro da lista, como antes.
+        val remotes = state(context).remotes
+        val remote = remotes.firstOrNull { it.id == id } ?: remotes.firstOrNull() ?: return
         runCatching { api(context).powerRemote(remote.id) }
     }
 }
@@ -354,8 +357,9 @@ abstract class ValkyrisWidgetProvider : AppWidgetProvider() {
             return PendingIntent.getBroadcast(context, requestCode, intent, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
         }
 
-        fun pendingRemotePower(context: Context, requestCode: Int): PendingIntent {
+        fun pendingRemotePower(context: Context, id: String, requestCode: Int): PendingIntent {
             val intent = Intent(context, WidgetActionReceiver::class.java).setAction(WidgetActionReceiver.ACTION_REMOTE_POWER)
+                .putExtra(WidgetActionReceiver.EXTRA_ID, id)
             return PendingIntent.getBroadcast(context, requestCode, intent, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
         }
 

@@ -36,7 +36,7 @@ class WidgetActionReceiver : BroadcastReceiver() {
                     ACTION_REMOTE_TEXT -> intent.getStringExtra(EXTRA_TEXT)?.let { WidgetBridge.sendText(app, it) }
                     // Energia igual à do app: desliga se estiver ligada e acorda
                     // a TV pela rede quando ela estiver em espera.
-                    ACTION_REMOTE_POWER -> WidgetBridge.toggleRemotePower(app)
+                    ACTION_REMOTE_POWER -> WidgetBridge.toggleRemotePower(app, intent.getStringExtra(EXTRA_ID).orEmpty())
                     // Troca o teclado do widget (números/letras) sem sair da home.
                     ACTION_REMOTE_KEYPAD -> WidgetBridge.setKeypadLetters(app, !WidgetBridge.keypadLetters(app))
                     // Só a imagem da câmera: mantém o widget perto do tempo real

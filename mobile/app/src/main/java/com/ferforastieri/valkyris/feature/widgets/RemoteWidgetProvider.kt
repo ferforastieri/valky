@@ -45,7 +45,7 @@ class RemoteWidgetProvider : ValkyrisWidgetProvider() {
         }
         // Energia igual ao botão do app (desliga ligada, acorda em espera) e o
         // botão ABC troca o teclado aqui mesmo, sem abrir o aplicativo.
-        views.setOnClickPendingIntent(R.id.widget_remote_power, pendingRemotePower(context, 31))
+        views.setOnClickPendingIntent(R.id.widget_remote_power, pendingRemotePower(context, remote.id, 31))
         views.setOnClickPendingIntent(R.id.widget_remote_name, pendingOpenApp(context, "remote:${remote.id}", 32))
         val letters = WidgetBridge.keypadLetters(context)
         views.setOnClickPendingIntent(R.id.widget_remote_abc, pendingRemoteKeypad(context, 33))

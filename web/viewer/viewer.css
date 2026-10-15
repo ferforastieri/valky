@@ -430,7 +430,7 @@ main {
 .devices-light-title { margin-top: 42px; }
 .section-title.compact { margin-top: 28px; }
 .light-grid { display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:12px; }
-.light-card { display:flex;align-items:stretch;border:1px solid color-mix(in srgb,var(--light-color) 55%,var(--line));border-radius:16px;background:linear-gradient(135deg,color-mix(in srgb,var(--light-color) var(--light-glow),var(--surface)),var(--surface) 72%);box-shadow:var(--shadow);overflow:hidden; }
+.light-card { display:flex;align-items:center;gap:12px;padding:12px 14px;border:1px solid var(--line);border-radius:16px;background:var(--surface);box-shadow:var(--shadow); }
 .light-main { flex:1;justify-content:flex-start;border:0;border-radius:0;background:transparent;padding:17px;text-align:left; }
 .light-main > span:not(.light-orb) { display:flex;flex-direction:column;min-width:0; }
 .light-main strong { font-family:var(--display);font-size:17px; }
