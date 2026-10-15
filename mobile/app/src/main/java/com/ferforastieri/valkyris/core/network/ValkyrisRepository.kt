@@ -12,6 +12,10 @@ import javax.inject.Singleton
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
+import kotlinx.serialization.json.contentOrNull
+import kotlinx.serialization.json.decodeFromJsonElement
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
 
 // This repository intentionally keeps no persistent/offline cache. Every refresh
 // reads the current data from the Valkyris API.
@@ -21,6 +25,9 @@ class ValkyrisRepository @Inject constructor(
     private val notifier: com.ferforastieri.valkyris.core.alarm.AlarmNotifier,
     @dagger.hilt.android.qualifiers.ApplicationContext private val appContext: android.content.Context,
 ) {
+    /** Leitura dos avisos do canal em tempo real. */
+    private val json = kotlinx.serialization.json.Json { ignoreUnknownKeys = true }
+
     private val _cameras = MutableStateFlow<List<Camera>>(emptyList())
     val cameras = _cameras.asStateFlow()
     private val _events = MutableStateFlow<List<ValkyrisEvent>>(emptyList())
@@ -57,6 +64,26 @@ class ValkyrisRepository @Inject constructor(
     suspend fun deleteCamera(id: String) {
         api.deleteCamera(id)
         _cameras.update { current -> current.filterNot { it.id == id } }
+    }
+
+    /**
+     * Aplica no lugar o que chegou pelo canal em tempo real: é o mesmo dado que
+     * o servidor mandou, então a tela muda na hora e nada é pedido de novo.
+     * Devolve falso quando o aviso não traz o que precisamos — aí quem chamou
+     * pede a lista, como plano B.
+     */
+    fun applyLightEvent(payload: String): Boolean {
+        if (payload.isBlank()) return false
+        val root = runCatching { json.parseToJsonElement(payload).jsonObject }.getOrNull() ?: return false
+        val id = root["lightId"]?.jsonPrimitive?.contentOrNull
+            ?: root["light"]?.jsonObject?.get("id")?.jsonPrimitive?.contentOrNull
+            ?: return false
+        val stateJson = root["state"] ?: root["light"]?.jsonObject?.get("state") ?: return false
+        if (_lights.value.none { it.id == id }) return false
+        val state = runCatching { json.decodeFromJsonElement<com.ferforastieri.valkyris.core.model.LightState>(stateJson) }.getOrNull() ?: return false
+        _lights.update { list -> list.map { if (it.id == id) it.copy(state = state) else it } }
+        runCatching { com.ferforastieri.valkyris.feature.widgets.WidgetBridge.publishLights(appContext, _lights.value) }
+        return true
     }
 
     suspend fun refreshLights() = api.lights().also { lights ->

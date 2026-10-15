@@ -295,6 +295,7 @@
     <string name="widget_light_off">Off</string>
     <string name="widget_light_offline">Unavailable</string>
     <string name="widget_light_toggle">Turn on or off</string>
+    <string name="light_missing">This bulb is no longer here.</string>
     <string name="light_toggle">Turn on or off</string>
     <string name="widget_camera_title">Camera</string>
     <string name="widget_camera_empty">Register a camera</string>

@@ -30,6 +30,7 @@ import androidx.lifecycle.compose.LifecycleResumeEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.composables.icons.lucide.*
 import com.ferforastieri.valkyris.R
+import androidx.compose.runtime.LaunchedEffect
 import com.ferforastieri.valkyris.core.design.ValkyrisTopBar
 import com.ferforastieri.valkyris.core.design.AnimatedBulbIcon
 import com.ferforastieri.valkyris.core.design.warmWhiteColor
@@ -55,8 +56,14 @@ fun LightDetailScreen(
     val busy by vm.busy.collectAsStateWithLifecycle()
     LifecycleResumeEffect(Unit) { vm.refresh(); onPauseOrDispose {} }
     val light = lights.firstOrNull { it.id == lightId }
+    val missing by vm.missing.collectAsStateWithLifecycle()
     if (light == null) {
-        Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { CircularProgressIndicator() }
+        // Pode ser o primeiro toque, vindo do widget: busca antes de desistir.
+        LaunchedEffect(lightId) { vm.ensure(lightId) }
+        Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+            if (missing) Text(stringResource(R.string.light_missing), color = MaterialTheme.colorScheme.onSurfaceVariant)
+            else CircularProgressIndicator()
+        }
         return
     }
     LightDetailContent(light, busy, onBack, onNotifications, unreadNotifications) { vm.control(light.id, it) }

@@ -60,7 +60,7 @@ class PeopleViewModel @Inject constructor(
 
     private fun connectRealtime() {
         realtime = repository.api.realtime(
-            { viewModelScope.launch { refresh() } },
+            { _ -> viewModelScope.launch { refresh() } },
             { if (observing) viewModelScope.launch { delay(5_000); if (observing) connectRealtime() } },
         )
     }

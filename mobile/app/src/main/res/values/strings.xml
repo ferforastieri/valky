@@ -295,6 +295,7 @@
     <string name="widget_light_off">Desligada</string>
     <string name="widget_light_offline">Indisponível</string>
     <string name="widget_light_toggle">Ligar ou desligar</string>
+    <string name="light_missing">Esta lâmpada não está mais aqui.</string>
     <string name="light_toggle">Ligar ou desligar</string>
     <string name="widget_camera_title">Câmera</string>
     <string name="widget_camera_empty">Cadastre uma câmera</string>

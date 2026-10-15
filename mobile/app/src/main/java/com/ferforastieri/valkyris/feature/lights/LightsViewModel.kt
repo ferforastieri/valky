@@ -61,7 +61,7 @@ class LightsViewModel @Inject constructor(
     }
 
     private fun connectRealtime() {
-        realtime = repository.api.realtime({ refresh() }, { if (active) viewModelScope.launch { delay(5_000); if (active) connectRealtime() } }, eventPrefix = "light.")
+        realtime = repository.api.realtime({ message -> if (!repository.applyLightEvent(message)) refresh() }, { if (active) viewModelScope.launch { delay(5_000); if (active) connectRealtime() } }, eventPrefix = "light.")
     }
 
     fun refresh() = viewModelScope.launch { runCatching { repository.refreshLights() }.onFailure { error -> _state.update { it.copy(loading = false, error = error.message) } } }

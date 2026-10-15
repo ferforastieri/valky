@@ -85,7 +85,7 @@ class CamerasViewModel @Inject constructor(
     }
 
     private fun connectRealtime() {
-        realtime = api.realtime({ refreshStatuses() }, {
+        realtime = api.realtime({ _ -> refreshStatuses() }, {
             if (active) viewModelScope.launch { delay(5_000); if (active) connectRealtime() }
         }, eventPrefix = "camera.")
     }
@@ -222,7 +222,7 @@ class CameraLiveViewModel @Inject constructor(
         if (value == active) return
         active = value
         if (value) {
-            realtime = api.realtime({ refresh() }, eventPrefix = "camera.")
+            realtime = api.realtime({ _ -> refresh() }, eventPrefix = "camera.")
             refresh()
         } else {
             realtime?.close(1000, "tela fora de vista")

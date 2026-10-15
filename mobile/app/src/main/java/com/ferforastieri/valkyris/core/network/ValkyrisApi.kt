@@ -508,7 +508,7 @@ class ValkyrisApi(
         }
     }
 
-    fun realtime(onMessage: () -> Unit, onDisconnect: () -> Unit = {}, eventPrefix: String = ""): WebSocket {
+    fun realtime(onMessage: (String) -> Unit, onDisconnect: () -> Unit = {}, eventPrefix: String = ""): WebSocket {
         val current = requireNotNull(session())
         val wsUrl = current.baseUrl.replaceFirst("https://", "wss://").replaceFirst("http://", "ws://")
             .trimEnd('/') + "/api/v1/realtime"
@@ -521,12 +521,12 @@ class ValkyrisApi(
         return realtimeClient(current.fingerprint).newWebSocket(request, object : WebSocketListener() {
             override fun onOpen(webSocket: WebSocket, response: Response) {
                 // Canal (re)aberto: uma leitura garante que a tela não fique com
-                // o estado de antes da queda.
-                notify()
+                // o estado de antes da queda. Sem conteúdo: quem trata pede a lista.
+                notify("")
             }
             override fun onMessage(webSocket: WebSocket, text: String) {
                 val type = runCatching { org.json.JSONObject(text).optString("type") }.getOrDefault("")
-                if (type.startsWith(eventPrefix)) notify()
+                if (type.startsWith(eventPrefix)) notify(text)
             }
             override fun onFailure(webSocket: WebSocket, t: Throwable, response: Response?) {
                 onDisconnect()
