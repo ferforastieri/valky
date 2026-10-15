@@ -2,7 +2,8 @@
     <color name="valkyris_canvas">#E8E9E5</color>
     <color name="valkyris_surface">#F9FAF7</color>
     <color name="widget_surface">#CC1A1F1A</color>
-    <color name="widget_surface_solid">#FF1A1F1A</color>
+    <!-- Fundo dos widgets = fundo do app (CanvasDark). -->
+    <color name="widget_surface_solid">#FF101310</color>
     <color name="widget_ink">#FFF1F4EF</color>
     <color name="widget_muted">#FFA6AFA5</color>
     <color name="widget_signal">#FF8AE07D</color>
@@ -10,4 +11,8 @@
     <color name="widget_outline">#FF2B312B</color>
     <color name="widget_secondary_container">#FF293D29</color>
     <color name="widget_alarm">#FFFF766E</color>
+    <!-- As MESMAS cores dos estados usados na lista de lâmpadas do app. -->
+    <color name="widget_on_secondary_container">#FFE9F7E6</color>
+    <color name="widget_error_container">#FF4C2623</color>
+    <color name="widget_on_error_container">#FFFFDAD6</color>
 </resources>

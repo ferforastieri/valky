@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Mesmo cartão da lista de lâmpadas do app: superfície com contorno. -->
+<shape xmlns:android="http://schemas.android.com/apk/res/android">
+    <solid android:color="@color/widget_surface_solid" />
+    <stroke android:width="1dp" android:color="@color/widget_outline" />
+    <corners android:radius="16dp" />
+</shape>

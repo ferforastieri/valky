@@ -168,7 +168,7 @@ fun OverviewScreen(
     onPeople: () -> Unit,
     onEvents: () -> Unit,
     onRemote: (String) -> Unit,
-    onLight: () -> Unit,
+    onLight: (String) -> Unit,
     onFavorite: (FavoriteItem) -> Unit,
     viewModel: OverviewViewModel = hiltViewModel(),
 ) {
@@ -213,7 +213,7 @@ fun OverviewContent(
     onPeople: () -> Unit = {},
     onEvents: () -> Unit = {},
     onTv: () -> Unit = {},
-    onLight: () -> Unit = {},
+    onLight: (String) -> Unit = {},
     onFavorite: (FavoriteItem) -> Unit = {},
     onToggleLight: (FavoriteItem) -> Unit = {},
     activityChart: @Composable () -> Unit = {},
@@ -239,11 +239,13 @@ fun OverviewContent(
                     onOpen = { favorite ->
                         when (favorite.type) {
                             "camera" -> onCamera(favorite.id)
-                            // A lâmpada é acionada aqui mesmo, sem sair da visão geral.
-                            "light" -> onToggleLight(favorite)
+                            // A lâmpada abre a tela; quem acende é o ícone da
+                            // lâmpada dentro do cartão, igual à lista do app.
+                            "light" -> onLight(favorite.id)
                             else -> onFavorite(favorite)
                         }
                     },
+                    onToggle = { favorite -> if (favorite.type == "light") onToggleLight(favorite) },
                 )
             }
         }
@@ -355,6 +357,7 @@ internal fun orderedFavorites(favorites: List<FavoriteItem>): List<FavoriteItem>
 internal fun FavoriteGrid(
     items: List<FavoriteItem>,
     onOpen: (FavoriteItem) -> Unit,
+    onToggle: (FavoriteItem) -> Unit = {},
 ) {
     val count = items.size
     val columns = if (LocalDensity.current.fontScale >= 1.3f) 1 else 2
@@ -366,6 +369,7 @@ internal fun FavoriteGrid(
                         item = favorite,
                         modifier = Modifier.weight(1f),
                         onClick = { onOpen(favorite) },
+                        onToggle = { onToggle(favorite) },
                     )
                 }
                 repeat(columns - row.size) { Spacer(Modifier.weight(1f)) }
@@ -375,7 +379,7 @@ internal fun FavoriteGrid(
 }
 
 @Composable
-internal fun FavoriteCard(item: FavoriteItem, modifier: Modifier, onClick: () -> Unit) {
+internal fun FavoriteCard(item: FavoriteItem, modifier: Modifier, onClick: () -> Unit, onToggle: () -> Unit = {}) {
     val lamp = item.type == "light"
     val lit = lamp && item.power && item.online
     Card(
@@ -387,15 +391,25 @@ internal fun FavoriteCard(item: FavoriteItem, modifier: Modifier, onClick: () ->
         elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
     ) {
         Row(Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 12.dp), verticalAlignment = Alignment.CenterVertically) {
-            Surface(Modifier.size(36.dp), RoundedCornerShape(11.dp), color = com.ferforastieri.valkyris.core.design.ColorTokens.BrandTile) {
-                if (lamp) {
+            if (lamp) {
+                // A lâmpada é o botão: acende e apaga sem sair da visão geral.
+                Surface(
+                    onClick = onToggle,
+                    enabled = item.online,
+                    modifier = Modifier.size(36.dp),
+                    shape = RoundedCornerShape(11.dp),
+                    color = com.ferforastieri.valkyris.core.design.ColorTokens.BrandTile,
+                ) {
                     com.ferforastieri.valkyris.core.design.AnimatedBulbIcon(
                         on = lit,
                         color = com.ferforastieri.valkyris.core.design.lightTint(item.mode, item.hue, item.saturation, item.value, item.kelvin),
                         offTint = MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier.padding(7.dp),
+                        contentDescription = stringResource(R.string.light_toggle),
                     )
-                } else {
+                }
+            } else {
+                Surface(Modifier.size(36.dp), RoundedCornerShape(11.dp), color = com.ferforastieri.valkyris.core.design.ColorTokens.BrandTile) {
                     Icon(favoriteIcon(item.type), null, Modifier.padding(9.dp), tint = MaterialTheme.colorScheme.secondary)
                 }
             }

@@ -43,9 +43,15 @@ class RemoteWidgetProvider : ValkyrisWidgetProvider() {
             )
             return views
         }
-        views.setOnClickPendingIntent(R.id.widget_remote_power, pendingRemoteKey(context, "KEY_POWER", 31))
-        views.setOnClickPendingIntent(R.id.widget_remote_name, pendingOpenApp(context, "remote:${remote!!.id}", 32))
-        views.setOnClickPendingIntent(R.id.widget_remote_abc, pendingOpenApp(context, "remote:${remote!!.id}", 33))
+        // Energia igual ao botão do app (desliga ligada, acorda em espera) e o
+        // botão ABC troca o teclado aqui mesmo, sem abrir o aplicativo.
+        views.setOnClickPendingIntent(R.id.widget_remote_power, pendingRemotePower(context, 31))
+        views.setOnClickPendingIntent(R.id.widget_remote_name, pendingOpenApp(context, "remote:${remote.id}", 32))
+        val letters = WidgetBridge.keypadLetters(context)
+        views.setOnClickPendingIntent(R.id.widget_remote_abc, pendingRemoteKeypad(context, 33))
+        views.setTextViewText(R.id.widget_remote_abc, context.getString(if (letters) R.string.widget_remote_keypad_letters else R.string.widget_remote_keypad_toggle))
+        views.setViewVisibility(R.id.widget_remote_digits, if (letters) View.GONE else View.VISIBLE)
+        views.setViewVisibility(R.id.widget_remote_letters, if (letters) View.VISIBLE else View.GONE)
         val keys = listOf(
             Key(R.id.widget_remote_up, "KEY_UP"),
             Key(R.id.widget_remote_down, "KEY_DOWN"),
@@ -75,6 +81,38 @@ class RemoteWidgetProvider : ValkyrisWidgetProvider() {
             R.id.widget_remote_digit_9 to "KEY_9",
             R.id.widget_remote_digit_0 to "KEY_0",
         ).forEachIndexed { index, (view, key) -> views.setOnClickPendingIntent(view, pendingRemoteKey(context, key, 70 + index)) }
+        // Letras, espaço, apagar e enter: os MESMOS textos que o app digita na TV.
+        listOf(
+            R.id.widget_remote_letter_q to "q",
+            R.id.widget_remote_letter_w to "w",
+            R.id.widget_remote_letter_e to "e",
+            R.id.widget_remote_letter_r to "r",
+            R.id.widget_remote_letter_t to "t",
+            R.id.widget_remote_letter_y to "y",
+            R.id.widget_remote_letter_u to "u",
+            R.id.widget_remote_letter_i to "i",
+            R.id.widget_remote_letter_o to "o",
+            R.id.widget_remote_letter_p to "p",
+            R.id.widget_remote_letter_a to "a",
+            R.id.widget_remote_letter_s to "s",
+            R.id.widget_remote_letter_d to "d",
+            R.id.widget_remote_letter_f to "f",
+            R.id.widget_remote_letter_g to "g",
+            R.id.widget_remote_letter_h to "h",
+            R.id.widget_remote_letter_j to "j",
+            R.id.widget_remote_letter_k to "k",
+            R.id.widget_remote_letter_l to "l",
+            R.id.widget_remote_letter_z to "z",
+            R.id.widget_remote_letter_x to "x",
+            R.id.widget_remote_letter_c to "c",
+            R.id.widget_remote_letter_v to "v",
+            R.id.widget_remote_letter_b to "b",
+            R.id.widget_remote_letter_n to "n",
+            R.id.widget_remote_letter_m to "m",
+            R.id.widget_remote_text_space to " ",
+            R.id.widget_remote_text_backspace to "\b",
+            R.id.widget_remote_text_enter to "\n",
+        ).forEachIndexed { index, (view, text) -> views.setOnClickPendingIntent(view, pendingRemoteText(context, text, 200 + index)) }
         return views
     }
 }

@@ -58,13 +58,25 @@ class LightsWidgetProvider : ValkyrisWidgetProvider() {
                     else -> context.getString(R.string.widget_light_off)
                 },
             )
+            // A linha é a MESMA do aplicativo: a lâmpada acesa fica na cor da
+            // luz com a aura em volta; apagada (ou fora do ar) fica apagada.
             val on = light.power && light.online
-            row.setImageViewResource(R.id.widget_light_bulb, if (on) R.drawable.widget_light_glow else R.drawable.widget_bulb_off)
-            row.setInt(R.id.widget_light_bulb, "setColorFilter", if (on) light.color else context.getColor(R.color.widget_muted))
-            row.setImageViewResource(R.id.widget_light_power, if (light.power) R.drawable.widget_switch_on else R.drawable.widget_switch_off)
-            row.setFloat(R.id.widget_light_power, "setAlpha", if (light.online) 1f else .4f)
-            row.setOnClickPendingIntent(R.id.widget_light_power, pendingToggleLight(context, light.id, 100 + index))
-            row.setOnClickPendingIntent(R.id.widget_light_row, pendingOpenApp(context, "lights", 120 + index))
+            row.setImageViewResource(R.id.widget_light_bulb, if (on) R.drawable.widget_bulb_on else R.drawable.widget_bulb_off)
+            row.setInt(
+                R.id.widget_light_bulb,
+                "setColorFilter",
+                if (on) light.color else context.getColor(R.color.widget_on_secondary_container),
+            )
+            row.setViewVisibility(R.id.widget_light_glow, if (on) View.VISIBLE else View.GONE)
+            if (on) row.setInt(R.id.widget_light_glow, "setColorFilter", light.color)
+            row.setTextColor(
+                R.id.widget_light_state,
+                if (light.online) context.getColor(R.color.widget_muted) else context.getColor(R.color.widget_alarm),
+            )
+            // Tocar na lâmpada liga/desliga (como no app); tocar na linha abre a
+            // luz, não a lista.
+            row.setOnClickPendingIntent(R.id.widget_light_toggle, pendingToggleLight(context, light.id, 100 + index))
+            row.setOnClickPendingIntent(R.id.widget_light_row, pendingOpenApp(context, "light:${light.id}", 120 + index))
             views.addView(R.id.widget_lights_list, row)
         }
         return views

@@ -60,6 +60,7 @@ internal object WidgetBridge {
     private const val STORE = "valkyris_widgets"
     private const val KEY_STATE = "state"
     private const val KEY_PHOTO = "photo"
+    private const val KEY_KEYPAD = "keypad_letters"
     private val json = Json { ignoreUnknownKeys = true; encodeDefaults = true }
 
     fun api(context: Context): ValkyrisApi {
@@ -179,6 +180,22 @@ internal object WidgetBridge {
         )
     }
 
+    /**
+     * Teclado do controle: letras ou números. É a MESMA troca que o botão ABC
+     * faz dentro do aplicativo, lembrada entre uma atualização e outra.
+     */
+    fun keypadLetters(context: Context): Boolean = prefs(context).getBoolean(KEY_KEYPAD, false)
+
+    fun setKeypadLetters(context: Context, letters: Boolean) {
+        prefs(context).edit().putBoolean(KEY_KEYPAD, letters).apply()
+    }
+
+    /** Digita no campo da TV: letras, espaço, apagar e enter, como no app. */
+    suspend fun sendText(context: Context, text: String) {
+        val remote = state(context).remotes.firstOrNull() ?: return
+        runCatching { api(context).sendRemoteText(remote.id, text) }
+    }
+
     suspend fun sendKey(context: Context, key: String) {
         val remote = state(context).remotes.firstOrNull() ?: return
         runCatching { api(context).sendRemoteKey(remote.id, key) }
@@ -275,6 +292,21 @@ abstract class ValkyrisWidgetProvider : AppWidgetProvider() {
 
         fun pendingRemoteKey(context: Context, key: String, requestCode: Int): PendingIntent {
             val intent = Intent(context, WidgetActionReceiver::class.java).setAction(WidgetActionReceiver.ACTION_REMOTE_KEY).putExtra(WidgetActionReceiver.EXTRA_KEY, key)
+            return PendingIntent.getBroadcast(context, requestCode, intent, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
+        }
+
+        fun pendingRemoteText(context: Context, text: String, requestCode: Int): PendingIntent {
+            val intent = Intent(context, WidgetActionReceiver::class.java).setAction(WidgetActionReceiver.ACTION_REMOTE_TEXT).putExtra(WidgetActionReceiver.EXTRA_TEXT, text)
+            return PendingIntent.getBroadcast(context, requestCode, intent, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
+        }
+
+        fun pendingRemotePower(context: Context, requestCode: Int): PendingIntent {
+            val intent = Intent(context, WidgetActionReceiver::class.java).setAction(WidgetActionReceiver.ACTION_REMOTE_POWER)
+            return PendingIntent.getBroadcast(context, requestCode, intent, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
+        }
+
+        fun pendingRemoteKeypad(context: Context, requestCode: Int): PendingIntent {
+            val intent = Intent(context, WidgetActionReceiver::class.java).setAction(WidgetActionReceiver.ACTION_REMOTE_KEYPAD)
             return PendingIntent.getBroadcast(context, requestCode, intent, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
         }
 

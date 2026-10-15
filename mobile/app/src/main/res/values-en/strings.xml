@@ -295,11 +295,14 @@
     <string name="widget_light_off">Off</string>
     <string name="widget_light_offline">Unavailable</string>
     <string name="widget_light_toggle">Turn on or off</string>
+    <string name="light_toggle">Turn on or off</string>
     <string name="widget_camera_title">Camera</string>
     <string name="widget_camera_empty">Register a camera</string>
     <string name="widget_camera_waiting">Waiting for a picture…</string>
     <string name="widget_remote_title">Remote</string>
     <string name="widget_remote_keypad_toggle">ABC</string>
+    <string name="widget_remote_keypad_letters">123</string>
+    <string name="widget_remote_space">space</string>
     <string name="widget_remote_empty">No remote registered</string>
     <string name="widget_remote_power">Power</string>
     <string name="widget_remote_up">Up</string>

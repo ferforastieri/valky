@@ -39,6 +39,7 @@ fun AnimatedBulbIcon(
     offTint: Color,
     modifier: Modifier = Modifier,
     size: Dp = 30.dp,
+    contentDescription: String? = null,
 ) {
     val tint by animateColorAsState(
         targetValue = if (on) color else offTint,
@@ -76,7 +77,7 @@ fun AnimatedBulbIcon(
         }
         Icon(
             if (on) Lucide.Lightbulb else Lucide.LightbulbOff,
-            null,
+            contentDescription,
             Modifier.fillMaxSize().scale(if (on) breathe else restScale),
             tint = tint,
         )

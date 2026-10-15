@@ -26,6 +26,7 @@ import java.util.concurrent.TimeUnit
 import java.util.concurrent.ConcurrentHashMap
 import javax.net.ssl.SSLContext
 import javax.net.ssl.X509TrustManager
+import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.Response
 import okhttp3.WebSocket
@@ -46,27 +47,48 @@ class ValkyrisApi(
     val notices = _notices.asSharedFlow()
     private val apiClients = ConcurrentHashMap<String, HttpClient>()
     private val mediaClients = ConcurrentHashMap<String, okhttp3.OkHttpClient>()
+    private val realtimeClients = ConcurrentHashMap<String, okhttp3.OkHttpClient>()
 
     fun mediaHttpClient(): okhttp3.OkHttpClient {
         val fingerprint = requireNotNull(session()).fingerprint
         return mediaClients.computeIfAbsent(fingerprint) { pinnedClient(it) }
     }
 
-    private fun pinnedClient(fingerprint: String) = okhttp3.OkHttpClient.Builder()
+    private fun OkHttpClient.Builder.withPinning(fingerprint: String): OkHttpClient.Builder = apply {
+        if (fingerprint.isNotBlank()) {
+            val trust = PinnedTrustManager(fingerprint)
+            val ssl = SSLContext.getInstance("TLS").apply { init(null, arrayOf(trust), null) }
+            sslSocketFactory(ssl.socketFactory, trust)
+            hostnameVerifier { _, _ -> true }
+        }
+    }
+
+    private fun pinnedClient(fingerprint: String) = OkHttpClient.Builder()
         .connectTimeout(20, TimeUnit.SECONDS)
         .readTimeout(60, TimeUnit.SECONDS)
         .writeTimeout(30, TimeUnit.SECONDS)
         .callTimeout(90, TimeUnit.SECONDS)
         .pingInterval(20, TimeUnit.SECONDS)
-        .apply {
-            if (fingerprint.isNotBlank()) {
-                val trust = PinnedTrustManager(fingerprint)
-                val ssl = SSLContext.getInstance("TLS").apply { init(null, arrayOf(trust), null) }
-                sslSocketFactory(ssl.socketFactory, trust)
-                hostnameVerifier { _, _ -> true }
-            }
-        }
+        .withPinning(fingerprint)
         .build()
+
+    /**
+     * Cliente do canal em tempo real, um por instalação. Diferente do cliente de
+     * requisições, aqui não existe `callTimeout`: um WebSocket vive até ser
+     * fechado, não até o fim de uma chamada. Sem isso a conexão era derrubada
+     * sozinha de tempos em tempos (e o cliente novo a cada conexão ainda
+     * desperdiçava threads e sockets). O ping de 20 s mantém o canal vivo
+     * atravessando Wi-Fi, NAT e proxy.
+     */
+    private fun realtimeClient(fingerprint: String) = realtimeClients.computeIfAbsent(fingerprint) {
+        OkHttpClient.Builder()
+            .connectTimeout(20, TimeUnit.SECONDS)
+            .readTimeout(0, TimeUnit.MILLISECONDS)
+            .writeTimeout(0, TimeUnit.MILLISECONDS)
+            .pingInterval(20, TimeUnit.SECONDS)
+            .withPinning(it)
+            .build()
+    }
 
     private fun client(fingerprint: String) = apiClients.computeIfAbsent(fingerprint) {
         HttpClient(OkHttp) {
@@ -495,10 +517,16 @@ class ValkyrisApi(
             .header("Authorization", "Bearer ${current.token}")
             .header("Accept-Language", Locale.getDefault().toLanguageTag())
             .build()
-        return pinnedClient(current.fingerprint).newWebSocket(request, object : WebSocketListener() {
+        val notify = onMessage
+        return realtimeClient(current.fingerprint).newWebSocket(request, object : WebSocketListener() {
+            override fun onOpen(webSocket: WebSocket, response: Response) {
+                // Canal (re)aberto: uma leitura garante que a tela não fique com
+                // o estado de antes da queda.
+                notify()
+            }
             override fun onMessage(webSocket: WebSocket, text: String) {
                 val type = runCatching { org.json.JSONObject(text).optString("type") }.getOrDefault("")
-                if (type.startsWith(eventPrefix)) onMessage()
+                if (type.startsWith(eventPrefix)) notify()
             }
             override fun onFailure(webSocket: WebSocket, t: Throwable, response: Response?) {
                 onDisconnect()

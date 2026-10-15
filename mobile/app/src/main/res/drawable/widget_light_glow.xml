@@ -1,7 +1,13 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Pulso da lâmpada acesa no widget: o brilho alterna entre dois quadros,
-     como uma lâmpada viva. A cor vem do próprio estado atual da lâmpada. -->
-<animation-list xmlns:android="http://schemas.android.com/apk/res/android" android:oneshot="false">
-    <item android:drawable="@drawable/widget_bulb_glow_soft" android:duration="750" />
-    <item android:drawable="@drawable/widget_bulb_glow_full" android:duration="750" />
-</animation-list>
+<!-- Brilho da lâmpada acesa: degradê radial que some nas bordas, como a aura
+     desenhada pelo aplicativo. O tom vem do android:tint, na cor da lâmpada. -->
+<shape xmlns:android="http://schemas.android.com/apk/res/android" android:shape="oval">
+    <gradient
+        android:centerX="50%"
+        android:centerY="50%"
+        android:gradientRadius="50%"
+        android:startColor="#70FFFFFF"
+        android:centerColor="#30FFFFFF"
+        android:endColor="#00FFFFFF"
+        android:type="radial" />
+</shape>

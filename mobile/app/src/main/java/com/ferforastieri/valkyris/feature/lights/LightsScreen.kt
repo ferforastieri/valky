@@ -87,7 +87,7 @@ import com.ferforastieri.valkyris.core.model.*
                 enabled=light.state.online,
                 shape=CircleShape,
                 color=MaterialTheme.colorScheme.secondaryContainer,
-            ){AnimatedBulbIcon(on&&light.state.online,lightTint(light.state.mode,light.state.color.hue,light.state.color.saturation,light.state.color.value,light.state.temperatureKelvin),offTint=MaterialTheme.colorScheme.onSecondaryContainer,modifier=Modifier.padding(7.dp),size=34.dp)}
+            ){AnimatedBulbIcon(on&&light.state.online,lightTint(light.state.mode,light.state.color.hue,light.state.color.saturation,light.state.color.value,light.state.temperatureKelvin),offTint=MaterialTheme.colorScheme.onSecondaryContainer,modifier=Modifier.padding(7.dp),size=34.dp,contentDescription=stringResource(R.string.light_toggle))}
             Spacer(Modifier.width(13.dp))
             Column(Modifier.weight(1f)){
                 Text(light.name,fontWeight=FontWeight.SemiBold)

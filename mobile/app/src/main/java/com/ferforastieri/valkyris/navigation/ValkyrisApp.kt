@@ -143,6 +143,8 @@ private fun ConnectedValkyrisApp(main: MainViewModel) {
         pendingSection?.let { section ->
             when {
                 section == "lights" -> nav.navigate("lights") { launchSingleTop = true }
+                // O widget de lâmpadas abre a lâmpada tocada, não a lista.
+                section.startsWith("light:") -> nav.navigate("light/${section.substringAfter("light:")}") { launchSingleTop = true }
                 section.startsWith("remote:") -> nav.navigate("remote/${section.substringAfter("remote:")}") { launchSingleTop = true }
                 section == "devices" -> nav.openTopLevel("devices")
             }
@@ -204,7 +206,7 @@ private fun ConnectedValkyrisApp(main: MainViewModel) {
                     onPeople = { nav.openTopLevel("people") },
                     onEvents = { nav.navigate("events") { launchSingleTop = true } },
                     onRemote = { nav.navigate("remote/$it") },
-                    onLight = { nav.navigate("lights") { launchSingleTop = true } },
+                    onLight = { nav.navigate("light/$it") },
                     onFavorite = { favorite ->
                         when (favorite.type) {
                             "camera" -> nav.navigate("camera/${favorite.id}")

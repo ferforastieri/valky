@@ -179,7 +179,9 @@ func (s *Service) Send(ctx context.Context, id, key string) (Device, error) {
 
 // SendText types text into the TV's focused field.
 func (s *Service) SendText(ctx context.Context, id, text string) (Device, error) {
-	text = strings.TrimSpace(text)
+	// Espaço, apagar (\\b) e enter (\\n) são teclas de verdade na TV: só o
+	// vazio é recusado. Nada de aparar o texto — era o que comia a barra de
+	// espaço e o enter do teclado do app e do widget.
 	if text == "" {
 		return Device{}, fmt.Errorf("informe o texto")
 	}

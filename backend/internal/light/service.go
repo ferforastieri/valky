@@ -27,12 +27,19 @@ type Service struct {
 	mu     sync.RWMutex
 	states map[string]State
 	locks  sync.Map
+
+	// polled guarda quando cada lâmpada foi consultada pela última vez, para
+	// uma olhada nova na API atualizar o que estiver velho na hora — sem
+	// depender só do relógio.
+	pollMu sync.Mutex
+	polled map[string]time.Time
 }
 
 func NewService(repo *Repository, driver Driver, hub Broadcaster, logger *slog.Logger) *Service {
 	return &Service{
 		repo: repo, driver: driver, hub: hub, logger: logger,
 		states: map[string]State{},
+		polled: map[string]time.Time{},
 	}
 }
 
@@ -173,6 +180,10 @@ func (s *Service) List(ctx context.Context) ([]Light, error) {
 	if err != nil {
 		return nil, err
 	}
+	// Quem está olhando merece estado fresco: o que estiver velho é consultado
+	// agora, em segundo plano. O aplicativo recebe o resultado pelo canal em
+	// tempo real; o widget, na próxima atualização.
+	s.warm(items)
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 	for i := range items {
@@ -265,6 +276,7 @@ func (s *Service) Control(ctx context.Context, id string, patch StatePatch) (Lig
 func (s *Service) Refresh(ctx context.Context, id string) (Light, error) {
 	unlock := s.lock(id)
 	defer unlock()
+	s.markPolled(id)
 	item, cred, err := s.repo.Get(ctx, id)
 	if err != nil {
 		return item, err
@@ -301,6 +313,39 @@ func (s *Service) Refresh(ctx context.Context, id string) (Light, error) {
 	return s.Get(ctx, id)
 }
 
+// WarmAfter é o tempo a partir do qual o estado guardado é considerado velho.
+const WarmAfter = 10 * time.Second
+
+// warm consulta em segundo plano as lâmpadas cujo estado passou de WarmAfter.
+func (s *Service) warm(items []Light) {
+	if !s.Available() {
+		return
+	}
+	for _, item := range items {
+		if !item.Enabled || !s.stale(item.ID) {
+			continue
+		}
+		id := item.ID
+		go func() {
+			ctx, cancel := context.WithTimeout(context.Background(), 12*time.Second)
+			defer cancel()
+			_, _ = s.Refresh(ctx, id)
+		}()
+	}
+}
+
+func (s *Service) stale(id string) bool {
+	s.pollMu.Lock()
+	defer s.pollMu.Unlock()
+	return time.Since(s.polled[id]) > WarmAfter
+}
+
+func (s *Service) markPolled(id string) {
+	s.pollMu.Lock()
+	s.polled[id] = time.Now()
+	s.pollMu.Unlock()
+}
+
 func (s *Service) discover(ctx context.Context, item Light, cred Credentials) (string, error) {
 	address, err := s.driver.Discover(ctx, item, cred)
 	if err != nil {
@@ -314,7 +359,7 @@ func (s *Service) discover(ctx context.Context, item Light, cred Credentials) (s
 // realtime channel. With a client connected the cadence is PollInterval.
 const (
 	PollInterval  = 20 * time.Second
-	QuietInterval = 5 * time.Minute
+	QuietInterval = 2 * time.Minute
 )
 
 func (s *Service) Run(ctx context.Context) {
@@ -385,10 +430,16 @@ func (s *Service) storeState(id string, state State) {
 func (s *Service) markOffline(id string) {
 	s.mu.Lock()
 	state := s.states[id]
+	wasOnline := state.Online
 	state.Online = false
 	state.UpdatedAt = time.Now().UTC().Format(time.RFC3339Nano)
 	s.states[id] = state
 	s.mu.Unlock()
+	// A queda também é notícia: sem isso o aplicativo só descobria a lâmpada
+	// fora do ar na próxima consulta completa.
+	if wasOnline {
+		s.hub.Broadcast(map[string]any{"type": "light.state", "lightId": id, "state": state})
+	}
 }
 func (s *Service) lock(id string) func() {
 	value, _ := s.locks.LoadOrStore(id, &sync.Mutex{})

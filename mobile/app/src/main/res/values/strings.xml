@@ -295,11 +295,14 @@
     <string name="widget_light_off">Desligada</string>
     <string name="widget_light_offline">Indisponível</string>
     <string name="widget_light_toggle">Ligar ou desligar</string>
+    <string name="light_toggle">Ligar ou desligar</string>
     <string name="widget_camera_title">Câmera</string>
     <string name="widget_camera_empty">Cadastre uma câmera</string>
     <string name="widget_camera_waiting">Aguardando imagem…</string>
     <string name="widget_remote_title">Controle</string>
     <string name="widget_remote_keypad_toggle">ABC</string>
+    <string name="widget_remote_keypad_letters">123</string>
+    <string name="widget_remote_space">espaço</string>
     <string name="widget_remote_empty">Nenhum controle cadastrado</string>
     <string name="widget_remote_power">Energia</string>
     <string name="widget_remote_up">Cima</string>
