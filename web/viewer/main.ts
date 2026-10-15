@@ -538,7 +538,7 @@ function lightDetails(id: string) {
   };
 
   const colourBlock = $("#lamp-color"); if (colourBlock) track(colourBlock as HTMLElement, (px, py) => { hue = Math.max(0, Math.min(360, px * 360)); saturation = Math.max(1, Math.min(100, (1 - py) * 100)); paint(); }, () => void run({ mode: "color", color: { hue: Math.round(hue), saturation: Math.round(saturation), value: Math.round(memory.color) } }));
-  const whiteBlock = $("#lamp-white"); if (whiteBlock) track(whiteBlock as HTMLElement, (px) => { temperature = Math.max(2700, Math.min(6500, 2700 + px * 3800)); paint(); }, () => void run({ mode: "white", temperatureKelvin: Math.round(temperature), brightness: Math.round(memory.white) }));
+  const whiteBlock = $("#lamp-white"); if (whiteBlock) track(whiteBlock as HTMLElement, (px, py) => { temperature = Math.max(2700, Math.min(6500, 2700 + ((px + (1 - py)) / 2) * 3800)); paint(); }, () => void run({ mode: "white", temperatureKelvin: Math.round(temperature) }));
   const colourSlider = $("#lamp-brightness-color") as HTMLInputElement | null;
   if (colourSlider) {
     colourSlider.addEventListener("input", () => { memory.color = Number(colourSlider.value); paint(); });
@@ -659,7 +659,7 @@ function remoteDetails(id: string) {
       button.setAttribute("disabled", "");
       try {
         const pressed = button.dataset.remoteKey || "";
-        if (pressed === "POWER") await api.mutate(`/remotes/${key(id)}/power`, "POST");
+        if (pressed === "POWER") await api.mutate(`/remotes/${key(id)}/power`, "POST", {});
         else if (pressed.startsWith("TEXT:")) {
           const typed = pressed.slice(5);
           const text = typed === "ESPACO" ? " " : typed === "APAGAR" ? "\b" : typed === "ENTER" ? "\n" : typed;

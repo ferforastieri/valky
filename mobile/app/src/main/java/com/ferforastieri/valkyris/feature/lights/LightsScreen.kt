@@ -95,9 +95,10 @@ import com.ferforastieri.valkyris.core.model.*
                     listOfNotNull(
                         when{
                             light.setupStatus=="failed"->light.setupError.ifBlank{stringResource(R.string.light_setup_failed)}
+                            // Fora do ar é fora do ar: "conferindo" só enquanto ela responde.
+                            !light.state.online->stringResource(R.string.unavailable)
                             light.setupStatus!="ready"->stringResource(R.string.light_setup_pending)
-                            light.state.online->"${stringResource(if(on)R.string.favorite_light_on else R.string.favorite_light_off)} · ${light.state.brightness}%"
-                            else->stringResource(R.string.unavailable)
+                            else->"${stringResource(if(on)R.string.favorite_light_on else R.string.favorite_light_off)} · ${light.state.brightness}%"
                         },
                     ).joinToString(" · "),
                     style=MaterialTheme.typography.bodySmall,

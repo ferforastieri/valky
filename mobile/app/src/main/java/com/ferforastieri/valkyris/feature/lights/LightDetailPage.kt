@@ -105,7 +105,6 @@ internal fun LightDetailContent(
             title = light.name,
             onNotifications = onNotifications,
             unreadNotifications = unreadNotifications,
-            actions = { IconButton(onClick = onDismiss) { Icon(Lucide.X, stringResource(R.string.close)) } },
         )
         // Energia num cartão igual aos outros do app.
         Surface(
@@ -172,11 +171,11 @@ internal fun LightDetailContent(
                         horizontal = Brush.horizontalGradient(listOf(warmWhiteColor(2700), warmWhiteColor(4000), warmWhiteColor(6500))),
                         overlay = Brush.verticalGradient(listOf(Color.Transparent, Color.Black.copy(alpha = .82f))),
                         x = (temperature - 2700f) / 3800f,
-                        y = 1f - (whiteBrightness - 1f) / 99f,
+                        y = 1f - ((temperature - 2700f) / 3800f),
                         enabled = reachable,
                         badge = stringResource(R.string.light_kelvin_badge, temperature.toInt()),
-                        onPick = { px, _ -> temperature = 2700f + px * 3800f },
-                        onFinished = { apply(LightStatePatch(mode = "white", temperatureKelvin = temperature.toInt(), brightness = whiteBrightness.toInt())) },
+                        onPick = { px, py -> temperature = 2700f + (((px + (1f - py)) / 2f).coerceIn(0f, 1f)) * 3800f },
+                        onFinished = { apply(LightStatePatch(mode = "white", temperatureKelvin = temperature.toInt())) },
                     )
                 }
                 Text(stringResource(R.string.light_brightness), style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)

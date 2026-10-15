@@ -1294,3 +1294,17 @@ dialog::backdrop {
 .remote-dpad .ok { left: 50%; top: 50%; transform: translate(-50%, -50%); width: 64px; height: 64px; border-radius: 50%; background: #222822; color: #8ae07d; font-weight: 700; }
 .remote-bottom { display: flex; justify-content: center; gap: 8px; padding: 8px; border-radius: 16px; background: #222822; }
 .remote-bottom button { padding: 14px 18px; border-radius: 12px; border: 1px solid rgba(255,255,255,.10); background: #1a1f1a; color: #f1f4ef; }
+
+/* ---- responsivo: cabe no celular ---- */
+.light-grid { grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); }
+@media (max-width: 720px) {
+  .remote-pad { grid-template-columns: repeat(5, 1fr); }
+  .remote-mid { grid-template-columns: 1fr; gap: 8px; }
+  .remote-rocker { flex-direction: row; }
+  .remote-rocker button { flex: 1; width: auto; }
+  .remote-dpad { width: min(280px, 100%); margin: 0 auto; }
+  .lamp-head, .remote-head { flex-wrap: wrap; }
+  .lamp-block { height: 150px; }
+  .remote-bottom { flex-wrap: wrap; }
+  .remote-bottom button { flex: 1; min-width: 96px; }
+}
