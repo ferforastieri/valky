@@ -146,10 +146,10 @@ const lightColor = (light: LightDevice) => light.state.mode === "color"
   ? `hsl(${light.state.color.hue} ${light.state.color.saturation}% ${Math.max(28, light.state.color.value / 2)}%)`
   : `hsl(${35 + (light.state.temperatureKelvin - 2700) / 120} 88% 68%)`;
 const lightGrid = (list: LightDevice[]) => list.length
-  ? `<div class="light-grid">${list.map(light => `<article class="light-card" style="--light-color:${e(lightColor(light))};--light-glow:${light.state.power ? '18%' : '4%'}"><button class="light-main" data-light="${e(light.id)}"><span class="light-orb">${icon('light')}</span><span><strong>${e(light.name)}</strong><small>${e(light.room || 'Sem cômodo')} · ${light.state.online ? `${light.state.brightness}%` : 'Indisponível'}</small></span></button><button class="light-power ${light.state.power ? 'active' : ''}" data-light-power="${e(light.id)}" aria-label="${light.state.power ? 'Desligar' : 'Ligar'} ${e(light.name)}" ${light.state.online ? '' : 'disabled'}>${icon('light')}</button></article>`).join('')}</div>`
+  ? `<div class="light-grid">${list.map(light => `<article class="light-card" style="--light-color:${e(lightColor(light))};--light-glow:${light.state.power ? '18%' : '4%'}"><button class="light-main" data-light="${e(light.id)}"><span class="light-orb">${icon('light')}</span><span><strong>${e(light.name)}</strong><small>${light.state.online ? `${light.state.power ? 'Ligada' : 'Desligada'} · ${light.state.brightness}%` : 'Indisponível'}</small></span></button><button class="light-power ${light.state.power ? 'active' : ''}" data-light-power="${e(light.id)}" aria-label="${light.state.power ? 'Desligar' : 'Ligar'} ${e(light.name)}" ${light.state.online ? '' : 'disabled'}>${icon('light')}</button></article>`).join('')}</div>`
   : empty("Nenhuma iluminação cadastrada", "Cadastre uma lâmpada pelo aplicativo para controlá-la aqui.");
 const remoteGrid = (list: Remote[]) => list.length
-  ? `<div class="remote-grid">${list.map(remote => `<button class="remote-card" data-remote="${e(remote.id)}"><span class="tile-icon">${icon('tv')}</span><span><strong>${e(remote.name)}</strong><small>${e(remote.host)}:${remote.port} · ${remote.tokenConfigured ? 'Pareado' : 'Não pareado'}</small></span><span class="arrow">${icon('arrow')}</span></button>`).join('')}</div>`
+  ? `<div class="remote-grid">${list.map(remote => `<button class="remote-card" data-remote="${e(remote.id)}"><span class="tile-icon">${icon('tv')}</span><span><strong>${e(remote.name)}</strong><small>${remote.tokenConfigured ? 'Pareado' : 'Não pareado'}</small></span><span class="arrow">${icon('arrow')}</span></button>`).join('')}</div>`
   : empty("Nenhum controle remoto", "Cadastre sua TV pelo aplicativo para controlá-la aqui.");
 const avatar = (p: Person) =>
   `<span class="avatar">${p.avatarData?.startsWith("data:image/jpeg;base64,") ? `<img src="${e(p.avatarData)}" alt=""/>` : e(p.name.slice(0, 1).toUpperCase())}</span>`;
@@ -462,7 +462,7 @@ async function cameraDetails(id: string) {
 function hsvToHex(h:number,s:number,v:number){s/=100;v/=100;const c=v*s,x=c*(1-Math.abs((h/60)%2-1)),m=v-c;let r=0,g=0,b=0;if(h<60){r=c;g=x}else if(h<120){r=x;g=c}else if(h<180){g=c;b=x}else if(h<240){g=x;b=c}else if(h<300){r=x;b=c}else{r=c;b=x}return `#${[r,g,b].map(n=>Math.round((n+m)*255).toString(16).padStart(2,'0')).join('')}`}
 function hexToHsv(hex:string){const [r,g,b]=[1,3,5].map(i=>parseInt(hex.slice(i,i+2),16)/255);const max=Math.max(r,g,b),min=Math.min(r,g,b),d=max-min;let h=0;if(d){if(max===r)h=60*(((g-b)/d)%6);else if(max===g)h=60*((b-r)/d+2);else h=60*((r-g)/d+4)}if(h<0)h+=360;return{hue:Math.round(h),saturation:max?Math.round(d/max*100):0,value:Math.round(max*100)}}
 async function applyLight(id:string,patch:Record<string,unknown>){const updated=await api.mutate<LightDevice>(`/lights/${key(id)}/state`,'PUT',patch);lights=lights.map(item=>item.id===id?updated:item);signature='';render();return updated}
-function lightDetails(id:string){const light=lights.find(item=>item.id===id);if(!light)return;openDetails(light.name,'ILUMINAÇÃO');const color=hsvToHex(light.state.color.hue,light.state.color.saturation,light.state.color.value);const caps=light.capabilities||{brightness:true,colorTemperature:true,color:true};const disabled=light.state.online?'':'disabled';$('#detail-body').innerHTML=`<div class="light-detail" style="--light-color:${e(lightColor(light))}"><div class="light-detail-head"><span class="light-orb large">${icon('light')}</span><div><strong>${e(light.room||'Sem cômodo')}</strong><small>${light.state.online?'Disponível na rede local':'Indisponível'}</small></div><button id="light-toggle" class="${light.state.power?'primary':''}" ${disabled}>${light.state.power?'Desligar':'Ligar'}</button></div>${caps.brightness?`<label>Brilho <output id="brightness-value">${light.state.brightness}%</output><input id="light-brightness" type="range" min="1" max="100" value="${light.state.brightness}" ${disabled}></label>`:''}${caps.colorTemperature?`<label>Branco <output id="temperature-value">${light.state.temperatureKelvin} K</output><input id="light-temperature" type="range" min="2700" max="6500" step="50" value="${light.state.temperatureKelvin}" ${disabled}></label>`:''}${caps.color?`<label>Cor <input id="light-color" type="color" value="${color}" ${disabled}></label>`:''}<p id="light-result" class="error" role="status"></p></div>`;
+function lightDetails(id:string){const light=lights.find(item=>item.id===id);if(!light)return;openDetails(light.name,'ILUMINAÇÃO');const color=hsvToHex(light.state.color.hue,light.state.color.saturation,light.state.color.value);const caps=light.capabilities||{brightness:true,colorTemperature:true,color:true};const disabled=light.state.online?'':'disabled';$('#detail-body').innerHTML=`<div class="light-detail" style="--light-color:${e(lightColor(light))}"><div class="light-detail-head"><span class="light-orb large">${icon('light')}</span><div><strong>${light.state.power ? 'Ligada' : 'Desligada'}</strong><small>${light.state.online?'Disponível na rede local':'Indisponível'}</small></div><button id="light-toggle" class="${light.state.power?'primary':''}" ${disabled}>${light.state.power?'Desligar':'Ligar'}</button></div>${caps.brightness?`<label>Brilho <output id="brightness-value">${light.state.brightness}%</output><input id="light-brightness" type="range" min="1" max="100" value="${light.state.brightness}" ${disabled}></label>`:''}${caps.colorTemperature?`<label>Branco <output id="temperature-value">${light.state.temperatureKelvin} K</output><input id="light-temperature" type="range" min="2700" max="6500" step="50" value="${light.state.temperatureKelvin}" ${disabled}></label>`:''}${caps.color?`<label>Cor <input id="light-color" type="color" value="${color}" ${disabled}></label>`:''}<p id="light-result" class="error" role="status"></p></div>`;
  const run=async(patch:Record<string,unknown>)=>{try{await applyLight(id,patch);if(dialog.open)lightDetails(id)}catch(error){if(dialog.open)$('#light-result').textContent=(error as Error).message}};
  $('#light-toggle').onclick=()=>void run({power:!light.state.power});
  const brightness=$<HTMLInputElement>('#light-brightness');if(brightness){brightness.oninput=()=>{$('#brightness-value').textContent=`${brightness.value}%`};brightness.onchange=()=>void run({brightness:Number(brightness.value)})}
@@ -470,26 +470,33 @@ function lightDetails(id:string){const light=lights.find(item=>item.id===id);if(
  const colourInput=$<HTMLInputElement>('#light-color');if(colourInput)colourInput.onchange=event=>void run({color:hexToHsv((event.target as HTMLInputElement).value)});
 }
 const remoteKeypad: [string, string][] = [
-  ["KEY_POWER", "Energia"],
-  ["KEY_HOME", "Início"],
-  ["KEY_RETURN", "Voltar"],
-  ["KEY_MENU", "Menu"],
-  ["KEY_UP", "▲"],
-  ["KEY_ENTER", "OK"],
-  ["KEY_DOWN", "▼"],
-  ["KEY_LEFT", "◀"],
-  ["KEY_RIGHT", "▶"],
+  ["POWER", "Energia"],
   ["KEY_VOLUP", "Volume +"],
   ["KEY_MUTE", "Mudo"],
   ["KEY_VOLDOWN", "Volume −"],
   ["KEY_CHUP", "Canal +"],
-  ["KEY_CHDOWN", "Canal −"],
   ["KEY_CH_LIST", "Canais"],
-  ["KEY_REWIND", "◀◀"],
-  ["KEY_PLAY", "▶"],
-  ["KEY_PAUSE", "⏸"],
-  ["KEY_FF", "▶▶"],
+  ["KEY_CHDOWN", "Canal −"],
+  ["KEY_UP", "▲"],
+  ["KEY_LEFT", "◀"],
+  ["KEY_ENTER", "OK"],
+  ["KEY_RIGHT", "▶"],
+  ["KEY_DOWN", "▼"],
+  ["KEY_RETURN", "Voltar"],
+  ["KEY_HOME", "Início"],
+  ["KEY_MENU", "Menu"],
+  ..."1234567890".split("").map((digit) => [`KEY_${digit}`, digit] as [string, string]),
 ];
+// Letras digitadas na TV, como o teclado do aplicativo.
+const remoteLetters: [string, string][] = [
+  ..."qwertyuiop".split("").map((letter) => [`TEXT:${letter}`, letter] as [string, string]),
+  ..."asdfghjkl".split("").map((letter) => [`TEXT:${letter}`, letter] as [string, string]),
+  ..."zxcvbnm".split("").map((letter) => [`TEXT:${letter}`, letter] as [string, string]),
+  ["TEXT:ESPACO", "espaço"],
+  ["TEXT:APAGAR", "⌫"],
+  ["TEXT:ENTER", "⏎"],
+];
+
 function remoteDetails(id: string) {
   const remote = remotes.find((item) => item.id === id);
   if (!remote) return;
@@ -500,7 +507,7 @@ function remoteDetails(id: string) {
     : api.admin
       ? '<button id="remote-pair" class="primary">Parear</button>'
       : '<p class="muted">Peça a um administrador para parear o controle no aplicativo.</p>';
-  $("#detail-body").innerHTML = `<div class="remote-detail"><div class="remote-detail-head"><span class="tile-icon">${icon("tv")}</span><div><strong>${e(remote.host)}:${remote.port}</strong><small>${ready ? "Pareado" : "Não pareado"}</small></div>${pairAction}</div>${ready ? `<div class="remote-keypad">${remoteKeypad.map(([k, l]) => `<button data-remote-key="${k}">${e(l)}</button>`).join("")}</div>` : ""}<p id="remote-result" class="error" role="status"></p></div>`;
+  $("#detail-body").innerHTML = `<div class="remote-detail"><div class="remote-detail-head"><span class="tile-icon">${icon("tv")}</span><div><strong>${e(remote.name)}</strong><small>${ready ? "Pareado" : "Não pareado"}</small></div>${pairAction}</div>${ready ? `<div class="remote-keypad">${remoteKeypad.map(([k, l]) => `<button data-remote-key="${k}">${e(l)}</button>`).join("")}</div><p class="muted">Teclado de letras (digita no campo da TV)</p><div class="remote-keypad letters">${remoteLetters.map(([k, l]) => `<button data-remote-key="${k}">${e(l)}</button>`).join("")}</div>` : ""}<p id="remote-result" class="error" role="status"></p></div>`;
   const pair = $("#remote-pair");
   if (pair) pair.onclick = async () => {
     pair.setAttribute("disabled", "");
@@ -517,7 +524,13 @@ function remoteDetails(id: string) {
     button.onclick = async () => {
       button.setAttribute("disabled", "");
       try {
-        await api.mutate(`/remotes/${key(id)}/keys`, "POST", { key: button.dataset.remoteKey });
+        const pressed = button.dataset.remoteKey || "";
+        if (pressed === "POWER") await api.mutate(`/remotes/${key(id)}/power`, "POST");
+        else if (pressed.startsWith("TEXT:")) {
+          const typed = pressed.slice(5);
+          const text = typed === "ESPACO" ? " " : typed === "APAGAR" ? "\b" : typed === "ENTER" ? "\n" : typed;
+          await api.mutate(`/remotes/${key(id)}/text`, "POST", { text });
+        } else await api.mutate(`/remotes/${key(id)}/keys`, "POST", { key: pressed });
       } catch (error) {
         if (dialog.open) $("#remote-result").textContent = (error as Error).message;
       } finally {
