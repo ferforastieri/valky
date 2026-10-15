@@ -49,6 +49,17 @@ func viewerRequestAllowed(r *http.Request) bool {
 		return true
 	}
 	parts := strings.Split(strings.Trim(r.URL.Path, "/"), "/")
+	// O painel pode acender lâmpadas e usar o controle da TV: são exatamente as
+	// operações que o aplicativo faz, e o painel existe para a casa ser operada
+	// também pelo navegador. O resto continua só na mão de administrador.
+	if len(parts) == 3 && parts[1] != "" {
+		switch {
+		case parts[0] == "lights" && parts[2] == "state" && r.Method == http.MethodPut:
+			return true
+		case parts[0] == "remotes" && (parts[2] == "keys" || parts[2] == "power" || parts[2] == "text") && r.Method == http.MethodPost:
+			return true
+		}
+	}
 	if len(parts) < 5 || parts[0] != "cameras" || parts[1] == "" || parts[2] != "live" || parts[3] != "webrtc" || parts[4] != "whep" {
 		return false
 	}

@@ -382,7 +382,6 @@ fun CameraLiveScreen(
                         }
                     }
                 }
-                IconButton(onClick = onBack) { Icon(Lucide.X, stringResource(R.string.close)) }
             },
         )
         when (camera?.setupStatus) {

@@ -175,7 +175,7 @@ internal fun LightDetailContent(
                         y = 1f - (whiteBrightness - 1f) / 99f,
                         enabled = reachable,
                         badge = stringResource(R.string.light_kelvin_badge, temperature.toInt()),
-                        onPick = { px, py -> temperature = 2700f + px * 3800f; whiteBrightness = (1f - py) * 99f + 1f },
+                        onPick = { px, _ -> temperature = 2700f + px * 3800f },
                         onFinished = { apply(LightStatePatch(mode = "white", temperatureKelvin = temperature.toInt(), brightness = whiteBrightness.toInt())) },
                     )
                 }

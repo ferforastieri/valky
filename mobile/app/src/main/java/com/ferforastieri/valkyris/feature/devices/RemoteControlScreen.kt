@@ -92,7 +92,6 @@ fun RemoteControlScreen(
             title = remote?.name ?: stringResource(R.string.remote_control),
             onNotifications = onNotifications,
             unreadNotifications = unreadNotifications,
-            actions = { IconButton(onClick = onBack) { Icon(Lucide.X, stringResource(R.string.close)) } },
         )
         // Conteúdo com a mesma margem lateral das outras telas.
         Column(Modifier.fillMaxSize().padding(horizontal = 18.dp)) {
