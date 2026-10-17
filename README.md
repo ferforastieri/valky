@@ -1,8 +1,8 @@
 <p align="center">
-  <img src="web/public/valkyris-mark.svg" width="112" height="112" alt="Logo do Valkyris">
+  <img src="web/public/valkyris-mark.svg" width="112" height="112" alt="Logo do Valk">
 </p>
 
-<h1 align="center">Valkyris</h1>
+<h1 align="center">Valk</h1>
 
 <p align="center">
   Monitoramento e controle residencial self-hosted para câmeras e iluminação inteligente.<br>
@@ -18,7 +18,7 @@
 
 ## O projeto
 
-Valkyris transforma um servidor doméstico em uma central privada de monitoramento. Uma única instalação pode gerenciar várias câmeras e autorizar vários celulares, sem cadastro público e sem expor RTSP, ONVIF ou o MediaMTX na internet.
+Valk transforma um servidor doméstico em uma central privada de monitoramento. Uma única instalação pode gerenciar várias câmeras e autorizar vários celulares, sem cadastro público e sem expor RTSP, ONVIF ou o MediaMTX na internet.
 
 - Descoberta de capacidades e do perfil principal por ONVIF Profile S; previews são extraídos do stream local já conectado.
 - Live WebRTC autenticado, com uma única conexão RTSP por câmera e conversão apenas do áudio G.711 para Opus.
@@ -188,7 +188,7 @@ Não existe `PUBLIC_URL`: cada celular informa a URL que realmente usa para alca
 
 ### Notificações nativas com FCM
 
-O Valkyris não exige aplicativo auxiliar no celular. O APK recebe mensagens de dados pelo Firebase Cloud Messaging e cria localmente a notificação ou o alarme nativo. O conteúdo do evento continua cifrado de ponta a ponta entre o backend e o dispositivo.
+O Valk não exige aplicativo auxiliar no celular. O APK recebe mensagens de dados pelo Firebase Cloud Messaging e cria localmente a notificação ou o alarme nativo. O conteúdo do evento continua cifrado de ponta a ponta entre o backend e o dispositivo.
 
 1. No Firebase Console, crie um projeto, adicione o aplicativo Android `com.ferforastieri.valkyris` e baixe `google-services.json`.
 2. Codifique esse arquivo em base64 e cadastre o conteúdo no secret do GitHub `FIREBASE_ANDROID_CONFIG_BASE64`; ele será incluído no APK durante a release.
@@ -325,7 +325,7 @@ para fazer uma atualização.
 
 ## Compatibilidade e limites
 
-Valkyris apresenta apenas recursos anunciados por ONVIF/RTSP. Ausências degradam a interface sem impedir o restante da câmera. Recursos proprietários da Tapo que não fazem parte do Profile S — como áudio bidirecional, holofote, sirene, privacidade e patrulha — não são controlados pelo projeto.
+Valk apresenta apenas recursos anunciados por ONVIF/RTSP. Ausências degradam a interface sem impedir o restante da câmera. Recursos proprietários da Tapo que não fazem parte do Profile S — como áudio bidirecional, holofote, sirene, privacidade e patrulha — não são controlados pelo projeto.
 
 Não há gravação contínua, nuvem central, cadastro público nem promessa de entrega absoluta de alarmes quando faltam energia, rede ou permissões do Android.
 

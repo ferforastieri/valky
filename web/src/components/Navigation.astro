@@ -13,9 +13,9 @@ const homePath = `/${locale}`;
 const sectionPath = (section: string) => current === 'home' ? `#${section}` : `${homePath}#${section}`;
 ---
 <nav class="floating-dock" aria-label={locale === 'pt-BR' ? 'Navegação principal' : 'Main navigation'}>
-  <a class="dock-brand" href={homePath} aria-label="Valkyris home">
+  <a class="dock-brand" href={homePath} aria-label="Valk home">
     <span class="brand-mark"><img src="/valkyris-mark.svg?v=6" alt="" /></span>
-    <span class="dock-identity"><strong>Valkyris</strong><small>© 2026 Fernando Forastieri · MIT</small></span>
+    <span class="dock-identity"><strong>Valk</strong><small>© 2026 Fernando Forastieri · MIT</small></span>
   </a>
   <div class="dock-links">
     <a class="dock-link" href={homePath} aria-current={current === "home" ? "page" : undefined}><House size={17}/><span>{t.nav[0]}</span></a>

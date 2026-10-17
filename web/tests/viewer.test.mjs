@@ -6,7 +6,7 @@ import { resolve } from 'node:path';
 const output = resolve('dist-viewer');
 const html = readFileSync(resolve(output, 'index.html'), 'utf8');
 test('painel tem build separado da landing e assets servidos pelo backend', () => {
-  assert.match(html, /Valkyris · Consulta/);
+  assert.match(html, /Valk · Consulta/);
   assert.match(html, /noindex/);
   assert.doesNotMatch(readFileSync('dist/index.html', 'utf8'), /id="login-form"/);
   const assets = [...html.matchAll(/(?:src|href)="(\/app\/[^"#?]+)"/g)];
