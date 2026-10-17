@@ -227,7 +227,6 @@
     <string name="alert_preview">Text preview</string>
     <string name="alarm_ack_failed">Sound stopped, but the event could not be acknowledged. Try again.</string>
     <string name="open_alarm">Open alarm</string>
-    <string name="location_updating">Updating your location…</string>
     <string name="location_send_failed">Could not send your location. Check your connection to the server.</string>
     <string name="location_permission_needed">Allow location access in the app settings.</string>
     <string name="location_fix_unavailable">Could not obtain an accurate position. Check that phone location is enabled.</string>

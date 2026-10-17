@@ -227,7 +227,6 @@
     <string name="alert_preview">Prévia dos textos</string>
     <string name="alarm_ack_failed">O som foi interrompido, mas não foi possível confirmar o evento. Tente novamente.</string>
     <string name="open_alarm">Abrir alarme</string>
-    <string name="location_updating">Atualizando sua localização…</string>
     <string name="location_send_failed">Não foi possível enviar sua localização. Verifique o acesso ao servidor.</string>
     <string name="location_permission_needed">Permita o acesso à localização nas configurações do aplicativo.</string>
     <string name="location_fix_unavailable">Não foi possível obter uma posição precisa. Confira se a localização do celular está ativada.</string>

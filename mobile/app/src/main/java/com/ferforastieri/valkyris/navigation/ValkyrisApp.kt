@@ -128,6 +128,7 @@ private fun ConnectedValkyrisApp(main: MainViewModel) {
     val pendingEvent by main.pendingEvent.collectAsStateWithLifecycle()
     val pendingCamera by main.pendingCamera.collectAsStateWithLifecycle()
     val pendingSection by main.pendingSection.collectAsStateWithLifecycle()
+    val refreshing by main.refreshing.collectAsStateWithLifecycle()
     LaunchedEffect(pendingEvent) {
         pendingEvent?.let {
             nav.navigate("event/$it") { launchSingleTop = true }
@@ -153,7 +154,6 @@ private fun ConnectedValkyrisApp(main: MainViewModel) {
             main.sectionOpened()
         }
     }
-    val refreshing by main.refreshing.collectAsStateWithLifecycle()
         // Puxar de cima para baixo atualiza tudo, em qualquer tela do app.
         PullToRefreshBox(
             isRefreshing = refreshing,
