@@ -19,7 +19,7 @@ android {
     compileSdk = 36
 
     defaultConfig {
-        applicationId = "com.ferforastieri.valkyris"
+        applicationId = "com.ferforastieri.valky"
         minSdk = 26
         targetSdk = 36
         versionCode = valkyrisVersionCode.get()
