@@ -181,7 +181,12 @@ const endpoints = pt ? [
             <li><span>3</span><div><strong>{pt ? 'Conceda a permissão' : 'Grant permission'}</strong><p>{pt ? 'Abra o APK da nova release, faça login e permita notificações. O registro no FCM acontece automaticamente.' : 'Open the APK from the new release, sign in and allow notifications. FCM registration happens automatically.'}</p></div></li>
           </ol>
           <p>{pt ? 'A API aceita a mesma configuração para integrações administrativas em PUT /api/v1/settings/push, usando serviceAccountBase64. A conta nunca é retornada pela API.' : 'The API accepts the same setup for administrative integrations at PUT /api/v1/settings/push with serviceAccountBase64. The account is never returned by the API.'}</p>
-        </section>
+        
+          <h3>{pt ? 'Controle de TV' : 'TV remote'}</h3>
+          <p>{pt ? 'O aplicativo liga, desliga e também acorda a TV pela rede (Wake-on-LAN), com teclado numérico e de letras digitando direto no campo de texto da TV. O mesmo controle funciona no painel web e no widget da tela inicial.' : 'The app powers the TV on and off and wakes it over the network (Wake-on-LAN), with numeric and letter keypads typing straight into the TV text field. The same remote works on the web panel and on the home screen widget.'}</p>
+          <h3 id="remote-tv">{pt ? 'Widgets da tela inicial' : 'Home screen widgets'}</h3>
+          <p>{pt ? 'Três widgets: câmera (imagem sempre fresca), lâmpadas (a lista rola e mostra todas, tocando na lâmpada para acender e na linha para abrir a tela) e controle da TV (com o botão de energia que acorda a TV desligada).' : 'Three widgets: camera (always fresh picture), bulbs (scrolling list with every lamp — tap the bulb to switch, tap the row to open it) and TV remote (with the power button that wakes a sleeping TV).'}</p>
+</section>
 
 
         <section id="viewer">
