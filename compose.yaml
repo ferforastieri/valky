@@ -1,4 +1,4 @@
-name: valkyris
+name: valky
 
 services:
   valkyris:
@@ -27,7 +27,7 @@ services:
     ports:
       - "${VALKYRIS_PORT:-8443}:8443"
     volumes:
-      - valkyris-data:/data
+      - valky-data:/data
       - type: volume
         source: recording-buffer
         target: /data/recordings
@@ -58,7 +58,7 @@ services:
         read_only: true
         bind:
           create_host_path: false
-      - valkyris-data:/data
+      - valky-data:/data
       - type: volume
         source: recording-buffer
         target: /data/recordings
@@ -78,7 +78,7 @@ networks:
     internal: false
 
 volumes:
-  valkyris-data:
+  valky-data:
 
   recording-buffer:
     driver: local

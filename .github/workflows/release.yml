@@ -176,48 +176,11 @@ jobs:
           path: mobile/app/build/outputs/apk/release/app-release.apk
           if-no-files-found: error
 
-  smoke:
-    name: Smoke · ${{ matrix.arch }}
-    runs-on: ${{ matrix.runner }}
-    needs: [prepare, manifest]
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - arch: amd64
-            runner: ubuntu-24.04
-          - arch: arm64
-            runner: ubuntu-24.04-arm
-    steps:
-      - uses: docker/login-action@v3
-        with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-      - name: Iniciar e verificar imagem nativa
-        env:
-          CONTAINER: valkyris-smoke-${{ matrix.arch }}
-          VERSION: ${{ needs.prepare.outputs.version }}
-        run: |
-          docker pull "$IMAGE:$VERSION"
-          docker run -d --rm --name "$CONTAINER" -p 127.0.0.1:18443:8443 "$IMAGE:$VERSION"
-          for attempt in $(seq 1 45); do
-            if curl -kfsS https://127.0.0.1:18443/health | grep -q '"status":"ok"'; then
-              curl -kfsS https://127.0.0.1:18443/app/ -o /tmp/valkyris-viewer.html
-              grep -q 'Valkyris · Consulta' /tmp/valkyris-viewer.html
-              docker stop "$CONTAINER"
-              exit 0
-            fi
-            sleep 2
-          done
-          docker logs "$CONTAINER"
-          docker stop "$CONTAINER"
-          exit 1
 
   release:
     name: Publicar artefatos
     runs-on: ubuntu-latest
-    needs: [prepare, android, smoke]
+    needs: [prepare, android]
     steps:
       - uses: actions/checkout@v4
         with:

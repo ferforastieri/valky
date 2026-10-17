@@ -3,7 +3,7 @@ set -eu
 
 REPOSITORY="ferforastieri/valky"
 REQUESTED_VERSION="${VALKYRIS_VERSION:-latest}"
-INSTALL_ROOT="${VALKYRIS_HOME:-${XDG_DATA_HOME:-${HOME}/.local/share}/valkyris}"
+INSTALL_ROOT="${VALKYRIS_HOME:-${XDG_DATA_HOME:-${HOME}/.local/share}/valky}"
 TEMP_ROOT="$(mktemp -d "${TMPDIR:-/tmp}/valkyris.XXXXXX")"
 
 cleanup() {
