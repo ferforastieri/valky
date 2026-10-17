@@ -35,6 +35,9 @@ import com.composables.icons.lucide.SlidersHorizontal
 import com.composables.icons.lucide.Trash2
 import com.composables.icons.lucide.TriangleAlert
 import com.composables.icons.lucide.Video
+import androidx.compose.foundation.shape.CircleShape
+import com.ferforastieri.valkyris.core.design.SkeletonList
+import com.ferforastieri.valkyris.core.design.ValkyrisSkeleton
 
 @Composable
 fun CameraRulesSection(cameraId: String, vm: RulesViewModel = hiltViewModel()) {
@@ -105,7 +108,7 @@ fun RulesContent(
                 containerColor = MaterialTheme.colorScheme.secondary,
                 contentColor = MaterialTheme.colorScheme.onSecondary,
             ) {
-                if (saving) CircularProgressIndicator(Modifier.size(22.dp), strokeWidth = 2.dp, color = MaterialTheme.colorScheme.onSecondary)
+                if (saving) ValkyrisSkeleton(Modifier.size(22.dp), CircleShape)
                 else Icon(Lucide.Plus, contentDescription = stringResource(R.string.add_rule))
             }
         }
@@ -202,7 +205,7 @@ fun RuleEditorDialog(cameras: List<Camera>, detectors: List<DetectorKind>, exist
                 },
                 enabled = !saving && camera != null && detector != null && name.isNotBlank() && validSchedule && validMotion && cooldown.toIntOrNull() in 10..3600,
             ) {
-                if (saving) CircularProgressIndicator(Modifier.size(18.dp), strokeWidth = 2.dp, color = MaterialTheme.colorScheme.onPrimary)
+                if (saving) ValkyrisSkeleton(Modifier.size(18.dp), CircleShape)
                 else Text(stringResource(R.string.save))
             }
         },

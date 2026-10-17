@@ -8,6 +8,7 @@ import (
 	"math"
 	"net"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/ferforastieri/valkyris/backend/internal/light/tuya"
@@ -411,17 +412,34 @@ func (d *TuyaDriver) Discover(ctx context.Context, item Light, cred Credentials)
 	// com a chave da lâmpada (chave errada não responde estado). É isso que traz
 	// a lâmpada de volta sozinha quando o roteador troca o IP dela.
 	if known := strings.TrimSpace(item.LastAddress); known != "" {
-		scanCtx, cancel := context.WithTimeout(ctx, 12*time.Second)
-		candidates := tuya.ScanAddresses(scanCtx, known, 6668, 300*time.Millisecond)
+		// A ronda dá 8 segundos por lâmpada: a varredura e as sondagens correm
+		// JUNTAS e com prazo curto, senão o tempo acaba antes de achar a
+		// lâmpada (era por isso que ela nunca era encontrada sozinha).
+		scanCtx, cancel := context.WithTimeout(ctx, 5*time.Second)
+		candidates := tuya.ScanAddresses(scanCtx, known, 6668, 250*time.Millisecond)
 		cancel()
-		for _, candidate := range candidates {
-			try := cred
-			try.Address = candidate
-			probeCtx, probeCancel := context.WithTimeout(ctx, 5*time.Second)
-			_, statusErr := d.Status(probeCtx, item, try)
-			probeCancel()
-			if statusErr == nil {
-				return candidate, nil
+		if len(candidates) > 0 {
+			found := make(chan string, len(candidates))
+			var probes sync.WaitGroup
+			for _, candidate := range candidates {
+				probes.Add(1)
+				go func(address string) {
+					defer probes.Done()
+					try := cred
+					try.Address = address
+					probeCtx, probeCancel := context.WithTimeout(ctx, 1500*time.Millisecond)
+					defer probeCancel()
+					if _, err := d.Status(probeCtx, item, try); err == nil {
+						select {
+						case found <- address:
+						default:
+						}
+					}
+				}(candidate)
+			}
+			go func() { probes.Wait(); close(found) }()
+			if address, ok := <-found; ok {
+				return address, nil
 			}
 		}
 	}

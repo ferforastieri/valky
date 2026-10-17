@@ -84,7 +84,6 @@ fun PeopleScreen(onPerson: (String) -> Unit = {}, vm: PeopleViewModel = hiltView
     Box(Modifier.fillMaxSize()) {
     Column(Modifier.fillMaxSize().padding(horizontal = 18.dp)) {
         when (locationStatus) {
-            LocationTrackingStatus.State.Locating -> Text(stringResource(R.string.location_updating), style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(bottom = 8.dp))
             LocationTrackingStatus.State.LocationUnavailable, LocationTrackingStatus.State.SendFailed, LocationTrackingStatus.State.PermissionRequired -> {
                 Column(Modifier.fillMaxWidth().padding(bottom = 8.dp)) {
                     Text(stringResource(when (locationStatus) {

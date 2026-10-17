@@ -56,6 +56,9 @@ import com.composables.icons.lucide.Smartphone
 import com.composables.icons.lucide.Sun
 import com.composables.icons.lucide.UserPlus
 import com.ferforastieri.valkyris.feature.people.LocationTrackingService
+import androidx.compose.foundation.shape.CircleShape
+import com.ferforastieri.valkyris.core.design.SkeletonList
+import com.ferforastieri.valkyris.core.design.ValkyrisSkeleton
 
 @Composable
 fun SettingsScreen(main: MainViewModel, viewModel: SettingsViewModel = hiltViewModel()) {
@@ -293,7 +296,7 @@ fun RetentionSheet(
             TextButton(onDismiss, enabled = !saving) { Text(stringResource(R.string.cancel)) }
             Button(onClick = { onSave(RetentionSettings(days, storage)) }, enabled = !saving) {
                 if (saving) {
-                    CircularProgressIndicator(Modifier.size(18.dp), strokeWidth = 2.dp)
+                    ValkyrisSkeleton(Modifier.size(18.dp), CircleShape)
                     Spacer(Modifier.width(8.dp))
                 }
                 Text(stringResource(R.string.save))
@@ -446,7 +449,7 @@ private fun InvitationDialog(state: InvitationState, onCreate: () -> Unit, onDis
     ) {
         Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(12.dp)) {
             when {
-                state.loading -> CircularProgressIndicator()
+                state.loading -> ValkyrisSkeleton(Modifier.size(22.dp), CircleShape)
                 bitmap != null -> {
                     Image(
                         bitmap.asImageBitmap(),

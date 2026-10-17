@@ -55,6 +55,8 @@ import kotlinx.coroutines.launch
 import androidx.compose.runtime.rememberCoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import com.ferforastieri.valkyris.core.design.SkeletonList
+import com.ferforastieri.valkyris.core.design.ValkyrisSkeleton
 
 @Composable
 fun ProfileScreen(admin: Boolean, vm: ProfileViewModel = hiltViewModel()) {
@@ -84,7 +86,7 @@ fun ProfileScreen(admin: Boolean, vm: ProfileViewModel = hiltViewModel()) {
         val profile = current
         if (profile == null) {
             Spacer(Modifier.height(48.dp))
-            CircularProgressIndicator(Modifier.align(Alignment.CenterHorizontally))
+            ValkyrisSkeleton(Modifier.size(22.dp), CircleShape)
         } else {
             Card(
                 modifier = Modifier.fillMaxWidth(),
@@ -121,7 +123,6 @@ fun ProfileScreen(admin: Boolean, vm: ProfileViewModel = hiltViewModel()) {
             ) { Text("Salvar perfil") }
 
             run {
-            Text("Usuário: ${permissions.username}", style = MaterialTheme.typography.bodyMedium)
             Text("Senha da sua conta", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold, modifier = Modifier.padding(top = 12.dp))
             Text("Use seu usuário e esta senha para entrar em outro aparelho.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             OutlinedTextField(currentPassword, { currentPassword = it }, label = { Text("Senha atual") }, singleLine = true, visualTransformation = PasswordVisualTransformation(), modifier = Modifier.fillMaxWidth())

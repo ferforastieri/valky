@@ -37,6 +37,8 @@ import com.ferforastieri.valkyris.core.design.warmWhiteColor
 import com.ferforastieri.valkyris.core.model.LightColor
 import com.ferforastieri.valkyris.core.model.LightDevice
 import com.ferforastieri.valkyris.core.model.LightStatePatch
+import com.ferforastieri.valkyris.core.design.SkeletonList
+import com.ferforastieri.valkyris.core.design.ValkyrisSkeleton
 
 /**
  * Página da lâmpada: uma tela de verdade, com a barra de navegação do app
@@ -62,7 +64,7 @@ fun LightDetailScreen(
         LaunchedEffect(lightId) { vm.ensure(lightId) }
         Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
             if (missing) Text(stringResource(R.string.light_missing), color = MaterialTheme.colorScheme.onSurfaceVariant)
-            else CircularProgressIndicator()
+            else ValkyrisSkeleton(Modifier.size(22.dp), CircleShape)
         }
         return
     }

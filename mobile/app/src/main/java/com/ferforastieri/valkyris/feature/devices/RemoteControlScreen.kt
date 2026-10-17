@@ -66,6 +66,8 @@ import com.ferforastieri.valkyris.core.design.ValkyrisTopBar
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import com.ferforastieri.valkyris.core.design.SkeletonList
+import com.ferforastieri.valkyris.core.design.ValkyrisSkeleton
 
 /** Espaço único entre os botões do controle. */
 private val KeyGap = 8.dp
@@ -105,7 +107,7 @@ fun RemoteControlScreen(
         Spacer(Modifier.height(14.dp))
         state.error?.let { /* errors surface as a toast */ }
         when {
-            remote == null -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { CircularProgressIndicator() }
+            remote == null -> SkeletonList(rows = 5, horizontal = 0.dp)
             !remote.tokenConfigured -> PairingPanel(pairing = state.pairing, onPair = vm::pair)
             else -> ConnectedRemote(state, vm, qwerty)
         }
@@ -125,7 +127,7 @@ private fun PowerButton(powering: Boolean, onPower: () -> Unit, modifier: Modifi
     ) {
         Box(contentAlignment = Alignment.Center) {
             if (powering) {
-                CircularProgressIndicator(Modifier.size(22.dp), strokeWidth = 2.dp, color = MaterialTheme.colorScheme.onErrorContainer)
+                ValkyrisSkeleton(Modifier.size(22.dp), CircleShape)
             } else {
                 Icon(Lucide.Power, stringResource(R.string.remote_power), Modifier.size(26.dp), tint = MaterialTheme.colorScheme.onErrorContainer)
             }

@@ -14,6 +14,9 @@ import com.ferforastieri.valkyris.core.model.ManagedUser
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import androidx.compose.foundation.shape.CircleShape
+import com.ferforastieri.valkyris.core.design.SkeletonList
+import com.ferforastieri.valkyris.core.design.ValkyrisSkeleton
 
 @Composable
 fun UserManagementSheet(users: List<ManagedUser>, error: String?, busy: Boolean, onSave: (ManagedUser)->Unit, onRemove: (ManagedUser)->Unit, onDismiss: ()->Unit) {
@@ -76,7 +79,7 @@ fun UserManagementSheet(users: List<ManagedUser>, error: String?, busy: Boolean,
                             com.ferforastieri.valkyris.core.design.AdaptiveRow(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                                 TextButton({ removing = user }, enabled = !busy) { Text("Remover pessoa", color = MaterialTheme.colorScheme.error) }
                                 Button({ onSave(user.copy(name = name.trim(), enabled = enabled, admin = admin, viewRules = viewRules, editRules = editRules, notifyCamera = notifyCamera, notifyLocation = notifyLocation, avatarData = avatarEdits[user.id] ?: user.avatarData, username = username.trim(), password = password)); password = "" }, enabled = !busy && name.isNotBlank() && (password.isEmpty() || username.isNotBlank() && password.toByteArray().size in 12..72)) {
-                                    if (busy) CircularProgressIndicator(Modifier.size(18.dp), strokeWidth = 2.dp) else Text("Salvar alterações")
+                                    if (busy) ValkyrisSkeleton(Modifier.size(18.dp), CircleShape) else Text("Salvar alterações")
                                 }
                             }
                         }

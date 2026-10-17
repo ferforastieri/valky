@@ -26,6 +26,8 @@ import com.composables.icons.lucide.Lucide
 import com.composables.icons.lucide.Smartphone
 import com.ferforastieri.valkyris.R
 import com.ferforastieri.valkyris.core.design.ValkyrisBottomSheet
+import com.ferforastieri.valkyris.core.design.SkeletonList
+import com.ferforastieri.valkyris.core.design.ValkyrisSkeleton
 
 /**
  * Update notice shown when a new signed APK is available. It is dismissible so
@@ -52,7 +54,7 @@ fun UpdateAvailableSheet(
                 modifier = Modifier.fillMaxWidth(),
             ) {
                 if (updating) {
-                    CircularProgressIndicator(Modifier.size(18.dp), strokeWidth = 2.dp)
+                    ValkyrisSkeleton(Modifier.size(18.dp), CircleShape)
                     Spacer(Modifier.width(8.dp))
                 }
                 Text(stringResource(if (updating) R.string.update_downloading else R.string.update_now))

@@ -154,6 +154,12 @@ private fun ConnectedValkyrisApp(main: MainViewModel) {
         }
     }
     val refreshing by main.refreshing.collectAsStateWithLifecycle()
+        // Puxar de cima para baixo atualiza tudo, em qualquer tela do app.
+        PullToRefreshBox(
+            isRefreshing = refreshing,
+            onRefresh = { main.refreshEverything() },
+            modifier = Modifier.fillMaxSize(),
+        ) {
     Scaffold(
         modifier = Modifier.fillMaxSize().imePadding(),
         containerColor = MaterialTheme.colorScheme.background,
@@ -192,12 +198,6 @@ private fun ConnectedValkyrisApp(main: MainViewModel) {
         },
     ) { padding ->
         val contentModifier = Modifier.padding(padding)
-        // Puxar de cima para baixo atualiza tudo, em qualquer tela do app.
-        PullToRefreshBox(
-            isRefreshing = refreshing,
-            onRefresh = { main.refreshEverything() },
-            modifier = Modifier.fillMaxSize(),
-        ) {
         NavHost(
             navController = nav,
             startDestination = "overview",
@@ -265,8 +265,8 @@ private fun ConnectedValkyrisApp(main: MainViewModel) {
             composable("profile") { ProfileScreen(admin = admin) }
             composable("settings") { SettingsScreen(main) }
         }
-        }
     }
+        }
 }
 
 internal fun NavHostController.openTopLevel(route: String) {

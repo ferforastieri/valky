@@ -25,6 +25,8 @@ import com.ferforastieri.valkyris.core.design.AnimatedBulbIcon
 import com.ferforastieri.valkyris.core.design.ValkyrisBottomSheet
 import com.ferforastieri.valkyris.core.design.lightTint
 import com.ferforastieri.valkyris.core.model.*
+import com.ferforastieri.valkyris.core.design.SkeletonList
+import com.ferforastieri.valkyris.core.design.ValkyrisSkeleton
 
 @Composable fun LightsScreen(admin:Boolean,onLight:(String)->Unit,vm:LightsViewModel=hiltViewModel()){
     LifecycleResumeEffect(Unit){vm.setActive(true);onPauseOrDispose{vm.setActive(false)}}
@@ -36,7 +38,7 @@ import com.ferforastieri.valkyris.core.model.*
         Column(Modifier.fillMaxSize().padding(horizontal=18.dp)){
             state.error?.let{ /* errors surface as a toast */ }
             when{
-                state.loading->Box(Modifier.fillMaxSize(),contentAlignment=Alignment.Center){CircularProgressIndicator()}
+                state.loading->SkeletonList(rows = 5, horizontal = 0.dp)
                 state.lights.isEmpty()->EmptyLighting(admin)
                 else->LazyColumn(verticalArrangement=Arrangement.spacedBy(12.dp),contentPadding=PaddingValues(top=12.dp,bottom=96.dp)){
                     items(state.lights,key={it.id}){light->LightCard(light,light.id in state.busy,{vm.control(light.id,LightStatePatch(power=!light.state.power))},{onLight(light.id)},if(admin){{removing=light}}else null,{vm.toggleFavorite(light.id,!light.favorite)},if(admin){{renaming=light}}else null)}
@@ -94,9 +96,10 @@ import com.ferforastieri.valkyris.core.model.*
                 Text(
                     listOfNotNull(
                         when{
-                            // Fora do ar é fora do ar: uma falha antiga não vale mais quando ela responde.
-                            !light.state.online->if(light.setupStatus=="failed")light.setupError.ifBlank{stringResource(R.string.light_setup_failed)}else stringResource(R.string.unavailable)
-                            light.setupStatus!="ready"->stringResource(R.string.light_setup_pending)
+                            // Fora do ar é fora do ar: respondendo, o aviso antigo não vale.
+                            !light.state.online&&light.setupStatus=="failed"->light.setupError.ifBlank{stringResource(R.string.light_setup_failed)}
+                            !light.state.online&&light.setupStatus!="ready"->stringResource(R.string.light_setup_pending)
+                            !light.state.online->stringResource(R.string.unavailable)
                             else->"${stringResource(if(on)R.string.favorite_light_on else R.string.favorite_light_off)} · ${light.state.brightness}%"
                         },
                     ).joinToString(" · "),
@@ -108,7 +111,7 @@ import com.ferforastieri.valkyris.core.model.*
             onFavorite?.let{IconButton(onClick=it){Icon(Lucide.Star,stringResource(if(light.favorite)R.string.unfavorite else R.string.favorite),tint=if(light.favorite)MaterialTheme.colorScheme.secondary else MaterialTheme.colorScheme.onSurfaceVariant)}}
             onEdit?.let{IconButton(onClick=it){Icon(Lucide.Pencil,stringResource(R.string.edit),tint=MaterialTheme.colorScheme.onSurfaceVariant)}}
             onRemove?.let{IconButton(onClick=it){Icon(Lucide.Trash2,stringResource(R.string.remove),tint=MaterialTheme.colorScheme.error)}}
-            if(busy)CircularProgressIndicator(Modifier.size(24.dp),strokeWidth=2.dp)
+            if(busy)ValkyrisSkeleton(Modifier.size(24.dp), CircleShape)
         }
     }
 }
@@ -135,7 +138,7 @@ import com.ferforastieri.valkyris.core.model.*
             Button(
                 onClick={onSubmit(LightRegistration(address=address.trim(),deviceId=deviceId.trim(),localKey=localKey.trim(),name=name.trim())){ok->if(ok)onDismiss()}},
                 enabled=ready,
-            ){if(running)CircularProgressIndicator(Modifier.size(18.dp),strokeWidth=2.dp)else Text(stringResource(R.string.save))}
+            ){if(running)ValkyrisSkeleton(Modifier.size(18.dp), CircleShape)else Text(stringResource(R.string.save))}
         },
     ){
         Column(Modifier.fillMaxWidth(),verticalArrangement=Arrangement.spacedBy(10.dp)){
@@ -145,7 +148,7 @@ import com.ferforastieri.valkyris.core.model.*
             Row(verticalAlignment=Alignment.CenterVertically){
                 Text(stringResource(R.string.light_register_network),Modifier.weight(1f),fontWeight=FontWeight.SemiBold,style=MaterialTheme.typography.bodyMedium)
                 TextButton(onClick=onScan,enabled=!running&&!state.scanning){
-                    if(state.scanning)CircularProgressIndicator(Modifier.size(16.dp),strokeWidth=2.dp)else Text(stringResource(R.string.light_register_scan))
+                    if(state.scanning)ValkyrisSkeleton(Modifier.size(16.dp), CircleShape)else Text(stringResource(R.string.light_register_scan))
                 }
             }
             state.candidates.forEach{candidate->

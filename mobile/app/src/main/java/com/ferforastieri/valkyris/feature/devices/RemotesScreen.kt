@@ -61,6 +61,8 @@ import com.ferforastieri.valkyris.core.design.ValkyrisBottomSheet
 import com.ferforastieri.valkyris.core.model.RemoteDevice
 import com.ferforastieri.valkyris.core.model.RemoteInput
 import com.ferforastieri.valkyris.core.model.RemoteUpdate
+import com.ferforastieri.valkyris.core.design.SkeletonList
+import com.ferforastieri.valkyris.core.design.ValkyrisSkeleton
 
 @Composable
 fun RemotesScreen(admin: Boolean, onRemote: (String) -> Unit = {}, vm: RemotesViewModel = hiltViewModel()) {
@@ -101,7 +103,7 @@ fun RemotesScreen(admin: Boolean, onRemote: (String) -> Unit = {}, vm: RemotesVi
                     item { Text(stringResource(R.string.remote_discover_empty), color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodySmall) }
                 }
                 if (state.loading && state.remotes.isEmpty()) {
-                    item { Box(Modifier.fillMaxWidth().padding(top = 40.dp), contentAlignment = Alignment.Center) { CircularProgressIndicator() } }
+                    item { Box(Modifier.fillMaxWidth().padding(top = 40.dp), contentAlignment = Alignment.Center) { ValkyrisSkeleton(Modifier.size(22.dp), CircleShape) } }
                 }
                 if (state.remotes.isNotEmpty()) {
                     items(state.remotes, key = { it.id }) { remote ->
@@ -282,7 +284,7 @@ private fun RemoteEditorSheet(
                 onClick = { onSave(RemoteInput(name = name.trim(), host = host.trim(), port = port.toIntOrNull() ?: 8002)) },
                 enabled = !saving && name.isNotBlank() && host.isNotBlank(),
             ) {
-                if (saving) CircularProgressIndicator(Modifier.size(18.dp), strokeWidth = 2.dp, color = MaterialTheme.colorScheme.onPrimary)
+                if (saving) ValkyrisSkeleton(Modifier.size(18.dp), CircleShape)
                 else Text(stringResource(R.string.save))
             }
         },

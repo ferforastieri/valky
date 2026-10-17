@@ -31,6 +31,9 @@ import kotlinx.serialization.json.jsonPrimitive
 import java.time.Instant
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
+import androidx.compose.foundation.shape.CircleShape
+import com.ferforastieri.valkyris.core.design.SkeletonList
+import com.ferforastieri.valkyris.core.design.ValkyrisSkeleton
 
 @Composable
 fun EventDetailScreen(vm: EventDetailViewModel = hiltViewModel()) {
@@ -51,7 +54,7 @@ fun EventDetailScreen(vm: EventDetailViewModel = hiltViewModel()) {
 
     val value = event
     if (value == null) {
-        Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { CircularProgressIndicator() }
+        SkeletonList(rows = 5, horizontal = 0.dp)
         return
     }
     Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = 18.dp, vertical = 10.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
@@ -90,7 +93,7 @@ fun EventDetailScreen(vm: EventDetailViewModel = hiltViewModel()) {
         } else Surface(Modifier.fillMaxWidth().aspectRatio(16 / 9f), RoundedCornerShape(22.dp), color = MaterialTheme.colorScheme.surface, border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant), shadowElevation = 5.dp) {
             if (player == null && value.clipStatus == "processing") {
                 Column(Modifier.fillMaxSize(), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center) {
-                    CircularProgressIndicator(Modifier.size(30.dp), strokeWidth = 3.dp)
+                    ValkyrisSkeleton(Modifier.size(30.dp), CircleShape)
                     Spacer(Modifier.height(12.dp))
                     Text(stringResource(R.string.media_processing), color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
