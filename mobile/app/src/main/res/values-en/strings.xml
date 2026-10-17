@@ -1,7 +1,7 @@
 <resources>
     <string name="notification_alarm_body">Attention needed. Tap to open the alert.</string>
     <string name="notification_event_body">Activity detected. Tap to view details.</string>
-    <string name="app_name">Valk</string>
+    <string name="app_name">Valky</string>
     <string name="invite_device">Invite another phone</string>
     <string name="invite_device_body">Generate a temporary QR code to authorize someone else.</string>
     <string name="invite_title">Temporary invitation</string>
@@ -35,7 +35,7 @@
     <string name="permission_location">Location</string>
     <string name="permission_location_needed">Needed for the family map</string>
     <string name="remove_light_title">Remove bulb?</string>
-    <string name="remove_light_body">The bulb “%1$s” will be removed from Valk. Its physical configuration will not change.</string>
+    <string name="remove_light_body">The bulb “%1$s” will be removed from Valky. Its physical configuration will not change.</string>
     <string name="remove">Remove</string>
     <string name="edit">Edit</string>
     <string name="unavailable">Unavailable</string>
@@ -54,7 +54,7 @@
     <string name="notification_channel_events">Home alerts</string>
     <string name="notification_channel_alarm">Critical alarms</string>
     <string name="alert_readiness_title">Get alerts ready</string>
-    <string name="alert_readiness_body">Valk needs these permissions to alert you while the screen is locked or the phone is in silent mode.</string>
+    <string name="alert_readiness_body">Valky needs these permissions to alert you while the screen is locked or the phone is in silent mode.</string>
     <string name="configure_permission">Configure %1$s</string>
     <string name="not_now">Not now</string>
     <string name="notification_permission">Notification permission</string>
@@ -136,7 +136,7 @@
     <string name="background_location">Background location</string>
     <string name="battery_optimization">Alerts without battery restrictions</string>
     <string name="disconnect_phone">Disconnect this phone</string>
-    <string name="app_version">Valk · v%1$s</string>
+    <string name="app_version">Valky · v%1$s</string>
     <string name="copyright_owner">© 2026 Fernando Forastieri</string>
     <string name="record_media">Save snapshot and clip</string>
     <string name="send_notification">Send persistent notification</string>
@@ -155,7 +155,7 @@
     <string name="recent_activity">Recent activity</string>
     <string name="update_available">Update available</string>
     <string name="update_now">Update</string>
-    <string name="update_sheet_body">Valk version %1$s is ready to install.</string>
+    <string name="update_sheet_body">Valky version %1$s is ready to install.</string>
     <string name="update_downloading">Downloading…</string>
     <string name="update_install_hint">Confirm the installation on the system screen to finish.</string>
     <string name="downloading_update">Downloading the signed application update</string>
@@ -270,7 +270,7 @@
     <string name="remote_pair_required">Pair the remote with the TV</string>
     <string name="remote_pair_hint">Tap “Pair” and accept the authorization prompt shown on the TV.</string>
     <string name="remote_remove_title">Remove remote control?</string>
-    <string name="remote_remove_body">The remote “%1$s” will be removed from Valk. The TV is not changed.</string>
+    <string name="remote_remove_body">The remote “%1$s” will be removed from Valky. The TV is not changed.</string>
     <string name="remote_volume_up">Volume +</string>
     <string name="remote_volume_down">Volume −</string>
     <string name="remote_mute">Mute</string>
@@ -313,7 +313,7 @@
     <string name="widget_remote_volume_down">Volume down</string>
     <string name="widget_remote_mute">Mute</string>
     <string name="widget_refresh">Refresh</string>
-    <string name="widget_signed_out">Open Valk and sign in</string>
+    <string name="widget_signed_out">Open Valky and sign in</string>
     <string name="widget_lights_description">Turn your favorite bulbs on and off.</string>
     <string name="widget_camera_description">The latest picture from a camera, refreshed from time to time.</string>
     <string name="widget_remote_description">Power, volume and navigation for the TV.</string>

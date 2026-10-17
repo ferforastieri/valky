@@ -102,8 +102,8 @@ test('carrossel avança automaticamente sem controle visual redundante', () => {
 test('documentação é uma rota separada, localizada e completa', async () => {
   assert.match(ptDocs, /<html lang="pt-BR"/);
   assert.match(enDocs, /<html lang="en"/);
-  assert.match(ptDocs, /Documentação do Valk/);
-  assert.match(enDocs, /Valk documentation/);
+  assert.match(ptDocs, /Documentação do Valky/);
+  assert.match(enDocs, /Valky documentation/);
   assert.match(ptDocs, /\/api\/v1\/cameras/);
   assert.match(ptDocs, /Iluminação inteligente/);
   assert.match(ptDocs, /\/api\/v1\/lights\/\{id\}\/state/);

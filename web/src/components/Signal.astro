@@ -2,7 +2,7 @@
 interface Props { class?: string; }
 const { class: className = '' } = Astro.props;
 ---
-<svg class={`signal ${className}`} viewBox="0 0 720 140" role="img" aria-label="Valk signal line">
+<svg class={`signal ${className}`} viewBox="0 0 720 140" role="img" aria-label="Valky signal line">
   <path class="signal-ghost" d="M0 78 C70 78 72 78 112 78 C150 78 150 22 188 22 C226 22 226 122 266 122 C306 122 306 50 348 50 C390 50 390 92 432 92 C474 92 474 42 516 42 C558 42 558 78 600 78 L720 78" />
   <path class="signal-live" d="M0 78 C70 78 72 78 112 78 C150 78 150 22 188 22 C226 22 226 122 266 122 C306 122 306 50 348 50 C390 50 390 92 432 92 C474 92 474 42 516 42 C558 42 558 78 600 78 L720 78" />
 </svg>

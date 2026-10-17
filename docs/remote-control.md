@@ -52,7 +52,7 @@ principais plataformas de TV como alternativa quando o roteador bloqueia
 multicast). As TVs encontradas aparecem em **Encontradas na rede**; tocar em uma
 delas cadastra o controle e inicia o pareamento.
 
-Na primeira conexão a TV mostra um aviso do tipo *"Permitir que Valk acesse
+Na primeira conexão a TV mostra um aviso do tipo *"Permitir que Valky acesse
 este dispositivo?"*. Ao aceitar, a TV devolve um token que o backend guarda
 cifrado. Depois disso os comandos não pedem mais autorização.
 
@@ -76,7 +76,7 @@ TV. A API rejeita qualquer comando fora dessa lista.
 ## Aplicativos instalados
 
 A Samsung removeu, a partir do Tizen 5 (2020+), a API que listava os aplicativos
-instalados na TV. Por isso o controle do Valk **não exibe a barra de apps**:
+instalados na TV. Por isso o controle do Valky **não exibe a barra de apps**:
 não existe chamada que devolva a lista completa nesta geração de firmware.
 
 ## Ligar e desligar a TV

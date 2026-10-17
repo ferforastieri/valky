@@ -1,7 +1,7 @@
 # Buffer de vídeo em RAM
 
 O Compose mantém o buffer temporário de dez minutos em um único volume
-tmpfs, `recording-buffer`, compartilhado entre Valk e MediaMTX em
+tmpfs, `recording-buffer`, compartilhado entre Valky e MediaMTX em
 `/data/recordings`. Esse é o comportamento padrão da instalação.
 
 Banco de dados, credenciais, snapshots e clipes de eventos continuam no
@@ -37,7 +37,7 @@ e usado tanto pelo instalador quanto pelo atualizador. Não exige override,
 variável de ativação ou edição manual dos arquivos instalados.
 
 Em instalações existentes, aplique a release pelo instalador no host para
-atualizar o Compose e recriar **Valk e MediaMTX juntos**. A atualização
+atualizar o Compose e recriar **Valky e MediaMTX juntos**. A atualização
 pelo app troca apenas o backend; ela não migra o Compose de uma instalação
 antiga. Após a migração, atualizações pelo app preservam o volume compartilhado.
 

@@ -10,8 +10,8 @@ const pt = locale === 'pt-BR';
 const installCommand = 'curl -fsSL https://valkyris.vercel.app/install.sh | sh';
 
 const text = pt ? {
-  title: 'Documentação do Valk',
-  description: 'Guia de instalação, câmeras ONVIF, iluminação inteligente, segurança, operação e referência completa da API HTTP do Valk.',
+  title: 'Documentação do Valky',
+  description: 'Guia de instalação, câmeras ONVIF, iluminação inteligente, segurança, operação e referência completa da API HTTP do Valky.',
   eyebrow: 'GUIA OPERACIONAL · API V1',
   intro: 'Tudo o que você precisa para instalar o servidor, preparar câmeras e iluminação, conectar o Android e integrar a API.',
   onThisPage: 'Nesta página',
@@ -19,8 +19,8 @@ const text = pt ? {
   requirements: ['Linux em amd64 ou arm64', 'Docker Engine com Docker Compose v2', 'Android 8.0 (SDK 26) ou mais recente', 'Câmera ONVIF Profile S com RTSP', 'Servidor, celular e câmera acessíveis por LAN ou VPN'],
   methods: 'Bearer no Android e integrações; o painel usa cookie HttpOnly e X-Valkyris-Viewer: 1. Rotas públicas dispensam sessão.',
 } : {
-  title: 'Valk documentation',
-  description: 'Installation, ONVIF camera setup, smart lighting, security, operations and complete Valk HTTP API reference.',
+  title: 'Valky documentation',
+  description: 'Installation, ONVIF camera setup, smart lighting, security, operations and complete Valky HTTP API reference.',
   eyebrow: 'OPERATIONS GUIDE · API V1',
   intro: 'Everything needed to install the server, prepare cameras and lighting, connect Android and integrate the API.',
   onThisPage: 'On this page',
@@ -109,7 +109,7 @@ const endpoints = pt ? [
   ['GET','/api/v1/realtime','Authenticated','WebSocket for camera, lighting and event changes.'],
 ];
 ---
-<BaseLayout locale={locale} title={`${text.title} | Valk`} description={text.description}>
+<BaseLayout locale={locale} title={`${text.title} | Valky`} description={text.description}>
   <main class="docs-shell">
     <header class="docs-hero">
       <div>
@@ -132,7 +132,7 @@ const endpoints = pt ? [
       <article class="docs-content">
         <section id="start">
           <div class="docs-heading"><SquareTerminal size={22}/><div><span>01</span><h2>{pt ? 'Começar' : 'Get started'}</h2></div></div>
-          <p>{pt ? 'O instalador baixa artefatos da release, gera os segredos locais e o certificado TLS, prepara o Compose e inicia Valk e MediaMTX.' : 'The installer downloads release artifacts, generates local secrets and a TLS certificate, prepares Compose, then starts Valk and MediaMTX.'}</p>
+          <p>{pt ? 'O instalador baixa artefatos da release, gera os segredos locais e o certificado TLS, prepara o Compose e inicia Valky e MediaMTX.' : 'The installer downloads release artifacts, generates local secrets and a TLS certificate, prepares Compose, then starts Valky and MediaMTX.'}</p>
           <div class="docs-code"><code>{installCommand}</code><button class="docs-copy" type="button" data-command={installCommand}>{pt ? 'Copiar' : 'Copy'}</button></div>
           <h3>{pt ? 'Requisitos' : 'Requirements'}</h3>
           <ul class="check-list">{text.requirements.map(item=><li><span>✓</span>{item}</li>)}</ul>
@@ -170,11 +170,11 @@ const endpoints = pt ? [
         <section id="android">
           <div class="docs-heading"><Smartphone size={22}/><div><span>04</span><h2>Android</h2></div></div>
           <p>{pt ? 'Instale o APK da release mais recente. No primeiro acesso, informe a URL HTTPS pela qual o celular alcança o servidor e crie a conta com usuário e senha. O primeiro dispositivo vira administrador.' : 'Install the APK from the latest release. On first access, enter the HTTPS URL through which the phone reaches the server and create the personal username and password. The first device becomes administrator.'}</p>
-          <div class="docs-actions"><a class="button dark" href="https://github.com/ferforastieri/valk/releases/latest"><Download size={17}/>{pt ? 'Baixar APK' : 'Download APK'}</a><a class="button quiet" href="https://github.com/ferforastieri/valk/releases"><ExternalLink size={17}/>{pt ? 'Todas as releases' : 'All releases'}</a></div>
+          <div class="docs-actions"><a class="button dark" href="https://github.com/ferforastieri/valky/releases/latest"><Download size={17}/>{pt ? 'Baixar APK' : 'Download APK'}</a><a class="button quiet" href="https://github.com/ferforastieri/valky/releases"><ExternalLink size={17}/>{pt ? 'Todas as releases' : 'All releases'}</a></div>
           <h3>{pt ? 'Outros celulares' : 'Other phones'}</h3>
           <p>{pt ? 'Em Ajustes, o administrador cria um convite temporário e de uso único. O QR é montado dentro do app com a URL já conhecida; o backend não possui página pública de pareamento.' : 'In Settings, the administrator creates a temporary, single-use invitation. The QR is assembled inside the app using the known server URL; the backend has no public pairing page.'}</p>
           <h3>{pt ? 'Notificações nativas' : 'Native notifications'}</h3>
-          <p>{pt ? 'O APK usa Firebase Cloud Messaging diretamente e não exige aplicativo auxiliar. Após o login, o token deste celular é registrado automaticamente; o Android recebe um payload mínimo cifrado e o Valk cria a notificação ou o alarme nativo.' : 'The APK uses Firebase Cloud Messaging directly and requires no companion app. After login, this phone token is registered automatically; Android receives a minimal encrypted payload and Valk creates the native notification or alarm.'}</p>
+          <p>{pt ? 'O APK usa Firebase Cloud Messaging diretamente e não exige aplicativo auxiliar. Após o login, o token deste celular é registrado automaticamente; o Android recebe um payload mínimo cifrado e o Valky cria a notificação ou o alarme nativo.' : 'The APK uses Firebase Cloud Messaging directly and requires no companion app. After login, this phone token is registered automatically; Android receives a minimal encrypted payload and Valky creates the native notification or alarm.'}</p>
           <ol class="docs-steps">
             <li><span>1</span><div><strong>{pt ? 'Configure o APK' : 'Configure the APK'}</strong><p>{pt ? 'Adicione com.ferforastieri.valkyris ao projeto Firebase, baixe google-services.json e grave seu base64 no secret FIREBASE_ANDROID_CONFIG_BASE64 do GitHub.' : 'Add com.ferforastieri.valkyris to the Firebase project, download google-services.json and store its base64 in the FIREBASE_ANDROID_CONFIG_BASE64 GitHub secret.'}</p></div></li>
             <li><span>2</span><div><strong>{pt ? 'Configure o servidor' : 'Configure the server'}</strong><p>{pt ? 'Gere uma chave JSON em Configurações do projeto → Contas de serviço. No sheet de alertas do app, envie esse JSON: ele é validado e cifrado no SQLite do seu servidor.' : 'Generate a JSON key under Project settings → Service accounts. In the app alert sheet, upload this JSON: it is validated and encrypted in your server SQLite database.'}</p></div></li>

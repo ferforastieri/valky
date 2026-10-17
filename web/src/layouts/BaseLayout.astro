@@ -14,8 +14,8 @@ const keywords = isPortuguese
   ? 'monitoramento residencial self-hosted, homelab, câmera ONVIF, câmera RTSP, segurança residencial open source, NVR local, detecção local, Tapo TC40, servidor doméstico, Android'
   : 'self-hosted home monitoring, homelab, ONVIF camera, RTSP camera, open source home security, local NVR, local detection, Tapo TC40, home server, Android';
 const socialImageAlt = isPortuguese
-  ? 'Valk, monitoramento residencial self-hosted para câmeras ONVIF'
-  : 'Valk, self-hosted home monitoring for ONVIF cameras';
+  ? 'Valky, monitoramento residencial self-hosted para câmeras ONVIF'
+  : 'Valky, self-hosted home monitoring for ONVIF cameras';
 const structuredData = {
   '@context': 'https://schema.org',
   '@graph': [
@@ -23,7 +23,7 @@ const structuredData = {
       '@type': 'WebSite',
       '@id': 'https://valkyris.vercel.app/#website',
       url: 'https://valkyris.vercel.app/',
-      name: 'Valk',
+      name: 'Valky',
       description,
       inLanguage: ['pt-BR', 'en'],
       publisher: { '@id': 'https://valkyris.vercel.app/#author' },
@@ -31,7 +31,7 @@ const structuredData = {
     {
       '@type': 'SoftwareApplication',
       '@id': 'https://valkyris.vercel.app/#application',
-      name: 'Valk',
+      name: 'Valky',
       url: canonical.href,
       description,
       applicationCategory: 'HomeApplication',
@@ -40,7 +40,7 @@ const structuredData = {
       isAccessibleForFree: true,
       license: 'https://opensource.org/license/mit',
       codeRepository: 'https://github.com/ferforastieri/valk',
-      downloadUrl: 'https://github.com/ferforastieri/valk/releases/latest',
+      downloadUrl: 'https://github.com/ferforastieri/valky/releases/latest',
       image: socialImage.href,
       keywords,
       inLanguage: locale,
@@ -70,7 +70,7 @@ const structuredData = {
     <meta name="description" content={description} />
     <meta name="keywords" content={keywords} />
     <meta name="author" content="Fernando Forastieri" />
-    <meta name="application-name" content="Valk" />
+    <meta name="application-name" content="Valky" />
     <meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1" />
     <meta name="googlebot" content="index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1" />
     <meta name="referrer" content="strict-origin-when-cross-origin" />
@@ -86,7 +86,7 @@ const structuredData = {
     <link rel="icon" href="/favicon.png?v=6" type="image/png" sizes="64x64" />
     <link rel="apple-touch-icon" href="/apple-touch-icon.png?v=6" sizes="180x180" />
     <meta property="og:type" content="website" />
-    <meta property="og:site_name" content="Valk" />
+    <meta property="og:site_name" content="Valky" />
     <meta property="og:title" content={title} />
     <meta property="og:description" content={description} />
     <meta property="og:url" content={canonical} />

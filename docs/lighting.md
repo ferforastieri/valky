@@ -1,6 +1,6 @@
 # Iluminação local
 
-O Valk controla lâmpadas Wi-Fi compatíveis com Tuya (protocolos locais 3.1 a 3.5) diretamente na rede de casa, na porta TCP 6668. Depois de cadastrada, é possível ligar, desligar e, quando o dispositivo oferecer essas capacidades, alterar brilho, temperatura do branco e cor RGB.
+O Valky controla lâmpadas Wi-Fi compatíveis com Tuya (protocolos locais 3.1 a 3.5) diretamente na rede de casa, na porta TCP 6668. Depois de cadastrada, é possível ligar, desligar e, quando o dispositivo oferecer essas capacidades, alterar brilho, temperatura do branco e cor RGB.
 
 Nada aqui conversa com a internet: a descoberta e o controle acontecem na rede local, com o backend falando direto com a lâmpada.
 
@@ -13,7 +13,7 @@ O domínio de iluminação não depende de conta ou protocolo de um fabricante. 
 - leitura do estado atual;
 - aplicação de uma alteração de estado.
 
-`internal/light/tuya` implementa essa fronteira para os protocolos Tuya LAN 3.1 a 3.5. O formato dos quadros e da descoberta foi documentado pela comunidade em [tinytuya](https://github.com/jasonacox/tinytuya) e [tuyapi](https://github.com/codetheweb/tuyapi) (ambos MIT); a implementação do Valk é própria, cobre apenas descoberta e leitura/escrita de pontos de controle, e é verificada contra quadros de referência gravados, sem depender de bibliotecas de terceiros.
+`internal/light/tuya` implementa essa fronteira para os protocolos Tuya LAN 3.1 a 3.5. O formato dos quadros e da descoberta foi documentado pela comunidade em [tinytuya](https://github.com/jasonacox/tinytuya) e [tuyapi](https://github.com/codetheweb/tuyapi) (ambos MIT); a implementação do Valky é própria, cobre apenas descoberta e leitura/escrita de pontos de controle, e é verificada contra quadros de referência gravados, sem depender de bibliotecas de terceiros.
 
 ## Como cadastrar uma lâmpada
 
@@ -31,7 +31,7 @@ Depois disso o controle é local e não depende de nuvem. A chave local é fixa:
 
 A chave local é entregue pelo servidor do fabricante quando a lâmpada é
 configurada, e fica vinculada à conta. Você só precisa dela **uma vez**; o
-Valk não guarda a conta da Tuya nem faz login no fabricante.
+Valky não guarda a conta da Tuya nem faz login no fabricante.
 
 A lâmpada precisa estar pareada em um aplicativo **Tuya Smart** ou **Smart Life**
 (os dois usam a mesma conta Tuya). O aplicativo da marca própria não serve para
@@ -66,11 +66,11 @@ python3 -m venv /tmp/tuya && /tmp/tuya/bin/pip install tuya-device-sharing-sdk c
 > utilitário acima costuma ser o caminho mais confiável.
 
 Se a chave mudar (por exemplo ao remover e adicionar a lâmpada de novo no
-aplicativo), remova e cadastre a lâmpada novamente no Valk.
+aplicativo), remova e cadastre a lâmpada novamente no Valky.
 
 ## Descoberta de endereço
 
-O Valk guarda o último endereço funcional. Quando a lâmpada não responde, ele procura de novo pelo identificador do dispositivo nos anúncios da rede local. Redes com isolamento entre clientes, VLANs ou firewall precisam permitir que o container do Valk alcance a lâmpada na porta TCP 6668; a descoberta usa UDP 6666, 6667 e 7000.
+O Valky guarda o último endereço funcional. Quando a lâmpada não responde, ele procura de novo pelo identificador do dispositivo nos anúncios da rede local. Redes com isolamento entre clientes, VLANs ou firewall precisam permitir que o container do Valky alcance a lâmpada na porta TCP 6668; a descoberta usa UDP 6666, 6667 e 7000.
 
 ## Capacidades e pontos de controle
 

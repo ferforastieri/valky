@@ -1,8 +1,8 @@
 <p align="center">
-  <img src="web/public/valkyris-mark.svg" width="112" height="112" alt="Logo do Valk">
+  <img src="web/public/valkyris-mark.svg" width="112" height="112" alt="Logo do Valky">
 </p>
 
-<h1 align="center">Valk</h1>
+<h1 align="center">Valky</h1>
 
 <p align="center">
   Monitoramento e controle residencial self-hosted para câmeras e iluminação inteligente.<br>
@@ -12,13 +12,13 @@
 <p align="center">
   <a href="https://valkyris.vercel.app/">Site</a> ·
   <a href="https://valkyris.vercel.app/pt-BR/docs">Documentação</a> ·
-  <a href="https://github.com/ferforastieri/valk/releases/latest">Última release</a> ·
+  <a href="https://github.com/ferforastieri/valky/releases/latest">Última release</a> ·
   <a href="LICENSE">Licença MIT</a>
 </p>
 
 ## O projeto
 
-Valk transforma um servidor doméstico em uma central privada de monitoramento. Uma única instalação pode gerenciar várias câmeras e autorizar vários celulares, sem cadastro público e sem expor RTSP, ONVIF ou o MediaMTX na internet.
+Valky transforma um servidor doméstico em uma central privada de monitoramento. Uma única instalação pode gerenciar várias câmeras e autorizar vários celulares, sem cadastro público e sem expor RTSP, ONVIF ou o MediaMTX na internet.
 
 - Descoberta de capacidades e do perfil principal por ONVIF Profile S; previews são extraídos do stream local já conectado.
 - Live WebRTC autenticado, com uma única conexão RTSP por câmera e conversão apenas do áudio G.711 para Opus.
@@ -102,7 +102,7 @@ O instalador verifica o Compose, baixa os artefatos da release, cria os segredos
 
 Depois:
 
-1. Instale o APK da [última release](https://github.com/ferforastieri/valk/releases/latest).
+1. Instale o APK da [última release](https://github.com/ferforastieri/valky/releases/latest).
 2. Abra o app e informe a URL HTTPS pela qual o celular alcança o servidor.
 3. No primeiro acesso, crie a conta com usuário e senha; esse dispositivo se torna administrador.
 4. Cadastre a câmera com nome, ícone, IP, usuário e senha. Para Tapo, o RTSP principal é montado automaticamente.
@@ -188,7 +188,7 @@ Não existe `PUBLIC_URL`: cada celular informa a URL que realmente usa para alca
 
 ### Notificações nativas com FCM
 
-O Valk não exige aplicativo auxiliar no celular. O APK recebe mensagens de dados pelo Firebase Cloud Messaging e cria localmente a notificação ou o alarme nativo. O conteúdo do evento continua cifrado de ponta a ponta entre o backend e o dispositivo.
+O Valky não exige aplicativo auxiliar no celular. O APK recebe mensagens de dados pelo Firebase Cloud Messaging e cria localmente a notificação ou o alarme nativo. O conteúdo do evento continua cifrado de ponta a ponta entre o backend e o dispositivo.
 
 1. No Firebase Console, crie um projeto, adicione o aplicativo Android `com.ferforastieri.valkyris` e baixe `google-services.json`.
 2. Codifique esse arquivo em base64 e cadastre o conteúdo no secret do GitHub `FIREBASE_ANDROID_CONFIG_BASE64`; ele será incluído no APK durante a release.
@@ -325,7 +325,7 @@ para fazer uma atualização.
 
 ## Compatibilidade e limites
 
-Valk apresenta apenas recursos anunciados por ONVIF/RTSP. Ausências degradam a interface sem impedir o restante da câmera. Recursos proprietários da Tapo que não fazem parte do Profile S — como áudio bidirecional, holofote, sirene, privacidade e patrulha — não são controlados pelo projeto.
+Valky apresenta apenas recursos anunciados por ONVIF/RTSP. Ausências degradam a interface sem impedir o restante da câmera. Recursos proprietários da Tapo que não fazem parte do Profile S — como áudio bidirecional, holofote, sirene, privacidade e patrulha — não são controlados pelo projeto.
 
 Não há gravação contínua, nuvem central, cadastro público nem promessa de entrega absoluta de alarmes quando faltam energia, rede ou permissões do Android.
 

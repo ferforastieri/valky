@@ -1,6 +1,6 @@
 # Architecture
 
-Valk is a single-home system. The Go process is the security boundary: apps
+Valky is a single-home system. The Go process is the security boundary: apps
 never receive camera passwords and MediaMTX control/RTSP ports stay internal. Only WebRTC media port 8189 UDP/TCP is published.
 
 1. The camera and its encrypted credentials are persisted immediately with a

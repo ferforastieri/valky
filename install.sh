@@ -1,7 +1,7 @@
 #!/bin/sh
 set -eu
 
-REPOSITORY="ferforastieri/valk"
+REPOSITORY="ferforastieri/valky"
 REQUESTED_VERSION="${VALKYRIS_VERSION:-latest}"
 INSTALL_ROOT="${VALKYRIS_HOME:-${XDG_DATA_HOME:-${HOME}/.local/share}/valkyris}"
 TEMP_ROOT="$(mktemp -d "${TMPDIR:-/tmp}/valkyris.XXXXXX")"

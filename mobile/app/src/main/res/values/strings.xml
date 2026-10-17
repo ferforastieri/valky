@@ -1,5 +1,5 @@
 <resources>
-    <string name="app_name">Valk</string>
+    <string name="app_name">Valky</string>
     <string name="invite_device">Convidar outro celular</string>
     <string name="invite_device_body">Gere um QR temporário para autorizar outra pessoa.</string>
     <string name="invite_title">Convite temporário</string>
@@ -33,7 +33,7 @@
     <string name="permission_location">Localização</string>
     <string name="permission_location_needed">Necessária para o mapa da família</string>
     <string name="remove_light_title">Remover lâmpada?</string>
-    <string name="remove_light_body">A lâmpada “%1$s” será removida do Valk. A configuração física não será alterada.</string>
+    <string name="remove_light_body">A lâmpada “%1$s” será removida do Valky. A configuração física não será alterada.</string>
     <string name="remove">Remover</string>
     <string name="edit">Editar</string>
     <string name="unavailable">Indisponível</string>
@@ -54,7 +54,7 @@
     <string name="notification_alarm_body">Atenção necessária. Toque para abrir o alerta.</string>
     <string name="notification_event_body">Atividade detectada. Toque para ver os detalhes.</string>
     <string name="alert_readiness_title">Deixe os alertas prontos</string>
-    <string name="alert_readiness_body">O Valk precisa destes acessos para avisar mesmo com a tela bloqueada ou o celular em modo silencioso.</string>
+    <string name="alert_readiness_body">O Valky precisa destes acessos para avisar mesmo com a tela bloqueada ou o celular em modo silencioso.</string>
     <string name="configure_permission">Configurar %1$s</string>
     <string name="not_now">Agora não</string>
     <string name="notification_permission">Permissão de notificações</string>
@@ -136,7 +136,7 @@
     <string name="background_location">Localização em segundo plano</string>
     <string name="battery_optimization">Alertas sem restrição de bateria</string>
     <string name="disconnect_phone">Desconectar este celular</string>
-    <string name="app_version">Valk · v%1$s</string>
+    <string name="app_version">Valky · v%1$s</string>
     <string name="copyright_owner">© 2026 Fernando Forastieri</string>
     <string name="record_media">Salvar snapshot e clipe</string>
     <string name="send_notification">Enviar notificação persistente</string>
@@ -155,7 +155,7 @@
     <string name="recent_activity">Atividade recente</string>
     <string name="update_available">Atualização disponível</string>
     <string name="update_now">Atualizar</string>
-    <string name="update_sheet_body">A versão %1$s do Valk está pronta para instalar.</string>
+    <string name="update_sheet_body">A versão %1$s do Valky está pronta para instalar.</string>
     <string name="update_downloading">Baixando…</string>
     <string name="update_install_hint">Confirme a instalação na tela do sistema para concluir.</string>
     <string name="downloading_update">Baixando a atualização assinada do aplicativo</string>
@@ -270,7 +270,7 @@
     <string name="remote_pair_required">Pareie o controle com a TV</string>
     <string name="remote_pair_hint">Toque em “Parear” e aceite a autorização que aparece na tela da TV.</string>
     <string name="remote_remove_title">Remover controle remoto?</string>
-    <string name="remote_remove_body">O controle “%1$s” será removido do Valk. A TV não será alterada.</string>
+    <string name="remote_remove_body">O controle “%1$s” será removido do Valky. A TV não será alterada.</string>
     <string name="remote_volume_up">Volume +</string>
     <string name="remote_volume_down">Volume −</string>
     <string name="remote_mute">Mudo</string>
@@ -313,7 +313,7 @@
     <string name="widget_remote_volume_down">Diminuir volume</string>
     <string name="widget_remote_mute">Silenciar</string>
     <string name="widget_refresh">Atualizar</string>
-    <string name="widget_signed_out">Abra o Valk e conecte-se</string>
+    <string name="widget_signed_out">Abra o Valky e conecte-se</string>
     <string name="widget_lights_description">Ligue e desligue suas lâmpadas favoritas.</string>
     <string name="widget_camera_description">A última imagem de uma câmera, atualizada de tempo em tempo.</string>
     <string name="widget_remote_description">Energia, volume e navegação da TV.</string>
