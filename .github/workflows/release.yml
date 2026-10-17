@@ -29,16 +29,30 @@ jobs:
       version_code: ${{ steps.version.outputs.version_code }}
       commit: ${{ steps.version.outputs.commit }}
     steps:
-      - name: Gerar versão a partir da execução
+      - name: Gerar próxima versão (SemVer)
         id: version
         env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           HEAD_SHA: ${{ github.event.workflow_run.head_sha }}
         run: |
-          patch=$((GITHUB_RUN_NUMBER - RELEASE_PATCH_OFFSET))
-          test "$patch" -ge 0
+          # Boa prática: a próxima versão nasce SEMPRE da última publicada,
+          # sem pular número (o run do pipeline não define mais a versão).
+          ultima="$(gh release list --repo "$GITHUB_REPOSITORY" --limit 1 --json tagName -q '.[0].tagName' | sed 's/^v//')"
+          ultima="${ultima:-0.0.0}"
+          major="${ultima%%.*}"
+          resto="${ultima#*.}"
+          minor="${resto%%.*}"
+          patch="${resto#*.}"
+          patch=$((patch + 1))
+          # Convenção: "feat:" sobe a minor; quebra de compatibilidade sobe a major.
+          mensagem="$(gh api "repos/$GITHUB_REPOSITORY/commits/$HEAD_SHA" -q '.commit.message' 2>/dev/null | head -1)"
+          case "$mensagem" in
+            *BREAKING*|*!*) major=$((major + 1)); minor=0; patch=0 ;;
+            feat*|*"(feat)"*) minor=$((minor + 1)); patch=0 ;;
+          esac
           {
-            echo "version=v${RELEASE_SERIES}.${patch}"
-            echo "apk_version=${RELEASE_SERIES}.${patch}"
+            echo "version=v${major}.${minor}.${patch}"
+            echo "apk_version=${major}.${minor}.${patch}"
             echo "version_code=${GITHUB_RUN_NUMBER}"
             echo "commit=${HEAD_SHA}"
           } >> "$GITHUB_OUTPUT"

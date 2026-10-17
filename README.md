@@ -196,6 +196,16 @@ O Valkyris não exige aplicativo auxiliar no celular. O APK recebe mensagens de 
 
 O APK registra o token FCM automaticamente depois do login. No app, basta conceder a permissão de notificações; não existe configuração ou tentativa manual de registro. A chave de conta de serviço é privada e deve permanecer somente no servidor.
 
+## Versionamento
+
+O projeto segue **SemVer** (`MAJOR.MINOR.PATCH`):
+
+- **MAJOR**: mudança que quebra compatibilidade (ex.: app antigo deixa de falar com o servidor novo)
+- **MINOR**: recurso novo, compatível
+- **PATCH**: correção
+
+A próxima versão é sempre calculada a partir da **última publicada** (`patch + 1`), sem pular número. O pipeline lê a mensagem do commit: `feat:` sobe a **minor** e uma marcação de quebra (`!` ou `BREAKING`) sobe a **major**. As releases ficam publicadas em ordem, do começo ao mais recente, sempre com o código-fonte correspondente.
+
 ## Documentação
 
 A documentação operacional está em **[valkyris.vercel.app/pt-BR/docs](https://valkyris.vercel.app/pt-BR/docs)**. Ela cobre:
