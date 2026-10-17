@@ -2,14 +2,23 @@ package com.ferforastieri.valkyris.feature.lights
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.unit.dp
+import com.composables.icons.lucide.House
+import com.composables.icons.lucide.Lucide
+import com.composables.icons.lucide.MapPin
+import com.composables.icons.lucide.MonitorSmartphone
+import com.composables.icons.lucide.Settings
+import com.composables.icons.lucide.UserRound
 import com.ferforastieri.valkyris.core.design.ValkyrisTheme
 import com.ferforastieri.valkyris.core.design.ValkyrisTopBar
 import com.ferforastieri.valkyris.core.model.Camera
@@ -17,8 +26,13 @@ import com.ferforastieri.valkyris.core.model.LightCapabilities
 import com.ferforastieri.valkyris.core.model.LightColor
 import com.ferforastieri.valkyris.core.model.LightDevice
 import com.ferforastieri.valkyris.core.model.LightState
+import com.ferforastieri.valkyris.core.model.ValkyrisEvent
 import com.ferforastieri.valkyris.feature.cameras.CamerasContent
 import com.ferforastieri.valkyris.feature.cameras.CamerasState
+import com.ferforastieri.valkyris.feature.events.EventsContent
+import com.ferforastieri.valkyris.feature.rules.RulesContent
+import com.ferforastieri.valkyris.feature.settings.SettingsContent
+import com.ferforastieri.valkyris.core.design.FloatingDock
 import com.github.takahirom.roborazzi.captureRoboImage
 import org.junit.Rule
 import org.junit.Test
@@ -28,85 +42,79 @@ import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
 
 /**
- * Capturas no padrão da landing: tela inteira do app, fundo do próprio app,
- * par claro/escuro, tamanho de celular. Arquivos em app/build/screenshots.
+ * Capturas das telas principais na íntegra (barra de cima, conteúdo e dock de
+ * navegação), em português, claro e escuro, no tamanho de celular.
  */
 @RunWith(RobolectricTestRunner::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
 @Config(sdk = [34], qualifiers = "pt-rBR-w411dp-h891dp-xxhdpi", application = android.app.Application::class)
 class LandingScreenshotsTest {
     init { java.util.Locale.setDefault(java.util.Locale("pt", "BR")) }
+
     @get:Rule val compose = createComposeRule()
 
-    private fun lamp(name: String, on: Boolean, hue: Int, brightness: Int = 88) = LightDevice(
-        id = "luz-$name",
-        name = name,
-        capabilities = LightCapabilities(brightness = true, color = true, colorTemperature = true),
-        setupStatus = "ready",
-        favorite = true,
-        enabled = true,
-        state = LightState(
-            online = true,
-            power = on,
-            mode = "color",
-            brightness = brightness,
-            temperatureKelvin = 4000,
-            color = LightColor(hue = hue, saturation = 100, value = brightness),
-        ),
-        deviceId = "eb83892f581112f805ytyu",
-        protocolVersion = 3.5,
-        lastAddress = "192.0.2.111",
+    private val dock = listOf(
+        Lucide.House to "Visão geral",
+        Lucide.MapPin to "Localização",
+        Lucide.MonitorSmartphone to "Dispositivos",
+        Lucide.UserRound to "Perfil",
+        Lucide.Settings to "Ajustes",
     )
 
-    /** Tela com a barra do app (usada nas telas que não trazem a própria). */
-    private fun tela(modo: String, conteudo: @androidx.compose.runtime.Composable () -> Unit) {
+    private fun lamp(name: String, on: Boolean, hue: Int, brightness: Int = 88) = LightDevice(
+        id = "luz-$name", name = name,
+        capabilities = LightCapabilities(brightness = true, color = true, colorTemperature = true),
+        setupStatus = "ready", favorite = true, enabled = true,
+        state = LightState(online = true, power = on, mode = "color", brightness = brightness,
+            temperatureKelvin = 4000, color = LightColor(hue = hue, saturation = 100, value = brightness)),
+        deviceId = "eb83892f581112f805ytyu", protocolVersion = 3.5, lastAddress = "192.0.2.111",
+    )
+
+    private fun tela(modo: String, titulo: String, selecionado: Int, proprioCabecalho: Boolean = false, conteudo: @androidx.compose.runtime.Composable () -> Unit) {
         compose.setContent {
             ValkyrisTheme(mode = modo) {
                 Column(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
-                    ValkyrisTopBar(title = "Iluminação", onNotifications = {}, unreadNotifications = 3)
-                    conteudo()
+                    if (!proprioCabecalho) ValkyrisTopBar(title = titulo, onNotifications = {}, unreadNotifications = 3)
+                    Box(Modifier.weight(1f)) { conteudo() }
+                    Box(Modifier.fillMaxWidth().padding(bottom = 18.dp), contentAlignment = Alignment.Center) {
+                        FloatingDock(dock, selecionado, {})
+                    }
                 }
             }
         }
     }
 
-    /** Tela cujo conteúdo já tem a barra do app (não duplicar). */
-    private fun telaPura(modo: String, conteudo: @androidx.compose.runtime.Composable () -> Unit) {
-        compose.setContent {
-            ValkyrisTheme(mode = modo) {
-                Column(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) { conteudo() }
-            }
-        }
-    }
+    private fun capturar(nome: String) = compose.onRoot().captureRoboImage("build/screenshots/$nome.png")
 
-    @androidx.compose.runtime.Composable
-    private fun lista() {
-        Column(Modifier.padding(horizontal = 18.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-            LightCard(lamp("Luz Suíte", true, 30), false, {}, {}, null, {}, {})
-            LightCard(lamp("Sala de TV", true, 205, 40), false, {}, {}, null, {}, {})
-            LightCard(lamp("Sala de Jantar", false, 0, 100), false, {}, {}, null, {}, {})
-        }
-    }
+    private fun cameras() = CamerasState(cameras = listOf(
+        Camera(id = "cam-1", name = "Entrada principal", icon = "camera", host = "192.0.2.50", setupStatus = "ready", favorite = true),
+        Camera(id = "cam-2", name = "Quintal", icon = "camera", host = "192.0.2.51", setupStatus = "ready"),
+    ))
 
-    private fun cameras() = CamerasState(
-        cameras = listOf(
-            Camera(id = "cam-1", name = "Entrada principal", icon = "camera", host = "192.0.2.50", setupStatus = "ready", favorite = true),
-            Camera(id = "cam-2", name = "Quintal", icon = "camera", host = "192.0.2.51", setupStatus = "ready"),
-        ),
+    private fun eventos() = listOf(
+        ValkyrisEvent(id = "e1", cameraId = "cam-1", type = "pessoa", confidence = 0.93, occurredAt = "2026-10-17T14:02:00Z"),
+        ValkyrisEvent(id = "e2", cameraId = "cam-2", type = "movimento", confidence = 0.81, occurredAt = "2026-10-17T13:40:00Z"),
+        ValkyrisEvent(id = "e3", cameraId = "cam-1", type = "som", confidence = 0.77, occurredAt = "2026-10-17T12:15:00Z"),
     )
 
-    @Test fun camerasClara() { tela("light") { CamerasContent(cameras()) }; compose.onRoot().captureRoboImage("build/screenshots/landing-cameras-light.png") }
-    @Test fun camerasEscura() { tela("dark") { CamerasContent(cameras()) }; compose.onRoot().captureRoboImage("build/screenshots/landing-cameras-dark.png") }
-    // LandingTelas
-    @Test fun rulesClara() { tela("light") { com.ferforastieri.valkyris.feature.rules.RulesContent(rules = emptyList()) }; compose.onRoot().captureRoboImage("build/screenshots/landing-rules-light.png") }
-    @Test fun rulesEscura() { tela("dark") { com.ferforastieri.valkyris.feature.rules.RulesContent(rules = emptyList()) }; compose.onRoot().captureRoboImage("build/screenshots/landing-rules-dark.png") }
-    @Test fun eventsClara() { tela("light") { com.ferforastieri.valkyris.feature.events.EventsContent(events = listOf(com.ferforastieri.valkyris.core.model.ValkyrisEvent(id = "e1", cameraId = "cam-1", type = "pessoa", confidence = 0.93, occurredAt = "2026-10-17T14:02:00Z"), com.ferforastieri.valkyris.core.model.ValkyrisEvent(id = "e2", cameraId = "cam-2", type = "movimento", confidence = 0.81, occurredAt = "2026-10-17T13:40:00Z"), com.ferforastieri.valkyris.core.model.ValkyrisEvent(id = "e3", cameraId = "cam-1", type = "som", confidence = 0.77, occurredAt = "2026-10-17T12:15:00Z"))) }; compose.onRoot().captureRoboImage("build/screenshots/landing-events-light.png") }
-    @Test fun eventsEscura() { tela("dark") { com.ferforastieri.valkyris.feature.events.EventsContent(events = listOf(com.ferforastieri.valkyris.core.model.ValkyrisEvent(id = "e1", cameraId = "cam-1", type = "pessoa", confidence = 0.93, occurredAt = "2026-10-17T14:02:00Z"), com.ferforastieri.valkyris.core.model.ValkyrisEvent(id = "e2", cameraId = "cam-2", type = "movimento", confidence = 0.81, occurredAt = "2026-10-17T13:40:00Z"), com.ferforastieri.valkyris.core.model.ValkyrisEvent(id = "e3", cameraId = "cam-1", type = "som", confidence = 0.77, occurredAt = "2026-10-17T12:15:00Z"))) }; compose.onRoot().captureRoboImage("build/screenshots/landing-events-dark.png") }
-    @Test fun settingsClara() { tela("light") { com.ferforastieri.valkyris.feature.settings.SettingsContent(admin = true, permissionsReady = 0, permissionsTotal = 0, language = "", theme = "") }; compose.onRoot().captureRoboImage("build/screenshots/landing-settings-light.png") }
-    @Test fun settingsEscura() { tela("dark") { com.ferforastieri.valkyris.feature.settings.SettingsContent(admin = true, permissionsReady = 0, permissionsTotal = 0, language = "", theme = "") }; compose.onRoot().captureRoboImage("build/screenshots/landing-settings-dark.png") }
+    private fun regras() = listOf(com.ferforastieri.valkyris.core.model.Rule(cameraId = "cam-1", name = "Pessoa na entrada", detectorTypes = listOf("pessoa")), com.ferforastieri.valkyris.core.model.Rule(cameraId = "cam-1", name = "Movimento no quintal", detectorTypes = listOf("pessoa")))
 
-    @Test fun listaClara() { tela("light") { lista() }; compose.onRoot().captureRoboImage("build/screenshots/landing-lista-light.png") }
-    @Test fun listaEscura() { tela("dark") { lista() }; compose.onRoot().captureRoboImage("build/screenshots/landing-lista-dark.png") }
-    @Test fun luzClara() { telaPura("light") { LightDetailContent(lamp("Luz Suíte", true, 30), false, {}, onChange = {}) }; compose.onRoot().captureRoboImage("build/screenshots/landing-luz-light.png") }
-    @Test fun luzEscura() { telaPura("dark") { LightDetailContent(lamp("Luz Suíte", true, 30), false, {}, onChange = {}) }; compose.onRoot().captureRoboImage("build/screenshots/landing-luz-dark.png") }
+    private fun lista() = Column(Modifier.padding(horizontal = 18.dp, vertical = 12.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        LightCard(lamp("Luz Suíte", true, 30), false, {}, {}, null, {}, {})
+        LightCard(lamp("Sala de TV", true, 205, 40), false, {}, {}, null, {}, {})
+        LightCard(lamp("Sala de Jantar", false, 0, 100), false, {}, {}, null, {}, {})
+    }
+
+    @Test fun camerasClara() { tela("light", "Câmeras", 2) { CamerasContent(cameras()) }; capturar("landing-cameras-light") }
+    @Test fun camerasEscura() { tela("dark", "Câmeras", 2) { CamerasContent(cameras()) }; capturar("landing-cameras-dark") }
+    @Test fun eventosClara() { tela("light", "Notificações", 0) { EventsContent(eventos()) }; capturar("landing-events-light") }
+    @Test fun eventosEscura() { tela("dark", "Notificações", 0) { EventsContent(eventos()) }; capturar("landing-events-dark") }
+    @Test fun regrasClara() { tela("light", "Regras", 4) { RulesContent(regras()) }; capturar("landing-rules-light") }
+    @Test fun regrasEscura() { tela("dark", "Regras", 4) { RulesContent(regras()) }; capturar("landing-rules-dark") }
+    @Test fun ajustesClara() { tela("light", "Ajustes", 4) { SettingsContent(admin = true, permissionsReady = 0, permissionsTotal = 0, language = "", theme = "") }; capturar("landing-settings-light") }
+    @Test fun ajustesEscura() { tela("dark", "Ajustes", 4) { SettingsContent(admin = true, permissionsReady = 0, permissionsTotal = 0, language = "", theme = "") }; capturar("landing-settings-dark") }
+    @Test fun listaClara() { tela("light", "Iluminação", 2) { lista() }; capturar("landing-lista-light") }
+    @Test fun listaEscura() { tela("dark", "Iluminação", 2) { lista() }; capturar("landing-lista-dark") }
+    @Test fun luzClara() { tela("light", "", 2, proprioCabecalho = true) { LightDetailContent(lamp("Luz Suíte", true, 30), false, {}, onChange = {}) }; capturar("landing-luz-light") }
+    @Test fun luzEscura() { tela("dark", "", 2, proprioCabecalho = true) { LightDetailContent(lamp("Luz Suíte", true, 30), false, {}, onChange = {}) }; capturar("landing-luz-dark") }
 }
