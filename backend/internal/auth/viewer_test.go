@@ -157,16 +157,16 @@ func TestViewerRequestSafeBehindTLSProxy(t *testing.T) {
 		r.Header.Set("X-Forwarded-Proto", forwardedProto)
 		return r
 	}
-	if !ViewerRequestSafe(request("https://valkyris.example.com", "valkyris.example.com", "https", "same-origin")) {
+	if !ViewerRequestSafe(request("https://valky.example.com", "valky.example.com", "https", "same-origin")) {
 		t.Fatal("same-origin browser request through TLS proxy was rejected")
 	}
-	if ViewerRequestSafe(request("https://evil.example", "valkyris.example.com", "https", "cross-site")) {
+	if ViewerRequestSafe(request("https://evil.example", "valky.example.com", "https", "cross-site")) {
 		t.Fatal("cross-site browser request through proxy was accepted")
 	}
-	if ViewerRequestSafe(request("https://valkyris.example.com", "valkyris.example.com", "http", "same-origin")) {
+	if ViewerRequestSafe(request("https://valky.example.com", "valky.example.com", "http", "same-origin")) {
 		t.Fatal("insecure forwarded request was accepted")
 	}
-	if ViewerRequestSafe(request("https://valkyris.example.com", "other.example", "https", "same-origin")) {
+	if ViewerRequestSafe(request("https://valky.example.com", "other.example", "https", "same-origin")) {
 		t.Fatal("mismatched forwarded host was accepted")
 	}
 }
