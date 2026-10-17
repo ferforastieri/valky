@@ -13,7 +13,7 @@ permissions:
   attestations: write
 
 env:
-  IMAGE: ghcr.io/ferforastieri/valk
+  IMAGE: ghcr.io/ferforastieri/valky
   RELEASE_SERIES: '4.0'
   # Run 104 starts 3.0.0; subsequent successful CI runs increment the patch.
   RELEASE_PATCH_OFFSET: 175
