@@ -28,6 +28,7 @@ jobs:
       apk_version: ${{ steps.version.outputs.apk_version }}
       version_code: ${{ steps.version.outputs.version_code }}
       commit: ${{ steps.version.outputs.commit }}
+      skip: ${{ steps.version.outputs.skip }}
     steps:
       - name: Gerar próxima versão (SemVer)
         id: version
@@ -50,7 +51,12 @@ jobs:
             *BREAKING*|*!*) major=$((major + 1)); minor=0; patch=0 ;;
             feat*|*"(feat)"*) minor=$((minor + 1)); patch=0 ;;
           esac
+          case "$mensagem" in
+            docs:*|chore:*|style:*|test:*|ci:*) publica="false" ;;
+            *) publica="true" ;;
+          esac
           {
+            echo "skip=$([ "$publica" = "true" ] && echo false || echo true)"
             echo "version=v${major}.${minor}.${patch}"
             echo "apk_version=${major}.${minor}.${patch}"
             echo "version_code=${GITHUB_RUN_NUMBER}"
@@ -60,6 +66,7 @@ jobs:
   image:
     name: Imagem · ${{ matrix.arch }}
     needs: prepare
+    if: needs.prepare.outputs.skip != 'true'
     runs-on: ${{ matrix.runner }}
     strategy:
       fail-fast: false
@@ -119,6 +126,7 @@ jobs:
   android:
     name: APK assinado
     needs: prepare
+    if: needs.prepare.outputs.skip != 'true'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
