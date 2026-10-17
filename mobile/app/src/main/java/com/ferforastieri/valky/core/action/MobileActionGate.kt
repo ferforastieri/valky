@@ -1,4 +1,4 @@
-package com.ferforastieri.valkyris.core.action
+package com.ferforastieri.valky.core.action
 
 import javax.inject.Inject
 import javax.inject.Singleton
