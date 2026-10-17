@@ -37,9 +37,9 @@ test('controles e navegação possuem nomes acessíveis', async () => {
   assert.match(en, /href="\/en\/docs"/);
   assert.doesNotMatch(pt, /class="docs-shell"/);
   assert.match(pt, /Sua privacidade importa\./);
-  assert.match(pt, /class="lighting-section section"/);
-  assert.match(pt, /energia, brilho, branco e RGB/);
-  assert.match(en, /power, brightness, white temperature and RGB/);
+  // A seção dedicada de iluminação saiu da página; a menção ficou no topo.
+  assert.ok(!pt.includes("lighting-section"), "a landing não deve ter a seção de iluminação");
+  assert.match(pt, /Lâmpadas e controles de TV entram na mesma tela/);
   assert.doesNotMatch(pt, /class="flow section"/);
   assert.doesNotMatch(pt, /class="compatibility section"/);
   assert.doesNotMatch(pt, /class="detect section/);
