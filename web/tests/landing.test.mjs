@@ -62,8 +62,8 @@ test('respeita a preferência por movimento reduzido', async () => {
 });
 
 test('sincroniza os prints com o tema escolhido', () => {
-  assert.match(pt, /class="theme-screenshot"[^>]+data-light-src="\/screenshots\/overview-light\.png"[^>]+data-dark-src="\/screenshots\/overview-dark\.png"/);
-  assert.match(pt, /class="theme-screenshot"[^>]+data-light-src="\/screenshots\/cameras-light\.png"[^>]+data-dark-src="\/screenshots\/cameras-dark\.png"/);
+  assert.match(pt, /class="theme-screenshot"[^>]+data-light-src="\/screenshots\/overview-light\.png(\\?v=\\d+)?"[^>]+data-dark-src="\/screenshots\/overview-dark\.png(\\?v=\\d+)?"/);
+  assert.match(pt, /class="theme-screenshot"[^>]+data-light-src="\/screenshots\/cameras-light\.png(\\?v=\\d+)?"[^>]+data-dark-src="\/screenshots\/cameras-dark\.png(\\?v=\\d+)?"/);
   assert.match(landingSource, /syncThemeScreenshots/);
   assert.match(landingSource, /systemTheme\.addEventListener\('change'/);
 });
