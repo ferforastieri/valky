@@ -94,7 +94,7 @@ func localizedMessage(message string, success bool, language string) string {
 		"Account credentials updated successfully":                     "Credenciais da conta atualizadas com sucesso.",
 		"keep at least one active administrator":                       "Mantenha pelo menos um administrador ativo.",
 
-		"Valky is healthy":                         "Valky está saudável",
+		"Valky is healthy":                            "Valky está saudável",
 		"Place created successfully":                  "Área criada com sucesso",
 		"Place updated successfully":                  "Área atualizada com sucesso",
 		"Place removed successfully":                  "Área removida com sucesso",
