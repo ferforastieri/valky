@@ -30,6 +30,8 @@ import com.ferforastieri.valkyris.core.model.ValkyrisEvent
 import com.ferforastieri.valkyris.feature.cameras.CamerasContent
 import com.ferforastieri.valkyris.feature.cameras.CamerasState
 import com.ferforastieri.valkyris.feature.events.EventsContent
+import com.ferforastieri.valkyris.feature.overview.FavoriteItem
+import com.ferforastieri.valkyris.feature.overview.OverviewContent
 import com.ferforastieri.valkyris.feature.rules.RulesContent
 import com.ferforastieri.valkyris.feature.settings.SettingsContent
 import com.ferforastieri.valkyris.core.design.FloatingDock
@@ -106,6 +108,15 @@ class LandingScreenshotsTest {
         LightCard(lamp("Sala de Jantar", false, 0, 100), false, {}, {}, null, {}, {})
     }
 
+    private fun favoritos() = listOf(
+        FavoriteItem("light", "luz-1", "Luz Suíte", online = true, power = true),
+        FavoriteItem("camera", "cam-1", "Entrada principal", online = true),
+        FavoriteItem("light", "luz-2", "Sala de TV", online = true, power = true, hue = 205),
+        FavoriteItem("remote", "rem-1", "TV da sala"),
+    )
+
+    @Test fun overviewClara() { tela("light", "Visão geral", 0) { OverviewContent(cameras = emptyList(), trackedPeople = 2, events = eventos(), favorites = favoritos()) }; capturar("landing-overview-light") }
+    @Test fun overviewEscura() { tela("dark", "Visão geral", 0) { OverviewContent(cameras = emptyList(), trackedPeople = 2, events = eventos(), favorites = favoritos()) }; capturar("landing-overview-dark") }
     @Test fun camerasClara() { tela("light", "Câmeras", 2) { CamerasContent(cameras()) }; capturar("landing-cameras-light") }
     @Test fun camerasEscura() { tela("dark", "Câmeras", 2) { CamerasContent(cameras()) }; capturar("landing-cameras-dark") }
     @Test fun eventosClara() { tela("light", "Notificações", 0) { EventsContent(eventos()) }; capturar("landing-events-light") }
