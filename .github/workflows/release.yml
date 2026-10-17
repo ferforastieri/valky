@@ -38,7 +38,8 @@ jobs:
         run: |
           # Boa prática: a próxima versão nasce SEMPRE da última publicada,
           # sem pular número (o run do pipeline não define mais a versão).
-          ultima="$(gh release list --repo "$GITHUB_REPOSITORY" --limit 1 --json tagName -q '.[0].tagName' | sed 's/^v//')"
+          # Maior versão já publicada (não a mais recente por data): evita repetir tag.
+          ultima="$(gh api "repos/$GITHUB_REPOSITORY/tags?per_page=100" -q '.[].name' | sed 's/^v//' | sort -V | tail -1)"
           ultima="${ultima:-0.0.0}"
           major="${ultima%%.*}"
           resto="${ultima#*.}"
