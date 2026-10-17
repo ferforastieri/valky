@@ -99,6 +99,7 @@ class LandingScreenshotsTest {
 
     private fun regras() = listOf(com.ferforastieri.valkyris.core.model.Rule(cameraId = "cam-1", name = "Pessoa na entrada", detectorTypes = listOf("pessoa")), com.ferforastieri.valkyris.core.model.Rule(cameraId = "cam-1", name = "Movimento no quintal", detectorTypes = listOf("pessoa")))
 
+    @androidx.compose.runtime.Composable
     private fun lista() = Column(Modifier.padding(horizontal = 18.dp, vertical = 12.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
         LightCard(lamp("Luz Suíte", true, 30), false, {}, {}, null, {}, {})
         LightCard(lamp("Sala de TV", true, 205, 40), false, {}, {}, null, {}, {})
