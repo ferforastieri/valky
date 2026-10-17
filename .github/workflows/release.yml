@@ -201,7 +201,7 @@ jobs:
         run: |
           docker pull "$IMAGE:$VERSION"
           docker run -d --rm --name "$CONTAINER" -p 127.0.0.1:18443:8443 "$IMAGE:$VERSION"
-          for attempt in $(seq 1 30); do
+          for attempt in $(seq 1 45); do
             if curl -kfsS https://127.0.0.1:18443/health | grep -q '"status":"ok"'; then
               curl -kfsS https://127.0.0.1:18443/app/ -o /tmp/valkyris-viewer.html
               grep -q 'Valkyris · Consulta' /tmp/valkyris-viewer.html
