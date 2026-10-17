@@ -40,6 +40,18 @@ Valkyris transforma um servidor doméstico em uma central privada de monitoramen
 - [Controle remoto de TVs](docs/remote-control.md) pelo backend, com descoberta na rede, pareamento autorizado na TV e token cifrado.
 - Interface em PT-BR e inglês, temas claro/escuro e suporte a LAN ou VPN.
 
+## Destaques
+
+- **Câmeras ONVIF** ao vivo (WebRTC), PTZ, snapshot e clipes por evento
+- **Detecção** de pessoas, movimento e som (inclusive choro de bebê), com regras, confirmações e cooldown
+- **Iluminação inteligente**: lâmpadas Wi-Fi compatíveis com Tuya cadastradas pelo próprio app e controladas **na rede local** (sem conta do fabricante e sem nuvem), com cor, branco, tom e brilho por modo
+- **Controle de TV**: liga, desliga e acorda a TV pela rede, com teclado numérico e de letras digitando no campo da TV
+- **Localização da família** com mapa, histórico e alertas de lugar
+- **Notificações** no Android, marcadas como vistas ao abrir
+- **Widgets** na tela inicial: câmeras, lâmpadas (rolagem com todas) e controle da TV
+- **Painel web** para acompanhar e operar a casa pelo navegador
+- Tema claro e escuro, interface em português e inglês
+
 ## Como funciona
 
 ```text
