@@ -2,7 +2,7 @@ name: valkyris
 
 services:
   valkyris:
-    image: ghcr.io/ferforastieri/valkyris:${VALKYRIS_VERSION:-latest}
+    image: ghcr.io/ferforastieri/valk:${VALKYRIS_VERSION:-latest}
     build:
       context: .
       dockerfile: backend/Dockerfile
