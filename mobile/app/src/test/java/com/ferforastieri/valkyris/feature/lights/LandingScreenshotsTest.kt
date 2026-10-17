@@ -32,7 +32,7 @@ import com.ferforastieri.valkyris.feature.cameras.CamerasState
 import com.ferforastieri.valkyris.feature.events.EventsContent
 import com.ferforastieri.valkyris.feature.overview.FavoriteItem
 import com.ferforastieri.valkyris.feature.overview.OverviewContent
-import com.ferforastieri.valkyris.feature.rules.RulesContent
+import com.ferforastieri.valkyris.feature.rules.RuleCard
 import com.ferforastieri.valkyris.feature.settings.SettingsContent
 import com.ferforastieri.valkyris.core.design.FloatingDock
 import com.github.takahirom.roborazzi.captureRoboImage
@@ -91,7 +91,7 @@ class LandingScreenshotsTest {
     private fun cameras() = CamerasState(cameras = listOf(
         Camera(id = "cam-1", name = "Entrada principal", icon = "camera", host = "192.0.2.50", setupStatus = "ready", favorite = true),
         Camera(id = "cam-2", name = "Quintal", icon = "camera", host = "192.0.2.51", setupStatus = "ready"),
-    ))
+    ), loading = false)
 
     private fun eventos() = listOf(
         ValkyrisEvent(id = "e1", cameraId = "cam-1", type = "pessoa", confidence = 0.93, occurredAt = "2026-10-17T14:02:00Z"),
@@ -99,7 +99,16 @@ class LandingScreenshotsTest {
         ValkyrisEvent(id = "e3", cameraId = "cam-1", type = "som", confidence = 0.77, occurredAt = "2026-10-17T12:15:00Z"),
     )
 
-    private fun regras() = listOf(com.ferforastieri.valkyris.core.model.Rule(cameraId = "cam-1", name = "Pessoa na entrada", detectorTypes = listOf("pessoa")), com.ferforastieri.valkyris.core.model.Rule(cameraId = "cam-1", name = "Movimento no quintal", detectorTypes = listOf("pessoa")))
+    private fun regra(nome: String) = com.ferforastieri.valkyris.core.model.Rule(cameraId = "cam-1", name = nome, detectorTypes = listOf("pessoa"))
+
+    @androidx.compose.runtime.Composable
+    private fun regras() = Column(Modifier.padding(horizontal = 18.dp, vertical = 12.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        RuleCard(regra("Pessoa na entrada"), {}, {})
+        RuleCard(regra("Movimento no quintal"), {}, {})
+        RuleCard(regra("Choro do bebê"), {}, {})
+    }
+
+    private fun listaRegras() = listOf(com.ferforastieri.valkyris.core.model.Rule(cameraId = "cam-1", name = "Pessoa na entrada", detectorTypes = listOf("pessoa")), com.ferforastieri.valkyris.core.model.Rule(cameraId = "cam-1", name = "Movimento no quintal", detectorTypes = listOf("pessoa")))
 
     @androidx.compose.runtime.Composable
     private fun lista() = Column(Modifier.padding(horizontal = 18.dp, vertical = 12.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
