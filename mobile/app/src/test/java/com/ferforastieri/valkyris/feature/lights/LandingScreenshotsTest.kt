@@ -54,6 +54,7 @@ class LandingScreenshotsTest {
         lastAddress = "192.0.2.111",
     )
 
+    /** Tela com a barra do app (usada nas telas que não trazem a própria). */
     private fun tela(modo: String, conteudo: @androidx.compose.runtime.Composable () -> Unit) {
         compose.setContent {
             ValkyrisTheme(mode = modo) {
@@ -61,6 +62,15 @@ class LandingScreenshotsTest {
                     ValkyrisTopBar(title = "Iluminação", onNotifications = {}, unreadNotifications = 3)
                     conteudo()
                 }
+            }
+        }
+    }
+
+    /** Tela cujo conteúdo já tem a barra do app (não duplicar). */
+    private fun telaPura(modo: String, conteudo: @androidx.compose.runtime.Composable () -> Unit) {
+        compose.setContent {
+            ValkyrisTheme(mode = modo) {
+                Column(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) { conteudo() }
             }
         }
     }
@@ -76,6 +86,6 @@ class LandingScreenshotsTest {
 
     @Test fun listaClara() { tela("light") { lista() }; compose.onRoot().captureRoboImage("build/screenshots/landing-lista-light.png") }
     @Test fun listaEscura() { tela("dark") { lista() }; compose.onRoot().captureRoboImage("build/screenshots/landing-lista-dark.png") }
-    @Test fun luzClara() { tela("light") { LightDetailContent(lamp("Luz Suíte", true, 30), false, {}, onChange = {}) }; compose.onRoot().captureRoboImage("build/screenshots/landing-luz-light.png") }
-    @Test fun luzEscura() { tela("dark") { LightDetailContent(lamp("Luz Suíte", true, 30), false, {}, onChange = {}) }; compose.onRoot().captureRoboImage("build/screenshots/landing-luz-dark.png") }
+    @Test fun luzClara() { telaPura("light") { LightDetailContent(lamp("Luz Suíte", true, 30), false, {}, onChange = {}) }; compose.onRoot().captureRoboImage("build/screenshots/landing-luz-light.png") }
+    @Test fun luzEscura() { telaPura("dark") { LightDetailContent(lamp("Luz Suíte", true, 30), false, {}, onChange = {}) }; compose.onRoot().captureRoboImage("build/screenshots/landing-luz-dark.png") }
 }

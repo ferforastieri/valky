@@ -49,6 +49,10 @@ fun ToastMessageHost(notices: Flow<ApiNotice>, modifier: Modifier = Modifier) {
     var current by remember { mutableStateOf<ApiNotice?>(null) }
     LaunchedEffect(notices) {
         notices.collectLatest { notice ->
+            // Aviso de "notificações lidas" não precisa aparecer: o app marca
+            // tudo como visto ao abrir, isso é rotina e não novidade.
+            val texto = notice.message.lowercase()
+            if (texto.contains("marcadas como lidas") || texto.contains("acknowledged")) return@collectLatest
             current = notice
             delay(6_000)
             if (current == notice) current = null
