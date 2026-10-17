@@ -2677,3 +2677,26 @@ body {
   .dock-link { flex: 0 0 auto; }
   .dock-actions { flex: 0 0 auto; }
 }
+
+/* Valkyris · navegação de celular igual ao dock do app */
+@media (max-width: 720px) {
+  /* dock igual ao do app */
+  .dock-links {
+    display: inline-flex;
+    flex: 0 0 auto;
+    justify-content: center;
+    align-items: center;
+    gap: 2px;
+    padding: 5px 8px;
+    border-radius: 999px;
+    background: color-mix(in srgb, var(--surface) 92%, transparent);
+    border: 1px solid var(--line);
+    box-shadow: var(--shadow);
+    margin: 0 auto;
+  }
+  .dock-link { padding: 8px; border-radius: 999px; }
+  .dock-link svg { width: 19px; height: 19px; }
+  .floating-dock { flex-wrap: wrap; row-gap: 10px; }
+  .dock-brand { margin: 0 auto; }
+  .dock-actions { margin: 0 auto; }
+}
