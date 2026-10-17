@@ -105,9 +105,9 @@ func TestCryEvidence(t *testing.T) {
 // Optional integration test with the checksum-verified upstream model bundle.
 // No nursery audio or production notifications are used.
 func TestNativeAudioReference(t *testing.T) {
-	dir := os.Getenv("VALKYRIS_AUDIO_TEST_MODEL_DIR")
+	dir := os.Getenv("VALKY_AUDIO_TEST_MODEL_DIR")
 	if dir == "" {
-		t.Skip("set VALKYRIS_AUDIO_TEST_MODEL_DIR to the extracted upstream bundle")
+		t.Skip("set VALKY_AUDIO_TEST_MODEL_DIR to the extracted upstream bundle")
 	}
 	c, err := NewNativeClassifier(filepath.Join(dir, "model.int8.onnx"), filepath.Join(dir, "class_labels_indices.csv"))
 	if err != nil {

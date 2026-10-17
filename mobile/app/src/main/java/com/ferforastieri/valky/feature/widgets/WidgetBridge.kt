@@ -57,7 +57,7 @@ internal data class WidgetSnapshot(
  * store, and every call goes through the authenticated Valky API.
  */
 internal object WidgetBridge {
-    private const val STORE = "valkyris_widgets"
+    private const val STORE = "valky_widgets"
     private const val KEY_STATE = "state"
     private const val KEY_PHOTO = "photo"
     private const val KEY_KEYPAD = "keypad_letters"

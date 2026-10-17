@@ -46,7 +46,7 @@ func TestCameraCreationContinuesAsynchronously(t *testing.T) {
 	defer mediaServer.Close()
 
 	directory := t.TempDir()
-	database, err := store.Open(filepath.Join(directory, "valkyris.db"))
+	database, err := store.Open(filepath.Join(directory, "valky.db"))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -119,7 +119,7 @@ func TestCameraCreationContinuesAsynchronously(t *testing.T) {
 
 func TestCameraCreationPersistsProbeFailure(t *testing.T) {
 	directory := t.TempDir()
-	database, err := store.Open(filepath.Join(directory, "valkyris.db"))
+	database, err := store.Open(filepath.Join(directory, "valky.db"))
 	if err != nil {
 		t.Fatal(err)
 	}

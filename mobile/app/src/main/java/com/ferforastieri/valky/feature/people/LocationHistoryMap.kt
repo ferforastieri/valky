@@ -9,7 +9,7 @@ import androidx.compose.ui.viewinterop.AndroidView
 import com.ferforastieri.valky.core.design.applyValkyMapStyle
 import com.ferforastieri.valky.core.design.currentMapVisualStyle
 import com.ferforastieri.valky.core.design.mapColorWithAlpha
-import com.ferforastieri.valky.core.design.valkyrisTileSource
+import com.ferforastieri.valky.core.design.valkyTileSource
 import com.ferforastieri.valky.core.model.PersonLocation
 import org.osmdroid.config.Configuration
 import org.osmdroid.util.BoundingBox
@@ -48,7 +48,7 @@ internal fun LocationHistoryMap(history: List<PersonLocation>, selected: String?
         modifier = Modifier.fillMaxSize(),
         factory = { context ->
             Configuration.getInstance().userAgentValue = context.packageName
-            MapView(context).apply { setTileSource(valkyrisTileSource(style)); setMultiTouchControls(true) }
+            MapView(context).apply { setTileSource(valkyTileSource(style)); setMultiTouchControls(true) }
         },
         update = { map ->
             map.applyValkyMapStyle(style)

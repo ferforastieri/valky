@@ -43,7 +43,7 @@ import com.ferforastieri.valky.core.design.applyValkyMapStyle
 import com.ferforastieri.valky.core.design.currentMapVisualStyle
 import com.ferforastieri.valky.core.design.mapColorWithAlpha
 import com.ferforastieri.valky.core.design.mapMarkerDrawable
-import com.ferforastieri.valky.core.design.valkyrisTileSource
+import com.ferforastieri.valky.core.design.valkyTileSource
 import com.ferforastieri.valky.R
 import com.ferforastieri.valky.core.model.PersonLocation
 import com.ferforastieri.valky.core.model.TrackedPerson
@@ -196,7 +196,7 @@ internal fun FamilyMap(users: List<TrackedPerson>, places: List<TrackedPlace>, m
     AndroidView(factory = { context ->
         Configuration.getInstance().userAgentValue = context.packageName
         MapView(context).apply {
-            setTileSource(valkyrisTileSource(mapStyle)); setMultiTouchControls(true); controller.setZoom(13.5); controller.setCenter(GeoPoint(-23.5505, -46.6333))
+            setTileSource(valkyTileSource(mapStyle)); setMultiTouchControls(true); controller.setZoom(13.5); controller.setCenter(GeoPoint(-23.5505, -46.6333))
             overlays.add(MapEventsOverlay(object : MapEventsReceiver {
                 override fun singleTapConfirmedHelper(point: GeoPoint): Boolean { selectedId = null; return false }
                 override fun longPressHelper(point: GeoPoint) = false
@@ -405,7 +405,7 @@ private fun AreaPickerMap(
         factory = { context ->
             Configuration.getInstance().userAgentValue = context.packageName
             MapView(context).apply {
-                setTileSource(valkyrisTileSource(mapStyle))
+                setTileSource(valkyTileSource(mapStyle))
                 setMultiTouchControls(true)
                 setOnTouchListener { view, event ->
                     // Keep the entire gesture in the map, including the first finger and pinch release.

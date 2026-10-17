@@ -147,7 +147,7 @@ export class API {
   token = "";
   constructor() {
     try {
-      sessionStorage.removeItem("valkyris-viewer-session");
+      sessionStorage.removeItem("valky-viewer-session");
     } catch {}
   }
   clear() {

@@ -61,13 +61,13 @@
                 <action android:name="android.intent.action.VIEW" />
                 <category android:name="android.intent.category.DEFAULT" />
                 <category android:name="android.intent.category.BROWSABLE" />
-                <data android:scheme="valkyris" android:host="pair" />
+                <data android:scheme="valky" android:host="pair" />
             </intent-filter>
             <intent-filter android:autoVerify="false">
                 <action android:name="android.intent.action.VIEW" />
                 <category android:name="android.intent.category.DEFAULT" />
                 <category android:name="android.intent.category.BROWSABLE" />
-                <data android:scheme="valkyris" android:host="event" />
+                <data android:scheme="valky" android:host="event" />
             </intent-filter>
         </activity>
         <service android:name=".core.alarm.AlarmPlaybackService" android:exported="false" android:foregroundServiceType="mediaPlayback" />

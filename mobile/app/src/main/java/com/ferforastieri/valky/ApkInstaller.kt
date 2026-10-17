@@ -33,7 +33,7 @@ class ApkInstaller(private val context: Context) : AutoCloseable {
             "APK download URL is not trusted"
         }
         val safeVersion = version.replace(Regex("[^A-Za-z0-9._-]"), "_")
-        val target = File(context.getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS), "valkyris-$safeVersion.apk")
+        val target = File(context.getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS), "valky-$safeVersion.apk")
         if (target.exists()) target.delete()
         val request = DownloadManager.Request(uri)
             .setTitle("Valky $version")

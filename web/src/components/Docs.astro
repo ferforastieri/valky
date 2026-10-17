@@ -194,7 +194,7 @@ const endpoints = pt ? [
           <p>{pt ? 'Abra /app/ na URL HTTPS da instalação e use seu usuário e senha. O painel consulta câmeras ao vivo, controla as lâmpadas cadastradas, exibe eventos, família, percursos e informações do servidor. Cadastro e configuração dos dispositivos continuam no Android.' : 'Open /app/ at your installation HTTPS URL and use the personal username and password. The dashboard displays live cameras, controls registered bulbs, and shows events, family, routes and server information. Device registration and setup remain on Android.'}</p>
           <p>{pt ? 'A sessão usa cookie Secure, HttpOnly e SameSite=Strict, válido por 30 dias e renovado durante o uso. Sair ou trocar a senha revoga a sessão. O painel vem na imagem Docker e não exige Node nem deploy na Vercel. Dados são consultados a cada 15 segundos com a aba visível.' : 'Sessions use a Secure, HttpOnly, SameSite=Strict cookie, valid for 30 days and renewed during use. Logout or password changes revoke sessions. The dashboard ships in the Docker image and requires neither Node nor Vercel deployment. Data refreshes every 15 seconds while the tab is visible.'}</p>
           <h3>WebRTC · Cloudflare Tunnel</h3>
-          <p>{pt ? 'Android e painel usam os mesmos endpoints WHEP. O túnel leva HTTPS e a negociação, mas áudio e vídeo precisam alcançar o MediaMTX por ICE. Libere 8189 UDP/TCP na rede privada e configure VALKYRIS_WEBRTC_HOSTS com endereços LAN/VPN alcançáveis. O domínio do túnel não é endereço de mídia. STUN pode auxiliar conexão direta; NAT restritivo exige VPN, rota pública de mídia ou TURN configurado.' : 'Android and the dashboard use the same WHEP endpoints. The tunnel carries HTTPS and signaling, but audio and video must reach MediaMTX through ICE. Allow 8189 UDP/TCP on the private network and set VALKYRIS_WEBRTC_HOSTS to reachable LAN/VPN addresses. The tunnel hostname is not a media address. STUN can assist direct connections; restrictive NAT requires VPN, a public media route or configured TURN.'}</p>
+          <p>{pt ? 'Android e painel usam os mesmos endpoints WHEP. O túnel leva HTTPS e a negociação, mas áudio e vídeo precisam alcançar o MediaMTX por ICE. Libere 8189 UDP/TCP na rede privada e configure VALKY_WEBRTC_HOSTS com endereços LAN/VPN alcançáveis. O domínio do túnel não é endereço de mídia. STUN pode auxiliar conexão direta; NAT restritivo exige VPN, rota pública de mídia ou TURN configurado.' : 'Android and the dashboard use the same WHEP endpoints. The tunnel carries HTTPS and signaling, but audio and video must reach MediaMTX through ICE. Allow 8189 UDP/TCP on the private network and set VALKY_WEBRTC_HOSTS to reachable LAN/VPN addresses. The tunnel hostname is not a media address. STUN can assist direct connections; restrictive NAT requires VPN, a public media route or configured TURN.'}</p>
           <p>{pt ? 'O player não substitui WebRTC por imagem ou HLS. A espera ICE de oito segundos não encerra a conexão Android quando já existem candidatos utilizáveis. Um HTTP 201 na negociação não comprova reprodução: verifique frames recebidos.' : 'The player does not replace WebRTC with a snapshot or HLS. An eight-second ICE wait does not abort Android negotiation when usable candidates already exist. HTTP 201 during signaling does not prove playback: verify received frames.'}</p>
         </section>
 
@@ -210,20 +210,20 @@ const endpoints = pt ? [
           <div class="docs-heading"><ServerCog size={22}/><div><span>05</span><h2>{pt ? 'Configuração' : 'Configuration'}</h2></div></div>
           <div class="config-table" role="table">
             {[
-              ['VALKYRIS_WEBRTC_HOSTS','IP LAN/VPN',pt?'Endereços de mídia anunciados, separados por vírgula.':'Advertised media addresses, comma separated.'],
-              ['VALKYRIS_WEB_DIR','/opt/valkyris/web',pt?'Build estático do painel no backend.':'Static dashboard build served by the backend.'],
-              ['VALKYRIS_LISTEN',':8443',pt?'Endereço interno do serviço HTTPS.':'Internal HTTPS listen address.'],
-              ['VALKYRIS_DATA_DIR','/data',pt?'Volume persistente.':'Persistent data volume.'],
-              ['VALKYRIS_DATABASE','/data/valkyris.db','SQLite.'],
-              ['VALKYRIS_TLS_CERT','/data/tls/server.crt',pt?'Certificado TLS.':'TLS certificate.'],
-              ['VALKYRIS_TLS_KEY','/data/tls/server.key',pt?'Chave TLS.':'TLS key.'],
-              ['VALKYRIS_MASTER_KEY_FILE','/data/secrets/master.key',pt?'Chave mestra de criptografia.':'Encryption master key.'],
-              ['VALKYRIS_MEDIA_API','http://mediamtx:9997',pt?'API interna do MediaMTX.':'Internal MediaMTX API.'],
-              ['VALKYRIS_MEDIA_RTSP','rtsp://mediamtx:8554',pt?'Stream interno para monitoramento e detectores.':'Internal stream for monitoring and detectors.'],
-              ['VALKYRIS_MEDIA_WEBRTC','http://mediamtx:8889',pt?'Origem WHEP interna; a mídia WebRTC segue direto ao celular após ICE.':'Internal WHEP origin; WebRTC media goes directly to the phone after ICE.'],
-              ['VALKYRIS_MEDIA_PLAYBACK','http://mediamtx:9996',pt?'API interna para gerar clipes recentes.':'Internal API used to generate recent clips.'],
-              ['VALKYRIS_RELEASE_API','api.github.com/…/releases/latest',pt?'Release estável consultada.':'Stable release lookup.'],
-              ['VALKYRIS_FIREBASE_CREDENTIALS_FILE','/data/secrets/firebase-service-account.json',pt?'Alternativa legada: arquivo de conta de serviço FCM. O app usa o armazenamento cifrado do SQLite.':'Legacy alternative: FCM service-account file. The app uses encrypted SQLite storage.'],
+              ['VALKY_WEBRTC_HOSTS','IP LAN/VPN',pt?'Endereços de mídia anunciados, separados por vírgula.':'Advertised media addresses, comma separated.'],
+              ['VALKY_WEB_DIR','/opt/valky/web',pt?'Build estático do painel no backend.':'Static dashboard build served by the backend.'],
+              ['VALKY_LISTEN',':8443',pt?'Endereço interno do serviço HTTPS.':'Internal HTTPS listen address.'],
+              ['VALKY_DATA_DIR','/data',pt?'Volume persistente.':'Persistent data volume.'],
+              ['VALKY_DATABASE','/data/valky.db','SQLite.'],
+              ['VALKY_TLS_CERT','/data/tls/server.crt',pt?'Certificado TLS.':'TLS certificate.'],
+              ['VALKY_TLS_KEY','/data/tls/server.key',pt?'Chave TLS.':'TLS key.'],
+              ['VALKY_MASTER_KEY_FILE','/data/secrets/master.key',pt?'Chave mestra de criptografia.':'Encryption master key.'],
+              ['VALKY_MEDIA_API','http://mediamtx:9997',pt?'API interna do MediaMTX.':'Internal MediaMTX API.'],
+              ['VALKY_MEDIA_RTSP','rtsp://mediamtx:8554',pt?'Stream interno para monitoramento e detectores.':'Internal stream for monitoring and detectors.'],
+              ['VALKY_MEDIA_WEBRTC','http://mediamtx:8889',pt?'Origem WHEP interna; a mídia WebRTC segue direto ao celular após ICE.':'Internal WHEP origin; WebRTC media goes directly to the phone after ICE.'],
+              ['VALKY_MEDIA_PLAYBACK','http://mediamtx:9996',pt?'API interna para gerar clipes recentes.':'Internal API used to generate recent clips.'],
+              ['VALKY_RELEASE_API','api.github.com/…/releases/latest',pt?'Release estável consultada.':'Stable release lookup.'],
+              ['VALKY_FIREBASE_CREDENTIALS_FILE','/data/secrets/firebase-service-account.json',pt?'Alternativa legada: arquivo de conta de serviço FCM. O app usa o armazenamento cifrado do SQLite.':'Legacy alternative: FCM service-account file. The app uses encrypted SQLite storage.'],
             ].map(([name,value,meaning])=><div role="row"><code>{name}</code><code>{value}</code><span>{meaning}</span></div>)}
           </div>
           <p>{pt ? 'O arquivo mediamtx.yml deve existir como arquivo antes de subir o Compose.' : 'mediamtx.yml must exist as a file before Compose starts.'}</p>
@@ -240,7 +240,7 @@ const endpoints = pt ? [
         <section id="updates">
           <div class="docs-heading"><Download size={22}/><div><span>07</span><h2>{pt ? 'Atualizações' : 'Updates'}</h2></div></div>
           <p>{pt ? 'Quando uma release estável mais nova existir, o app e o web exibem um toast, sem atualizar automaticamente. Nas configurações do app, o usuário pode iniciar o download do APK assinado do GitHub; o Android solicita confirmação para instalar.' : 'When a newer stable release exists, mobile and web show a toast without updating automatically. In app settings, the user can start downloading the signed APK from GitHub; Android requests installation confirmation.'}</p>
-          <p>{pt ? 'SQLite, clipes e snapshots permanecem no volume valkyris-data. A API apenas consulta versões; não executa atualizações do servidor.' : 'SQLite, clips and snapshots remain in the valkyris-data volume. The API only checks releases; it cannot execute server updates.'}</p>
+          <p>{pt ? 'SQLite, clipes e snapshots permanecem no volume valky-data. A API apenas consulta versões; não executa atualizações do servidor.' : 'SQLite, clips and snapshots remain in the valky-data volume. The API only checks releases; it cannot execute server updates.'}</p>
 
           <p>{pt ? 'Na série 2.x, a API permanece /api/v1 e a migração preserva dados. Execute o instalador novamente no host para atualizar o backend, o web, Compose e MediaMTX. O APK precisa ser instalado em cada celular com confirmação do Android. A consulta de releases tem cache de até 15 minutos.' : 'In the 2.x series the API remains /api/v1 and migration preserves data. Rerun the installer on the host to update the backend, web, Compose and MediaMTX. Install the APK on each phone with Android confirmation. Release checks are cached for up to 15 minutes.'}</p>
         </section>
@@ -254,13 +254,13 @@ const endpoints = pt ? [
             <li>{pt ? 'Não encaminhe 554, 2020, 8888 ou 9997 no roteador.' : 'Do not forward ports 554, 2020, 8888 or 9997 on the router.'}</li>
             <li>{pt ? 'Use TLS confiável por proxy reverso ou instale a CA privada no celular.' : 'Use trusted TLS through a reverse proxy or install the private CA on the phone.'}</li>
             <li>{pt ? 'Use Tailscale, WireGuard ou outra VPN para acesso fora de casa.' : 'Use Tailscale, WireGuard or another VPN away from home.'}</li>
-            <li>{pt ? 'Faça backup do volume valkyris-data e do .env juntos, com acesso restrito.' : 'Back up the valkyris-data volume and .env together with restricted access.'}</li>
+            <li>{pt ? 'Faça backup do volume valky-data e do .env juntos, com acesso restrito.' : 'Back up the valky-data volume and .env together with restricted access.'}</li>
           </ul>
         </section>
 
         <section id="diagnostics">
           <div class="docs-heading"><Menu size={22}/><div><span>09</span><h2>{pt ? 'Diagnóstico' : 'Diagnostics'}</h2></div></div>
-          <div class="docs-code multiline"><code>{`docker compose ps\ndocker compose logs --tail=200 valkyris\ndocker compose logs --tail=200 mediamtx\ncurl -k https://localhost:8443/health`}</code></div>
+          <div class="docs-code multiline"><code>{`docker compose ps\ndocker compose logs --tail=200 valky\ndocker compose logs --tail=200 mediamtx\ncurl -k https://localhost:8443/health`}</code></div>
           <div class="diagnostic-grid">
             <article><strong>setup failed</strong><p>{pt ? 'Abra a câmera no app: a etapa e o erro persistido indicam se a falha ocorreu no ONVIF ou no stream.' : 'Open the camera in the app: persisted setup state and error show whether ONVIF or stream setup failed.'}</p></article>
             <article><strong>EOFException</strong><p>{pt ? 'Verifique primeiro se MediaMTX está saudável e se mediamtx.yml foi montado como arquivo.' : 'First verify MediaMTX health and that mediamtx.yml is mounted as a file.'}</p></article>
@@ -277,7 +277,7 @@ const endpoints = pt ? [
     const root=document.documentElement;
     const systemTheme=matchMedia('(prefers-color-scheme: dark)');
     const isDark=()=>root.dataset.theme==='dark'||(root.dataset.theme==='auto'&&systemTheme.matches);
-    document.querySelector('.theme-toggle')?.addEventListener('click',()=>{root.dataset.theme=isDark()?'light':'dark';localStorage.setItem('valkyris-theme',root.dataset.theme)});
+    document.querySelector('.theme-toggle')?.addEventListener('click',()=>{root.dataset.theme=isDark()?'light':'dark';localStorage.setItem('valky-theme',root.dataset.theme)});
     document.querySelector('.docs-copy')?.addEventListener('click',async event=>{const button=event.currentTarget as HTMLButtonElement;await navigator.clipboard.writeText(button.dataset.command||'');button.textContent=document.documentElement.lang==='pt-BR'?'Copiado':'Copied';setTimeout(()=>button.textContent=document.documentElement.lang==='pt-BR'?'Copiar':'Copy',1400)});
   </script>
 </BaseLayout>

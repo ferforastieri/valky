@@ -66,7 +66,7 @@ func viewerRequestAllowed(r *http.Request) bool {
 	return (len(parts) == 5 && r.Method == http.MethodPost) || (len(parts) == 6 && parts[5] != "" && (r.Method == http.MethodDelete || r.Method == http.MethodPatch))
 }
 
-const ViewerCookie = "__Host-valkyris-viewer"
+const ViewerCookie = "__Host-valky-viewer"
 
 func SetViewerCookie(w http.ResponseWriter, token string) {
 	http.SetCookie(w, &http.Cookie{Name: ViewerCookie, Value: token, Path: "/", Secure: true, HttpOnly: true, SameSite: http.SameSiteStrictMode, MaxAge: 30 * 24 * 60 * 60})

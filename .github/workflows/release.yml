@@ -156,23 +156,23 @@ jobs:
           ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
         run: |
           test -n "$ANDROID_KEYSTORE_BASE64"
-          printf '%s' "$ANDROID_KEYSTORE_BASE64" | base64 --decode > "$RUNNER_TEMP/valkyris.jks"
+          printf '%s' "$ANDROID_KEYSTORE_BASE64" | base64 --decode > "$RUNNER_TEMP/valky.jks"
       - name: Compilar APK assinado
         working-directory: mobile
         env:
-          ANDROID_KEYSTORE_PATH: ${{ runner.temp }}/valkyris.jks
+          ANDROID_KEYSTORE_PATH: ${{ runner.temp }}/valky.jks
           ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
           ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
           ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
-          VALKYRIS_FIREBASE_ENABLED: 'true'
-          VALKYRIS_VERSION_NAME: ${{ needs.prepare.outputs.apk_version }}
-          VALKYRIS_VERSION_CODE: ${{ needs.prepare.outputs.version_code }}
+          VALKY_FIREBASE_ENABLED: 'true'
+          VALKY_VERSION_NAME: ${{ needs.prepare.outputs.apk_version }}
+          VALKY_VERSION_CODE: ${{ needs.prepare.outputs.version_code }}
         # Caminho rápido; se o cache do Gradle trouxer entrada velha (já
         # aconteceu com os módulos multiplataforma), tenta de novo do zero.
         run: ./gradlew --stacktrace assembleRelease || ./gradlew --stacktrace --refresh-dependencies assembleRelease
       - uses: actions/upload-artifact@v4
         with:
-          name: valkyris-release-apk
+          name: valky-release-apk
           path: mobile/app/build/outputs/apk/release/app-release.apk
           if-no-files-found: error
 
@@ -187,19 +187,19 @@ jobs:
           ref: ${{ needs.prepare.outputs.commit }}
       - uses: actions/download-artifact@v4
         with:
-          name: valkyris-release-apk
+          name: valky-release-apk
           path: artifacts
       - name: Montar release verificável
         env:
           RELEASE_VERSION: ${{ needs.prepare.outputs.version }}
         run: |
           mkdir -p release
-          cp artifacts/app-release.apk "release/valkyris-${RELEASE_VERSION}.apk"
+          cp artifacts/app-release.apk "release/valky-${RELEASE_VERSION}.apk"
           cp compose.yaml mediamtx.yml install.sh release/
           cp backend/internal/api/openapi.yaml release/openapi.yaml
           printf '%s\n' "$RELEASE_VERSION" > release/VERSION
           cd release
-          sha256sum valkyris-*.apk compose.yaml mediamtx.yml install.sh openapi.yaml VERSION > SHA256SUMS
+          sha256sum valky-*.apk compose.yaml mediamtx.yml install.sh openapi.yaml VERSION > SHA256SUMS
       - name: Publicar GitHub Release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}

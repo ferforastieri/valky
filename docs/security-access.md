@@ -22,7 +22,7 @@ Todas as rotas registradas no mux protegido são verificadas por um teste que ex
 
 ## Navegador
 
-Login com `browserAdmin:true` solicita uma sessão de navegador após validar usuário e senha. O papel é lido da conta vinculada, nunca do payload ou cookie. Cookie `__Host-valkyris-viewer` é Secure, HttpOnly, SameSite=Strict, com renovação e validade de 30 dias. Trocar a senha pessoal revoga as outras sessões da conta.
+Login com `browserAdmin:true` solicita uma sessão de navegador após validar usuário e senha. O papel é lido da conta vinculada, nunca do payload ou cookie. Cookie `__Host-valky-viewer` é Secure, HttpOnly, SameSite=Strict, com renovação e validade de 30 dias. Trocar a senha pessoal revoga as outras sessões da conta.
 
 O painel permite apenas as mutações explicitamente autorizadas: gerenciamento de usuários, destinatários por regra e convites. Requisições por cookie exigem cabeçalho customizado e validação de Origin/Sec-Fetch-Site. Não há CORS permissivo. O WebSocket usa a política padrão de mesma origem. Conexões realtime revalidam a credencial a cada 15 segundos e são encerradas após revogação ou desativação; novas requisições são bloqueadas imediatamente.
 

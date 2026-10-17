@@ -82,7 +82,7 @@ const structuredData = {
     <link rel="alternate" hreflang="en" href={new URL(`/en${localizedPath}`, Astro.site)} />
     <link rel="alternate" hreflang="x-default" href={new URL(localizedPath ? `/pt-BR${localizedPath}` : '/', Astro.site)} />
     <link rel="sitemap" href="/sitemap-index.xml" />
-    <link rel="icon" href="/valkyris-mark.svg?v=6" type="image/svg+xml" />
+    <link rel="icon" href="/valky-mark.svg?v=6" type="image/svg+xml" />
     <link rel="icon" href="/favicon.png?v=6" type="image/png" sizes="64x64" />
     <link rel="apple-touch-icon" href="/apple-touch-icon.png?v=6" sizes="180x180" />
     <meta property="og:type" content="website" />
@@ -106,7 +106,7 @@ const structuredData = {
     <title>{title}</title>
     <script type="application/ld+json" set:html={JSON.stringify(structuredData)} is:inline />
     <script is:inline>
-      const saved = localStorage.getItem('valkyris-theme');
+      const saved = localStorage.getItem('valky-theme');
       if (saved) document.documentElement.dataset.theme = saved;
     </script>
   </head>

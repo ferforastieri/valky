@@ -92,7 +92,7 @@ jobs:
       - name: Testes
         run: go test -race -coverprofile=coverage.out ./...
       - name: Compilação
-        run: CGO_ENABLED=1 go build -trimpath ./cmd/valkyris
+        run: CGO_ENABLED=1 go build -trimpath ./cmd/valky
 
   web:
     name: Web · Astro
@@ -134,7 +134,7 @@ jobs:
         run: ./gradlew --stacktrace lintDebug testDebugUnitTest
       - uses: actions/upload-artifact@v4
         with:
-          name: valkyris-debug
+          name: valky-debug
           path: mobile/app/build/outputs/apk/debug/app-debug.apk
 
   container:
@@ -153,23 +153,23 @@ jobs:
           platforms: linux/amd64
           push: false
           load: true
-          tags: valkyris:ci
+          tags: valky:ci
           cache-from: type=gha
           cache-to: type=gha,mode=max
       - name: Validar Compose
         run: docker compose config --quiet
       - name: Smoke test HTTPS
         run: |
-          docker run -d --rm --name valkyris-ci -p 127.0.0.1:18443:8443 valkyris:ci
+          docker run -d --rm --name valky-ci -p 127.0.0.1:18443:8443 valky:ci
           for attempt in $(seq 1 45); do
             if curl -kfsS https://127.0.0.1:18443/health | grep -q '"status":"ok"'; then
-              curl -kfsS https://127.0.0.1:18443/app/ -o /tmp/valkyris-viewer.html
-              grep -q 'Valky · Consulta' /tmp/valkyris-viewer.html
-              docker stop valkyris-ci
+              curl -kfsS https://127.0.0.1:18443/app/ -o /tmp/valky-viewer.html
+              grep -q 'Valky · Consulta' /tmp/valky-viewer.html
+              docker stop valky-ci
               exit 0
             fi
             sleep 1
           done
-          docker logs valkyris-ci
-          docker stop valkyris-ci
+          docker logs valky-ci
+          docker stop valky-ci
           exit 1

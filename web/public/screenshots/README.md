@@ -1,6 +1,6 @@
 # Capturas reais do app
 
-Estas imagens são renderizadas pelos próprios componentes Jetpack Compose usados pelo Valkyris. Elas não são mockups desenhados na landing page.
+Estas imagens são renderizadas pelos próprios componentes Jetpack Compose usados pelo Valky. Elas não são mockups desenhados na landing page.
 
 Para regenerar todas as capturas após uma mudança visual:
 

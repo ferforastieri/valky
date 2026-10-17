@@ -6,9 +6,9 @@
         <item name="android:navigationBarColor">#101310</item>
     </style>
     <style name="Theme.Valky.Starting" parent="Theme.SplashScreen">
-        <item name="windowSplashScreenBackground">@color/valkyris_canvas</item>
-        <item name="windowSplashScreenAnimatedIcon">@drawable/valkyris_mark</item>
-        <item name="windowSplashScreenIconBackgroundColor">@color/valkyris_surface</item>
+        <item name="windowSplashScreenBackground">@color/valky_canvas</item>
+        <item name="windowSplashScreenAnimatedIcon">@drawable/valky_mark</item>
+        <item name="windowSplashScreenIconBackgroundColor">@color/valky_surface</item>
         <item name="postSplashScreenTheme">@style/Theme.Valky</item>
     </style>
     <style name="Theme.Valky.Alarm" parent="Theme.Valky">

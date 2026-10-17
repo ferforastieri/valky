@@ -4,7 +4,7 @@ info:
   version: 2.0.0
   description: Local-first home camera monitoring API. JSON responses use a success/message/data envelope; every response also includes X-Valky-Success and X-Valky-Message headers.
 servers:
-  - url: https://valkyris.local:8443/api/v1
+  - url: https://valky.local:8443/api/v1
 security:
   - bearerAuth: []
 paths:
@@ -547,7 +547,7 @@ components:
     viewerCookie:
       type: apiKey
       in: cookie
-      name: __Host-valkyris-viewer
+      name: __Host-valky-viewer
       description: Secure HttpOnly SameSite=Strict cookie; requires X-Valky-Viewer 1 for cookie-authenticated calls. The browser can consult data, negotiate WHEP and control registered lights and remote controls, but cannot register or configure devices.
     bearerAuth: {type: http, scheme: bearer}
   parameters:

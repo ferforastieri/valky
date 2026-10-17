@@ -16,7 +16,7 @@ import (
 )
 
 func TestCreateRuleEndpoint(t *testing.T) {
-	database, err := store.Open(filepath.Join(t.TempDir(), "valkyris.db"))
+	database, err := store.Open(filepath.Join(t.TempDir(), "valky.db"))
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="web/public/valkyris-mark.svg" width="112" height="112" alt="Logo do Valky">
+  <img src="web/public/valky-mark.svg" width="112" height="112" alt="Logo do Valky">
 </p>
 
 <h1 align="center">Valky</h1>
@@ -66,7 +66,7 @@ Câmera ONVIF / RTSP
  Detectores locais → Regras → Evento + mídia → FCM → alerta nativo Android
 ```
 
-O backend Go é o limite de segurança: o app nunca recebe a senha da câmera e as APIs internas do MediaMTX não são expostas. Apenas a porta de mídia WebRTC 8189 UDP/TCP é publicada. SQLite, certificados, segredos, snapshots e clipes vivem no volume persistente `valkyris-data`. O buffer temporário de dez minutos fica em RAM, no volume compartilhado `recording-buffer`, limitado a 384 MiB, evitando gravações contínuas em disco. Veja [dimensionamento e operação 24/7](docs/energy-efficiency.md).
+O backend Go é o limite de segurança: o app nunca recebe a senha da câmera e as APIs internas do MediaMTX não são expostas. Apenas a porta de mídia WebRTC 8189 UDP/TCP é publicada. SQLite, certificados, segredos, snapshots e clipes vivem no volume persistente `valky-data`. O buffer temporário de dez minutos fica em RAM, no volume compartilhado `recording-buffer`, limitado a 384 MiB, evitando gravações contínuas em disco. Veja [dimensionamento e operação 24/7](docs/energy-efficiency.md).
 
 ## Tecnologias
 
@@ -98,7 +98,7 @@ No servidor, execute:
 curl -fsSL https://valkyris.vercel.app/install.sh | sh
 ```
 
-O instalador verifica o Compose, baixa os artefatos da release, cria os segredos e o certificado TLS, prepara os arquivos locais e inicia `valkyris` e `mediamtx` de forma idempotente.
+O instalador verifica o Compose, baixa os artefatos da release, cria os segredos e o certificado TLS, prepara os arquivos locais e inicia `valky` e `mediamtx` de forma idempotente.
 
 Depois:
 
@@ -107,7 +107,7 @@ Depois:
 3. No primeiro acesso, crie a conta com usuário e senha; esse dispositivo se torna administrador.
 4. Cadastre a câmera com nome, ícone, IP, usuário e senha. Para Tapo, o RTSP principal é montado automaticamente.
 
-Para acessar de fora de casa, use uma VPN como Tailscale ou WireGuard, ou publique o HTTPS por proxy/túnel. O Cloudflare Tunnel transporta a API e a negociação WHEP, mas não a mídia WebRTC: o cliente precisa alcançar a porta 8189 UDP/TCP por LAN, VPN ou outra rota ICE configurada. O instalador preserva VALKYRIS_WEBRTC_HOSTS com o endereço do servidor; não use o domínio do túnel como endereço de mídia. Veja [conectividade WebRTC](docs/webrtc-connectivity.md).
+Para acessar de fora de casa, use uma VPN como Tailscale ou WireGuard, ou publique o HTTPS por proxy/túnel. O Cloudflare Tunnel transporta a API e a negociação WHEP, mas não a mídia WebRTC: o cliente precisa alcançar a porta 8189 UDP/TCP por LAN, VPN ou outra rota ICE configurada. O instalador preserva VALKY_WEBRTC_HOSTS com o endereço do servidor; não use o domínio do túnel como endereço de mídia. Veja [conectividade WebRTC](docs/webrtc-connectivity.md).
 
 Abra https://SEU_SERVIDOR/app/ e entre com seu usuário e senha para consultar o painel. Regras ficam nos detalhes da câmera; áreas e percursos ficam em Família. O painel permite gestão de usuários e convites para administradores, edição de destinatários para quem tem permissão e controle das lâmpadas já cadastradas. Cadastro e configuração de dispositivos, PTZ, edição completa das regras e marcar eventos como lidos continuam no Android.
 
@@ -131,7 +131,7 @@ curl -k https://localhost:8443/health
 ```bash
 cd backend
 go test ./...
-go run ./cmd/valkyris
+go run ./cmd/valky
 ```
 
 ### Landing e documentação
@@ -175,14 +175,14 @@ O arquivo [.env.example](.env.example) lista as variáveis suportadas. As princi
 
 | Variável | Função |
 | --- | --- |
-| `VALKYRIS_LISTEN` | Endereço interno do servidor HTTPS. |
-| `VALKYRIS_DATA_DIR` | Diretório persistente para banco, mídia e segredos. |
-| `VALKYRIS_DATABASE` | Caminho do banco SQLite. |
-| `VALKYRIS_TLS_CERT` / `VALKYRIS_TLS_KEY` | Identidade TLS do backend. |
-| `VALKYRIS_MASTER_KEY_FILE` | Chave usada para cifrar credenciais sensíveis. |
-| `VALKYRIS_MEDIA_API` / `VALKYRIS_MEDIA_RTSP` / `VALKYRIS_MEDIA_WEBRTC` / `VALKYRIS_MEDIA_PLAYBACK` | Endereços internos de configuração, monitoramento RTSP, negociação WHEP/WebRTC e reprodução de clipes do MediaMTX. |
-| `VALKYRIS_RELEASE_API` | Release estável consultada pelo backend. |
-| `VALKYRIS_FIREBASE_CREDENTIALS_FILE` | Conta de serviço usada pelo backend para enviar alertas pelo FCM. |
+| `VALKY_LISTEN` | Endereço interno do servidor HTTPS. |
+| `VALKY_DATA_DIR` | Diretório persistente para banco, mídia e segredos. |
+| `VALKY_DATABASE` | Caminho do banco SQLite. |
+| `VALKY_TLS_CERT` / `VALKY_TLS_KEY` | Identidade TLS do backend. |
+| `VALKY_MASTER_KEY_FILE` | Chave usada para cifrar credenciais sensíveis. |
+| `VALKY_MEDIA_API` / `VALKY_MEDIA_RTSP` / `VALKY_MEDIA_WEBRTC` / `VALKY_MEDIA_PLAYBACK` | Endereços internos de configuração, monitoramento RTSP, negociação WHEP/WebRTC e reprodução de clipes do MediaMTX. |
+| `VALKY_RELEASE_API` | Release estável consultada pelo backend. |
+| `VALKY_FIREBASE_CREDENTIALS_FILE` | Conta de serviço usada pelo backend para enviar alertas pelo FCM. |
 
 Não existe `PUBLIC_URL`: cada celular informa a URL que realmente usa para alcançar sua instalação. Convites para outros dispositivos são criados dentro do app e combinados com essa URL localmente.
 
@@ -190,7 +190,7 @@ Não existe `PUBLIC_URL`: cada celular informa a URL que realmente usa para alca
 
 O Valky não exige aplicativo auxiliar no celular. O APK recebe mensagens de dados pelo Firebase Cloud Messaging e cria localmente a notificação ou o alarme nativo. O conteúdo do evento continua cifrado de ponta a ponta entre o backend e o dispositivo.
 
-1. No Firebase Console, crie um projeto, adicione o aplicativo Android `com.ferforastieri.valkyris` e baixe `google-services.json`.
+1. No Firebase Console, crie um projeto, adicione o aplicativo Android `com.ferforastieri.valky` e baixe `google-services.json`.
 2. Codifique esse arquivo em base64 e cadastre o conteúdo no secret do GitHub `FIREBASE_ANDROID_CONFIG_BASE64`; ele será incluído no APK durante a release.
 3. Em **Configurações do projeto → Contas de serviço**, gere uma chave privada JSON. No primeiro sheet de alertas do app, escolha essa chave: o administrador a envia por TLS, o backend valida e cifra o JSON no SQLite. A conta nunca é retornada pela API, registrada no Git ou incluída na imagem.
 
@@ -315,7 +315,7 @@ do sistema. Para atualizar o servidor e o web,
 execute novamente o instalador oficial. O instalador remove o antigo container
 de atualização e as variáveis que ele usava; não há acesso ao Docker pelo backend.
 
-Faça backup consistente do SQLite e preserve junto o volume valkyris-data
+Faça backup consistente do SQLite e preserve junto o volume valky-data
 (incluindo secrets/master.key, certificados e mídia), .env, compose.yaml
 e mediamtx.yml. Não copie apenas o arquivo .db de uma instância ativa sem
 considerar o WAL: use backup SQLite ou pare a stack durante a cópia.

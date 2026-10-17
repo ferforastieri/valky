@@ -73,7 +73,7 @@ fun EventDetailScreen(vm: EventDetailViewModel = hiltViewModel()) {
                     AndroidView(factory = { ctx ->
                         org.osmdroid.config.Configuration.getInstance().userAgentValue = ctx.packageName
                         org.osmdroid.views.MapView(ctx).apply {
-                            setTileSource(com.ferforastieri.valky.core.design.valkyrisTileSource(mapStyle))
+                            setTileSource(com.ferforastieri.valky.core.design.valkyTileSource(mapStyle))
                             applyValkyMapStyle(mapStyle)
                             setMultiTouchControls(true)
                             controller.setZoom(16.0)

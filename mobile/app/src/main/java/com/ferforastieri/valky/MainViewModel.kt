@@ -71,7 +71,7 @@ class MainViewModel @Inject constructor(
     val language = preferences.language.stateIn(viewModelScope, SharingStarted.Eagerly, "system")
 
     fun acceptPairingLink(uri: Uri?) {
-        if (_paired.value || uri?.scheme != "valkyris" || uri.host != "pair") return
+        if (_paired.value || uri?.scheme != "valky" || uri.host != "pair") return
         val url = uri.getQueryParameter("url").orEmpty()
         if (url.startsWith("https://") && !uri.getQueryParameter("code").isNullOrBlank()) {
             _pairingLink.value = uri
@@ -86,8 +86,8 @@ class MainViewModel @Inject constructor(
     }
     fun acceptLaunch(uri: Uri?, eventId: String?, cameraId: String? = null, section: String? = null) {
         acceptPairingLink(uri)
-        val deepLinkId = if (uri?.scheme == "valkyris" && uri.host == "event") uri.lastPathSegment else null
-        val deepCameraId = if (uri?.scheme == "valkyris" && uri.host == "camera") uri.lastPathSegment else null
+        val deepLinkId = if (uri?.scheme == "valky" && uri.host == "event") uri.lastPathSegment else null
+        val deepCameraId = if (uri?.scheme == "valky" && uri.host == "camera") uri.lastPathSegment else null
         val sectionCameraId = section?.takeIf { it.startsWith("camera:") }?.substringAfter("camera:")
         val sectionRoute = section?.takeIf { !it.startsWith("camera:") }
         _pendingCamera.value = cameraId?.takeIf(String::isNotBlank) ?: sectionCameraId?.takeIf(String::isNotBlank) ?: deepCameraId?.takeIf(String::isNotBlank)

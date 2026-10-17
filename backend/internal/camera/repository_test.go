@@ -5,17 +5,17 @@ import (
 	"net/url"
 	"testing"
 
-	valkyriscrypto "github.com/ferforastieri/valky/backend/internal/crypto"
+	valkycrypto "github.com/ferforastieri/valky/backend/internal/crypto"
 	"github.com/ferforastieri/valky/backend/internal/store"
 )
 
 func TestCreatePendingBuildsTapoRTSPURIAndPersistsIcon(t *testing.T) {
-	db, err := store.Open(t.TempDir() + "/valkyris.db")
+	db, err := store.Open(t.TempDir() + "/valky.db")
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer db.Close()
-	vault, err := valkyriscrypto.LoadOrCreate(t.TempDir() + "/master.key")
+	vault, err := valkycrypto.LoadOrCreate(t.TempDir() + "/master.key")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -51,12 +51,12 @@ func TestNormalizeIconFallsBackToCamera(t *testing.T) {
 }
 
 func TestDeleteRemovesCamera(t *testing.T) {
-	db, err := store.Open(t.TempDir() + "/valkyris.db")
+	db, err := store.Open(t.TempDir() + "/valky.db")
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer db.Close()
-	vault, err := valkyriscrypto.LoadOrCreate(t.TempDir() + "/master.key")
+	vault, err := valkycrypto.LoadOrCreate(t.TempDir() + "/master.key")
 	if err != nil {
 		t.Fatal(err)
 	}

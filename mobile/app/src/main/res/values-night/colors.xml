@@ -1,4 +1,4 @@
 <resources>
-    <color name="valkyris_canvas">#101310</color>
-    <color name="valkyris_surface">#1A1F1A</color>
+    <color name="valky_canvas">#101310</color>
+    <color name="valky_surface">#1A1F1A</color>
 </resources>

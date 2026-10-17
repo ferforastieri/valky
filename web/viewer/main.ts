@@ -997,7 +997,7 @@ document.addEventListener("click", (event) => {
 });
 try {
   document.documentElement.dataset.theme =
-    localStorage.getItem("valkyris-viewer-theme") || "auto";
+    localStorage.getItem("valky-viewer-theme") || "auto";
 } catch {}
 $("#theme").onclick = () => {
   const current = document.documentElement.dataset.theme;
@@ -1007,7 +1007,7 @@ $("#theme").onclick = () => {
   document.documentElement.dataset.theme = dark ? "light" : "dark";
   try {
     localStorage.setItem(
-      "valkyris-viewer-theme",
+      "valky-viewer-theme",
       document.documentElement.dataset.theme!,
     );
   } catch {}
@@ -1076,7 +1076,7 @@ async function inviteUser() {
     const invite = await api.mutate<{code: string; expiresAt: string}>('/pairing-sessions', 'POST');
     const QRCode = (await import('qrcode')).default;
     if (version !== dialogVersion || !dialog.open) return;
-    const uri = `valkyris://pair?url=${encodeURIComponent(window.location.origin)}&code=${encodeURIComponent(invite.code)}`;
+    const uri = `valky://pair?url=${encodeURIComponent(window.location.origin)}&code=${encodeURIComponent(invite.code)}`;
     $('#detail-body').innerHTML = `<div class="invitation"><p>Abra o Valky no Android e escaneie este QR Code para vincular o aparelho.</p><div class="qr-surface"><canvas id="invitation-qr" role="img" aria-label="QR Code de convite para o Valky"></canvas></div><span class="eyebrow">CÓDIGO DO CONVITE</span><strong class="invitation-code">${e(invite.code)}</strong><p class="muted">Uso único · válido até ${e(date(invite.expiresAt))}</p><button type="button" class="primary" id="copy-invitation">Copiar link do convite</button><p role="status" id="invitation-status"></p></div>`;
     await QRCode.toCanvas($<HTMLCanvasElement>('#invitation-qr'), uri, { width: 280, margin: 4, errorCorrectionLevel: 'M', color: { dark: '#000000', light: '#ffffff' } });
     if (version !== dialogVersion || !dialog.open) return;

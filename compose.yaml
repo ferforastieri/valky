@@ -1,8 +1,8 @@
 name: valky
 
 services:
-  valkyris:
-    image: ghcr.io/ferforastieri/valky:${VALKYRIS_VERSION:-latest}
+  valky:
+    image: ghcr.io/ferforastieri/valky:${VALKY_VERSION:-latest}
     build:
       context: .
       dockerfile: backend/Dockerfile
@@ -11,21 +11,21 @@ services:
       mediamtx:
         condition: service_started
     environment:
-      VALKYRIS_LISTEN: :8443
-      VALKYRIS_GEOCODER_URL: ${VALKYRIS_GEOCODER_URL:-https://photon.komoot.io/reverse}
-      VALKYRIS_DATA_DIR: /data
-      VALKYRIS_DATABASE: /data/valkyris.db
-      VALKYRIS_TLS_CERT: /data/tls/server.crt
-      VALKYRIS_TLS_KEY: /data/tls/server.key
-      VALKYRIS_MASTER_KEY_FILE: /data/secrets/master.key
-      VALKYRIS_MEDIA_API: http://mediamtx:9997
-      VALKYRIS_MEDIA_PLAYBACK: http://mediamtx:9996
-      VALKYRIS_MEDIA_WEBRTC: http://mediamtx:8889
-      VALKYRIS_MEDIA_RTSP: rtsp://mediamtx:8554
-      VALKYRIS_MEDIA_RECORDINGS: /data/recordings
-      VALKYRIS_FIREBASE_CREDENTIALS_FILE: ${VALKYRIS_FIREBASE_CREDENTIALS_FILE:-/data/secrets/firebase-service-account.json}
+      VALKY_LISTEN: :8443
+      VALKY_GEOCODER_URL: ${VALKY_GEOCODER_URL:-https://photon.komoot.io/reverse}
+      VALKY_DATA_DIR: /data
+      VALKY_DATABASE: /data/valky.db
+      VALKY_TLS_CERT: /data/tls/server.crt
+      VALKY_TLS_KEY: /data/tls/server.key
+      VALKY_MASTER_KEY_FILE: /data/secrets/master.key
+      VALKY_MEDIA_API: http://mediamtx:9997
+      VALKY_MEDIA_PLAYBACK: http://mediamtx:9996
+      VALKY_MEDIA_WEBRTC: http://mediamtx:8889
+      VALKY_MEDIA_RTSP: rtsp://mediamtx:8554
+      VALKY_MEDIA_RECORDINGS: /data/recordings
+      VALKY_FIREBASE_CREDENTIALS_FILE: ${VALKY_FIREBASE_CREDENTIALS_FILE:-/data/secrets/firebase-service-account.json}
     ports:
-      - "${VALKYRIS_PORT:-8443}:8443"
+      - "${VALKY_PORT:-8443}:8443"
     volumes:
       - valky-data:/data
       - type: volume
@@ -33,7 +33,7 @@ services:
         target: /data/recordings
         volume:
           nocopy: true
-    networks: [valkyris]
+    networks: [valky]
     healthcheck:
       test: ["CMD", "wget", "--no-check-certificate", "-qO-", "https://localhost:8443/health"]
       interval: 15s
@@ -47,7 +47,7 @@ services:
     restart: unless-stopped
     command: ["/etc/mediamtx.yml"]
     environment:
-      MTX_WEBRTCADDITIONALHOSTS: ${VALKYRIS_WEBRTC_HOSTS:-}
+      MTX_WEBRTCADDITIONALHOSTS: ${VALKY_WEBRTC_HOSTS:-}
     ports:
       - "8189:8189/udp"
       - "8189:8189/tcp"
@@ -69,12 +69,12 @@ services:
       - "8889"
       - "9997"
       - "9996"
-    networks: [valkyris]
+    networks: [valky]
     security_opt:
       - no-new-privileges:true
 
 networks:
-  valkyris:
+  valky:
     internal: false
 
 volumes:

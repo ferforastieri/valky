@@ -228,7 +228,7 @@ class ValkyApi(
 
     fun invitationUri(pairing: PairingSession): String {
         val current = requireNotNull(session())
-        return Uri.Builder().scheme("valkyris").authority("pair")
+        return Uri.Builder().scheme("valky").authority("pair")
             .appendQueryParameter("url", current.baseUrl)
             .appendQueryParameter("code", pairing.code)
             .apply { if (current.fingerprint.isNotBlank()) appendQueryParameter("fingerprint", current.fingerprint) }

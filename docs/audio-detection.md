@@ -41,7 +41,7 @@ Não é possível determinar retroativamente a pontuação de uma noite anterior
 `go test -race ./...` verifica captura em janelas, sobreposição, reconexão, confirmação, cooldown e retenção. O teste opcional com o modelo real usa o pacote oficial extraído, validado pelo SHA-256 já fixado no Dockerfile:
 
 ```sh
-VALKYRIS_AUDIO_TEST_MODEL_DIR=/caminho/sherpa-onnx-zipformer-small-audio-tagging-2024-04-15 go test ./internal/detector -run TestNativeAudioReference -v
+VALKY_AUDIO_TEST_MODEL_DIR=/caminho/sherpa-onnx-zipformer-small-audio-tagging-2024-04-15 go test ./internal/detector -run TestNativeAudioReference -v
 ```
 
 Referências: [modelo e amostras oficiais](https://k2-fsa.github.io/sherpa/onnx/audio-tagging/pretrained_models.html), [áudio tagging por trecho](https://k2-fsa.github.io/sherpa/onnx/audio-tagging/index.html), [classe Baby cry no AudioSet](https://research.google.com/audioset/ontology/baby_cry_infant_cry.html).

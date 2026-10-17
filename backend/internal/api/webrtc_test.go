@@ -54,7 +54,7 @@ func testWHEPProxy(t *testing.T, browser bool) {
 	defer mediaServer.Close()
 
 	directory := t.TempDir()
-	database, err := store.Open(filepath.Join(directory, "valkyris.db"))
+	database, err := store.Open(filepath.Join(directory, "valky.db"))
 	if err != nil {
 		t.Fatal(err)
 	}

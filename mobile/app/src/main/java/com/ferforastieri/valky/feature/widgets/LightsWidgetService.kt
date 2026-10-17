@@ -73,7 +73,7 @@ private class LightsFactory(private val context: Context) : RemoteViewsService.R
      * extras, para não depender de uma única forma.
      */
     private fun item(action: String, id: String) = Intent()
-        .setData("valkyris://widget/$action/$id".toUri())
+        .setData("valky://widget/$action/$id".toUri())
         .putExtra(WidgetActionReceiver.EXTRA_ITEM_ACTION, action)
         .putExtra(WidgetActionReceiver.EXTRA_ID, id)
 

@@ -16,7 +16,7 @@ import (
 )
 
 func TestFirstUserCreatesAdministratorAndInvites(t *testing.T) {
-	db, err := store.Open(filepath.Join(t.TempDir(), "valkyris.db"))
+	db, err := store.Open(filepath.Join(t.TempDir(), "valky.db"))
 	if err != nil {
 		t.Fatal(err)
 	}

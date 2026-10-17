@@ -46,7 +46,7 @@ func TestEncryptedPushRetriesAndThenDelivers(t *testing.T) {
 	}
 	service := NewService(db, vault, "")
 	service.http = &http.Client{Transport: transport}
-	service.projectID = "valkyris-test"
+	service.projectID = "valky-test"
 	service.tokenSource = oauth2.StaticTokenSource(&oauth2.Token{AccessToken: "test-access-token"})
 	now := time.Now().UTC().Format(time.RFC3339Nano)
 	if _, err = db.DB.Exec(`INSERT INTO cameras(id,name,host,username_enc,password_enc,rtsp_uri_enc,created_at,updated_at) VALUES('camera','Door','10.0.0.2',x'01',x'01',x'01',?,?)`, now, now); err != nil {
@@ -201,7 +201,7 @@ func TestExpiredPushIsNotDelivered(t *testing.T) {
 	}
 	service := NewService(db, vault, "")
 	service.http = &http.Client{Transport: transport}
-	service.projectID = "valkyris-test"
+	service.projectID = "valky-test"
 	service.tokenSource = oauth2.StaticTokenSource(&oauth2.Token{AccessToken: "test-access-token"})
 	now := time.Now().UTC()
 	stamp := now.Format(time.RFC3339Nano)

@@ -3,7 +3,7 @@
 
 Este utilitário é de uso único: serve para descobrir a chave que cada lâmpada
 recebeu quando foi configurada no aplicativo do fabricante. Depois que a
-lâmpada está cadastrada no Valkyris, nada aqui é necessário de novo.
+lâmpada está cadastrada no Valky, nada aqui é necessário de novo.
 
 Ele usa o SDK oficial da Tuya (`tuya-device-sharing-sdk`), o mesmo que o Home
 Assistant usa: o aplicativo Tuya Smart autoriza um token por QR code e a API da
@@ -32,7 +32,7 @@ Uso:
     /tmp/tuya/bin/python scripts/tuya-local-key.py --user-code SEUCODIGO --json
 
 A chave local é um segredo da sua instalação: ela não aparece na API do
-Valkyris em momento nenhum, e é guardada cifrada no banco.
+Valky em momento nenhum, e é guardada cifrada no banco.
 """
 
 from __future__ import annotations
@@ -140,7 +140,7 @@ def main() -> int:
         print(f"    Categoria : {row['category']}   produto: {row['productId']}")
         print(f"    Online    : {row['online']}")
         print()
-    print("No Valkyris: Dispositivos > Iluminação > + , preencha o Device ID e a chave local.")
+    print("No Valky: Dispositivos > Iluminação > + , preencha o Device ID e a chave local.")
     return 0
 
 

@@ -202,7 +202,7 @@ func (s *Server) Handler() http.Handler {
 	return requestLog(s.logger, securityHeaders(newRequestLimits().wrap(localizedResponses(outcomeHeaders(mux)))))
 }
 func (s *Server) health(w http.ResponseWriter, r *http.Request) {
-	writeSuccess(w, http.StatusOK, "Valky is healthy", map[string]any{"status": "ok", "service": "valkyris", "time": time.Now().UTC()})
+	writeSuccess(w, http.StatusOK, "Valky is healthy", map[string]any{"status": "ok", "service": "valky", "time": time.Now().UTC()})
 }
 func (s *Server) openapi(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/yaml")
@@ -645,7 +645,7 @@ func (s *Server) recentRecording(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	temporary, err := os.CreateTemp("", "valkyris-recent-*.mp4")
+	temporary, err := os.CreateTemp("", "valky-recent-*.mp4")
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, fmt.Errorf("create temporary recording: %w", err))
 		return
@@ -677,10 +677,10 @@ func (s *Server) recentRecording(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.Header().Set("Content-Type", "video/mp4")
-	w.Header().Set("Content-Disposition", `attachment; filename="valkyris-recording.mp4"`)
+	w.Header().Set("Content-Disposition", `attachment; filename="valky-recording.mp4"`)
 	w.Header().Set("Cache-Control", "no-store")
 	setOutcomeHeaders(w, http.StatusOK, "Recent camera recording loaded")
-	http.ServeContent(w, r, "valkyris-recording.mp4", info.ModTime(), file)
+	http.ServeContent(w, r, "valky-recording.mp4", info.ModTime(), file)
 }
 
 // liveWebRTC proxies only WHEP signalling. Once ICE connects, RTP/DTLS media

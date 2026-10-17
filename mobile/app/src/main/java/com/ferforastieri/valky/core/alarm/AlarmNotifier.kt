@@ -33,7 +33,7 @@ class AlarmNotifier @Inject constructor(@param:ApplicationContext private val co
         val manager = context.getSystemService(NotificationManager::class.java)
         // Remove the pre-versioned channels so users do not keep a stale,
         // possibly silenced, entry in the system settings.
-        listOf("valkyris_events", "valkyris_alarms").forEach { manager.deleteNotificationChannel(it) }
+        listOf("valky_events", "valky_alarms").forEach { manager.deleteNotificationChannel(it) }
         val policyAccess = manager.isNotificationPolicyAccessGranted
         // Channel importance, sound and DND bypass are immutable after creation.
         // If a phone kept a channel from an older or misconfigured install, drop
@@ -205,9 +205,9 @@ class AlarmNotifier @Inject constructor(@param:ApplicationContext private val co
         // current importance, sound and vibration instead of the values cached
         // from a previous install (the cause of phones that stopped alerting).
         private const val CHANNEL_VERSION = "v2"
-        val EVENTS = "valkyris_events_$CHANNEL_VERSION"
+        val EVENTS = "valky_events_$CHANNEL_VERSION"
         val EVENT_GROUP = "valkyris-home-events"
         const val SUMMARY_ID = 0x56414C
-        val ALARMS = "valkyris_alarms_$CHANNEL_VERSION"
+        val ALARMS = "valky_alarms_$CHANNEL_VERSION"
     }
 }

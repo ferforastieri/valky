@@ -73,7 +73,7 @@ func (s *Service) latest(ctx context.Context) (release, error) {
 		return release{}, err
 	}
 	req.Header.Set("Accept", "application/vnd.github+json")
-	req.Header.Set("User-Agent", "valkyris-release-check")
+	req.Header.Set("User-Agent", "valky-release-check")
 	req.Header.Set("X-GitHub-Api-Version", "2022-11-28")
 	resp, err := s.http.Do(req)
 	if err != nil {

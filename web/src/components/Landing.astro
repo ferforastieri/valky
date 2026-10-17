@@ -73,7 +73,7 @@ const heroLines = locale === 'pt-BR' ? ['Sua casa avisa.', 'Seus dados ficam.'] 
     const syncThemeScreenshots=()=>document.querySelectorAll<HTMLImageElement>('.theme-screenshot').forEach(image=>{const next=isDarkTheme()?image.dataset.darkSrc:image.dataset.lightSrc;if(next&&image.getAttribute('src')!==next)image.src=next});
     syncThemeScreenshots();
     systemTheme.addEventListener('change',()=>{if(root.dataset.theme==='auto')syncThemeScreenshots()});
-    document.querySelector('.theme-toggle')?.addEventListener('click',()=>{root.dataset.theme=isDarkTheme()?'light':'dark';localStorage.setItem('valkyris-theme',root.dataset.theme);syncThemeScreenshots()});
+    document.querySelector('.theme-toggle')?.addEventListener('click',()=>{root.dataset.theme=isDarkTheme()?'light':'dark';localStorage.setItem('valky-theme',root.dataset.theme);syncThemeScreenshots()});
     document.querySelector('.copy-command')?.addEventListener('click',async(event)=>{const button=event.currentTarget as HTMLButtonElement;await navigator.clipboard.writeText(button.dataset.command||'');const previous=button.textContent;button.textContent='COPIED';setTimeout(()=>button.textContent=previous,1400)});
     const heroPhones=[...document.querySelectorAll<HTMLButtonElement>('.hero-phone')];
     heroPhones.forEach(phone=>phone.addEventListener('click',()=>heroPhones.forEach(item=>{const active=item===phone;item.classList.toggle('is-front',active);item.setAttribute('aria-pressed',String(active))})));

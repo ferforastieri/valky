@@ -2,9 +2,9 @@
 set -eu
 
 REPOSITORY="ferforastieri/valky"
-REQUESTED_VERSION="${VALKYRIS_VERSION:-latest}"
+REQUESTED_VERSION="${VALKY_VERSION:-latest}"
 INSTALL_ROOT="${VALKYRIS_HOME:-${XDG_DATA_HOME:-${HOME}/.local/share}/valky}"
-TEMP_ROOT="$(mktemp -d "${TMPDIR:-/tmp}/valkyris.XXXXXX")"
+TEMP_ROOT="$(mktemp -d "${TMPDIR:-/tmp}/valky.XXXXXX")"
 
 cleanup() {
   rm -rf -- "$TEMP_ROOT"
@@ -12,7 +12,7 @@ cleanup() {
 trap cleanup EXIT HUP INT TERM
 
 fail() {
-  printf 'Valkyris: %s\n' "$1" >&2
+  printf 'Valky: %s\n' "$1" >&2
   exit 1
 }
 
@@ -27,7 +27,7 @@ else
   RELEASE_URL="https://github.com/${REPOSITORY}/releases/download/${REQUESTED_VERSION}"
 fi
 
-printf 'Valkyris: baixando a release %s...\n' "$REQUESTED_VERSION"
+printf 'Valky: baixando a release %s...\n' "$REQUESTED_VERSION"
 for asset in compose.yaml mediamtx.yml VERSION SHA256SUMS; do
   curl -fsSL --retry 3 --proto '=https' --tlsv1.2 \
     "${RELEASE_URL}/${asset}" -o "${TEMP_ROOT}/${asset}" || fail "não foi possível baixar ${asset}."
@@ -67,30 +67,30 @@ LAN_ADDRESS="$(hostname -I 2>/dev/null | awk '{ print $1 }')"
 ENV_FILE="${INSTALL_ROOT}/.env"
 if [ ! -f "$ENV_FILE" ]; then
   {
-    printf 'VALKYRIS_VERSION=%s\n' "$RELEASE_VERSION"
-    printf 'VALKYRIS_PORT=8443\n'
+    printf 'VALKY_VERSION=%s\n' "$RELEASE_VERSION"
+    printf 'VALKY_PORT=8443\n'
   } > "$ENV_FILE"
 else
-  sed '/^VALKYRIS_PUBLIC_URL=/d; /^VALKYRIS_SETUP_TOKEN=/d; /^VALKYRIS_UPDATER_URL=/d; /^VALKYRIS_UPDATER_TOKEN=/d' "$ENV_FILE" > "${TEMP_ROOT}/env-clean"
+  sed '/^VALKY_PUBLIC_URL=/d; /^VALKY_SETUP_TOKEN=/d; /^VALKY_UPDATER_URL=/d; /^VALKY_UPDATER_TOKEN=/d' "$ENV_FILE" > "${TEMP_ROOT}/env-clean"
   mv "${TEMP_ROOT}/env-clean" "$ENV_FILE"
-  if grep -q '^VALKYRIS_VERSION=' "$ENV_FILE"; then
-    sed "s/^VALKYRIS_VERSION=.*/VALKYRIS_VERSION=${RELEASE_VERSION}/" "$ENV_FILE" > "${TEMP_ROOT}/env"
+  if grep -q '^VALKY_VERSION=' "$ENV_FILE"; then
+    sed "s/^VALKY_VERSION=.*/VALKY_VERSION=${RELEASE_VERSION}/" "$ENV_FILE" > "${TEMP_ROOT}/env"
     mv "${TEMP_ROOT}/env" "$ENV_FILE"
   else
-    printf '\nVALKYRIS_VERSION=%s\n' "$RELEASE_VERSION" >> "$ENV_FILE"
+    printf '\nVALKY_VERSION=%s\n' "$RELEASE_VERSION" >> "$ENV_FILE"
   fi
 fi
 # Preserve explicitly configured public/LAN candidates across upgrades.
-if ! grep -Eq '^VALKYRIS_WEBRTC_HOSTS=.+$' "$ENV_FILE"; then
-  printf '\nVALKYRIS_WEBRTC_HOSTS=%s\n' "$LAN_ADDRESS" >> "$ENV_FILE"
+if ! grep -Eq '^VALKY_WEBRTC_HOSTS=.+$' "$ENV_FILE"; then
+  printf '\nVALKY_WEBRTC_HOSTS=%s\n' "$LAN_ADDRESS" >> "$ENV_FILE"
 fi
 chmod 600 "$ENV_FILE"
 
-printf 'Valkyris: iniciando os serviços em %s...\n' "$INSTALL_ROOT"
+printf 'Valky: iniciando os serviços em %s...\n' "$INSTALL_ROOT"
 docker compose --project-directory "$INSTALL_ROOT" --env-file "$ENV_FILE" pull
 docker compose --project-directory "$INSTALL_ROOT" --env-file "$ENV_FILE" up -d --remove-orphans
 
-PORT="$(awk -F= '$1 == "VALKYRIS_PORT" { print substr($0, index($0, "=") + 1); exit }' "$ENV_FILE")"
+PORT="$(awk -F= '$1 == "VALKY_PORT" { print substr($0, index($0, "=") + 1); exit }' "$ENV_FILE")"
 [ -n "$PORT" ] || PORT=8443
 
 for attempt in $(seq 1 30); do
@@ -101,7 +101,7 @@ for attempt in $(seq 1 30); do
   sleep 1
 done
 
-printf '\nValkyris %s está pronto. Abra o app para criar o primeiro administrador:\n\n' "$RELEASE_VERSION"
+printf '\nValky %s está pronto. Abra o app para criar o primeiro administrador:\n\n' "$RELEASE_VERSION"
 printf 'Endereço local: https://%s:%s\n' "$LAN_ADDRESS" "$PORT"
 printf '\nSe você usa Caddy ou outro proxy, informe o domínio HTTPS no app no lugar do endereço local.\n'
 printf 'Para receber alertas nativos, configure a conta de serviço FCM conforme https://valkyris.vercel.app/pt-BR/docs\n'

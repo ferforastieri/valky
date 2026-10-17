@@ -58,7 +58,7 @@ object TvDiscovery {
 
     private fun acquireMulticastLock(context: Context): WifiManager.MulticastLock? = runCatching {
         val wifi = context.applicationContext.getSystemService(Context.WIFI_SERVICE) as WifiManager
-        wifi.createMulticastLock("valkyris-tv-discovery").apply {
+        wifi.createMulticastLock("valky-tv-discovery").apply {
             setReferenceCounted(false)
             acquire()
         }

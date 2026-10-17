@@ -17,7 +17,7 @@ data class Session(val baseUrl:String,val token:String,val fingerprint:String=""
 
 @Singleton class SessionStore @Inject constructor(@ApplicationContext context:Context) {
     private val prefs=context.getSharedPreferences("secure_session",Context.MODE_PRIVATE)
-    private val keyAlias="valkyris_session_v1"
+    private val keyAlias="valky_session_v1"
     fun get():Session? { val base=prefs.getString("base",null)?:return null;val token=decrypt(prefs.getString("token",null)?:return null);val admin=if(prefs.contains("admin"))prefs.getBoolean("admin",false)else true;return Session(base,token,prefs.getString("fingerprint","").orEmpty(),admin) }
     fun save(session:Session){prefs.edit().putString("base",session.baseUrl.trimEnd('/')).putString("token",encrypt(session.token)).putString("fingerprint",session.fingerprint).putBoolean("admin",session.admin).apply()}
     fun savedBase():String = prefs.getString("base","").orEmpty()

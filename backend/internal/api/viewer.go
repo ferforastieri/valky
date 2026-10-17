@@ -11,7 +11,7 @@ func (s *Server) SetViewerDirectory(dir string) { s.viewerDir = dir }
 func (s *Server) viewerHandler() http.Handler {
 	dir := s.viewerDir
 	if dir == "" {
-		dir = "/opt/valkyris/web"
+		dir = "/opt/valky/web"
 	}
 	files := http.StripPrefix("/app/", http.FileServer(http.Dir(dir)))
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

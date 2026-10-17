@@ -1,6 +1,6 @@
 <resources>
-    <color name="valkyris_canvas">#E8E9E5</color>
-    <color name="valkyris_surface">#F9FAF7</color>
+    <color name="valky_canvas">#E8E9E5</color>
+    <color name="valky_surface">#F9FAF7</color>
     <color name="widget_surface">#CC1A1F1A</color>
     <!-- Fundo dos widgets = fundo do app (CanvasDark). -->
     <color name="widget_surface_solid">#FF101310</color>

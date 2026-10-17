@@ -5,7 +5,7 @@ tmpfs, `recording-buffer`, compartilhado entre Valky e MediaMTX em
 `/data/recordings`. Esse é o comportamento padrão da instalação.
 
 Banco de dados, credenciais, snapshots e clipes de eventos continuam no
-volume persistente `valkyris-data`, montado em `/data`. O vídeo já usa
+volume persistente `valky-data`, montado em `/data`. O vídeo já usa
 `-c:v copy`; o FFmpeg normaliza apenas o áudio para Opus. A mudança de
 armazenamento preserva os segmentos de dois segundos e a pré/pós-gravação.
 
@@ -42,7 +42,7 @@ pelo app troca apenas o backend; ela não migra o Compose de uma instalação
 antiga. Após a migração, atualizações pelo app preservam o volume compartilhado.
 
 A recriação interrompe brevemente o vídeo. Arquivos do buffer antigo em disco
-não são copiados nem apagados automaticamente. Não remova `valkyris-data`
+não são copiados nem apagados automaticamente. Não remova `valky-data`
 e não use `docker compose down -v`: esse volume contém dados persistentes.
 
 ## Validação

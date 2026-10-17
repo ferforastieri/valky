@@ -7,12 +7,12 @@ plugins {
     id("io.github.takahirom.roborazzi")
 }
 
-if (providers.environmentVariable("VALKYRIS_FIREBASE_ENABLED").orNull == "true") {
+if (providers.environmentVariable("VALKY_FIREBASE_ENABLED").orNull == "true") {
     apply(plugin = "com.google.gms.google-services")
 }
 
-val valkyrisVersionName = providers.environmentVariable("VALKYRIS_VERSION_NAME").orElse("3.0.0")
-val valkyrisVersionCode = providers.environmentVariable("VALKYRIS_VERSION_CODE").map(String::toInt).orElse(104)
+val valkyVersionName = providers.environmentVariable("VALKY_VERSION_NAME").orElse("3.0.0")
+val valkyVersionCode = providers.environmentVariable("VALKY_VERSION_CODE").map(String::toInt).orElse(104)
 
 android {
     namespace = "com.ferforastieri.valky"
@@ -22,8 +22,8 @@ android {
         applicationId = "com.ferforastieri.valky"
         minSdk = 26
         targetSdk = 36
-        versionCode = valkyrisVersionCode.get()
-        versionName = valkyrisVersionName.get()
+        versionCode = valkyVersionCode.get()
+        versionName = valkyVersionName.get()
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables.useSupportLibrary = true
     }

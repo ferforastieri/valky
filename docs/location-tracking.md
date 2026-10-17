@@ -42,7 +42,7 @@ O Android envia somente coordenadas, precisão e horário. A resolução de ende
 é responsabilidade do backend, em um worker separado, com nomes de áreas locais
 e [Photon](https://github.com/komoot/photon), cache persistente e limite de uma
 consulta a cada 10 segundos. Falhas de rede não bloqueiam o registro de localização.
-A instalação pode usar uma instância própria via `VALKYRIS_GEOCODER_URL`.
+A instalação pode usar uma instância própria via `VALKY_GEOCODER_URL`.
 
 Referências:
 - https://developer.android.com/develop/sensors-and-location/location/geofencing

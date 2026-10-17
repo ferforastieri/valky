@@ -45,13 +45,13 @@ fun MapView.applyValkyMapStyle(style: MapVisualStyle) {
  * late 2026 and now stamp unkeyed requests, so the community raster is used for
  * both themes. The style parameter is reserved for a future dark provider.
  */
-fun valkyrisTileSource(style: MapVisualStyle): XYTileSource {
+fun valkyTileSource(style: MapVisualStyle): XYTileSource {
     @Suppress("UNUSED_EXPRESSION")
     style
     // osmdroid concatenates the base URL with the zoom level directly, so the
     // base must end with a slash.
     return XYTileSource(
-        "valkyris-osm",
+        "valky-osm",
         0,
         19,
         256,

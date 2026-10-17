@@ -25,13 +25,13 @@ func TestCheckReleaseAvailabilityAndCache(t *testing.T) {
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			calls := 0
-			service := New(tc.server, "https://api.github.com/repos/ferforastieri/valkyris/releases/latest")
+			service := New(tc.server, "https://api.github.com/repos/ferforastieri/valky/releases/latest")
 			service.http.Transport = releaseTransport(func(r *http.Request) (*http.Response, error) {
 				calls++
 				if r.Method != http.MethodGet || r.URL.Host != "api.github.com" {
 					t.Fatalf("unexpected request: %s %s", r.Method, r.URL)
 				}
-				return &http.Response{StatusCode: 200, Body: io.NopCloser(strings.NewReader(`{"tag_name":"v0.6.0","html_url":"https://github.com/ferforastieri/valkyris/releases/tag/v0.6.0","assets":[{"name":"app.apk","browser_download_url":"https://github.com/ferforastieri/valkyris/releases/download/v0.6.0/app.apk"}]}`))}, nil
+				return &http.Response{StatusCode: 200, Body: io.NopCloser(strings.NewReader(`{"tag_name":"v0.6.0","html_url":"https://github.com/ferforastieri/valky/releases/tag/v0.6.0","assets":[{"name":"app.apk","browser_download_url":"https://github.com/ferforastieri/valky/releases/download/v0.6.0/app.apk"}]}`))}, nil
 			})
 			for range 2 {
 				info, err := service.Check(t.Context(), tc.client)
