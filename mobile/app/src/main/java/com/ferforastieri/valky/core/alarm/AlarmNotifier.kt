@@ -206,7 +206,7 @@ class AlarmNotifier @Inject constructor(@param:ApplicationContext private val co
         // from a previous install (the cause of phones that stopped alerting).
         private const val CHANNEL_VERSION = "v2"
         val EVENTS = "valky_events_$CHANNEL_VERSION"
-        val EVENT_GROUP = "valkyris-home-events"
+        val EVENT_GROUP = "valky-home-events"
         const val SUMMARY_ID = 0x56414C
         val ALARMS = "valky_alarms_$CHANNEL_VERSION"
     }
