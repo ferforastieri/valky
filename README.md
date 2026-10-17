@@ -12,7 +12,7 @@
 <p align="center">
   <a href="https://valkyris.vercel.app/">Site</a> ·
   <a href="https://valkyris.vercel.app/pt-BR/docs">Documentação</a> ·
-  <a href="https://github.com/ferforastieri/valkyris/releases/latest">Última release</a> ·
+  <a href="https://github.com/ferforastieri/valk/releases/latest">Última release</a> ·
   <a href="LICENSE">Licença MIT</a>
 </p>
 
@@ -102,7 +102,7 @@ O instalador verifica o Compose, baixa os artefatos da release, cria os segredos
 
 Depois:
 
-1. Instale o APK da [última release](https://github.com/ferforastieri/valkyris/releases/latest).
+1. Instale o APK da [última release](https://github.com/ferforastieri/valk/releases/latest).
 2. Abra o app e informe a URL HTTPS pela qual o celular alcança o servidor.
 3. No primeiro acesso, crie a conta com usuário e senha; esse dispositivo se torna administrador.
 4. Cadastre a câmera com nome, ícone, IP, usuário e senha. Para Tapo, o RTSP principal é montado automaticamente.
