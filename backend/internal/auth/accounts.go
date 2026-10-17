@@ -11,7 +11,7 @@ import (
 	"time"
 	"unicode/utf8"
 
-	appcrypto "github.com/ferforastieri/valkyris/backend/internal/crypto"
+	appcrypto "github.com/ferforastieri/valky/backend/internal/crypto"
 	"github.com/google/uuid"
 	"golang.org/x/crypto/bcrypt"
 )

@@ -13,7 +13,7 @@ import (
 	"time"
 	_ "time/tzdata"
 
-	"github.com/ferforastieri/valkyris/backend/internal/store"
+	"github.com/ferforastieri/valky/backend/internal/store"
 	"github.com/google/uuid"
 )
 

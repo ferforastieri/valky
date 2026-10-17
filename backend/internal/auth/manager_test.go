@@ -8,7 +8,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/ferforastieri/valkyris/backend/internal/store"
+	"github.com/ferforastieri/valky/backend/internal/store"
 )
 
 func TestPairingIsOneTimeAndTokenAuthenticates(t *testing.T) {

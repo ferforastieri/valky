@@ -2,7 +2,7 @@ package detector
 
 import (
 	"context"
-	"github.com/ferforastieri/valkyris/backend/internal/store"
+	"github.com/ferforastieri/valky/backend/internal/store"
 	"testing"
 	"time"
 )

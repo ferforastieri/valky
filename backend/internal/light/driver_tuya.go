@@ -11,7 +11,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/ferforastieri/valkyris/backend/internal/light/tuya"
+	"github.com/ferforastieri/valky/backend/internal/light/tuya"
 )
 
 // The data points a Tuya bulb exposes differ per firmware generation. The

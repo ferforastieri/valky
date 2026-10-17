@@ -12,10 +12,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/ferforastieri/valkyris/backend/internal/auth"
-	appcrypto "github.com/ferforastieri/valkyris/backend/internal/crypto"
-	"github.com/ferforastieri/valkyris/backend/internal/light"
-	"github.com/ferforastieri/valkyris/backend/internal/store"
+	"github.com/ferforastieri/valky/backend/internal/auth"
+	appcrypto "github.com/ferforastieri/valky/backend/internal/crypto"
+	"github.com/ferforastieri/valky/backend/internal/light"
+	"github.com/ferforastieri/valky/backend/internal/store"
 )
 
 // lightAdapter answers without a device on the network so the registration flow

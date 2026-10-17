@@ -99,7 +99,7 @@ func reverseAddress(ctx context.Context, client *http.Client, endpoint string, l
 	if err != nil {
 		return "", fmt.Errorf("invalid geocoder request")
 	}
-	req.Header.Set("User-Agent", "Valkyris/2 (https://github.com/ferforastieri/valkyris)")
+	req.Header.Set("User-Agent", "Valky/2 (https://github.com/ferforastieri/valkyris)")
 	response, err := client.Do(req)
 	if err != nil {
 		return "", fmt.Errorf("geocoder unavailable")

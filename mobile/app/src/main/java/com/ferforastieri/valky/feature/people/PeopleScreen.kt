@@ -1,0 +1,575 @@
+package com.ferforastieri.valky.feature.people
+
+import android.view.MotionEvent
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
+import androidx.lifecycle.compose.LifecycleResumeEffect
+import kotlinx.coroutines.launch
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.*
+import androidx.compose.material3.FloatingActionButton
+import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.toArgb
+import org.osmdroid.views.overlay.infowindow.InfoWindow
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.viewinterop.AndroidView
+import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.composables.icons.lucide.History
+import com.composables.icons.lucide.Lucide
+import com.composables.icons.lucide.MapPin
+import com.composables.icons.lucide.Pencil
+import com.composables.icons.lucide.Plus
+import com.composables.icons.lucide.Trash2
+import com.composables.icons.lucide.UserRound
+import com.ferforastieri.valky.core.design.ValkyBottomSheet
+import com.ferforastieri.valky.core.design.ProfileAvatar
+import com.ferforastieri.valky.core.design.profileMarkerDrawable
+import com.ferforastieri.valky.core.design.applyValkyMapStyle
+import com.ferforastieri.valky.core.design.currentMapVisualStyle
+import com.ferforastieri.valky.core.design.mapColorWithAlpha
+import com.ferforastieri.valky.core.design.mapMarkerDrawable
+import com.ferforastieri.valky.core.design.valkyrisTileSource
+import com.ferforastieri.valky.R
+import com.ferforastieri.valky.core.model.PersonLocation
+import com.ferforastieri.valky.core.model.TrackedPerson
+import com.ferforastieri.valky.core.model.TrackedPlace
+import java.time.Instant
+import java.time.ZoneId
+import java.time.format.DateTimeFormatter
+import org.osmdroid.config.Configuration
+import org.osmdroid.events.MapEventsReceiver
+import org.osmdroid.util.GeoPoint
+import org.osmdroid.views.MapView
+import org.osmdroid.views.overlay.MapEventsOverlay
+import org.osmdroid.views.overlay.Marker
+import org.osmdroid.views.overlay.Polygon
+import org.osmdroid.views.overlay.Polyline
+import org.osmdroid.util.BoundingBox
+
+@Composable
+fun PeopleScreen(onPerson: (String) -> Unit = {}, vm: PeopleViewModel = hiltViewModel()) {
+    val context = LocalContext.current
+    val locationStatus by LocationTrackingStatus.state.collectAsStateWithLifecycle()
+    LifecycleResumeEffect(vm) {
+        val job = vm.observe()
+        onPauseOrDispose { job.cancel() }
+    }
+    val users by vm.people.collectAsStateWithLifecycle()
+    val me by vm.me.collectAsStateWithLifecycle()
+    val places by vm.places.collectAsStateWithLifecycle()
+    val history by vm.history.collectAsStateWithLifecycle()
+    val busy by vm.busy.collectAsStateWithLifecycle()
+    var placeEditor by remember { mutableStateOf<TrackedPlace?>(null) }
+    var historyUser by remember { mutableStateOf<TrackedPerson?>(null) }
+    var areaPickerOpen by remember { mutableStateOf(false) }
+    var areasOpen by remember { mutableStateOf(false) }
+    var alertsOpen by remember { mutableStateOf(false) }
+    var deletingPlace by remember { mutableStateOf<TrackedPlace?>(null) }
+
+    Box(Modifier.fillMaxSize()) {
+    Column(Modifier.fillMaxSize().padding(horizontal = 18.dp)) {
+        when (locationStatus) {
+            LocationTrackingStatus.State.LocationUnavailable, LocationTrackingStatus.State.SendFailed, LocationTrackingStatus.State.PermissionRequired -> {
+                Column(Modifier.fillMaxWidth().padding(bottom = 8.dp)) {
+                    Text(stringResource(when (locationStatus) {
+                        LocationTrackingStatus.State.SendFailed -> R.string.location_send_failed
+                        LocationTrackingStatus.State.PermissionRequired -> R.string.location_permission_needed
+                        else -> R.string.location_fix_unavailable
+                    }), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error)
+                    TextButton(onClick = { LocationTrackingService.start(context, refresh = true) }) { Text(stringResource(R.string.location_refresh)) }
+                }
+            }
+            else -> Unit
+        }
+        Surface(
+            modifier = Modifier.fillMaxWidth().height((LocalConfiguration.current.screenHeightDp * .32f).coerceIn(160f, 285f).dp),
+            shape = MaterialTheme.shapes.extraLarge,
+            color = MaterialTheme.colorScheme.surfaceVariant,
+            tonalElevation = 1.dp,
+        ) {
+            FamilyMap(
+                users = users,
+                places = places,
+                modifier = Modifier.fillMaxSize().clip(MaterialTheme.shapes.extraLarge),
+            )
+        }
+        Surface(
+            modifier = Modifier.fillMaxWidth().weight(1f).padding(top = 14.dp),
+            shape = MaterialTheme.shapes.extraLarge,
+            color = MaterialTheme.colorScheme.surface,
+            border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+        ) {
+            LazyColumn(
+                Modifier.fillMaxSize().padding(horizontal = 16.dp),
+                contentPadding = PaddingValues(top = 16.dp, bottom = 98.dp),
+                verticalArrangement = Arrangement.spacedBy(10.dp),
+            ) {
+                item {
+                    Text("Família", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold)
+                }
+                if (users.isEmpty()) item { EmptyUsers() }
+                items(users, key = { it.id }) { user ->
+                    UserCard(user) { onPerson(user.id) }
+                }
+            }
+        }
+    }
+        FloatingActionButton(
+            onClick = { areasOpen = true },
+            modifier = Modifier.align(Alignment.BottomEnd).padding(end = 20.dp, bottom = 18.dp),
+            containerColor = MaterialTheme.colorScheme.secondary,
+            contentColor = MaterialTheme.colorScheme.onSecondary,
+        ) { Icon(Lucide.Plus, "Áreas") }
+    }
+    if (areaPickerOpen) AreaEditorSheet(
+        busy = busy,
+        initialCenter = me?.takeIf { it.lastLatitude != null && it.lastLongitude != null }
+            ?.let { GeoPoint(it.lastLatitude!!, it.lastLongitude!!) },
+        onDismiss = { areaPickerOpen = false },
+        onSave = { value ->
+            vm.createPlace(value) { created ->
+                if (created) areaPickerOpen = false
+            }
+        },
+    )
+    placeEditor?.let { place -> AreaEditorSheet(busy, GeoPoint(place.latitude, place.longitude), { placeEditor = null }, initial = place) { value ->
+        val done: (Boolean) -> Unit = { if (it) placeEditor = null }
+        if (value.id.isBlank()) vm.createPlace(value, done) else vm.updatePlace(value, done)
+    } }
+    if (areasOpen) AreasSheet(
+        places = places,
+        busy = busy,
+        onDismiss = { areasOpen = false },
+        onCreate = { areasOpen = false; areaPickerOpen = true },
+        onEdit = { areasOpen = false; placeEditor = it },
+        onDelete = { areasOpen = false; deletingPlace = it },
+        onAlerts = { areasOpen = false; alertsOpen = true },
+    )
+    if (alertsOpen) LocationAlertsSheet(vm) { alertsOpen = false }
+    deletingPlace?.let { place ->
+        AlertDialog(
+            onDismissRequest = { if (!busy) deletingPlace = null },
+            title = { Text("Remover área?") },
+            text = { Text("A área “${place.name}” será removida permanentemente.") },
+            dismissButton = { TextButton(onClick = { deletingPlace = null }, enabled = !busy) { Text("Cancelar") } },
+            confirmButton = {
+                Button(
+                    onClick = { vm.deletePlace(place) { if (it) deletingPlace = null } },
+                    enabled = !busy,
+                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error, contentColor = MaterialTheme.colorScheme.onError),
+                ) { Text("Remover") }
+            },
+        )
+    }
+    val historyLoading by vm.historyLoading.collectAsStateWithLifecycle()
+    val historyError by vm.historyError.collectAsStateWithLifecycle()
+    val historyMore by vm.historyMore.collectAsStateWithLifecycle()
+    @Suppress("UNUSED_EXPRESSION") historyLoading
+    @Suppress("UNUSED_EXPRESSION") historyError
+    @Suppress("UNUSED_EXPRESSION") historyMore
+    @Suppress("UNUSED_EXPRESSION") history
+    @Suppress("UNUSED_EXPRESSION") historyUser
+}
+
+@Composable
+internal fun FamilyMap(users: List<TrackedPerson>, places: List<TrackedPlace>, modifier: Modifier = Modifier, route: List<PersonLocation> = emptyList()) {
+    var selectedId by remember { mutableStateOf<String?>(null) }
+    val mapStyle = currentMapVisualStyle()
+    val surface = MaterialTheme.colorScheme.surface.toArgb()
+    val foreground = MaterialTheme.colorScheme.onSurface.toArgb()
+    val outline = MaterialTheme.colorScheme.outlineVariant.toArgb()
+    AndroidView(factory = { context ->
+        Configuration.getInstance().userAgentValue = context.packageName
+        MapView(context).apply {
+            setTileSource(valkyrisTileSource(mapStyle)); setMultiTouchControls(true); controller.setZoom(13.5); controller.setCenter(GeoPoint(-23.5505, -46.6333))
+            overlays.add(MapEventsOverlay(object : MapEventsReceiver {
+                override fun singleTapConfirmedHelper(point: GeoPoint): Boolean { selectedId = null; return false }
+                override fun longPressHelper(point: GeoPoint) = false
+            }))
+        }
+    }, update = { map ->
+        map.applyValkyMapStyle(mapStyle)
+        InfoWindow.closeAllInfoWindowsOn(map)
+        map.overlays.removeAll { it is Marker || it is Polygon || it is Polyline }
+        if (route.size >= 2) {
+            val points = route.sortedBy { it.occurredAt }.map { GeoPoint(it.latitude, it.longitude) }
+            map.overlays.add(Polyline().apply {
+                setPoints(points)
+                outlinePaint.color = mapStyle.accent
+                outlinePaint.strokeWidth = 9f
+                outlinePaint.isAntiAlias = true
+                outlinePaint.strokeCap = android.graphics.Paint.Cap.ROUND
+                outlinePaint.strokeJoin = android.graphics.Paint.Join.ROUND
+            })
+        }
+        places.forEach { place ->
+            val circle = Polygon().apply {
+                setPoints(Polygon.pointsAsCircle(GeoPoint(place.latitude, place.longitude), place.radiusMeters))
+            }
+            circle.fillColor = mapColorWithAlpha(mapStyle.accent, 36); circle.strokeColor = mapStyle.accent; circle.title = place.name
+            map.overlays.add(circle)
+        }
+        users.forEach { user ->
+            val lat = user.lastLatitude ?: return@forEach; val lon = user.lastLongitude ?: return@forEach
+            map.overlays.add(Marker(map).apply {
+                setOnMarkerClickListener { _, _ -> selectedId = if (selectedId == user.id) null else user.id; if (selectedId != null) map.controller.animateTo(position); true }
+                val density = map.resources.displayMetrics.density
+                val label = android.widget.TextView(map.context).apply {
+                    text = "${user.name}\n${user.lastLocatedAt?.let { formatTime(it) } ?: "Sem atualização"}"
+                    textSize = 13f
+                    setTextColor(foreground)
+                    setPadding((14*density).toInt(), (10*density).toInt(), (14*density).toInt(), (10*density).toInt())
+                    background = android.graphics.drawable.GradientDrawable().apply { setColor(surface); cornerRadius = 14*density; setStroke(density.toInt().coerceAtLeast(1), outline) }
+                    elevation = 5*density
+                    maxWidth = (240*density).toInt()
+                    gravity = android.view.Gravity.CENTER
+                    setOnClickListener { selectedId = null }
+                }
+                setInfoWindow(object : InfoWindow(label,map) { override fun onOpen(item: Any?) {} ; override fun onClose() {} })
+                setInfoWindowAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_TOP)
+                position = GeoPoint(lat, lon); title = user.name; snippet = user.lastLocatedAt?.let { "Atualizado ${formatTime(it)}" } ?: "Sem atualização"
+                icon = profileMarkerDrawable(map.context, user.avatarData, mapStyle.accent, mapStyle.surface)
+                    ?: mapMarkerDrawable(map.resources.displayMetrics.density, mapStyle)
+                setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_BOTTOM)
+                if (selectedId == user.id) showInfoWindow()
+            })
+        }
+        val located = users.filter { it.lastLatitude?.isFinite() == true && it.lastLongitude?.isFinite() == true }
+        val participantIds = located.map { it.id }.sorted()
+        if (route.size >= 2 && map.tag != "route-${route.size}-${route.firstOrNull()?.id}") {
+            map.tag = "route-${route.size}-${route.firstOrNull()?.id}"
+            val coordinates = route.map { GeoPoint(it.latitude, it.longitude) }
+            map.post {
+                val padding = (40 * map.resources.displayMetrics.density).toInt()
+                if (coordinates.distinctBy { it.latitude to it.longitude }.size == 1) {
+                    map.controller.setZoom(17.0); map.controller.setCenter(coordinates.first())
+                } else {
+                    map.zoomToBoundingBox(BoundingBox.fromGeoPoints(coordinates), false, padding, 18.0, null)
+                }
+            }
+        } else if (located.isNotEmpty() && map.tag != participantIds) {
+            map.tag = participantIds
+            val coordinates = located.map { GeoPoint(it.lastLatitude!!, it.lastLongitude!!) }
+            map.post {
+                if (map.tag == participantIds) {
+                    if (coordinates.distinctBy { it.latitude to it.longitude }.size == 1) {
+                        map.controller.setZoom(18.0)
+                        map.controller.setCenter(coordinates.first())
+                    } else {
+                        val padding = (40 * map.resources.displayMetrics.density).toInt()
+                        map.zoomToBoundingBox(BoundingBox.fromGeoPoints(coordinates), false, padding, 18.0, null)
+                    }
+                }
+            }
+        }
+        map.invalidate()
+    }, onRelease = { it.onDetach() }, modifier = modifier.clip(RoundedCornerShape(16.dp)).background(MaterialTheme.colorScheme.surfaceVariant))
+}
+
+@Composable
+private fun LocationAlertsSheet(vm: PeopleViewModel, onDismiss: () -> Unit) {
+    var alerts by remember { mutableStateOf<com.ferforastieri.valky.core.model.AlertPresentation?>(null) }
+    LaunchedEffect(Unit) { runCatching { vm.locationAlerts() }.onSuccess { alerts = it } }
+    val current = alerts
+    ValkyBottomSheet(
+        title = "Notificação de localização",
+        onDismiss = onDismiss,
+        actions = {
+            TextButton(onClick = onDismiss) { Text("Cancelar") }
+            Button(
+                onClick = { current?.let { value -> vm.saveLocationAlerts(value) { if (it) onDismiss() } } },
+                enabled = current != null,
+            ) { Text("Salvar") }
+        },
+    ) {
+        if (current == null) {
+            LinearProgressIndicator(Modifier.fillMaxWidth())
+        } else {
+            Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                Text("Como os alertas de localização e bateria devem tocar neste celular.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text(stringResource(R.string.alert_alarm_sound), style = MaterialTheme.typography.labelLarge)
+                listOf("alarm" to R.string.alert_sound_alarm, "ringtone" to R.string.alert_sound_ringtone, "silent" to R.string.alert_sound_silent).forEach { (value, label) ->
+                    Row(Modifier.fillMaxWidth().clickable { alerts = current.copy(alarmSound = value) }, verticalAlignment = Alignment.CenterVertically) {
+                        RadioButton(selected = current.alarmSound == value, onClick = { alerts = current.copy(alarmSound = value) })
+                        Text(stringResource(label), Modifier.weight(1f))
+                    }
+                }
+                Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                    Text(stringResource(R.string.alert_vibrate), Modifier.weight(1f))
+                    Switch(current.vibrate, { alerts = current.copy(vibrate = it) })
+                }
+                Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                    Text(stringResource(R.string.alert_full_screen), Modifier.weight(1f))
+                    Switch(current.fullScreen, { alerts = current.copy(fullScreen = it) })
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun AreaEditorSheet(
+    busy: Boolean,
+    initialCenter: GeoPoint?,
+    onDismiss: () -> Unit,
+    initial: TrackedPlace? = null,
+    onSave: (TrackedPlace) -> Unit,
+) {
+    var name by remember(initial?.id) { mutableStateOf(initial?.name.orEmpty()) }
+    var radius by remember(initial?.id) { mutableStateOf(initial?.radiusMeters?.toInt()?.toString() ?: "100") }
+    var point by remember(initial?.id) { mutableStateOf(initial?.let { GeoPoint(it.latitude, it.longitude) }) }
+    val radiusMeters = radius.toDoubleOrNull()
+    val validRadius = radiusMeters != null && radiusMeters in 20.0..5000.0
+
+    ValkyBottomSheet(
+        scrollContent = false,
+        title = if (initial == null) "Cadastrar área" else "Editar área",
+        onDismiss = onDismiss,
+        dismissEnabled = !busy,
+        swipeToDismissEnabled = false,
+        actions = {
+            TextButton(onClick = onDismiss, enabled = !busy) { Text("Cancelar") }
+            Button(
+                onClick = {
+                    val selectedPoint = requireNotNull(point)
+                    onSave(
+                        (initial ?: TrackedPlace(name = "", latitude = selectedPoint.latitude, longitude = selectedPoint.longitude)).copy(
+                            name = name.trim(),
+                            latitude = selectedPoint.latitude,
+                            longitude = selectedPoint.longitude,
+                            radiusMeters = requireNotNull(radiusMeters),
+                        ),
+                    )
+                },
+                enabled = !busy && name.isNotBlank() && validRadius && point != null,
+            ) { Text("Salvar") }
+        },
+    ) {
+        Column(Modifier.fillMaxWidth().heightIn(max = 520.dp).imePadding().verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            OutlinedTextField(
+                value = name,
+                onValueChange = { name = it },
+                label = { Text("Nome") },
+                singleLine = true,
+                modifier = Modifier.fillMaxWidth(),
+            )
+            OutlinedTextField(
+                value = radius,
+                onValueChange = { radius = it.filter(Char::isDigit) },
+                label = { Text("Raio em metros") },
+                supportingText = { Text("De 20 a 5.000 m") },
+                isError = radius.isNotBlank() && !validRadius,
+                singleLine = true,
+                modifier = Modifier.fillMaxWidth(),
+            )
+            Text(
+                "Toque diretamente no mapa para definir o local.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            AreaPickerMap(
+                selectedPoint = point,
+                initialCenter = initialCenter,
+                onPointSelected = { point = it },
+                modifier = Modifier.fillMaxWidth().height(250.dp).clip(MaterialTheme.shapes.large),
+            )
+        }
+    }
+}
+
+@Composable
+private fun AreaPickerMap(
+    selectedPoint: GeoPoint?,
+    initialCenter: GeoPoint?,
+    onPointSelected: (GeoPoint) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val currentOnPointSelected by rememberUpdatedState(onPointSelected)
+    val mapStyle = currentMapVisualStyle()
+    AndroidView(
+        factory = { context ->
+            Configuration.getInstance().userAgentValue = context.packageName
+            MapView(context).apply {
+                setTileSource(valkyrisTileSource(mapStyle))
+                setMultiTouchControls(true)
+                setOnTouchListener { view, event ->
+                    // Keep the entire gesture in the map, including the first finger and pinch release.
+                    val captureGesture = event.actionMasked != MotionEvent.ACTION_UP && event.actionMasked != MotionEvent.ACTION_CANCEL
+                    var parent = view.parent
+                    while (parent != null) {
+                        parent.requestDisallowInterceptTouchEvent(captureGesture)
+                        parent = parent.parent
+                    }
+                    false
+                }
+                controller.setZoom(13.5)
+                controller.setCenter(selectedPoint ?: initialCenter ?: GeoPoint(-23.5505, -46.6333))
+                overlays.add(MapEventsOverlay(object : MapEventsReceiver {
+                    override fun singleTapConfirmedHelper(point: GeoPoint?): Boolean {
+                        point?.let(currentOnPointSelected)
+                        return point != null
+                    }
+
+                    override fun longPressHelper(point: GeoPoint?): Boolean = false
+                }))
+            }
+        },
+        update = { map ->
+            map.applyValkyMapStyle(mapStyle)
+            map.overlays.removeAll { it is Marker }
+            selectedPoint?.let { point ->
+                map.overlays.add(Marker(map).apply {
+                    position = point
+                    title = "Local da área"
+                    icon = mapMarkerDrawable(map.resources.displayMetrics.density, mapStyle)
+                    setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_BOTTOM)
+                })
+            }
+            map.invalidate()
+        },
+        modifier = modifier.background(MaterialTheme.colorScheme.surfaceVariant),
+    )
+}
+
+@Composable
+private fun EmptyUsers() = Surface(shape = MaterialTheme.shapes.large, color = MaterialTheme.colorScheme.surfaceVariant) {
+    Column(Modifier.fillMaxWidth().padding(22.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+        Icon(Lucide.UserRound, null, Modifier.size(36.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
+        Spacer(Modifier.height(8.dp)); Text("Nenhum dispositivo pareado ainda", fontWeight = FontWeight.SemiBold)
+    }
+}
+
+@Composable
+private fun UserCard(user: TrackedPerson, onHistory: () -> Unit) = Card(
+    modifier = Modifier.fillMaxWidth().clickable(onClick = onHistory),
+    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+    border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+) {
+    Row(Modifier.padding(15.dp), verticalAlignment = Alignment.CenterVertically) {
+        ProfileAvatar(user.avatarData, user.name, Modifier.size(44.dp))
+        Spacer(Modifier.width(12.dp)); Column(Modifier.weight(1f)) {
+            Text(user.name, fontWeight = FontWeight.SemiBold)
+            Text(user.lastLocatedAt?.let { "Atualizado ${formatTime(it)}" } ?: "Ainda sem localização", color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodySmall)
+        }
+        if (user.battery in 0..100) {
+            Text(
+                "${user.battery}%",
+                style = MaterialTheme.typography.labelMedium,
+                fontWeight = FontWeight.SemiBold,
+                color = if (user.battery <= 20) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(end = 10.dp),
+            )
+        }
+        Icon(Lucide.History, "Abrir histórico", tint = MaterialTheme.colorScheme.onSurfaceVariant)
+    }
+}
+
+@Composable
+private fun AreasSheet(
+    places: List<TrackedPlace>,
+    busy: Boolean,
+    onDismiss: () -> Unit,
+    onCreate: () -> Unit,
+    onEdit: (TrackedPlace) -> Unit,
+    onDelete: (TrackedPlace) -> Unit,
+    onAlerts: () -> Unit = {},
+) = ValkyBottomSheet(
+    title = "Áreas",
+    onDismiss = onDismiss,
+    actions = {
+        TextButton(onClick = onAlerts) { Text("Notificação de localização") }
+        Button(onClick = onCreate, enabled = !busy) { Text("Cadastrar área") }
+    },
+) {
+    if (places.isEmpty()) {
+        Text("Nenhuma área cadastrada.", color = MaterialTheme.colorScheme.onSurfaceVariant)
+    } else {
+        Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            places.forEach { place ->
+                ListItem(
+                    headlineContent = { Text(place.name) },
+                    supportingContent = { Text("Raio de ${place.radiusMeters.toInt()} m") },
+                    trailingContent = {
+                        Row {
+                            IconButton(onClick = { onEdit(place) }) { Icon(Lucide.Pencil, "Editar área") }
+                            IconButton(onClick = { onDelete(place) }) { Icon(Lucide.Trash2, "Remover área", tint = MaterialTheme.colorScheme.error) }
+                        }
+                    },
+                )
+            }
+        }
+    }
+}
+
+@Composable
+internal fun HistorySheet(user: TrackedPerson, history: List<PersonLocation>, loading: Boolean = false, error: String? = null, more: Boolean = false, onMore: () -> Unit = {}, onDismiss: () -> Unit) {
+    var selected by remember(user.id) { mutableStateOf<String?>(null) }
+    val listState = rememberLazyListState()
+    val scope = rememberCoroutineScope()
+    val routeColor = MaterialTheme.colorScheme.secondary
+    ValkyBottomSheet(scrollContent = false, title = "Por onde ${user.name} passou", onDismiss = onDismiss) {
+        Column(Modifier.fillMaxWidth().height(LocalConfiguration.current.screenHeightDp.dp * .65f)) {
+            if (history.any(::validHistoryPoint)) {
+                Surface(Modifier.fillMaxWidth().weight(.42f).clip(MaterialTheme.shapes.large), color = MaterialTheme.colorScheme.surfaceVariant) {
+                    LocationHistoryMap(history, selected) { id ->
+                        selected = id
+                        val index = history.indexOfFirst { it.id == id }
+                        if (index >= 0) scope.launch { listState.animateScrollToItem(index) }
+                    }
+                }
+                Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                    Text(stringResource(R.string.location_route_hint), Modifier.weight(1f), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    TextButton(onClick = { selected = null }) { Text(stringResource(R.string.location_route_all)) }
+                }
+            }
+            LazyColumn(state = listState, modifier = Modifier.fillMaxWidth().weight(.58f), contentPadding = PaddingValues(bottom = 16.dp)) {
+                items(history, key = { it.id }) { point ->
+                    val isSelected = selected == point.id
+                    Row(Modifier.fillMaxWidth().height(IntrinsicSize.Min)
+                        .clip(MaterialTheme.shapes.small)
+                        .background(if (isSelected) routeColor.copy(alpha = .14f) else androidx.compose.ui.graphics.Color.Transparent)
+                        .clickable { selected = point.id }.padding(top = 6.dp)) {
+                        Column(Modifier.width(24.dp).fillMaxHeight(), horizontalAlignment = Alignment.CenterHorizontally) {
+                            Box(Modifier.padding(top = 5.dp).size(9.dp).background(routeColor, androidx.compose.foundation.shape.CircleShape))
+                            Box(Modifier.width(1.dp).weight(1f).background(routeColor.copy(alpha = .28f)))
+                        }
+                        Column(Modifier.weight(1f).padding(start = 10.dp, end = 8.dp, bottom = 24.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                            Text(formatHistoryTime(point.occurredAt), style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            if (point.lastSeenAt.isNotBlank() && point.lastSeenAt != point.occurredAt) Text("Até ${formatHistoryTime(point.lastSeenAt)}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            Text(point.address.ifBlank { "Localização registrada" }, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Medium)
+                            if (point.address.isBlank()) Text("%.5f, %.5f".format(java.util.Locale.ROOT, point.latitude, point.longitude), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            if (isSelected) Text(stringResource(R.string.location_map_selected, point.accuracy.toInt()), style = MaterialTheme.typography.labelSmall)
+                        }
+                    }
+                }
+                item {
+                    when {
+                        loading -> LinearProgressIndicator(Modifier.fillMaxWidth().padding(vertical = 12.dp))
+                        error != null -> { Text(error); TextButton(onClick = onMore) { Text("Tentar novamente") } }
+                        more -> TextButton(onClick = onMore, modifier = Modifier.fillMaxWidth()) { Text("Ver registros anteriores") }
+                        history.isEmpty() -> Text("Ainda não há localização com precisão suficiente para o histórico.", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                }
+                item { Text("Mapa e endereços: © OpenStreetMap", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant) }
+            }
+        }
+    }
+}
+
+private fun formatTime(value: String) = runCatching { DateTimeFormatter.ofPattern("dd MMM · HH:mm").withZone(ZoneId.systemDefault()).format(Instant.parse(value)) }.getOrDefault(value)
+private fun formatHistoryTime(value: String) = runCatching { DateTimeFormatter.ofPattern("dd/MM/yyyy · HH:mm").withZone(ZoneId.systemDefault()).format(Instant.parse(value)) }.getOrDefault(value)

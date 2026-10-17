@@ -9,12 +9,12 @@ import (
 	"sync"
 	"time"
 
-	"github.com/ferforastieri/valkyris/backend/internal/api"
-	"github.com/ferforastieri/valkyris/backend/internal/event"
-	"github.com/ferforastieri/valkyris/backend/internal/media"
-	"github.com/ferforastieri/valkyris/backend/internal/notify"
-	"github.com/ferforastieri/valkyris/backend/internal/preferences"
-	"github.com/ferforastieri/valkyris/backend/internal/rules"
+	"github.com/ferforastieri/valky/backend/internal/api"
+	"github.com/ferforastieri/valky/backend/internal/event"
+	"github.com/ferforastieri/valky/backend/internal/media"
+	"github.com/ferforastieri/valky/backend/internal/notify"
+	"github.com/ferforastieri/valky/backend/internal/preferences"
+	"github.com/ferforastieri/valky/backend/internal/rules"
 )
 
 type Service struct {

@@ -2,8 +2,8 @@ package api
 
 import (
 	"context"
-	"github.com/ferforastieri/valkyris/backend/internal/auth"
-	"github.com/ferforastieri/valkyris/backend/internal/store"
+	"github.com/ferforastieri/valky/backend/internal/auth"
+	"github.com/ferforastieri/valky/backend/internal/store"
 	"go/ast"
 	"go/parser"
 	"go/token"

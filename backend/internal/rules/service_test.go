@@ -5,7 +5,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/ferforastieri/valkyris/backend/internal/store"
+	"github.com/ferforastieri/valky/backend/internal/store"
 )
 
 func TestActiveAtOvernight(t *testing.T) {

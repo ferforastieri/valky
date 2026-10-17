@@ -4,7 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	appcrypto "github.com/ferforastieri/valkyris/backend/internal/crypto"
+	appcrypto "github.com/ferforastieri/valky/backend/internal/crypto"
 	"github.com/google/uuid"
 	"net/http"
 	"net/url"
@@ -74,7 +74,7 @@ func SetViewerCookie(w http.ResponseWriter, token string) {
 }
 
 func ViewerRequestSafe(r *http.Request) bool {
-	if r.Header.Get("X-Valkyris-Viewer") != "1" || r.Header.Get("Sec-Fetch-Site") == "cross-site" {
+	if r.Header.Get("X-Valky-Viewer") != "1" || r.Header.Get("Sec-Fetch-Site") == "cross-site" {
 		return false
 	}
 	if origin := r.Header.Get("Origin"); origin != "" {

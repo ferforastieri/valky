@@ -8,8 +8,8 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/ferforastieri/valkyris/backend/internal/camera"
-	"github.com/ferforastieri/valkyris/backend/internal/store"
+	"github.com/ferforastieri/valky/backend/internal/camera"
+	"github.com/ferforastieri/valky/backend/internal/store"
 )
 
 const retentionKey = "media_retention"

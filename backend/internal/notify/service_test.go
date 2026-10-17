@@ -14,11 +14,11 @@ import (
 	"testing"
 	"time"
 
-	"github.com/ferforastieri/valkyris/backend/internal/camera"
-	appcrypto "github.com/ferforastieri/valkyris/backend/internal/crypto"
-	"github.com/ferforastieri/valkyris/backend/internal/event"
-	"github.com/ferforastieri/valkyris/backend/internal/rules"
-	"github.com/ferforastieri/valkyris/backend/internal/store"
+	"github.com/ferforastieri/valky/backend/internal/camera"
+	appcrypto "github.com/ferforastieri/valky/backend/internal/crypto"
+	"github.com/ferforastieri/valky/backend/internal/event"
+	"github.com/ferforastieri/valky/backend/internal/rules"
+	"github.com/ferforastieri/valky/backend/internal/store"
 	"golang.org/x/oauth2"
 )
 

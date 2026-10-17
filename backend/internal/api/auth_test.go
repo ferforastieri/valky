@@ -11,8 +11,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/ferforastieri/valkyris/backend/internal/auth"
-	"github.com/ferforastieri/valkyris/backend/internal/store"
+	"github.com/ferforastieri/valky/backend/internal/auth"
+	"github.com/ferforastieri/valky/backend/internal/store"
 )
 
 func TestFirstUserCreatesAdministratorAndInvites(t *testing.T) {

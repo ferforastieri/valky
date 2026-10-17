@@ -5,8 +5,8 @@ import (
 	"net/url"
 	"testing"
 
-	valkyriscrypto "github.com/ferforastieri/valkyris/backend/internal/crypto"
-	"github.com/ferforastieri/valkyris/backend/internal/store"
+	valkyriscrypto "github.com/ferforastieri/valky/backend/internal/crypto"
+	"github.com/ferforastieri/valky/backend/internal/store"
 )
 
 func TestCreatePendingBuildsTapoRTSPURIAndPersistsIcon(t *testing.T) {

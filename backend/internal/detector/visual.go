@@ -3,7 +3,7 @@ package detector
 import (
 	"bytes"
 	"fmt"
-	"github.com/ferforastieri/valkyris/backend/internal/rules"
+	"github.com/ferforastieri/valky/backend/internal/rules"
 	"image"
 	"image/color"
 	_ "image/jpeg"

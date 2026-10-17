@@ -7,7 +7,7 @@
 // the tinytuya (https://github.com/jasonacox/tinytuya) and tuyapi
 // (https://github.com/codetheweb/tuyapi) projects, both MIT licensed. This is an
 // independent implementation of that documented format, limited to what the
-// Valkyris lighting adapter needs: device discovery and data-point read/write.
+// Valky lighting adapter needs: device discovery and data-point read/write.
 package tuya
 
 import (

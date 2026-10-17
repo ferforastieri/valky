@@ -2,7 +2,7 @@ package detector
 
 import (
 	"bytes"
-	"github.com/ferforastieri/valkyris/backend/internal/rules"
+	"github.com/ferforastieri/valky/backend/internal/rules"
 	"image"
 	"image/color"
 	"image/png"

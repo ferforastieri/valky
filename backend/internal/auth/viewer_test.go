@@ -2,7 +2,7 @@ package auth
 
 import (
 	"context"
-	"github.com/ferforastieri/valkyris/backend/internal/store"
+	"github.com/ferforastieri/valky/backend/internal/store"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -106,7 +106,7 @@ func TestViewerCookieRenewalCSRFAndLogout(t *testing.T) {
 	request := func(header, site string) *httptest.ResponseRecorder {
 		r := httptest.NewRequest("GET", "/viewer-session", nil)
 		r.AddCookie(&http.Cookie{Name: ViewerCookie, Value: v.Token})
-		r.Header.Set("X-Valkyris-Viewer", header)
+		r.Header.Set("X-Valky-Viewer", header)
 		r.Header.Set("Sec-Fetch-Site", site)
 		w := httptest.NewRecorder()
 		h.ServeHTTP(w, r)
@@ -135,7 +135,7 @@ func TestViewerCookieRenewalCSRFAndLogout(t *testing.T) {
 	}
 	r := httptest.NewRequest("DELETE", "/viewer-session", nil)
 	r.AddCookie(c)
-	r.Header.Set("X-Valkyris-Viewer", "1")
+	r.Header.Set("X-Valky-Viewer", "1")
 	w = httptest.NewRecorder()
 	m.Middleware(http.HandlerFunc(m.EndViewerSession)).ServeHTTP(w, r)
 	if w.Code != 204 || w.Result().Cookies()[0].MaxAge != -1 {
@@ -150,7 +150,7 @@ func TestViewerRequestSafeBehindTLSProxy(t *testing.T) {
 	request := func(origin, forwardedHost, forwardedProto, site string) *http.Request {
 		r := httptest.NewRequest(http.MethodPost, "https://192.0.2.23:8443/login", nil)
 		r.Host = "192.0.2.23:8443"
-		r.Header.Set("X-Valkyris-Viewer", "1")
+		r.Header.Set("X-Valky-Viewer", "1")
 		r.Header.Set("Origin", origin)
 		r.Header.Set("Sec-Fetch-Site", site)
 		r.Header.Set("X-Forwarded-Host", forwardedHost)

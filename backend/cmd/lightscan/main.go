@@ -14,7 +14,7 @@ import (
 	"os"
 	"time"
 
-	"github.com/ferforastieri/valkyris/backend/internal/light/tuya"
+	"github.com/ferforastieri/valky/backend/internal/light/tuya"
 )
 
 func main() {

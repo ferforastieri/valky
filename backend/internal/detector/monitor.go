@@ -6,9 +6,9 @@ import (
 	"sync"
 	"time"
 
-	"github.com/ferforastieri/valkyris/backend/internal/camera"
-	"github.com/ferforastieri/valkyris/backend/internal/media"
-	"github.com/ferforastieri/valkyris/backend/internal/rules"
+	"github.com/ferforastieri/valky/backend/internal/camera"
+	"github.com/ferforastieri/valky/backend/internal/media"
+	"github.com/ferforastieri/valky/backend/internal/rules"
 )
 
 type CameraLister interface {

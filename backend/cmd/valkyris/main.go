@@ -18,23 +18,23 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/ferforastieri/valkyris/backend/internal/api"
-	"github.com/ferforastieri/valkyris/backend/internal/app"
-	"github.com/ferforastieri/valkyris/backend/internal/auth"
-	"github.com/ferforastieri/valkyris/backend/internal/camera"
-	"github.com/ferforastieri/valkyris/backend/internal/config"
-	appcrypto "github.com/ferforastieri/valkyris/backend/internal/crypto"
-	"github.com/ferforastieri/valkyris/backend/internal/detector"
-	"github.com/ferforastieri/valkyris/backend/internal/event"
-	"github.com/ferforastieri/valkyris/backend/internal/light"
-	"github.com/ferforastieri/valkyris/backend/internal/media"
-	"github.com/ferforastieri/valkyris/backend/internal/notify"
-	"github.com/ferforastieri/valkyris/backend/internal/preferences"
-	"github.com/ferforastieri/valkyris/backend/internal/remote"
-	"github.com/ferforastieri/valkyris/backend/internal/rules"
-	"github.com/ferforastieri/valkyris/backend/internal/store"
-	"github.com/ferforastieri/valkyris/backend/internal/tracking"
-	"github.com/ferforastieri/valkyris/backend/internal/updates"
+	"github.com/ferforastieri/valky/backend/internal/api"
+	"github.com/ferforastieri/valky/backend/internal/app"
+	"github.com/ferforastieri/valky/backend/internal/auth"
+	"github.com/ferforastieri/valky/backend/internal/camera"
+	"github.com/ferforastieri/valky/backend/internal/config"
+	appcrypto "github.com/ferforastieri/valky/backend/internal/crypto"
+	"github.com/ferforastieri/valky/backend/internal/detector"
+	"github.com/ferforastieri/valky/backend/internal/event"
+	"github.com/ferforastieri/valky/backend/internal/light"
+	"github.com/ferforastieri/valky/backend/internal/media"
+	"github.com/ferforastieri/valky/backend/internal/notify"
+	"github.com/ferforastieri/valky/backend/internal/preferences"
+	"github.com/ferforastieri/valky/backend/internal/remote"
+	"github.com/ferforastieri/valky/backend/internal/rules"
+	"github.com/ferforastieri/valky/backend/internal/store"
+	"github.com/ferforastieri/valky/backend/internal/tracking"
+	"github.com/ferforastieri/valky/backend/internal/updates"
 )
 
 var version = "dev"
@@ -126,7 +126,7 @@ func main() {
 	go monitor.Run(ctx)
 	httpServer := &http.Server{Addr: cfg.Listen, Handler: apiServer.Handler(), ReadHeaderTimeout: 10 * time.Second, ReadTimeout: 30 * time.Second, WriteTimeout: 60 * time.Second, IdleTimeout: 2 * time.Minute}
 	go func() {
-		logger.Info("Valkyris listening", "address", cfg.Listen, "version", version)
+		logger.Info("Valky listening", "address", cfg.Listen, "version", version)
 		if e := httpServer.ListenAndServeTLS(cfg.TLSCert, cfg.TLSKey); e != nil && e != http.ErrServerClosed {
 			logger.Error("server stopped", "error", e)
 			cancel()
@@ -181,7 +181,7 @@ func ensureCertificate(certPath, keyPath string) error {
 		return err
 	}
 	serial, _ := rand.Int(rand.Reader, new(big.Int).Lsh(big.NewInt(1), 128))
-	template := x509.Certificate{SerialNumber: serial, Subject: pkix.Name{CommonName: "valkyris.local", Organization: []string{"Valkyris local installation"}}, NotBefore: time.Now().Add(-time.Hour), NotAfter: time.Now().AddDate(10, 0, 0), KeyUsage: x509.KeyUsageDigitalSignature | x509.KeyUsageKeyEncipherment, ExtKeyUsage: []x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth}, DNSNames: []string{"valkyris.local", "localhost"}, IPAddresses: []net.IP{net.ParseIP("127.0.0.1"), net.ParseIP("::1")}, BasicConstraintsValid: true}
+	template := x509.Certificate{SerialNumber: serial, Subject: pkix.Name{CommonName: "valkyris.local", Organization: []string{"Valky local installation"}}, NotBefore: time.Now().Add(-time.Hour), NotAfter: time.Now().AddDate(10, 0, 0), KeyUsage: x509.KeyUsageDigitalSignature | x509.KeyUsageKeyEncipherment, ExtKeyUsage: []x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth}, DNSNames: []string{"valkyris.local", "localhost"}, IPAddresses: []net.IP{net.ParseIP("127.0.0.1"), net.ParseIP("::1")}, BasicConstraintsValid: true}
 	der, err := x509.CreateCertificate(rand.Reader, &template, &template, &key.PublicKey, key)
 	if err != nil {
 		return err

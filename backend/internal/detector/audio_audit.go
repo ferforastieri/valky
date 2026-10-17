@@ -6,7 +6,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/ferforastieri/valkyris/backend/internal/store"
+	"github.com/ferforastieri/valky/backend/internal/store"
 )
 
 type AudioDecision struct {

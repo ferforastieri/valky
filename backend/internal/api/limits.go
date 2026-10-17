@@ -3,7 +3,7 @@ package api
 import (
 	"crypto/sha256"
 	"fmt"
-	"github.com/ferforastieri/valkyris/backend/internal/auth"
+	"github.com/ferforastieri/valky/backend/internal/auth"
 	"net"
 	"net/http"
 	"strconv"

@@ -1,0 +1,128 @@
+package com.ferforastieri.valky.feature.people
+
+import androidx.lifecycle.ViewModel
+import androidx.lifecycle.viewModelScope
+import com.ferforastieri.valky.core.action.MobileActionGate
+import com.ferforastieri.valky.core.model.PersonLocation
+import com.ferforastieri.valky.core.model.TrackedPerson
+import com.ferforastieri.valky.core.model.TrackedPlace
+import com.ferforastieri.valky.core.network.ValkyRepository
+import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.isActive
+import kotlinx.coroutines.CancellationException
+import javax.inject.Inject
+
+@HiltViewModel
+class PeopleViewModel @Inject constructor(
+    private val repository: ValkyRepository,
+    private val actionGate: MobileActionGate,
+) : ViewModel() {
+    val people = repository.people
+    val me = repository.me
+    val places = repository.places
+    private val _history = MutableStateFlow<List<PersonLocation>>(emptyList())
+    val history = _history.asStateFlow()
+    private val _historyLoading = MutableStateFlow(false)
+    val historyLoading = _historyLoading.asStateFlow()
+    private val _historyError = MutableStateFlow<String?>(null)
+    val historyError = _historyError.asStateFlow()
+    private val _historyMore = MutableStateFlow(false)
+    val historyMore = _historyMore.asStateFlow()
+    private var historyJob: Job? = null
+    private var realtime: okhttp3.WebSocket? = null
+    private var observing = false
+    private var historyOwner = ""
+    private var historyGeneration = 0
+    private var historyUntil = ""
+    private val _busy = MutableStateFlow(false)
+    val busy = _busy.asStateFlow()
+
+    fun observe() = viewModelScope.launch {
+        observing = true
+        refresh().join()
+        connectRealtime()
+        try {
+            // The realtime channel drives the updates; this slow poll is only a
+            // safety net for a dropped socket.
+            while (isActive) { delay(60_000); refresh() }
+        } finally {
+            observing = false
+            realtime?.cancel()
+            realtime = null
+        }
+    }
+
+    private fun connectRealtime() {
+        realtime = repository.api.realtime(
+            { _ -> viewModelScope.launch { refresh() } },
+            { if (observing) viewModelScope.launch { delay(5_000); if (observing) connectRealtime() } },
+        )
+    }
+    fun refresh() = viewModelScope.launch {
+        coroutineScope {
+            launch { runCatching { repository.refreshUsers() } }
+            launch { runCatching { repository.refreshMe() } }
+            launch { runCatching { repository.refreshPlaces() } }
+        }
+    }
+    suspend fun locationAlerts(): com.ferforastieri.valky.core.model.AlertPresentation = repository.api.locationAlerts()
+
+    fun saveLocationAlerts(value: com.ferforastieri.valky.core.model.AlertPresentation, done: (Boolean) -> Unit) {
+        _busy.value = true
+        viewModelScope.launch {
+            runCatching { repository.api.saveLocationAlerts(value) }
+                .onSuccess { done(true) }
+                .onFailure { done(false) }
+            _busy.value = false
+        }
+    }
+
+    fun history(person: TrackedPerson) {
+        historyGeneration++
+        historyUntil = ""
+        historyJob?.cancel()
+        historyOwner = person.id
+        _history.value = emptyList()
+        _historyMore.value = true
+        _historyLoading.value = false
+        moreHistory()
+    }
+    fun moreHistory() {
+        if (_historyLoading.value || historyOwner.isEmpty()) return
+        _historyLoading.value = true
+        _historyError.value = null
+        val owner = historyOwner
+        val generation = historyGeneration
+        historyJob = viewModelScope.launch {
+            try {
+                val page = repository.api.userHistory(owner, _history.value.size, historyUntil)
+                if (generation != historyGeneration) return@launch
+                if (historyUntil.isEmpty()) historyUntil = page.firstOrNull()?.let { it.lastSeenAt.ifBlank { it.occurredAt } }.orEmpty()
+                _history.value = _history.value + page
+                _historyMore.value = page.size == 20
+            } catch (cancelled: CancellationException) { throw cancelled }
+            catch (error: Exception) { _historyError.value = error.message }
+            finally { if (historyGeneration == generation) _historyLoading.value = false }
+        }
+    }
+    fun updateMe(person: TrackedPerson, done: (Boolean) -> Unit) = action(done) { repository.updateMe(person) }
+    fun updateUser(person: TrackedPerson, done: (Boolean) -> Unit) = action(done) { repository.updateUser(person.id, person) }
+    fun createPlace(place: TrackedPlace, done: (Boolean) -> Unit) = action(done) { repository.createPlace(place) }
+    fun updatePlace(place: TrackedPlace, done: (Boolean) -> Unit) = action(done) { repository.updatePlace(place.id, place) }
+    fun deletePlace(place: TrackedPlace, done: (Boolean) -> Unit = {}) = action(done) { repository.deletePlace(place.id) }
+
+    private fun action(done: (Boolean) -> Unit, block: suspend () -> Unit) {
+        if (!actionGate.tryAcquire()) return
+        _busy.value = true
+        viewModelScope.launch {
+            try { val result = runCatching { block() }; done(result.isSuccess) }
+            finally { _busy.value = false; actionGate.release() }
+        }
+    }
+}

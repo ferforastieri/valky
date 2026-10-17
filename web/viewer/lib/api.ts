@@ -157,7 +157,7 @@ export class API {
   async restore() {
     const response = await fetch("/api/v1/viewer-session", {
       credentials: "same-origin",
-      headers: { "X-Valkyris-Viewer": "1" },
+      headers: { "X-Valky-Viewer": "1" },
       cache: "no-store",
       signal: AbortSignal.timeout(15000),
     });
@@ -170,7 +170,7 @@ export class API {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        "X-Valkyris-Viewer": "1",
+        "X-Valky-Viewer": "1",
         "Accept-Language": "pt-BR",
       },
       body: JSON.stringify({
@@ -198,7 +198,7 @@ export class API {
       throw new Error("Caminho inválido.");
     const response = await fetch("/api/v1" + path, {
       headers: {
-        "X-Valkyris-Viewer": "1",
+        "X-Valky-Viewer": "1",
         "Accept-Language": "pt-BR",
       },
       cache: "no-store",
@@ -231,7 +231,7 @@ export class API {
     return (await this.response(path, signal)).blob();
   }
   async mutate<T>(path: string, method: string, value?: unknown): Promise<T> {
- const response = await fetch('/api/v1' + path, {method, credentials:'same-origin', headers:{'Content-Type':'application/json','X-Valkyris-Viewer':'1'}, body:value===undefined?undefined:JSON.stringify(value), signal:AbortSignal.timeout(15000)});
+ const response = await fetch('/api/v1' + path, {method, credentials:'same-origin', headers:{'Content-Type':'application/json','X-Valky-Viewer':'1'}, body:value===undefined?undefined:JSON.stringify(value), signal:AbortSignal.timeout(15000)});
  if(response.status===401) { this.clear(); window.dispatchEvent(new CustomEvent("viewer-expired")); throw new Error("Sessão expirada. Entre novamente."); }
  if(response.status===204) return undefined as T;
  const body=await response.json();if(!response.ok||!body.success) throw new Error(body.message||'Não foi possível salvar.');return body.data;
@@ -239,7 +239,7 @@ export class API {
   async logout() {
     const response = await fetch("/api/v1/viewer-session", {
       method: "DELETE",
-      headers: { "X-Valkyris-Viewer": "1" },
+      headers: { "X-Valky-Viewer": "1" },
       signal: AbortSignal.timeout(15000),
     });
     if (!response.ok && response.status !== 401) throw new Error("Não foi possível encerrar a sessão. Tente novamente.");

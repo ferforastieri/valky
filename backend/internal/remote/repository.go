@@ -6,8 +6,8 @@ import (
 	"strings"
 	"time"
 
-	appcrypto "github.com/ferforastieri/valkyris/backend/internal/crypto"
-	"github.com/ferforastieri/valkyris/backend/internal/store"
+	appcrypto "github.com/ferforastieri/valky/backend/internal/crypto"
+	"github.com/ferforastieri/valky/backend/internal/store"
 )
 
 type Repository struct {

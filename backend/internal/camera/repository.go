@@ -10,8 +10,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/ferforastieri/valkyris/backend/internal/crypto"
-	"github.com/ferforastieri/valkyris/backend/internal/store"
+	"github.com/ferforastieri/valky/backend/internal/crypto"
+	"github.com/ferforastieri/valky/backend/internal/store"
 	"github.com/google/uuid"
 )
 

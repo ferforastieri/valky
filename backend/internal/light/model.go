@@ -65,7 +65,7 @@ type StatePatch struct {
 }
 
 // UpdateInput changes what an administrator can edit after pairing: the name,
-// the room and whether Valkyris keeps polling the lamp. The local credentials
+// the room and whether Valky keeps polling the lamp. The local credentials
 // belong to the pairing flow and are never edited by hand.
 type UpdateInput struct {
 	Name    *string `json:"name,omitempty"`
@@ -82,7 +82,7 @@ type DiscoveryInput struct {
 
 // RegisterInput adopts a lamp that another application already configured. The
 // administrator supplies what the local protocol needs — the address, the device
-// identifier and the 16 character local key — and Valkyris validates them
+// identifier and the 16 character local key — and Valky validates them
 // against the device before storing anything.
 type RegisterInput struct {
 	Name            string  `json:"name,omitempty"`

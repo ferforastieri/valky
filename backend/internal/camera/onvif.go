@@ -218,7 +218,7 @@ func (c *ONVIFClient) RemovePTZPreset(ctx context.Context, cam Camera, cred Cred
 
 // MonitorEvents maintains a renewable ONVIF PullPoint subscription. Returning
 // errors are retried with bounded backoff so a camera reboot does not require
-// restarting Valkyris.
+// restarting Valky.
 func (c *ONVIFClient) MonitorEvents(ctx context.Context, cam Camera, cred Credentials, emit func(string, float64)) {
 	backoff := time.Second
 	for ctx.Err() == nil {

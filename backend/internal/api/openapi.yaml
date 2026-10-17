@@ -1,8 +1,8 @@
 openapi: 3.1.0
 info:
-  title: Valkyris API
+  title: Valky API
   version: 2.0.0
-  description: Local-first home camera monitoring API. JSON responses use a success/message/data envelope; every response also includes X-Valkyris-Success and X-Valkyris-Message headers.
+  description: Local-first home camera monitoring API. JSON responses use a success/message/data envelope; every response also includes X-Valky-Success and X-Valky-Message headers.
 servers:
   - url: https://valkyris.local:8443/api/v1
 security:
@@ -83,7 +83,7 @@ paths:
       security:
         - viewerCookie: []
       parameters:
-        - {in: header, name: X-Valkyris-Viewer, required: true, schema: {type: string, const: '1'}}
+        - {in: header, name: X-Valky-Viewer, required: true, schema: {type: string, const: '1'}}
       responses:
         '200': {description: Account permissions (admin, viewRules, editRules), username and credentialsConfigured; browser cookie renewed during use}
         '401': {description: Invalid or expired session}
@@ -268,7 +268,7 @@ paths:
         '200': {description: Updated light in APIResponse.data}
         '400': {description: Invalid name}
     delete:
-      summary: Remove a light from Valkyris (administrator only)
+      summary: Remove a light from Valky (administrator only)
       parameters: [{$ref: '#/components/parameters/id'}]
       responses: {'200': {description: Removed}}
   /lights/{id}/state:
@@ -548,7 +548,7 @@ components:
       type: apiKey
       in: cookie
       name: __Host-valkyris-viewer
-      description: Secure HttpOnly SameSite=Strict cookie; requires X-Valkyris-Viewer 1 for cookie-authenticated calls. The browser can consult data, negotiate WHEP and control registered lights and remote controls, but cannot register or configure devices.
+      description: Secure HttpOnly SameSite=Strict cookie; requires X-Valky-Viewer 1 for cookie-authenticated calls. The browser can consult data, negotiate WHEP and control registered lights and remote controls, but cannot register or configure devices.
     bearerAuth: {type: http, scheme: bearer}
   parameters:
     webrtcProfile:
@@ -693,7 +693,7 @@ components:
         colorTemperature: {type: boolean}
     LightUpdate:
       type: object
-      description: Changes the name or whether Valkyris keeps polling the lamp.
+      description: Changes the name or whether Valky keeps polling the lamp.
       properties:
         name: {type: string}
         enabled: {type: boolean}
@@ -993,7 +993,7 @@ components:
         browserAdmin: {type: boolean, description: Request an HttpOnly browser session. Permissions always come from the authenticated account.}
         password: {type: string, format: password}
         deviceName: {type: string}
-        readOnly: {type: boolean, default: false, description: "Issue a renewable 30-day HttpOnly cookie session; requires X-Valkyris-Viewer: 1; no token is returned in JSON."}
+        readOnly: {type: boolean, default: false, description: "Issue a renewable 30-day HttpOnly cookie session; requires X-Valky-Viewer: 1; no token is returned in JSON."}
         locale: {type: string, default: pt-BR}
     PairRequest:
       type: object

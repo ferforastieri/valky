@@ -60,7 +60,7 @@ func NewSmartTVDriver(logger *slog.Logger) *SmartTVDriver {
 		DialContext:           (&net.Dialer{Timeout: 6 * time.Second}).DialContext,
 	}
 	return &SmartTVDriver{
-		applicationName: "Valkyris",
+		applicationName: "Valky",
 		client:          &http.Client{Transport: transport},
 		logger:          logger,
 		conns:           map[string]*tvConn{},

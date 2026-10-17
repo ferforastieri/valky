@@ -5,7 +5,7 @@ import (
 	"errors"
 	"net/http"
 
-	"github.com/ferforastieri/valkyris/backend/internal/light"
+	"github.com/ferforastieri/valky/backend/internal/light"
 )
 
 func (s *Server) listLights(w http.ResponseWriter, r *http.Request) {

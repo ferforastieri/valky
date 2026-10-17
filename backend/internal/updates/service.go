@@ -89,7 +89,7 @@ func (s *Service) latest(ctx context.Context) (release, error) {
 		return release{}, fmt.Errorf("decode GitHub release: %w", err)
 	}
 	if latest.TagName == "" || latest.Draft || latest.Prerelease {
-		return release{}, fmt.Errorf("GitHub did not return a stable Valkyris release")
+		return release{}, fmt.Errorf("GitHub did not return a stable Valky release")
 	}
 	s.cached, s.cachedAt = latest, time.Now()
 	return latest, nil
@@ -114,9 +114,9 @@ func (s *Service) info(latest release, clientVersion string) Info {
 	info.APKUpdateAvailable = clientVersionBehind && info.APKURL != ""
 	info.Available = info.ServerUpdateAvailable || info.APKUpdateAvailable
 	if info.Available {
-		info.Message = "A new Valkyris release is available: " + latest.TagName
+		info.Message = "A new Valky release is available: " + latest.TagName
 	} else {
-		info.Message = "Valkyris is up to date"
+		info.Message = "Valky is up to date"
 	}
 	return info
 }

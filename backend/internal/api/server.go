@@ -20,18 +20,18 @@ import (
 	"sync"
 	"time"
 
-	"github.com/ferforastieri/valkyris/backend/internal/auth"
-	"github.com/ferforastieri/valkyris/backend/internal/camera"
-	"github.com/ferforastieri/valkyris/backend/internal/detector"
-	"github.com/ferforastieri/valkyris/backend/internal/event"
-	"github.com/ferforastieri/valkyris/backend/internal/light"
-	"github.com/ferforastieri/valkyris/backend/internal/media"
-	"github.com/ferforastieri/valkyris/backend/internal/notify"
-	"github.com/ferforastieri/valkyris/backend/internal/preferences"
-	"github.com/ferforastieri/valkyris/backend/internal/remote"
-	"github.com/ferforastieri/valkyris/backend/internal/rules"
-	"github.com/ferforastieri/valkyris/backend/internal/tracking"
-	"github.com/ferforastieri/valkyris/backend/internal/updates"
+	"github.com/ferforastieri/valky/backend/internal/auth"
+	"github.com/ferforastieri/valky/backend/internal/camera"
+	"github.com/ferforastieri/valky/backend/internal/detector"
+	"github.com/ferforastieri/valky/backend/internal/event"
+	"github.com/ferforastieri/valky/backend/internal/light"
+	"github.com/ferforastieri/valky/backend/internal/media"
+	"github.com/ferforastieri/valky/backend/internal/notify"
+	"github.com/ferforastieri/valky/backend/internal/preferences"
+	"github.com/ferforastieri/valky/backend/internal/remote"
+	"github.com/ferforastieri/valky/backend/internal/rules"
+	"github.com/ferforastieri/valky/backend/internal/tracking"
+	"github.com/ferforastieri/valky/backend/internal/updates"
 )
 
 //go:embed openapi.yaml
@@ -202,7 +202,7 @@ func (s *Server) Handler() http.Handler {
 	return requestLog(s.logger, securityHeaders(newRequestLimits().wrap(localizedResponses(outcomeHeaders(mux)))))
 }
 func (s *Server) health(w http.ResponseWriter, r *http.Request) {
-	writeSuccess(w, http.StatusOK, "Valkyris is healthy", map[string]any{"status": "ok", "service": "valkyris", "time": time.Now().UTC()})
+	writeSuccess(w, http.StatusOK, "Valky is healthy", map[string]any{"status": "ok", "service": "valkyris", "time": time.Now().UTC()})
 }
 func (s *Server) openapi(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/yaml")
@@ -738,7 +738,7 @@ func (s *Server) liveWebRTC(w http.ResponseWriter, r *http.Request) {
 		req.Host = target.Host
 		req.Header.Del("Authorization")
 		req.Header.Del("Cookie")
-		req.Header.Del("X-Valkyris-Viewer")
+		req.Header.Del("X-Valky-Viewer")
 	}
 	proxy.ModifyResponse = func(response *http.Response) error {
 		location := response.Header.Get("Location")
@@ -1179,8 +1179,8 @@ func writeError(w http.ResponseWriter, status int, err error) {
 	_ = json.NewEncoder(w).Encode(map[string]any{"success": false, "message": message, "error": message})
 }
 
-const messageHeader = "X-Valkyris-Message"
-const successHeader = "X-Valkyris-Success"
+const messageHeader = "X-Valky-Message"
+const successHeader = "X-Valky-Success"
 
 func setOutcomeHeaders(w http.ResponseWriter, status int, message string) {
 	w.Header().Set(messageHeader, message)

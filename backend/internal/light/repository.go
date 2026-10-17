@@ -6,8 +6,8 @@ import (
 	"encoding/json"
 	"time"
 
-	appcrypto "github.com/ferforastieri/valkyris/backend/internal/crypto"
-	"github.com/ferforastieri/valkyris/backend/internal/store"
+	appcrypto "github.com/ferforastieri/valky/backend/internal/crypto"
+	"github.com/ferforastieri/valky/backend/internal/store"
 )
 
 // Repository intentionally keeps reading the existing lights table so an

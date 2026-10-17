@@ -2,7 +2,7 @@ package auth
 
 import (
 	"context"
-	"github.com/ferforastieri/valkyris/backend/internal/store"
+	"github.com/ferforastieri/valky/backend/internal/store"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -84,7 +84,7 @@ func TestBrowserAdminCannotBeForged(t *testing.T) {
 		for _, cross := range []bool{false, true} {
 			req := httptest.NewRequest("PUT", "https://home.test/admin/users/user", nil)
 			req.AddCookie(&http.Cookie{Name: ViewerCookie, Value: session.Token})
-			req.Header.Set("X-Valkyris-Viewer", "1")
+			req.Header.Set("X-Valky-Viewer", "1")
 			req.Header.Set("X-Is-Admin", "true")
 			if cross {
 				req.Header.Set("Origin", "https://evil.test")

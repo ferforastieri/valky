@@ -1,0 +1,183 @@
+package com.ferforastieri.valky.core.network
+
+import com.ferforastieri.valky.core.model.Camera
+import com.ferforastieri.valky.core.model.CreateCameraRequest
+import com.ferforastieri.valky.core.model.Rule
+import com.ferforastieri.valky.core.model.ValkyEvent
+import com.ferforastieri.valky.core.model.TrackedPerson
+import com.ferforastieri.valky.core.model.TrackedPlace
+import com.ferforastieri.valky.core.model.*
+import javax.inject.Inject
+import javax.inject.Singleton
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.launch
+import kotlinx.serialization.json.contentOrNull
+import kotlinx.serialization.json.decodeFromJsonElement
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
+
+// This repository intentionally keeps no persistent/offline cache. Every refresh
+// reads the current data from the Valky API.
+@Singleton
+class ValkyRepository @Inject constructor(
+    val api: ValkyApi,
+    private val notifier: com.ferforastieri.valky.core.alarm.AlarmNotifier,
+    @dagger.hilt.android.qualifiers.ApplicationContext private val appContext: android.content.Context,
+) {
+    /** Leitura dos avisos do canal em tempo real. */
+    private val json = kotlinx.serialization.json.Json { ignoreUnknownKeys = true }
+
+    private val _cameras = MutableStateFlow<List<Camera>>(emptyList())
+    val cameras = _cameras.asStateFlow()
+    private val _events = MutableStateFlow<List<ValkyEvent>>(emptyList())
+    val events = _events.asStateFlow()
+    private val _rules = MutableStateFlow<List<Rule>>(emptyList())
+    val rules = _rules.asStateFlow()
+    private val _people = MutableStateFlow<List<TrackedPerson>>(emptyList())
+    val people = _people.asStateFlow()
+    private val _me = MutableStateFlow<TrackedPerson?>(null)
+    val me = _me.asStateFlow()
+    private val _places = MutableStateFlow<List<TrackedPlace>>(emptyList())
+    val places = _places.asStateFlow()
+    private val _lights = MutableStateFlow<List<LightDevice>>(emptyList())
+    val lights = _lights.asStateFlow()
+    private val _remotes = MutableStateFlow<List<RemoteDevice>>(emptyList())
+    val remotes = _remotes.asStateFlow()
+
+    /** Atualiza tudo de uma vez; é o "puxar para atualizar" do aplicativo. */
+    suspend fun refreshAll() = kotlinx.coroutines.coroutineScope {
+        listOf(
+            launch { runCatching { refreshCameras() } },
+            launch { runCatching { refreshLights() } },
+            launch { runCatching { refreshRemotes() } },
+            launch { runCatching { refreshEvents() } },
+            launch { runCatching { refreshUsers() } },
+            launch { runCatching { refreshMe() } },
+            launch { runCatching { refreshPlaces() } },
+        ).forEach { it.join() }
+    }
+
+    suspend fun refreshCameras(): List<Camera> {
+        return api.cameras().also { _cameras.value = it }
+    }
+
+    suspend fun createCamera(input: CreateCameraRequest): Camera {
+        return api.createCamera(input).also { camera ->
+            _cameras.update { current -> (current + camera).distinctBy(Camera::id) }
+        }
+    }
+
+    suspend fun updateCamera(id: String, input: CreateCameraRequest): Camera {
+        return api.updateCamera(id, input).also { camera ->
+            _cameras.update { current -> current.map { if (it.id == id) camera else it } }
+        }
+    }
+
+    suspend fun deleteCamera(id: String) {
+        api.deleteCamera(id)
+        _cameras.update { current -> current.filterNot { it.id == id } }
+    }
+
+    /**
+     * Aplica no lugar o que chegou pelo canal em tempo real: é o mesmo dado que
+     * o servidor mandou, então a tela muda na hora e nada é pedido de novo.
+     * Devolve falso quando o aviso não traz o que precisamos — aí quem chamou
+     * pede a lista, como plano B.
+     */
+    fun applyLightEvent(payload: String): Boolean {
+        if (payload.isBlank()) return false
+        val root = runCatching { json.parseToJsonElement(payload).jsonObject }.getOrNull() ?: return false
+        val id = root["lightId"]?.jsonPrimitive?.contentOrNull
+            ?: root["light"]?.jsonObject?.get("id")?.jsonPrimitive?.contentOrNull
+            ?: return false
+        val stateJson = root["state"] ?: root["light"]?.jsonObject?.get("state") ?: return false
+        if (_lights.value.none { it.id == id }) return false
+        val state = runCatching { json.decodeFromJsonElement<com.ferforastieri.valky.core.model.LightState>(stateJson) }.getOrNull() ?: return false
+        _lights.update { list -> list.map { if (it.id == id) it.copy(state = state) else it } }
+        runCatching { com.ferforastieri.valky.feature.widgets.WidgetBridge.publishLights(appContext, _lights.value) }
+        return true
+    }
+
+    suspend fun refreshLights() = api.lights().also { lights ->
+        _lights.value = lights
+        // O widget de lâmpadas vê o mesmo estado sem pedir nada a mais.
+        runCatching { com.ferforastieri.valky.feature.widgets.WidgetBridge.publishLights(appContext, lights) }
+    }
+    suspend fun refreshRemotes() = api.remotes().also { _remotes.value = it }
+    suspend fun controlLight(id: String, patch: LightStatePatch) = api.controlLight(id, patch).also { updated ->
+        _lights.update { list -> list.map { if (it.id == id) updated else it } }
+        runCatching { com.ferforastieri.valky.feature.widgets.WidgetBridge.publishLights(appContext, _lights.value) }
+    }
+    suspend fun deleteLight(id: String) { api.deleteLight(id); _lights.update { list -> list.filterNot { it.id == id } } }
+
+    /** Adota uma lâmpada já pareada no aplicativo do fabricante. */
+    suspend fun registerLight(input: LightRegistration): LightDevice {
+        return api.registerLight(input).also { created ->
+            _lights.update { current -> (current + created).distinctBy(LightDevice::id) }
+        }
+    }
+
+    /** Procura lâmpadas na rede local para preencher o formulário de cadastro. */
+    suspend fun discoverLights(): List<LightCandidate> = api.discoverLights()
+
+    suspend fun updateLight(id: String, input: LightUpdate): LightDevice {
+        return api.updateLight(id, input).also { updated ->
+            _lights.update { current -> current.map { if (it.id == id) updated else it } }
+        }
+    }
+
+    suspend fun refreshEvents(): List<ValkyEvent> {
+        return api.events().also { _events.value = it }
+    }
+
+    suspend fun refreshRules(): List<Rule> {
+        val allowed = api.sessionPermissions().viewRules
+        if (!allowed) { _rules.value = emptyList(); return emptyList() }
+        return try { api.rules().also { _rules.value = it } } catch (error: Exception) { _rules.value = emptyList(); throw error }
+    }
+
+    suspend fun acknowledge(eventId: String) {
+        api.acknowledge(eventId)
+        notifier.cancel(eventId)
+    }
+
+    suspend fun acknowledgeAll() {
+        api.acknowledgeAll()
+        notifier.cancelAll()
+    }
+
+    suspend fun createRule(rule: Rule): Rule {
+        return api.createRule(rule).also { created ->
+            _rules.update { current -> (current + created).distinctBy(Rule::id) }
+        }
+    }
+
+    suspend fun updateRule(id: String, rule: Rule): Rule {
+        return api.updateRule(id, rule).also { updated ->
+            _rules.update { current -> current.map { if (it.id == id) updated else it } }
+        }
+    }
+
+    suspend fun deleteRule(id: String) {
+        api.deleteRule(id)
+        _rules.update { current -> current.filterNot { it.id == id } }
+    }
+
+    suspend fun refreshUsers() = api.users().also { _people.value = it }
+    suspend fun refreshMe() = api.me().also { _me.value = it }
+    suspend fun refreshPlaces() = api.places().also { _places.value = it }
+    suspend fun updateMe(person: TrackedPerson) = api.updateMe(person).also { updated ->
+        _me.value = updated
+        _people.update { people -> people.map { if (it.id == updated.id) updated else it } }
+    }
+    suspend fun changeHomePassword(currentPassword: String, newPassword: String) = api.changeHomePassword(currentPassword, newPassword)
+    suspend fun updateUser(id: String, person: TrackedPerson) = api.updateUser(id, person).also { updated ->
+        _people.update { people -> people.map { if (it.id == id) updated else it } }
+        if (_me.value?.id == id) _me.value = updated
+    }
+    suspend fun createPlace(place: TrackedPlace) = api.createPlace(place).also { created -> _places.update { (it + created).distinctBy(TrackedPlace::id) } }
+    suspend fun updatePlace(id: String, place: TrackedPlace) = api.updatePlace(id, place).also { updated -> _places.update { it.map { current -> if (current.id == id) updated else current } } }
+    suspend fun deletePlace(id: String) { api.deletePlace(id); _places.update { it.filterNot { place -> place.id == id } } }
+}

@@ -9,7 +9,7 @@ import (
 	"os/exec"
 	"time"
 
-	"github.com/ferforastieri/valkyris/backend/internal/rules"
+	"github.com/ferforastieri/valky/backend/internal/rules"
 	"github.com/google/uuid"
 )
 

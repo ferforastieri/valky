@@ -33,7 +33,7 @@ export function live(
     const removeSession = () => {
       if (!session) return;
       void fetch(session, {
-        method: "DELETE", headers: { "X-Valkyris-Viewer": "1" }, keepalive: true,
+        method: "DELETE", headers: { "X-Valky-Viewer": "1" }, keepalive: true,
       }).catch(() => {});
       session = "";
     };
@@ -108,7 +108,7 @@ export function live(
         requestTimer = setTimeout(() => controller.abort(), browser ? 30000 : 15000);
         const response = await fetch(endpoint + (browser ? "?profile=browser" : ""), {
           method: "POST",
-          headers: { "X-Valkyris-Viewer": "1", "Content-Type": "application/sdp" },
+          headers: { "X-Valky-Viewer": "1", "Content-Type": "application/sdp" },
           body: offer, signal: controller.signal,
         });
         clearTimeout(requestTimer);

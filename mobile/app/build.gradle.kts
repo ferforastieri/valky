@@ -15,7 +15,7 @@ val valkyrisVersionName = providers.environmentVariable("VALKYRIS_VERSION_NAME")
 val valkyrisVersionCode = providers.environmentVariable("VALKYRIS_VERSION_CODE").map(String::toInt).orElse(104)
 
 android {
-    namespace = "com.ferforastieri.valkyris"
+    namespace = "com.ferforastieri.valky"
     compileSdk = 36
 
     defaultConfig {
@@ -59,7 +59,7 @@ android {
 // gravar as imagens: ./gradlew :app:recordRoborazziDebug -Pscreenshots
 tasks.withType<Test>().configureEach {
     if (!providers.gradleProperty("screenshots").isPresent) {
-        useJUnit { excludeCategories("com.ferforastieri.valkyris.ScreenshotTest") }
+        useJUnit { excludeCategories("com.ferforastieri.valky.ScreenshotTest") }
     }
 }
 

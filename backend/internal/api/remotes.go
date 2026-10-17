@@ -5,7 +5,7 @@ import (
 	"errors"
 	"net/http"
 
-	"github.com/ferforastieri/valkyris/backend/internal/remote"
+	"github.com/ferforastieri/valky/backend/internal/remote"
 )
 
 func (s *Server) listRemotes(w http.ResponseWriter, r *http.Request) {

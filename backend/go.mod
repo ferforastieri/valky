@@ -1,4 +1,4 @@
-module github.com/ferforastieri/valkyris/backend
+module github.com/ferforastieri/valky/backend
 
 go 1.26.5
 

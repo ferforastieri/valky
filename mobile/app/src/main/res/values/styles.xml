@@ -1,17 +1,17 @@
 <resources>
-    <style name="Theme.Valkyris" parent="android:style/Theme.Material.Light.NoActionBar">
+    <style name="Theme.Valky" parent="android:style/Theme.Material.Light.NoActionBar">
         <item name="android:fontFamily">sans</item>
         <item name="android:windowLightStatusBar">true</item>
         <item name="android:statusBarColor">#E8E9E5</item>
         <item name="android:navigationBarColor">#E8E9E5</item>
     </style>
-    <style name="Theme.Valkyris.Starting" parent="Theme.SplashScreen">
+    <style name="Theme.Valky.Starting" parent="Theme.SplashScreen">
         <item name="windowSplashScreenBackground">@color/valkyris_canvas</item>
         <item name="windowSplashScreenAnimatedIcon">@drawable/valkyris_mark</item>
         <item name="windowSplashScreenIconBackgroundColor">@color/valkyris_surface</item>
-        <item name="postSplashScreenTheme">@style/Theme.Valkyris</item>
+        <item name="postSplashScreenTheme">@style/Theme.Valky</item>
     </style>
-    <style name="Theme.Valkyris.Alarm" parent="Theme.Valkyris">
+    <style name="Theme.Valky.Alarm" parent="Theme.Valky">
         <item name="android:windowFullscreen">true</item>
     </style>
 </resources>

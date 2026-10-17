@@ -11,11 +11,11 @@ import (
 	"testing"
 	"time"
 
-	"github.com/ferforastieri/valkyris/backend/internal/auth"
-	"github.com/ferforastieri/valkyris/backend/internal/camera"
-	appcrypto "github.com/ferforastieri/valkyris/backend/internal/crypto"
-	"github.com/ferforastieri/valkyris/backend/internal/media"
-	"github.com/ferforastieri/valkyris/backend/internal/store"
+	"github.com/ferforastieri/valky/backend/internal/auth"
+	"github.com/ferforastieri/valky/backend/internal/camera"
+	appcrypto "github.com/ferforastieri/valky/backend/internal/crypto"
+	"github.com/ferforastieri/valky/backend/internal/media"
+	"github.com/ferforastieri/valky/backend/internal/store"
 )
 
 func TestWHEPProxyAuthenticatesAndRewritesSessionLocation(t *testing.T) {
@@ -84,7 +84,7 @@ func testWHEPProxy(t *testing.T, browser bool) {
 	authenticate := func(r *http.Request) {
 		if browser {
 			r.AddCookie(&http.Cookie{Name: auth.ViewerCookie, Value: session.Token})
-			r.Header.Set("X-Valkyris-Viewer", "1")
+			r.Header.Set("X-Valky-Viewer", "1")
 			r.Header.Set("Origin", "https://example.com")
 		} else {
 			r.Header.Set("Authorization", "Bearer "+session.Token)

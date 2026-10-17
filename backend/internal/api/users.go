@@ -1,7 +1,7 @@
 package api
 
 import (
-	"github.com/ferforastieri/valkyris/backend/internal/auth"
+	"github.com/ferforastieri/valky/backend/internal/auth"
 	"net/http"
 )
 

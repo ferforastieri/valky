@@ -2,8 +2,8 @@ package rules
 
 import (
 	"context"
-	"github.com/ferforastieri/valkyris/backend/internal/camera"
-	"github.com/ferforastieri/valkyris/backend/internal/store"
+	"github.com/ferforastieri/valky/backend/internal/camera"
+	"github.com/ferforastieri/valky/backend/internal/store"
 	"strings"
 	"testing"
 	"time"

@@ -1,7 +1,7 @@
 package rules
 
 import (
-	"github.com/ferforastieri/valkyris/backend/internal/camera"
+	"github.com/ferforastieri/valky/backend/internal/camera"
 	"time"
 )
 

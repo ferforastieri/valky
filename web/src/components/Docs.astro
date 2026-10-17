@@ -17,7 +17,7 @@ const text = pt ? {
   onThisPage: 'Nesta página',
   toc: [['start','Começar'],['architecture','Arquitetura'],['camera','Preparar a câmera'],['lighting','Iluminação'],['android','Android'],['viewer','Painel web'],['family','Localização e regras'],['configuration','Configuração'],['api','API HTTP'],['updates','Atualizações'],['security','Segurança'],['diagnostics','Diagnóstico']],
   requirements: ['Linux em amd64 ou arm64', 'Docker Engine com Docker Compose v2', 'Android 8.0 (SDK 26) ou mais recente', 'Câmera ONVIF Profile S com RTSP', 'Servidor, celular e câmera acessíveis por LAN ou VPN'],
-  methods: 'Bearer no Android e integrações; o painel usa cookie HttpOnly e X-Valkyris-Viewer: 1. Rotas públicas dispensam sessão.',
+  methods: 'Bearer no Android e integrações; o painel usa cookie HttpOnly e X-Valky-Viewer: 1. Rotas públicas dispensam sessão.',
 } : {
   title: 'Valky documentation',
   description: 'Installation, ONVIF camera setup, smart lighting, security, operations and complete Valky HTTP API reference.',
@@ -26,7 +26,7 @@ const text = pt ? {
   onThisPage: 'On this page',
   toc: [['start','Get started'],['architecture','Architecture'],['camera','Prepare a camera'],['lighting','Lighting'],['android','Android'],['viewer','Web dashboard'],['family','Location and rules'],['configuration','Configuration'],['api','HTTP API'],['updates','Updates'],['security','Security'],['diagnostics','Diagnostics']],
   requirements: ['Linux on amd64 or arm64', 'Docker Engine with Docker Compose v2', 'Android 8.0 (SDK 26) or later', 'ONVIF Profile S camera with RTSP', 'Server, phone and camera reachable over LAN or VPN'],
-  methods: 'Android and integrations use bearer tokens; the dashboard uses an HttpOnly cookie and X-Valkyris-Viewer: 1. Public routes require no session.',
+  methods: 'Android and integrations use bearer tokens; the dashboard uses an HttpOnly cookie and X-Valky-Viewer: 1. Public routes require no session.',
 };
 
 const endpoints = pt ? [
@@ -176,7 +176,7 @@ const endpoints = pt ? [
           <h3>{pt ? 'Notificações nativas' : 'Native notifications'}</h3>
           <p>{pt ? 'O APK usa Firebase Cloud Messaging diretamente e não exige aplicativo auxiliar. Após o login, o token deste celular é registrado automaticamente; o Android recebe um payload mínimo cifrado e o Valky cria a notificação ou o alarme nativo.' : 'The APK uses Firebase Cloud Messaging directly and requires no companion app. After login, this phone token is registered automatically; Android receives a minimal encrypted payload and Valky creates the native notification or alarm.'}</p>
           <ol class="docs-steps">
-            <li><span>1</span><div><strong>{pt ? 'Configure o APK' : 'Configure the APK'}</strong><p>{pt ? 'Adicione com.ferforastieri.valkyris ao projeto Firebase, baixe google-services.json e grave seu base64 no secret FIREBASE_ANDROID_CONFIG_BASE64 do GitHub.' : 'Add com.ferforastieri.valkyris to the Firebase project, download google-services.json and store its base64 in the FIREBASE_ANDROID_CONFIG_BASE64 GitHub secret.'}</p></div></li>
+            <li><span>1</span><div><strong>{pt ? 'Configure o APK' : 'Configure the APK'}</strong><p>{pt ? 'Adicione com.ferforastieri.valky ao projeto Firebase, baixe google-services.json e grave seu base64 no secret FIREBASE_ANDROID_CONFIG_BASE64 do GitHub.' : 'Add com.ferforastieri.valky to the Firebase project, download google-services.json and store its base64 in the FIREBASE_ANDROID_CONFIG_BASE64 GitHub secret.'}</p></div></li>
             <li><span>2</span><div><strong>{pt ? 'Configure o servidor' : 'Configure the server'}</strong><p>{pt ? 'Gere uma chave JSON em Configurações do projeto → Contas de serviço. No sheet de alertas do app, envie esse JSON: ele é validado e cifrado no SQLite do seu servidor.' : 'Generate a JSON key under Project settings → Service accounts. In the app alert sheet, upload this JSON: it is validated and encrypted in your server SQLite database.'}</p></div></li>
             <li><span>3</span><div><strong>{pt ? 'Conceda a permissão' : 'Grant permission'}</strong><p>{pt ? 'Abra o APK da nova release, faça login e permita notificações. O registro no FCM acontece automaticamente.' : 'Open the APK from the new release, sign in and allow notifications. FCM registration happens automatically.'}</p></div></li>
           </ol>

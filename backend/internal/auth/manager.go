@@ -10,8 +10,8 @@ import (
 	"strings"
 	"time"
 
-	appcrypto "github.com/ferforastieri/valkyris/backend/internal/crypto"
-	"github.com/ferforastieri/valkyris/backend/internal/store"
+	appcrypto "github.com/ferforastieri/valky/backend/internal/crypto"
+	"github.com/ferforastieri/valky/backend/internal/store"
 	"github.com/google/uuid"
 	"golang.org/x/crypto/bcrypt"
 )
@@ -376,8 +376,8 @@ func (m *Manager) RequireAdmin(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if !IsAdmin(r.Context()) {
 			w.Header().Set("Content-Type", "application/json")
-			w.Header().Set("X-Valkyris-Message", "administrator access required")
-			w.Header().Set("X-Valkyris-Success", "false")
+			w.Header().Set("X-Valky-Message", "administrator access required")
+			w.Header().Set("X-Valky-Success", "false")
 			w.WriteHeader(http.StatusForbidden)
 			_ = json.NewEncoder(w).Encode(map[string]any{"success": false, "message": "administrator access required", "error": "administrator access required"})
 			return
@@ -391,8 +391,8 @@ func IsAdmin(ctx context.Context) bool    { v, _ := ctx.Value(adminKey).(bool); 
 
 func writeUnauthorized(w http.ResponseWriter) {
 	w.Header().Set("Content-Type", "application/json")
-	w.Header().Set("X-Valkyris-Message", "authentication required")
-	w.Header().Set("X-Valkyris-Success", "false")
+	w.Header().Set("X-Valky-Message", "authentication required")
+	w.Header().Set("X-Valky-Success", "false")
 	w.WriteHeader(http.StatusUnauthorized)
 	_ = json.NewEncoder(w).Encode(map[string]any{"success": false, "message": "authentication required", "error": "authentication required"})
 }
