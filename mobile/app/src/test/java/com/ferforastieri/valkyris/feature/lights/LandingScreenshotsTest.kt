@@ -12,10 +12,13 @@ import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.unit.dp
 import com.ferforastieri.valkyris.core.design.ValkyrisTheme
 import com.ferforastieri.valkyris.core.design.ValkyrisTopBar
+import com.ferforastieri.valkyris.core.model.Camera
 import com.ferforastieri.valkyris.core.model.LightCapabilities
 import com.ferforastieri.valkyris.core.model.LightColor
 import com.ferforastieri.valkyris.core.model.LightDevice
 import com.ferforastieri.valkyris.core.model.LightState
+import com.ferforastieri.valkyris.feature.cameras.CamerasContent
+import com.ferforastieri.valkyris.feature.cameras.CamerasState
 import com.github.takahirom.roborazzi.captureRoboImage
 import org.junit.Rule
 import org.junit.Test
@@ -30,8 +33,9 @@ import org.robolectric.annotation.GraphicsMode
  */
 @RunWith(RobolectricTestRunner::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
-@Config(sdk = [34], qualifiers = "w411dp-h891dp-xxhdpi", application = android.app.Application::class)
+@Config(sdk = [34], qualifiers = "pt-rBR-w411dp-h891dp-xxhdpi", application = android.app.Application::class)
 class LandingScreenshotsTest {
+    init { java.util.Locale.setDefault(java.util.Locale("pt", "BR")) }
     @get:Rule val compose = createComposeRule()
 
     private fun lamp(name: String, on: Boolean, hue: Int, brightness: Int = 88) = LightDevice(
@@ -84,6 +88,15 @@ class LandingScreenshotsTest {
         }
     }
 
+    private fun cameras() = CamerasState(
+        cameras = listOf(
+            Camera(id = "cam-1", name = "Entrada principal", icon = "camera", host = "192.0.2.50", setupStatus = "ready", favorite = true),
+            Camera(id = "cam-2", name = "Quintal", icon = "camera", host = "192.0.2.51", setupStatus = "ready"),
+        ),
+    )
+
+    @Test fun camerasClara() { tela("light") { CamerasContent(cameras()) }; compose.onRoot().captureRoboImage("build/screenshots/landing-cameras-light.png") }
+    @Test fun camerasEscura() { tela("dark") { CamerasContent(cameras()) }; compose.onRoot().captureRoboImage("build/screenshots/landing-cameras-dark.png") }
     @Test fun listaClara() { tela("light") { lista() }; compose.onRoot().captureRoboImage("build/screenshots/landing-lista-light.png") }
     @Test fun listaEscura() { tela("dark") { lista() }; compose.onRoot().captureRoboImage("build/screenshots/landing-lista-dark.png") }
     @Test fun luzClara() { telaPura("light") { LightDetailContent(lamp("Luz Suíte", true, 30), false, {}, onChange = {}) }; compose.onRoot().captureRoboImage("build/screenshots/landing-luz-light.png") }
