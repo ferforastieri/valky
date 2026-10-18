@@ -114,12 +114,23 @@ def vector(path, entries, size=108):
 
 
 def symbol(path, entries, width, height, size_w):
-    """Marca solta (sem fundo), na proporção do desenho — usada dentro do app."""
+    """Marca solta (sem fundo), na proporção do desenho — usada dentro do app.
+
+    O viewport ganha a altura que falta para o centro de massa cair no meio,
+    pelo mesmo motivo dos ícones: centralizar pela caixa deixa a marca baixa.
+    """
+    altura_marca = BBOX[3] - BBOX[1]
+    massa_do_topo = altura_marca * MASS_RATIO
+    massa_ate_base = altura_marca - massa_do_topo
+    # altura em que a massa cai no meio, com 4% de folga embaixo
+    altura_view = 2 * massa_ate_base * 1.04
+    dy = altura_view / 2 - (BBOX[1] + massa_do_topo)
     out = ['<?xml version="1.0" encoding="utf-8"?>',
            '<vector xmlns:android="http://schemas.android.com/apk/res/android"',
            '    xmlns:aapt="http://schemas.android.com/aapt"',
-           f'    android:width="{size_w}dp" android:height="{size_w * height / width:.2f}dp"',
-           f'    android:viewportWidth="{width}" android:viewportHeight="{height}">']
+           f'    android:width="{size_w}dp" android:height="{size_w * altura_view / width:.2f}dp"',
+           f'    android:viewportWidth="{width}" android:viewportHeight="{altura_view:.1f}">',
+           f'    <group android:translateY="{dy:.2f}">']
     for pts, fill, alpha in entries:
         if fill == 'GRADIENT':
             out += [f'    <path android:pathData="{path_data(pts)}">',
@@ -133,7 +144,8 @@ def symbol(path, entries, width, height, size_w):
                     '    </path>']
         else:
             extra = f' android:fillAlpha="{alpha}"' if alpha else ''
-            out.append(f'    <path android:fillColor="{fill}"{extra} android:pathData="{path_data(pts)}" />')
+            out.append(f'        <path android:fillColor="{fill}"{extra} android:pathData="{path_data(pts)}" />')
+    out.append('    </group>')
     out.append('</vector>')
     path.write_text('\n'.join(out) + '\n')
 
