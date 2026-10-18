@@ -557,34 +557,6 @@ function lightDetails(id: string) {
   paint();
 }
 
-const remoteKeypad: [string, string][] = [
-  ["POWER", "Energia"],
-  ["KEY_VOLUP", "Volume +"],
-  ["KEY_MUTE", "Mudo"],
-  ["KEY_VOLDOWN", "Volume −"],
-  ["KEY_CHUP", "Canal +"],
-  ["KEY_CH_LIST", "Canais"],
-  ["KEY_CHDOWN", "Canal −"],
-  ["KEY_UP", "▲"],
-  ["KEY_LEFT", "◀"],
-  ["KEY_ENTER", "OK"],
-  ["KEY_RIGHT", "▶"],
-  ["KEY_DOWN", "▼"],
-  ["KEY_RETURN", "Voltar"],
-  ["KEY_HOME", "Início"],
-  ["KEY_MENU", "Menu"],
-  ..."1234567890".split("").map((digit) => [`KEY_${digit}`, digit] as [string, string]),
-];
-// Letras digitadas na TV, como o teclado do aplicativo.
-const remoteLetters: [string, string][] = [
-  ..."qwertyuiop".split("").map((letter) => [`TEXT:${letter}`, letter] as [string, string]),
-  ..."asdfghjkl".split("").map((letter) => [`TEXT:${letter}`, letter] as [string, string]),
-  ..."zxcvbnm".split("").map((letter) => [`TEXT:${letter}`, letter] as [string, string]),
-  ["TEXT:ESPACO", "espaço"],
-  ["TEXT:APAGAR", "⌫"],
-  ["TEXT:ENTER", "⏎"],
-];
-
 function remoteDetails(id: string) {
   const remote = remotes.find((item) => item.id === id);
   if (!remote) return;
