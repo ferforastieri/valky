@@ -2,8 +2,8 @@
     <style name="Theme.Valky" parent="android:style/Theme.Material.Light.NoActionBar">
         <item name="android:fontFamily">sans</item>
         <item name="android:windowLightStatusBar">true</item>
-        <item name="android:statusBarColor">#E8E9E5</item>
-        <item name="android:navigationBarColor">#E8E9E5</item>
+        <item name="android:statusBarColor">#F5F3FC</item>
+        <item name="android:navigationBarColor">#F5F3FC</item>
     </style>
     <style name="Theme.Valky.Starting" parent="Theme.SplashScreen">
         <item name="windowSplashScreenBackground">@color/valky_canvas</item>

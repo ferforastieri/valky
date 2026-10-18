@@ -1,7 +1,9 @@
-<vector xmlns:android="http://schemas.android.com/apk/res/android" android:width="24dp" android:height="24dp" android:viewportWidth="64" android:viewportHeight="64">
-    <!-- Status-bar icons must contain alpha only. This is the Valky shield
-         and eye drawn as a single white outline, without an opaque backdrop. -->
-    <path android:fillColor="@android:color/transparent" android:strokeColor="#FFFFFFFF" android:strokeWidth="4" android:strokeLineCap="round" android:strokeLineJoin="round" android:pathData="M11.5,23.5L21,17.5L32,23.5L43,17.5L52.5,23.5V35.75C48.8,44.2 41.2,50.3 32,54.5C22.8,50.3 15.2,44.2 11.5,35.75Z" />
-    <path android:fillColor="@android:color/transparent" android:strokeColor="#FFFFFFFF" android:strokeWidth="3.5" android:pathData="M41.5,35A9.5,9.5 0,1 1,22.5 35A9.5,9.5 0,1 1,41.5 35" />
-    <path android:fillColor="#FFFFFFFF" android:pathData="M35.25,35A3.25,3.25 0,1 1,28.75 35A3.25,3.25 0,1 1,35.25 35" />
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:aapt="http://schemas.android.com/aapt"
+    android:width="108dp" android:height="108dp"
+    android:viewportWidth="108" android:viewportHeight="108">
+    <path android:fillColor="#FFFFFFFF" android:pathData="M30,36.73 L30.83,38.99 L33.45,47.69 L36.79,53.52 L46.91,62.69 L53.11,70.44 L54.06,71.39 L49.53,54.71 L46.44,42.33Z" />
+    <path android:fillColor="#FFFFFFFF" android:pathData="M61.56,42.33 L58.47,54.71 L53.94,71.39 L54.89,70.44 L61.09,62.69 L71.21,53.52 L74.55,47.69 L77.17,38.99 L78,36.73Z" />
+    <path android:fillColor="#FFFFFFFF" android:pathData="M54,36.61 L56.38,46.38 L54,57.1 L51.62,46.38Z" />
 </vector>

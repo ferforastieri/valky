@@ -1,18 +1,18 @@
 <resources>
-    <color name="valky_canvas">#E8E9E5</color>
-    <color name="valky_surface">#F9FAF7</color>
-    <color name="widget_surface">#CC1A1F1A</color>
+    <color name="valky_canvas">#F5F3FC</color>
+    <color name="valky_surface">#FBFAFF</color>
+    <color name="widget_surface">#CC1A1726</color>
     <!-- Fundo dos widgets = fundo do app (CanvasDark). -->
-    <color name="widget_surface_solid">#FF101310</color>
-    <color name="widget_ink">#FFF1F4EF</color>
-    <color name="widget_muted">#FFA6AFA5</color>
-    <color name="widget_signal">#FF8AE07D</color>
-    <color name="widget_surface_variant">#FF222822</color>
-    <color name="widget_outline">#FF2B312B</color>
-    <color name="widget_secondary_container">#FF293D29</color>
+    <color name="widget_surface_solid">#FF14121C</color>
+    <color name="widget_ink">#FFF2F0FA</color>
+    <color name="widget_muted">#FFA9A3BC</color>
+    <color name="widget_signal">#FF806DF8</color>
+    <color name="widget_surface_variant">#FF262231</color>
+    <color name="widget_outline">#FF332E42</color>
+    <color name="widget_secondary_container">#FF2E2775</color>
     <color name="widget_alarm">#FFFF766E</color>
     <!-- As MESMAS cores dos estados usados na lista de lâmpadas do app. -->
-    <color name="widget_on_secondary_container">#FFE9F7E6</color>
+    <color name="widget_on_secondary_container">#FFE7E2FE</color>
     <color name="widget_error_container">#FF4C2623</color>
     <color name="widget_on_error_container">#FFFFDAD6</color>
 </resources>

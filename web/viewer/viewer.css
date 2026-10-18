@@ -1,43 +1,43 @@
 :root {
-  --canvas: #e8e9e5;
-  --surface: #f9faf7;
-  --soft: #f0f1ee;
-  --ink: #242724;
-  --muted: #697167;
-  --line: #d2d5d0;
-  --signal: #357b2e;
-  --accent: #7bd66f;
-  --alarm: #bd3632;
-  --shadow: 0 12px 36px #1b271710;
+  --canvas: #f5f3fc;
+  --surface: #fbfaff;
+  --soft: #efecfa;
+  --ink: #1a1726;
+  --muted: #6b6580;
+  --line: #dcd7ee;
+  --signal: #6d5ff9;
+  --accent: #806df8;
+  --alarm: #dc4a44;
+  --shadow: 0 12px 36px #241e5210;
   --display: "Bricolage Grotesque Variable", sans-serif;
   --body: "Manrope Variable", sans-serif;
   --mono: "IBM Plex Mono", monospace;
   color-scheme: light;
 }
 :root[data-theme="dark"] {
-  --canvas: #101310;
-  --surface: #1a1f1a;
-  --soft: #222822;
-  --ink: #f1f4ef;
-  --muted: #a6afa5;
-  --line: #343d33;
-  --signal: #8ae07d;
-  --accent: #8ae07d;
-  --alarm: #ff928c;
+  --canvas: #14121c;
+  --surface: #1c1926;
+  --soft: #262231;
+  --ink: #f2f0fa;
+  --muted: #a9a3bc;
+  --line: #332e42;
+  --signal: #9b8cfa;
+  --accent: #9b8cfa;
+  --alarm: #ff766e;
   --shadow: 0 12px 36px #0003;
   color-scheme: dark;
 }
 @media (prefers-color-scheme: dark) {
   :root[data-theme="auto"] {
-    --canvas: #101310;
-    --surface: #1a1f1a;
-    --soft: #222822;
-    --ink: #f1f4ef;
-    --muted: #a6afa5;
-    --line: #343d33;
-    --signal: #8ae07d;
-    --accent: #8ae07d;
-    --alarm: #ff928c;
+    --canvas: #14121c;
+    --surface: #1c1926;
+    --soft: #262231;
+    --ink: #f2f0fa;
+    --muted: #a9a3bc;
+    --line: #332e42;
+    --signal: #9b8cfa;
+    --accent: #9b8cfa;
+    --alarm: #ff766e;
     --shadow: 0 12px 36px #0003;
     color-scheme: dark;
   }
@@ -190,7 +190,7 @@ small,
   flex-direction: column;
   justify-content: space-between;
   min-height: 700px;
-  background: radial-gradient(ellipse at 20% 80%, #7bd66f17, transparent 70%);
+  background: radial-gradient(ellipse at 20% 80%, #806df817, transparent 70%);
   border-right: 1px solid var(--line);
 }
 .login-story h1 {
@@ -476,7 +476,7 @@ main {
   display: grid;
   place-items: center;
   overflow: hidden;
-  color: #b4c8b3;
+  color: #a9a3bc;
 }
 .camera-preview > svg {
   width: 32px;
@@ -814,7 +814,7 @@ dialog::backdrop {
   aspect-ratio: 16/9;
   display: grid;
   place-items: center;
-  color: #b4c8b3;
+  color: #a9a3bc;
   margin-bottom: 16px;
 }
 .media-stage img,
@@ -826,8 +826,8 @@ dialog::backdrop {
 }
 .media-stage .region {
   position: absolute;
-  border: 2px solid #8ae07d;
-  background: #8ae07d24;
+  border: 2px solid #9b8cfa;
+  background: #9b8cfa24;
   pointer-events: none;
 }
 .media-actions {
@@ -1193,10 +1193,10 @@ dialog::backdrop {
 }
 
 /* Leaflet's light cartography and popup chrome stay readable in either app theme. */
-.map .leaflet-popup-content-wrapper, .map .leaflet-popup-tip { background: #ffffff; color: #242724; }
-.map .leaflet-control-zoom a { background: #ffffff; color: #242724; }
+.map .leaflet-popup-content-wrapper, .map .leaflet-popup-tip { background: #ffffff; color: #1a1726; }
+.map .leaflet-control-zoom a { background: #ffffff; color: #1a1726; }
 .map .leaflet-control-attribution { background: #ffffffe6; color: #374151; }
-.map .leaflet-control-attribution a { color: #1d4ed8; }
+.map .leaflet-control-attribution a { color: #6d5ff9; }
 
 .update-toast {
   position: fixed;
@@ -1262,38 +1262,38 @@ dialog::backdrop {
 .lamp-head, .remote-head { display: flex; align-items: center; gap: 12px; }
 .lamp-head > div, .remote-head > div { flex: 1; }
 .lamp-orb, .tile-icon { display: grid; place-items: center; width: 44px; height: 44px; border-radius: 50%; background: color-mix(in srgb, var(--lamp) 22%, #202420); color: var(--lamp); box-shadow: inset 0 0 0 1px rgba(255,255,255,.08), 0 0 18px -6px var(--lamp); }
-.tile-icon { border-radius: 12px; background: #202420; color: var(--signal, #8ae07d); box-shadow: inset 0 0 0 1px rgba(255,255,255,.08); }
-.lamp-name small, .remote-head small { color: #a6afa5; }
-.lamp-switch { padding: 9px 16px; border-radius: 999px; border: 1px solid rgba(255,255,255,.14); background: #222822; color: #f1f4ef; font-weight: 600; }
-.lamp-switch.on { background: #293d29; border-color: rgba(138,224,125,.35); }
-.lamp-tabs { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; padding: 5px; border-radius: 14px; background: #222822; }
-.lamp-tabs button { padding: 10px; border: 0; border-radius: 10px; background: transparent; color: #a6afa5; font-weight: 600; }
-.lamp-tabs button.active { background: #293d29; color: #e9f7e6; }
+.tile-icon { border-radius: 12px; background: #202420; color: var(--signal, #9b8cfa); box-shadow: inset 0 0 0 1px rgba(255,255,255,.08); }
+.lamp-name small, .remote-head small { color: #a9a3bc; }
+.lamp-switch { padding: 9px 16px; border-radius: 999px; border: 1px solid rgba(255,255,255,.14); background: #262231; color: #f2f0fa; font-weight: 600; }
+.lamp-switch.on { background: #2e2775; border-color: rgba(128,109,248,.35); }
+.lamp-tabs { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; padding: 5px; border-radius: 14px; background: #262231; }
+.lamp-tabs button { padding: 10px; border: 0; border-radius: 10px; background: transparent; color: #a9a3bc; font-weight: 600; }
+.lamp-tabs button.active { background: #2e2775; color: #e7e2fe; }
 .lamp-block { position: relative; height: 190px; border-radius: 16px; touch-action: none; cursor: crosshair; overflow: hidden;
   background: linear-gradient(to right, #ff0000, #ffff00, #00ff00, #00ffff, #0000ff, #ff00ff, #ff0000); }
 .lamp-block.white { background: linear-gradient(to right, #ffb46b, #ffd9a8, #fff6e6, #eaf2ff, #bcd8ff); }
 .lamp-veil { position: absolute; inset: 0; background: linear-gradient(to top, #ffffff, rgba(255,255,255,0)); }
 .lamp-pin { position: absolute; width: 20px; height: 20px; margin: -10px 0 0 -10px; border-radius: 50%; background: #fff; box-shadow: 0 2px 8px rgba(0,0,0,.45); }
 .lamp-block.white .lamp-pin { top: 50%; }
-.lamp-slider { display: flex; flex-direction: column; gap: 6px; color: #a6afa5; }
+.lamp-slider { display: flex; flex-direction: column; gap: 6px; color: #a9a3bc; }
 .lamp-slider input { width: 100%; }
 .remote-power { align-self: center; width: 62px; height: 62px; border-radius: 50%; border: 1px solid rgba(255,118,110,.35); background: #4c2623; color: #ffdad6; font-size: 26px; line-height: 1; }
-.remote-mode { align-self: center; width: 62px; height: 62px; border-radius: 50%; border: 1px solid rgba(255,255,255,.12); background: #222822; color: #8ae07d; font-weight: 700; }
+.remote-mode { align-self: center; width: 62px; height: 62px; border-radius: 50%; border: 1px solid rgba(255,255,255,.12); background: #262231; color: #9b8cfa; font-weight: 700; }
 .remote-pad { display: grid; grid-template-columns: repeat(10, 1fr); gap: 6px; }
-.remote-pad button { padding: 12px 0; border: 1px solid rgba(255,255,255,.10); border-radius: 12px; background: #222822; color: #f1f4ef; }
+.remote-pad button { padding: 12px 0; border: 1px solid rgba(255,255,255,.10); border-radius: 12px; background: #262231; color: #f2f0fa; }
 .remote-pad.letters button.wide { grid-column: span 3; }
 .remote-mid { display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: 10px; }
-.remote-rocker { display: flex; flex-direction: column; gap: 6px; padding: 8px; border-radius: 16px; background: #222822; }
-.remote-rocker button { width: 52px; padding: 12px 0; border-radius: 12px; border: 1px solid rgba(255,255,255,.10); background: #1a1f1a; color: #f1f4ef; font-size: 13px; }
+.remote-rocker { display: flex; flex-direction: column; gap: 6px; padding: 8px; border-radius: 16px; background: #262231; }
+.remote-rocker button { width: 52px; padding: 12px 0; border-radius: 12px; border: 1px solid rgba(255,255,255,.10); background: #1c1926; color: #f2f0fa; font-size: 13px; }
 .remote-dpad { position: relative; aspect-ratio: 1; border-radius: 50%; background: #262c26; }
-.remote-dpad button { position: absolute; border: 0; background: transparent; color: #f1f4ef; font-size: 15px; }
+.remote-dpad button { position: absolute; border: 0; background: transparent; color: #f2f0fa; font-size: 15px; }
 .remote-dpad .up { top: 4%; left: 50%; transform: translateX(-50%); }
 .remote-dpad .down { bottom: 4%; left: 50%; transform: translateX(-50%); }
 .remote-dpad .left { left: 4%; top: 50%; transform: translateY(-50%); }
 .remote-dpad .right { right: 4%; top: 50%; transform: translateY(-50%); }
-.remote-dpad .ok { left: 50%; top: 50%; transform: translate(-50%, -50%); width: 64px; height: 64px; border-radius: 50%; background: #222822; color: #8ae07d; font-weight: 700; }
-.remote-bottom { display: flex; justify-content: center; gap: 8px; padding: 8px; border-radius: 16px; background: #222822; }
-.remote-bottom button { padding: 14px 18px; border-radius: 12px; border: 1px solid rgba(255,255,255,.10); background: #1a1f1a; color: #f1f4ef; }
+.remote-dpad .ok { left: 50%; top: 50%; transform: translate(-50%, -50%); width: 64px; height: 64px; border-radius: 50%; background: #262231; color: #9b8cfa; font-weight: 700; }
+.remote-bottom { display: flex; justify-content: center; gap: 8px; padding: 8px; border-radius: 16px; background: #262231; }
+.remote-bottom button { padding: 14px 18px; border-radius: 12px; border: 1px solid rgba(255,255,255,.10); background: #1c1926; color: #f2f0fa; }
 
 /* ---- responsivo: cabe no celular ---- */
 .light-grid { grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); }

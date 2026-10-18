@@ -130,6 +130,9 @@ class LandingScreenshotsTest {
     @Test fun camerasEscura() { tela("dark", "Câmeras", 2) { CamerasContent(cameras()) }; capturar("landing-cameras-dark") }
     @Test fun eventosClara() { tela("light", "Notificações", 0) { EventsContent(eventos()) }; capturar("landing-events-light") }
     @Test fun eventosEscura() { tela("dark", "Notificações", 0) { EventsContent(eventos()) }; capturar("landing-events-dark") }
+    // Capturas das regras: voltam à landing com a identidade nova.
+    @Test fun regrasClara() { tela("light", "Regras", 4) { regras() }; capturar("landing-rules-light") }
+    @Test fun regrasEscura() { tela("dark", "Regras", 4) { regras() }; capturar("landing-rules-dark") }
     @Test fun ajustesClara() { tela("light", "Ajustes", 4) { SettingsContent(admin = true, permissionsReady = 0, permissionsTotal = 0, language = "", theme = "") }; capturar("landing-settings-light") }
     @Test fun ajustesEscura() { tela("dark", "Ajustes", 4) { SettingsContent(admin = true, permissionsReady = 0, permissionsTotal = 0, language = "", theme = "") }; capturar("landing-settings-dark") }
     @Test fun listaClara() { tela("light", "Iluminação", 2) { lista() }; capturar("landing-lista-light") }

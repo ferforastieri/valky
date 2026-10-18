@@ -14,26 +14,28 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.unit.dp
 
-val CanvasLight=Color(0xFFE8E9E5);val SurfaceLight=Color(0xFFF9FAF7);val InkLight=Color(0xFF242724);val MutedLight=Color(0xFF70766F);val SignalLight=Color(0xFF7BD66F);val AlarmLight=Color(0xFFEC625B)
-val CanvasDark=Color(0xFF101310);val SurfaceDark=Color(0xFF1A1F1A);val InkDark=Color(0xFFF1F4EF);val MutedDark=Color(0xFFA6AFA5);val SignalDark=Color(0xFF8AE07D);val AlarmDark=Color(0xFFFF766E)
-object ColorTokens { val BrandTile=Color(0xFF202420) }
+// Paleta Valky: roxo principal (#806DF8) e secundário (#594DFC), com neutros
+// levemente arroxeados para o texto e os fundos continuarem legíveis.
+val CanvasLight=Color(0xFFF5F3FC);val SurfaceLight=Color(0xFFFBFAFF);val InkLight=Color(0xFF1A1726);val MutedLight=Color(0xFF6B6580);val SignalLight=Color(0xFF594DFC);val AlarmLight=Color(0xFFDC4A44)
+val CanvasDark=Color(0xFF14121C);val SurfaceDark=Color(0xFF1C1926);val InkDark=Color(0xFFF2F0FA);val MutedDark=Color(0xFFA9A3BC);val SignalDark=Color(0xFF9B8CFA);val AlarmDark=Color(0xFFFF766E)
+object ColorTokens { val BrandTile=Color(0xFF1C1926) }
 private val light=lightColorScheme(
-    primary=InkLight,onPrimary=SurfaceLight,primaryContainer=Color(0xFFE1E5DE),onPrimaryContainer=InkLight,
-    secondary=SignalLight,onSecondary=InkLight,secondaryContainer=Color(0xFFDDF3D8),onSecondaryContainer=InkLight,
-    tertiary=MutedLight,onTertiary=SurfaceLight,tertiaryContainer=Color(0xFFE7EBE4),onTertiaryContainer=InkLight,
-    error=AlarmLight,onError=SurfaceLight,errorContainer=Color(0xFFFBE1DF),onErrorContainer=Color(0xFF671D19),
+    primary=Color(0xFF806DF8),onPrimary=Color(0xFFFFFFFF),primaryContainer=Color(0xFFE7E2FE),onPrimaryContainer=Color(0xFF241E52),
+    secondary=Color(0xFF594DFC),onSecondary=Color(0xFFFFFFFF),secondaryContainer=Color(0xFFDFDBFE),onSecondaryContainer=Color(0xFF1B1550),
+    tertiary=MutedLight,onTertiary=Color(0xFFFFFFFF),tertiaryContainer=Color(0xFFEDEAF8),onTertiaryContainer=InkLight,
+    error=AlarmLight,onError=Color(0xFFFFFFFF),errorContainer=Color(0xFFFBE1DF),onErrorContainer=Color(0xFF6A1A17),
     background=CanvasLight,onBackground=InkLight,surface=SurfaceLight,onSurface=InkLight,
-    surfaceVariant=Color(0xFFF0F1EE),onSurfaceVariant=MutedLight,surfaceContainerLow=Color(0xFFF4F5F2),
-    outline=Color(0xFFD2D5D0),outlineVariant=Color(0xFFE0E2DD),
+    surfaceVariant=Color(0xFFEFECFA),onSurfaceVariant=MutedLight,surfaceContainerLow=Color(0xFFF7F5FD),
+    outline=Color(0xFFDCD7EE),outlineVariant=Color(0xFFE6E2F3),
 )
 private val dark=darkColorScheme(
-    primary=InkDark,onPrimary=CanvasDark,primaryContainer=Color(0xFF303630),onPrimaryContainer=InkDark,
-    secondary=SignalDark,onSecondary=CanvasDark,secondaryContainer=Color(0xFF293D29),onSecondaryContainer=Color(0xFFE9F7E6),
-    tertiary=MutedDark,onTertiary=CanvasDark,tertiaryContainer=Color(0xFF2A302A),onTertiaryContainer=InkDark,
+    primary=Color(0xFF9B8CFA),onPrimary=Color(0xFF1A1433),primaryContainer=Color(0xFF322A6B),onPrimaryContainer=Color(0xFFE7E2FE),
+    secondary=Color(0xFF8E85FB),onSecondary=Color(0xFF1B1550),secondaryContainer=Color(0xFF2E2775),onSecondaryContainer=Color(0xFFDFDBFE),
+    tertiary=MutedDark,onTertiary=Color(0xFF1A1433),tertiaryContainer=Color(0xFF2A2536),onTertiaryContainer=InkDark,
     error=AlarmDark,onError=Color(0xFF32100E),errorContainer=Color(0xFF4C2623),onErrorContainer=Color(0xFFFFDAD6),
     background=CanvasDark,onBackground=InkDark,surface=SurfaceDark,onSurface=InkDark,
-    surfaceVariant=Color(0xFF222822),onSurfaceVariant=MutedDark,surfaceContainerLow=Color(0xFF161B16),
-    outline=Color(0xFF343A34),outlineVariant=Color(0xFF2B312B),
+    surfaceVariant=Color(0xFF262231),onSurfaceVariant=MutedDark,surfaceContainerLow=Color(0xFF191623),
+    outline=Color(0xFF3B3550),outlineVariant=Color(0xFF2C2740),
 )
 private val typography=Typography(
     headlineLarge=TextStyle(fontSize=40.sp,lineHeight=42.sp,fontWeight=FontWeight.SemiBold,letterSpacing=(-1.2).sp),
