@@ -410,6 +410,7 @@ function closeDetails() {
 }
 function openDetails(title: string, kicker: string) {
   closeDetails();
+  dialog.classList.remove("remote-open");
   $("#detail-title").textContent = title;
   $("#detail-kicker").textContent = kicker;
   $("#detail-body").innerHTML =
@@ -588,45 +589,58 @@ function remoteDetails(id: string) {
   const remote = remotes.find((item) => item.id === id);
   if (!remote) return;
   openDetails(remote.name, "CONTROLE REMOTO");
+  dialog.classList.add("remote-open");
   const ready = remote.tokenConfigured;
-  const digits = "1234567890".split("").map((digit) => '<button data-remote-key="KEY_' + digit + '">' + digit + '</button>').join("");
-  const letters = "qwertyuiop".split("").map((letter) => '<button data-remote-key="TEXT:' + letter + '">' + letter + '</button>').join("")
-    + "asdfghjkl".split("").map((letter) => '<button data-remote-key="TEXT:' + letter + '">' + letter + '</button>').join("")
-    + "zxcvbnm".split("").map((letter) => '<button data-remote-key="TEXT:' + letter + '">' + letter + '</button>').join("")
+  // Teclado numérico em 3x4 (como no aplicativo): 1-9, apagar, 0 e enter.
+  const digits = "123456789".split("").map((digit) => '<button data-remote-key="KEY_' + digit + '">' + digit + '</button>').join("")
+    + '<button data-remote-key="TEXT:APAGAR" aria-label="Apagar">⌫</button>'
+    + '<button data-remote-key="KEY_0">0</button>'
+    + '<button data-remote-key="TEXT:ENTER" aria-label="Confirmar">⏎</button>';
+  // Letras em 6 colunas: 30 casas exatas, sem sobra nem rolagem.
+  const letters = "qwertyuiopasdfghjklzxcvbnm".split("").map((letter) => '<button data-remote-key="TEXT:' + letter + '">' + letter + '</button>').join("")
     + '<button class="wide" data-remote-key="TEXT:ESPACO">espaço</button>'
-    + '<button data-remote-key="TEXT:APAGAR">⌫</button>'
-    + '<button data-remote-key="TEXT:ENTER">⏎</button>';
+    + '<button data-remote-key="TEXT:APAGAR" aria-label="Apagar">⌫</button>'
+    + '<button data-remote-key="TEXT:ENTER" aria-label="Confirmar">⏎</button>';
   const pairAction = ready
     ? ""
     : api.admin
       ? '<button id="remote-pair" class="primary">Parear</button>'
       : '<p class="muted">Peça a um administrador para parear o controle no aplicativo.</p>';
-  // Mesma ordem do aplicativo: energia grande, teclado (números/letras),
-  // volume | direcional | canais e, embaixo, voltar/casa/menu.
+  // O controle inteiro cabe na altura do painel: nada de rolagem. A marca e o
+  // estado ficam no topo, o teclado e o direcional dividem o meio e as ações de
+  // navegação ficam no rodapé.
   $("#detail-body").innerHTML = '<div class="remote-sheet">' +
-    '<div class="remote-head"><span class="tile-icon">' + icon("tv") + '</span><div><strong>' + e(remote.name) + '</strong><small>' + (ready ? "Pareado" : "Não pareado") + '</small></div>' + pairAction + '</div>' +
+    '<div class="remote-head"><span class="tile-icon">' + icon("tv") + '</span>' +
+      '<div class="remote-identity"><strong>' + e(remote.name) + '</strong><small>' + (ready ? "Pareado" : "Não pareado") + '</small></div>' +
+      '<div class="remote-head-actions">' + pairAction +
+        (ready ? '<button id="remote-mode" class="remote-mode" aria-label="Alternar teclado">ABC</button>' +
+                 '<button class="remote-power" data-remote-key="POWER" aria-label="Energia">&#9211;</button>' : '') +
+      '</div>' +
+    '</div>' +
     (ready ? '' +
-      '<button class="remote-power" data-remote-key="POWER" aria-label="Energia">&#9211;</button>' +
-      '<button id="remote-mode" class="remote-mode">ABC</button>' +
-      '<div id="remote-digits" class="remote-pad">' + digits + '</div>' +
-      '<div id="remote-letters" class="remote-pad letters" hidden>' + letters + '</div>' +
-      '<div class="remote-mid">' +
-        '<div class="remote-rocker">' +
-          '<button data-remote-key="KEY_VOLUP" aria-label="Volume mais">+</button>' +
-          '<button data-remote-key="KEY_MUTE" aria-label="Mudo">Mudo</button>' +
-          '<button data-remote-key="KEY_VOLDOWN" aria-label="Volume menos">&minus;</button>' +
+      '<div class="remote-body">' +
+        '<div class="remote-pads">' +
+          '<div id="remote-digits" class="remote-pad">' + digits + '</div>' +
+          '<div id="remote-letters" class="remote-pad letters" hidden>' + letters + '</div>' +
         '</div>' +
-        '<div class="remote-dpad">' +
-          '<button class="up" data-remote-key="KEY_UP" aria-label="Cima">&#9650;</button>' +
-          '<button class="left" data-remote-key="KEY_LEFT" aria-label="Esquerda">&#9664;</button>' +
-          '<button class="ok" data-remote-key="KEY_ENTER">OK</button>' +
-          '<button class="right" data-remote-key="KEY_RIGHT" aria-label="Direita">&#9654;</button>' +
-          '<button class="down" data-remote-key="KEY_DOWN" aria-label="Baixo">&#9660;</button>' +
-        '</div>' +
-        '<div class="remote-rocker">' +
-          '<button data-remote-key="KEY_CHUP" aria-label="Canal mais">+</button>' +
-          '<button data-remote-key="KEY_CH_LIST" aria-label="Canais">Canais</button>' +
-          '<button data-remote-key="KEY_CHDOWN" aria-label="Canal menos">&minus;</button>' +
+        '<div class="remote-side">' +
+          '<div class="remote-dpad">' +
+            '<button class="up" data-remote-key="KEY_UP" aria-label="Cima">&#9650;</button>' +
+            '<button class="left" data-remote-key="KEY_LEFT" aria-label="Esquerda">&#9664;</button>' +
+            '<button class="ok" data-remote-key="KEY_ENTER">OK</button>' +
+            '<button class="right" data-remote-key="KEY_RIGHT" aria-label="Direita">&#9654;</button>' +
+            '<button class="down" data-remote-key="KEY_DOWN" aria-label="Baixo">&#9660;</button>' +
+          '</div>' +
+          '<div class="remote-rockers">' +
+            '<button data-remote-key="KEY_VOLUP" aria-label="Volume mais">Volume +</button>' +
+            '<button data-remote-key="KEY_CHUP" aria-label="Canal mais">Canal +</button>' +
+            '<button data-remote-key="KEY_VOLDOWN" aria-label="Volume menos">Volume −</button>' +
+            '<button data-remote-key="KEY_CHDOWN" aria-label="Canal menos">Canal −</button>' +
+          '</div>' +
+          '<div class="remote-extra">' +
+            '<button data-remote-key="KEY_MUTE">Mudo</button>' +
+            '<button data-remote-key="KEY_CH_LIST">Canais</button>' +
+          '</div>' +
         '</div>' +
       '</div>' +
       '<div class="remote-bottom">' +

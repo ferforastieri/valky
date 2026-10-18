@@ -2734,8 +2734,12 @@ body {
     margin: 0;
     pointer-events: auto;
   }
-  /* Espaço para a marca fixa no topo. */
+  /* Espaço para a marca fixa no topo: sem isso o herói e a documentação
+     ficavam por baixo do símbolo. */
+  .hero {
+    padding-top: 92px;
+  }
   .docs-shell {
-    padding-top: 64px;
+    padding-top: 72px;
   }
 }

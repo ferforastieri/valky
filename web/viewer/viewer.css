@@ -1251,19 +1251,14 @@ dialog::backdrop {
 .remote-card > span:not(.tile-icon):not(.arrow) { display:flex;flex-direction:column;min-width:0;flex:1; }
 .remote-card strong { font-family:var(--display);font-size:17px; }
 .remote-card small { white-space:nowrap;overflow:hidden;text-overflow:ellipsis; }
-.remote-detail { display:grid;gap:20px; }
-.remote-detail-head { display:flex;gap:13px;align-items:center;padding:16px;border-radius:16px;background:var(--soft); }
-.remote-detail-head > div { display:flex;flex:1;flex-direction:column; }
-.remote-keypad { display:grid;grid-template-columns:repeat(auto-fit,minmax(84px,1fr));gap:8px; }
-.remote-keypad button { min-height:52px; }
 
-/* ---- luz e controle com a cara do aplicativo ---- */
-.lamp-sheet, .remote-sheet { display: flex; flex-direction: column; gap: 12px; --lamp: #ffd7a0; }
-.lamp-head, .remote-head { display: flex; align-items: center; gap: 12px; }
-.lamp-head > div, .remote-head > div { flex: 1; }
-.lamp-orb, .tile-icon { display: grid; place-items: center; width: 44px; height: 44px; border-radius: 50%; background: color-mix(in srgb, var(--lamp) 22%, #202420); color: var(--lamp); box-shadow: inset 0 0 0 1px rgba(255,255,255,.08), 0 0 18px -6px var(--lamp); }
-.tile-icon { border-radius: 12px; background: #202420; color: var(--signal, #9b8cfa); box-shadow: inset 0 0 0 1px rgba(255,255,255,.08); }
-.lamp-name small, .remote-head small { color: #a9a3bc; }
+/* ---- luz e controle remoto com a cara do aplicativo ---- */
+.lamp-sheet { display: flex; flex-direction: column; gap: 12px; --lamp: #ffd7a0; }
+.lamp-head { display: flex; align-items: center; gap: 12px; }
+.lamp-head > div { flex: 1; }
+.lamp-name small { color: #a9a3bc; }
+.lamp-orb, .tile-icon { display: grid; place-items: center; width: 44px; height: 44px; border-radius: 50%; background: color-mix(in srgb, var(--lamp) 22%, #262231); color: var(--lamp); box-shadow: inset 0 0 0 1px rgba(255,255,255,.08), 0 0 18px -6px var(--lamp); }
+.tile-icon { border-radius: 12px; background: #262231; color: var(--signal, #9b8cfa); box-shadow: inset 0 0 0 1px rgba(255,255,255,.08); }
 .lamp-switch { padding: 9px 16px; border-radius: 999px; border: 1px solid rgba(255,255,255,.14); background: #262231; color: #f2f0fa; font-weight: 600; }
 .lamp-switch.on { background: #2e2775; border-color: rgba(128,109,248,.35); }
 .lamp-tabs { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; padding: 5px; border-radius: 14px; background: #262231; }
@@ -1277,57 +1272,131 @@ dialog::backdrop {
 .lamp-block.white .lamp-pin { top: 50%; }
 .lamp-slider { display: flex; flex-direction: column; gap: 6px; color: #a9a3bc; }
 .lamp-slider input { width: 100%; }
-.remote-power { align-self: center; width: 62px; height: 62px; border-radius: 50%; border: 1px solid rgba(255,118,110,.35); background: #4c2623; color: #ffdad6; font-size: 26px; line-height: 1; }
-.remote-mode { align-self: center; width: 62px; height: 62px; border-radius: 50%; border: 1px solid rgba(255,255,255,.12); background: #262231; color: #9b8cfa; font-weight: 700; }
-.remote-pad { display: grid; grid-template-columns: repeat(10, 1fr); gap: 6px; }
-.remote-pad button { padding: 12px 0; border: 1px solid rgba(255,255,255,.10); border-radius: 12px; background: #262231; color: #f2f0fa; }
-.remote-pad.letters button.wide { grid-column: span 3; }
-.remote-mid { display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: 10px; }
-.remote-rocker { display: flex; flex-direction: column; gap: 6px; padding: 8px; border-radius: 16px; background: #262231; }
-.remote-rocker button { width: 52px; padding: 12px 0; border-radius: 12px; border: 1px solid rgba(255,255,255,.10); background: #1c1926; color: #f2f0fa; font-size: 13px; }
-.remote-dpad { position: relative; aspect-ratio: 1; border-radius: 50%; background: #262231; }
-.remote-dpad button { position: absolute; border: 0; background: transparent; color: #f2f0fa; font-size: 15px; }
-.remote-dpad .up { top: 4%; left: 50%; transform: translateX(-50%); }
-.remote-dpad .down { bottom: 4%; left: 50%; transform: translateX(-50%); }
-.remote-dpad .left { left: 4%; top: 50%; transform: translateY(-50%); }
-.remote-dpad .right { right: 4%; top: 50%; transform: translateY(-50%); }
-.remote-dpad .ok { left: 50%; top: 50%; transform: translate(-50%, -50%); width: 64px; height: 64px; border-radius: 50%; background: #262231; color: #9b8cfa; font-weight: 700; }
-.remote-bottom { display: flex; justify-content: center; gap: 8px; padding: 8px; border-radius: 16px; background: #262231; }
-.remote-bottom button { padding: 14px 18px; border-radius: 12px; border: 1px solid rgba(255,255,255,.10); background: #1c1926; color: #f2f0fa; }
 
-/* ---- responsivo: cabe no celular ---- */
+/* ---- responsivo ---- */
 .light-grid { grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); }
 @media (max-width: 720px) {
-  .remote-pad { grid-template-columns: repeat(5, 1fr); }
-  .remote-mid { grid-template-columns: 1fr; gap: 8px; }
-  .remote-rocker { flex-direction: row; }
-  .remote-rocker button { flex: 1; width: auto; }
-  .remote-dpad { width: min(280px, 100%); margin: 0 auto; }
-  .lamp-head, .remote-head { flex-wrap: wrap; }
   .lamp-block { height: 150px; }
-  .remote-bottom { flex-wrap: wrap; }
-  .remote-bottom button { flex: 1; min-width: 96px; }
+  .lamp-head { flex-wrap: wrap; }
 }
 
-/* ---- seções separadas e controle que cabe sem rolar ---- */
+/* ---- seções separadas ---- */
 .section-title { margin-top: 18px; }
 .remote-grid, .light-grid, .camera-grid { margin-top: 10px; }
 .remote-grid + .section-title, .light-grid + .section-title, .camera-grid + .section-title { margin-top: 26px; }
-.remote-sheet { gap: 8px; }
-.remote-pad { gap: 4px; }
-.remote-pad button { padding: 8px 0; font-size: 14px; border-radius: 10px; }
-.remote-power, .remote-mode { width: 52px; height: 52px; }
-.remote-power { font-size: 22px; }
-.remote-rocker { padding: 6px; gap: 4px; }
-.remote-rocker button { width: 46px; padding: 8px 0; font-size: 12px; }
-.remote-dpad button { font-size: 13px; }
-.remote-dpad .ok { width: 54px; height: 54px; font-size: 14px; }
-.remote-bottom { padding: 6px; }
-.remote-bottom button { padding: 10px 14px; }
-.lamp-block { height: 170px; }
-@media (max-height: 720px), (max-width: 720px) {
-  .remote-pad button { padding: 6px 0; font-size: 13px; }
-  .remote-power, .remote-mode { width: 46px; height: 46px; }
-  .remote-dpad .ok { width: 48px; height: 48px; }
-  .lamp-block { height: 140px; }
+
+/* Controle remoto: ocupa a altura do painel inteiro e nada rola. */
+dialog.remote-open:has(.remote-body) {
+  height: min(90dvh, 780px);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+dialog.remote-open:has(.remote-body) #detail-body {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  padding: 18px 22px 20px;
+}
+.remote-sheet {
+  flex: 1;
+  min-height: 0;
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr) auto auto;
+  gap: 12px;
+}
+.remote-head { display: flex; align-items: center; gap: 12px; }
+.remote-identity { display: flex; flex-direction: column; flex: 1; min-width: 0; }
+.remote-identity strong { font-family: var(--display); font-size: 19px; }
+.remote-identity small { color: #a9a3bc; }
+.remote-head-actions { display: flex; align-items: center; gap: 8px; }
+.remote-head-actions .primary { padding: 11px 18px; }
+.remote-mode, .remote-power {
+  width: 48px;
+  height: 48px;
+  border-radius: 16px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: #262231;
+  color: #9b8cfa;
+  font: 700 13px var(--mono);
+  cursor: pointer;
+}
+.remote-power { border-radius: 50%; border-color: rgba(255, 118, 110, 0.35); background: #4c2623; color: #ffdad6; font-size: 22px; }
+.remote-body { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 16px; min-height: 0; }
+.remote-pads { display: grid; min-height: 0; }
+.remote-pad {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-auto-rows: minmax(0, 1fr);
+  gap: 7px;
+  min-height: 0;
+}
+.remote-pad.letters { grid-template-columns: repeat(6, minmax(0, 1fr)); }
+.remote-pad button {
+  min-height: 0;
+  padding: 0;
+  border: 1px solid rgba(255, 255, 255, 0.10);
+  border-radius: 12px;
+  background: #262231;
+  color: #f2f0fa;
+  font-size: clamp(12px, 1.5vh, 18px);
+  cursor: pointer;
+}
+.remote-pad.letters button { font-size: clamp(11px, 1.3vh, 15px); }
+.remote-pad.letters button.wide { grid-column: span 2; }
+.remote-pad button:disabled, .remote-rockers button:disabled, .remote-extra button:disabled, .remote-bottom button:disabled { opacity: .5; }
+.remote-side { display: grid; grid-template-rows: minmax(0, 1fr) auto auto; gap: 10px; min-height: 0; }
+.remote-dpad {
+  position: relative;
+  align-self: center;
+  aspect-ratio: 1;
+  width: min(100%, 220px);
+  max-height: 100%;
+  margin: 0 auto;
+  border-radius: 50%;
+  background: #262231;
+}
+.remote-dpad button { position: absolute; border: 0; background: transparent; color: #f2f0fa; font-size: 16px; cursor: pointer; }
+.remote-dpad .up { top: 5%; left: 50%; transform: translateX(-50%); }
+.remote-dpad .down { bottom: 5%; left: 50%; transform: translateX(-50%); }
+.remote-dpad .left { left: 5%; top: 50%; transform: translateY(-50%); }
+.remote-dpad .right { right: 5%; top: 50%; transform: translateY(-50%); }
+.remote-dpad .ok { left: 50%; top: 50%; transform: translate(-50%, -50%); width: 62px; height: 62px; border-radius: 50%; background: #1c1926; color: #9b8cfa; font-weight: 700; }
+.remote-rockers { display: grid; grid-template-columns: 1fr 1fr; gap: 7px; }
+.remote-rockers button, .remote-extra button {
+  padding: 12px 6px;
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.10);
+  background: #1c1926;
+  color: #f2f0fa;
+  font-size: 13px;
+  cursor: pointer;
+}
+.remote-extra { display: grid; grid-template-columns: 1fr 1fr; gap: 7px; }
+.remote-bottom {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px;
+  border-radius: 16px;
+  background: #262231;
+}
+.remote-bottom button {
+  flex: 1;
+  padding: 13px 0;
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.10);
+  background: #1c1926;
+  color: #f2f0fa;
+  font-size: 14px;
+  cursor: pointer;
+}
+.remote-sheet #remote-result { margin: 0; }
+.remote-sheet #remote-result:empty { display: none; }
+@media (max-width: 760px) {
+  /* Em tela estreita o direcional sobe e o teclado ocupa a largura toda. */
+  .remote-body { grid-template-columns: minmax(0, 1fr); grid-template-rows: minmax(0, 1fr) auto; }
+  .remote-side { grid-template-rows: auto auto auto; }
+  .remote-dpad { width: min(70%, 170px); }
+  .remote-head { flex-wrap: wrap; }
 }
