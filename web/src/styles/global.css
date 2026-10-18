@@ -1321,8 +1321,16 @@ body {
   gap: 5px;
   padding-left: 2px;
 }
+/* Tema e GitHub são irmãos dos links da barra: mesma cor, sem borda nem fundo
+   próprios (o destaque aparece só no hover). */
 .dock-actions .icon-button {
-  background: color-mix(in srgb, var(--surface-soft) 82%, transparent);
+  border: 0;
+  background: transparent;
+  color: var(--muted);
+}
+.dock-actions .icon-button:hover {
+  background: var(--surface-soft);
+  color: var(--ink);
 }
 
 @media (max-width: 760px) {

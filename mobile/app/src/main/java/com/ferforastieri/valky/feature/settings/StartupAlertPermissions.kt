@@ -157,7 +157,9 @@ fun StartupAlertPermissions() {
                 Icon(
                     Lucide.BellRing,
                     contentDescription = null,
-                    tint = MaterialTheme.colorScheme.secondary,
+                    // Sobre o círculo primário o ícone precisa ser onPrimary:
+                    // roxo sobre roxo sumia.
+                    tint = MaterialTheme.colorScheme.onPrimary,
                     modifier = Modifier.padding(12.dp).size(24.dp),
                 )
             }
