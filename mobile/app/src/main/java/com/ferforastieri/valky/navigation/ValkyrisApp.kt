@@ -57,8 +57,8 @@ import com.composables.icons.lucide.MonitorSmartphone
 
 private data class Destination(val route: String, val label: Int, val icon: ImageVector)
 
+// A visão geral saiu da lista: quem leva para lá é a marca, no meio da barra.
 private val destinations = listOf(
-    Destination("overview", R.string.overview, Lucide.House),
     Destination("people", R.string.location_screen, Lucide.MapPin),
     Destination("devices", R.string.devices, Lucide.MonitorSmartphone),
     Destination("profile", R.string.profile, Lucide.UserRound),
@@ -123,7 +123,7 @@ private fun ConnectedValkyApp(main: MainViewModel) {
     val entry by nav.currentBackStackEntryAsState()
     val currentRoute = entry?.destination?.route
     val selectedIndex = destinations.indexOfFirst { it.route == currentRoute }
-    val showBottomBar = selectedIndex >= 0 || currentRoute == "events" || currentRoute == "event/{id}" || currentRoute == "camera/{id}" || currentRoute == "lights" || currentRoute == "light/{id}" || currentRoute == "remote/{id}" || currentRoute == "person/{id}"
+    val showBottomBar = currentRoute == "overview" || selectedIndex >= 0 || currentRoute == "events" || currentRoute == "event/{id}" || currentRoute == "camera/{id}" || currentRoute == "lights" || currentRoute == "light/{id}" || currentRoute == "remote/{id}" || currentRoute == "person/{id}"
     val showTopBar = selectedIndex >= 0 || currentRoute == "events" || currentRoute == "event/{id}" || currentRoute == "lights"
     val pendingEvent by main.pendingEvent.collectAsStateWithLifecycle()
     val pendingCamera by main.pendingCamera.collectAsStateWithLifecycle()
@@ -191,9 +191,13 @@ private fun ConnectedValkyApp(main: MainViewModel) {
                 contentAlignment = androidx.compose.ui.Alignment.Center,
             ) {
                 val labels = destinations.map { it.icon to stringResource(it.label) }
-                FloatingDock(labels, selectedIndex, onSelect = { index ->
-                    nav.openTopLevel(destinations[index].route)
-                })
+                FloatingDock(
+                    items = labels,
+                    selectedIndex = selectedIndex,
+                    onSelect = { index -> nav.openTopLevel(destinations[index].route) },
+                    overviewSelected = currentRoute == "overview",
+                    onOverview = { nav.openTopLevel("overview") },
+                )
             }
         },
     ) { padding ->

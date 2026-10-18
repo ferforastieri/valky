@@ -278,10 +278,9 @@ select:focus {
   display: flex;
   flex-direction: column;
 }
-.sidebar .brand {
-  justify-content: center;
-  width: 100%;
-  padding: 0 0 30px;
+/* No desktop a marca não fica no topo: ela vive na barra do celular, no meio. */
+.sidebar > .brand {
+  display: none;
 }
 .sidebar .brand img {
   width: 88px;
@@ -955,14 +954,50 @@ dialog::backdrop {
   .sidebar > .brand {
     display: none;
   }
-  .sidebar nav {
-    display: flex;
-    justify-content: space-around;
-    min-width: 0;
-    flex: 5;
-    height: 100%;
-    gap: 0;
+  /* Mesma divisão da landing: três itens, a marca no meio e três itens. */
+  .sidebar {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr)) auto repeat(3, minmax(0, 1fr));
+    align-items: center;
+    gap: 2px;
   }
+  /* Seletores com .sidebar para vencer as regras de flex que vêm depois. */
+  .sidebar > nav,
+  .sidebar > .sidebar-actions {
+    display: contents;
+  }
+  .sidebar > .brand {
+    display: flex;
+    align-items: center;
+    grid-column: 4;
+    grid-row: 1;
+    justify-self: center;
+    margin: 0;
+    padding: 0;
+    border: 0;
+  }
+  .sidebar > .brand img {
+    width: clamp(44px, 13vw, 56px);
+    height: auto;
+    aspect-ratio: 403 / 292;
+  }
+  /* Itens redondos e do mesmo tamanho da marca, como na landing. */
+  .sidebar nav a,
+  .sidebar-actions button {
+    justify-self: center;
+    grid-row: 1;
+    width: 44px;
+    min-width: 0;
+    height: 44px;
+    min-height: 44px;
+    padding: 0;
+  }
+  .sidebar nav a:nth-child(1) { grid-column: 1; }
+  .sidebar nav a:nth-child(2) { grid-column: 2; }
+  .sidebar nav a:nth-child(3) { grid-column: 3; }
+  .sidebar nav a:nth-child(4) { grid-column: 5; }
+  .sidebar-actions button:nth-child(1) { grid-column: 6; }
+  .sidebar-actions button:nth-child(2) { grid-column: 7; }
   .sidebar nav a {
     flex: 1;
     min-width: 0;

@@ -4,8 +4,9 @@ import '@fontsource-variable/manrope';
 import '@fontsource/ibm-plex-mono/400.css';
 import '../viewer.css';
 import { LayoutDashboard, LayoutGrid, Bell, MapPin, Server, SunMoon, LogOut, ShieldCheck, ArrowRight, X } from '@lucide/astro';
+// A visão geral saiu da lista: quem leva para lá é a marca, no meio da barra.
 const links = [
-  ['overview','Visão geral',LayoutDashboard],['devices','Dispositivos',LayoutGrid],['events','Eventos',Bell],
+  ['devices','Dispositivos',LayoutGrid],['events','Eventos',Bell],
   ['family','Família',MapPin],['system','Sistema',Server],
 ] as const;
 ---
@@ -33,7 +34,7 @@ const links = [
     </form></div>
   </section>
   <div id="application" class="app-shell" hidden>
-    <aside class="sidebar"><a href="#overview" class="brand" aria-label="Visão geral"><img src="/app/valky-mark.svg?v=7" alt="" /></a>
+    <aside class="sidebar"><a href="#overview" class="brand" data-page="overview" aria-label="Visão geral" title="Visão geral"><img src="/app/valky-mark.svg?v=7" alt="" /></a>
       <nav aria-label="Navegação principal">{links.map(([id,label,Icon]) => <a href={`#${id}`} data-page={id} aria-label={label} title={label}><Icon size={20}/><span>{label}</span><span class="nav-count" id={`count-${id}`}></span></a>)}</nav>
       <div class="sidebar-actions">
         <button id="theme" class="quiet" aria-label="Alternar tema" title="Alternar tema"><SunMoon size={19}/><span>Tema</span></button>

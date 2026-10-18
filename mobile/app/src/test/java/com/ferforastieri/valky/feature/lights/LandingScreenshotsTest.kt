@@ -56,8 +56,9 @@ class LandingScreenshotsTest {
 
     @get:Rule val compose = createComposeRule()
 
+    // A barra real: dois destinos de cada lado e a marca no meio (a visão geral
+    // saiu da lista e agora é a marca que leva para lá).
     private val dock = listOf(
-        Lucide.House to "Visão geral",
         Lucide.MapPin to "Localização",
         Lucide.MonitorSmartphone to "Dispositivos",
         Lucide.UserRound to "Perfil",
@@ -83,7 +84,7 @@ class LandingScreenshotsTest {
                     if (!proprioCabecalho) ValkyTopBar(title = titulo, onNotifications = {}, unreadNotifications = 3)
                     Box(Modifier.weight(1f)) { conteudo() }
                     Box(Modifier.fillMaxWidth().padding(bottom = 18.dp), contentAlignment = Alignment.Center) {
-                        FloatingDock(dock, selecionado, {})
+                        FloatingDock(dock, selecionado, {}, overviewSelected = selecionado < 0, onOverview = {})
                     }
                 }
             }
@@ -129,19 +130,19 @@ class LandingScreenshotsTest {
         FavoriteItem("remote", "rem-1", "TV da sala"),
     )
 
-    @Test fun overviewClara() { tela("light", "Visão geral", 0) { OverviewContent(cameras = emptyList(), trackedPeople = 2, events = eventos(), favorites = favoritos()) }; capturar("landing-overview-light") }
-    @Test fun overviewEscura() { tela("dark", "Visão geral", 0) { OverviewContent(cameras = emptyList(), trackedPeople = 2, events = eventos(), favorites = favoritos()) }; capturar("landing-overview-dark") }
-    @Test fun camerasClara() { tela("light", "Câmeras", 2) { CamerasContent(cameras()) }; capturar("landing-cameras-light") }
-    @Test fun camerasEscura() { tela("dark", "Câmeras", 2) { CamerasContent(cameras()) }; capturar("landing-cameras-dark") }
-    @Test fun eventosClara() { tela("light", "Notificações", 0) { EventsContent(eventos()) }; capturar("landing-events-light") }
-    @Test fun eventosEscura() { tela("dark", "Notificações", 0) { EventsContent(eventos()) }; capturar("landing-events-dark") }
+    @Test fun overviewClara() { tela("light", "Visão geral", -1) { OverviewContent(cameras = emptyList(), trackedPeople = 2, events = eventos(), favorites = favoritos()) }; capturar("landing-overview-light") }
+    @Test fun overviewEscura() { tela("dark", "Visão geral", -1) { OverviewContent(cameras = emptyList(), trackedPeople = 2, events = eventos(), favorites = favoritos()) }; capturar("landing-overview-dark") }
+    @Test fun camerasClara() { tela("light", "Câmeras", 1) { CamerasContent(cameras()) }; capturar("landing-cameras-light") }
+    @Test fun camerasEscura() { tela("dark", "Câmeras", 1) { CamerasContent(cameras()) }; capturar("landing-cameras-dark") }
+    @Test fun eventosClara() { tela("light", "Notificações", -1) { EventsContent(eventos()) }; capturar("landing-events-light") }
+    @Test fun eventosEscura() { tela("dark", "Notificações", -1) { EventsContent(eventos()) }; capturar("landing-events-dark") }
     // Capturas das regras: voltam à landing com a identidade nova.
-    @Test fun regrasClara() { tela("light", "Regras", 4) { regras() }; capturar("landing-rules-light") }
-    @Test fun regrasEscura() { tela("dark", "Regras", 4) { regras() }; capturar("landing-rules-dark") }
-    @Test fun ajustesClara() { tela("light", "Ajustes", 4) { SettingsContent(admin = true, permissionsReady = 0, permissionsTotal = 0, language = "", theme = "") }; capturar("landing-settings-light") }
-    @Test fun ajustesEscura() { tela("dark", "Ajustes", 4) { SettingsContent(admin = true, permissionsReady = 0, permissionsTotal = 0, language = "", theme = "") }; capturar("landing-settings-dark") }
-    @Test fun listaClara() { tela("light", "Iluminação", 2) { lista() }; capturar("landing-lista-light") }
-    @Test fun listaEscura() { tela("dark", "Iluminação", 2) { lista() }; capturar("landing-lista-dark") }
-    @Test fun luzClara() { tela("light", "", 2, proprioCabecalho = true) { LightDetailContent(lamp("Luz Suíte", true, 30), false, {}, onChange = {}) }; capturar("landing-luz-light") }
-    @Test fun luzEscura() { tela("dark", "", 2, proprioCabecalho = true) { LightDetailContent(lamp("Luz Suíte", true, 30), false, {}, onChange = {}) }; capturar("landing-luz-dark") }
+    @Test fun regrasClara() { tela("light", "Regras", -1) { regras() }; capturar("landing-rules-light") }
+    @Test fun regrasEscura() { tela("dark", "Regras", -1) { regras() }; capturar("landing-rules-dark") }
+    @Test fun ajustesClara() { tela("light", "Ajustes", 3) { SettingsContent(admin = true, permissionsReady = 0, permissionsTotal = 0, language = "", theme = "") }; capturar("landing-settings-light") }
+    @Test fun ajustesEscura() { tela("dark", "Ajustes", 3) { SettingsContent(admin = true, permissionsReady = 0, permissionsTotal = 0, language = "", theme = "") }; capturar("landing-settings-dark") }
+    @Test fun listaClara() { tela("light", "Iluminação", 1) { lista() }; capturar("landing-lista-light") }
+    @Test fun listaEscura() { tela("dark", "Iluminação", 1) { lista() }; capturar("landing-lista-dark") }
+    @Test fun luzClara() { tela("light", "", 1, proprioCabecalho = true) { LightDetailContent(lamp("Luz Suíte", true, 30), false, {}, onChange = {}) }; capturar("landing-luz-light") }
+    @Test fun luzEscura() { tela("dark", "", 1, proprioCabecalho = true) { LightDetailContent(lamp("Luz Suíte", true, 30), false, {}, onChange = {}) }; capturar("landing-luz-dark") }
 }
