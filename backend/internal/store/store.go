@@ -8,6 +8,8 @@ import (
 	"time"
 
 	_ "modernc.org/sqlite"
+	"os"
+	"path/filepath"
 )
 
 //go:embed schema.sql
@@ -15,7 +17,32 @@ var schema string
 
 type Store struct{ DB *sql.DB }
 
+// adotaBancoAntigo evita que uma mudança de nome/endereço do banco pareça
+// perda de dados: se o arquivo configurado não existe e há um banco antigo do
+// projeto na mesma pasta, ele é adotado (renomeado) em vez de criar um vazio.
+func adotaBancoAntigo(path string) string {
+	if _, err := os.Stat(path); err == nil {
+		return path
+	}
+	pasta := filepath.Dir(path)
+	for _, antigo := range []string{"valkyris.db", "valkyris.sqlite", "valky.sqlite"} {
+		candidato := filepath.Join(pasta, antigo)
+		if _, err := os.Stat(candidato); err != nil {
+			continue
+		}
+		if err := os.Rename(candidato, path); err != nil {
+			return candidato
+		}
+		for _, sufixo := range []string{"-wal", "-shm"} {
+			_ = os.Rename(candidato+sufixo, path+sufixo)
+		}
+		return path
+	}
+	return path
+}
+
 func Open(path string) (*Store, error) {
+	path = adotaBancoAntigo(path)
 	db, err := sql.Open("sqlite", path+"?_pragma=busy_timeout(5000)&_pragma=foreign_keys(1)")
 	if err != nil {
 		return nil, fmt.Errorf("open database: %w", err)
