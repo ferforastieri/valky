@@ -2677,3 +2677,65 @@ body {
   .dock-brand { margin: 0 auto; }
   .dock-actions { margin: 0 auto; }
 }
+
+/* Navegação do celular: a marca sozinha no topo, centralizada, e as opções no
+   rodapé — sem nenhum card em volta (a base e as cascatas anteriores pintavam
+   fundo, borda e sombra, por isso esta regra vem por último). */
+@media (max-width: 760px) {
+  .floating-dock {
+    position: fixed;
+    inset: 0;
+    left: 0;
+    top: 0;
+    transform: none;
+    width: 100%;
+    max-width: none;
+    height: auto;
+    min-height: 0;
+    padding: 0;
+    display: block;
+    border: 0;
+    border-radius: 0;
+    background: transparent;
+    box-shadow: none;
+    backdrop-filter: none;
+    /* A tela inteira não captura toque: só a marca e as opções. */
+    pointer-events: none;
+  }
+  .dock-brand {
+    display: flex;
+    position: absolute;
+    top: 14px;
+    left: 50%;
+    transform: translateX(-50%);
+    margin: 0;
+    pointer-events: auto;
+  }
+  .dock-brand .dock-identity {
+    display: none;
+  }
+  .dock-brand .brand-mark {
+    width: 52px;
+    height: 38px;
+  }
+  .dock-links {
+    position: absolute;
+    left: 50%;
+    bottom: 16px;
+    transform: translateX(-50%);
+    margin: 0;
+    pointer-events: auto;
+  }
+  .dock-actions {
+    display: flex;
+    position: absolute;
+    top: 12px;
+    right: 14px;
+    margin: 0;
+    pointer-events: auto;
+  }
+  /* Espaço para a marca fixa no topo. */
+  .docs-shell {
+    padding-top: 64px;
+  }
+}
