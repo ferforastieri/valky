@@ -418,7 +418,7 @@ private fun PermissionOption(
     ) {
         Row(Modifier.padding(14.dp), verticalAlignment = Alignment.CenterVertically) {
             Surface(shape = MaterialTheme.shapes.small, color = ColorTokens.BrandTile) {
-                Icon(icon, null, Modifier.padding(9.dp).size(21.dp), tint = MaterialTheme.colorScheme.secondary)
+                Icon(icon, null, Modifier.padding(9.dp).size(21.dp), tint = ColorTokens.OnBrandTile)
             }
             Spacer(Modifier.width(12.dp))
             Column(Modifier.weight(1f)) {
@@ -500,7 +500,7 @@ private fun ThemeOption(value: String, label: String, icon: androidx.compose.ui.
     ) {
         Row(Modifier.padding(horizontal = 14.dp, vertical = 10.dp), verticalAlignment = Alignment.CenterVertically) {
             Surface(shape = MaterialTheme.shapes.small, color = ColorTokens.BrandTile) {
-                Icon(icon, null, Modifier.padding(8.dp).size(20.dp), tint = MaterialTheme.colorScheme.secondary)
+                Icon(icon, null, Modifier.padding(8.dp).size(20.dp), tint = ColorTokens.OnBrandTile)
             }
             Spacer(Modifier.width(10.dp))
             Text(label, Modifier.weight(1f), fontWeight = if (current == value) FontWeight.SemiBold else FontWeight.Normal)
@@ -548,7 +548,7 @@ private fun SettingsCard(icon: androidx.compose.ui.graphics.vector.ImageVector, 
     Card(onClick = onClick, modifier = Modifier.fillMaxWidth(), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface), elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)) {
         Row(Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
             Surface(shape = MaterialTheme.shapes.small, color = ColorTokens.BrandTile, shadowElevation = 3.dp) {
-                Icon(icon, null, Modifier.padding(10.dp), tint = MaterialTheme.colorScheme.secondary)
+                Icon(icon, null, Modifier.padding(10.dp), tint = ColorTokens.OnBrandTile)
             }
             Spacer(Modifier.width(14.dp))
             Column(Modifier.weight(1f)) {

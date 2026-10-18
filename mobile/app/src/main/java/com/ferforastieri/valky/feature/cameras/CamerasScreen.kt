@@ -225,7 +225,7 @@ private fun CameraCard(camera: Camera, stream: CameraListStream?, onClick: () ->
         Column {
             Box(Modifier.fillMaxWidth().aspectRatio(16 / 9f).background(ColorTokens.BrandTile)) {
                 if (ready && stream != null) CameraListLivePlayer(camera, stream, Modifier.fillMaxSize())
-                else SignalLine(Modifier.fillMaxWidth().height(70.dp).align(Alignment.Center), if (failed) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.secondary)
+                else SignalLine(Modifier.fillMaxWidth().height(70.dp).align(Alignment.Center), if (failed) MaterialTheme.colorScheme.error else ColorTokens.OnBrandTile)
                 Surface(Modifier.padding(12.dp).align(Alignment.TopEnd), shape = CircleShape, color = MaterialTheme.colorScheme.surface.copy(alpha = .9f)) {
                     Row(Modifier.padding(horizontal = 10.dp, vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
                         Box(Modifier.size(7.dp).background(if (failed) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.secondary, CircleShape))

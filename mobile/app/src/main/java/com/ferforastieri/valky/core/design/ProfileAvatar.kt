@@ -45,7 +45,9 @@ fun ProfileAvatar(avatarData: String, contentDescription: String?, modifier: Mod
                 androidx.compose.material3.Icon(
                     Lucide.UserRound,
                     contentDescription = contentDescription,
-                    tint = MaterialTheme.colorScheme.primary,
+                    // Par correto do primaryContainer: o primary puro ficava em
+                    // 3:1 no tema claro.
+                    tint = MaterialTheme.colorScheme.onPrimaryContainer,
                 )
             }
         }

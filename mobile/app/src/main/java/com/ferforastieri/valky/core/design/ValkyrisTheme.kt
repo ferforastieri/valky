@@ -18,7 +18,13 @@ import androidx.compose.ui.unit.dp
 // levemente arroxeados para o texto e os fundos continuarem legíveis.
 val CanvasLight=Color(0xFFF5F3FC);val SurfaceLight=Color(0xFFFBFAFF);val InkLight=Color(0xFF1A1726);val MutedLight=Color(0xFF6B6580);val SignalLight=Color(0xFF594DFC);val AlarmLight=Color(0xFFDC4A44)
 val CanvasDark=Color(0xFF14121C);val SurfaceDark=Color(0xFF1C1926);val InkDark=Color(0xFFF2F0FA);val MutedDark=Color(0xFFA9A3BC);val SignalDark=Color(0xFF9B8CFA);val AlarmDark=Color(0xFFFF766E)
-object ColorTokens { val BrandTile=Color(0xFF1C1926) }
+object ColorTokens {
+    val BrandTile=Color(0xFF1C1926)
+    // O tile da marca é escuro nos dois temas: o ícone dentro dele precisa ser
+    // claro sempre. Usar o secondary do tema deixava o ícone quase invisível no
+    // tema claro (contraste 3,2:1 contra 8,4:1 deste tom).
+    val OnBrandTile=Color(0xFFB9AAFF)
+}
 private val light=lightColorScheme(
     primary=Color(0xFF806DF8),onPrimary=Color(0xFFFFFFFF),primaryContainer=Color(0xFFE7E2FE),onPrimaryContainer=Color(0xFF241E52),
     secondary=Color(0xFF594DFC),onSecondary=Color(0xFFFFFFFF),secondaryContainer=Color(0xFFDFDBFE),onSecondaryContainer=Color(0xFF1B1550),

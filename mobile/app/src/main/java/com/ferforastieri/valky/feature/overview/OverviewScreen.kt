@@ -403,14 +403,14 @@ internal fun FavoriteCard(item: FavoriteItem, modifier: Modifier, onClick: () ->
                     com.ferforastieri.valky.core.design.AnimatedBulbIcon(
                         on = lit,
                         color = com.ferforastieri.valky.core.design.lightTint(item.mode, item.hue, item.saturation, item.value, item.kelvin),
-                        offTint = MaterialTheme.colorScheme.onSurfaceVariant,
+                        offTint = com.ferforastieri.valky.core.design.ColorTokens.OnBrandTile,
                         modifier = Modifier.padding(7.dp),
                         contentDescription = stringResource(R.string.light_toggle),
                     )
                 }
             } else {
                 Surface(Modifier.size(36.dp), RoundedCornerShape(11.dp), color = com.ferforastieri.valky.core.design.ColorTokens.BrandTile) {
-                    Icon(favoriteIcon(item.type), null, Modifier.padding(9.dp), tint = MaterialTheme.colorScheme.secondary)
+                    Icon(favoriteIcon(item.type), null, Modifier.padding(9.dp), tint = com.ferforastieri.valky.core.design.ColorTokens.OnBrandTile)
                 }
             }
             Spacer(Modifier.width(11.dp))
