@@ -152,7 +152,7 @@ small,
 
 .primary {
   background: var(--accent);
-  color: #152111;
+  color: #ffffff;
   border-color: transparent;
   font-weight: 700;
 }
@@ -467,12 +467,12 @@ main {
   background:
     repeating-linear-gradient(
       0deg,
-      #27342508,
-      #27342508 1px,
+      #2e277508,
+      #2e277508 1px,
       transparent 1px,
       transparent 16px
     ),
-    #1a231b;
+    #1c1926;
   display: grid;
   place-items: center;
   overflow: hidden;
@@ -501,8 +501,8 @@ main {
   position: absolute;
   top: 12px;
   left: 12px;
-  background: #131e17bf;
-  color: #e5f8e0;
+  background: #14121cbf;
+  color: #e7e2fe;
   border-color: #fff2;
   backdrop-filter: blur(6px);
   font-size: 9px;
@@ -785,7 +785,7 @@ dialog {
   box-shadow: 0 30px 150px #0005;
 }
 dialog::backdrop {
-  background: #06100688;
+  background: #0a081088;
   backdrop-filter: blur(5px);
 }
 .dialog-head {
@@ -808,7 +808,7 @@ dialog::backdrop {
 }
 .media-stage {
   position: relative;
-  background: #111b13;
+  background: #14121c;
   border-radius: 14px;
   overflow: hidden;
   aspect-ratio: 16/9;
@@ -1228,7 +1228,7 @@ dialog::backdrop {
   min-width: 0;
 }
 .update-banner-text small {
-  color: var(--muted, #5b615b);
+  color: var(--muted, #a9a3bc);
 }
 .update-banner a {
   color: var(--signal);
@@ -1285,7 +1285,7 @@ dialog::backdrop {
 .remote-mid { display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: 10px; }
 .remote-rocker { display: flex; flex-direction: column; gap: 6px; padding: 8px; border-radius: 16px; background: #262231; }
 .remote-rocker button { width: 52px; padding: 12px 0; border-radius: 12px; border: 1px solid rgba(255,255,255,.10); background: #1c1926; color: #f2f0fa; font-size: 13px; }
-.remote-dpad { position: relative; aspect-ratio: 1; border-radius: 50%; background: #262c26; }
+.remote-dpad { position: relative; aspect-ratio: 1; border-radius: 50%; background: #262231; }
 .remote-dpad button { position: absolute; border: 0; background: transparent; color: #f2f0fa; font-size: 15px; }
 .remote-dpad .up { top: 4%; left: 50%; transform: translateX(-50%); }
 .remote-dpad .down { bottom: 4%; left: 50%; transform: translateX(-50%); }

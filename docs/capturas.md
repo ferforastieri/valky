@@ -1,4 +1,4 @@
-# Capturas reais do app
+# Capturas reais do app (landing)
 
 Estas imagens são renderizadas pelos próprios componentes Jetpack Compose usados pelo Valky. Elas não são mockups desenhados na landing page.
 

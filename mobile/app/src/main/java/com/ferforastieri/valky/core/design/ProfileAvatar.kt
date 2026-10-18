@@ -83,7 +83,7 @@ fun loadProfileAvatar(context: Context, uri: Uri): Bitmap? = runCatching {
 fun encodeProfileAvatar(source: Bitmap, zoom: Float, rotation: Float): String? = runCatching {
     val output = Bitmap.createBitmap(512, 512, Bitmap.Config.ARGB_8888)
     val canvas = Canvas(output)
-    canvas.drawColor(android.graphics.Color.rgb(20, 29, 27))
+    canvas.drawColor(android.graphics.Color.rgb(28, 25, 38))
     val baseScale = 512f / minOf(source.width, source.height).coerceAtLeast(1)
     canvas.translate(256f, 256f)
     canvas.rotate(rotation)

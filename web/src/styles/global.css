@@ -94,13 +94,10 @@ p {
   outline-offset: 3px;
 }
 .brand-mark {
-  width: 36px;
-  height: 36px;
-  border-radius: 12px;
-  background: var(--ink);
-  color: var(--signal);
-  display: grid;
-  place-items: center;
+  /* Só a marca, sem fundo: o símbolo já é o logo. */
+  width: 46px;
+  height: 34px;
+  display: block;
 }
 .icon-button {
   width: 38px;
@@ -402,7 +399,7 @@ p {
   width: min(1500px, calc(100% - 24px));
   padding: 104px max(4vw, 24px);
   border-radius: 38px;
-  background: #171c18;
+  background: #1c1926;
   color: #f2f0fa;
   display: grid;
   grid-template-columns: 0.8fr 1.2fr;
@@ -440,9 +437,9 @@ p {
   left: calc((var(--i) % 2) * 48%);
   top: calc((var(--i) / 2) * 18%);
   padding: 10px 14px;
-  border: 1px solid #384038;
+  border: 1px solid #332e42;
   border-radius: 12px;
-  background: #222922;
+  background: #262231;
   font: 400 0.72rem var(--mono);
   display: flex;
   align-items: center;
@@ -588,7 +585,7 @@ p {
   width: 9px;
   height: 9px;
   border-radius: 50%;
-  background: #414941;
+  background: #3b3550;
 }
 .terminal-bar span:first-child {
   background: var(--alarm);
@@ -601,7 +598,7 @@ p {
 }
 .terminal-bar b {
   font: 400 0.62rem var(--mono);
-  color: #899288;
+  color: #a9a3bc;
   margin: auto;
 }
 .terminal-command {
@@ -618,7 +615,7 @@ p {
 }
 .copy-command {
   margin-left: auto;
-  border: 1px solid #3b443b;
+  border: 1px solid #332e42;
   color: #a9a3bc;
   background: #262231;
   border-radius: 9px;
@@ -631,7 +628,7 @@ p {
   display: flex;
   flex-direction: column;
   font: 400 0.65rem/1.8 var(--mono);
-  color: #7f897f;
+  color: #a9a3bc;
 }
 .compat-card {
   padding: 65px;
@@ -778,8 +775,8 @@ p {
 }
 @media (max-width: 620px) {
   .brand-mark {
-    width: 34px;
-    height: 34px;
+    width: 40px;
+    height: 30px;
   }
   .hero,
   .section {
@@ -1133,16 +1130,9 @@ p {
 }
 
 /* Valky: compact operational surfaces inspired by the supplied interface. */
-.brand-mark {
-  overflow: hidden;
-  background: linear-gradient(145deg, #313531, #171a17);
-  box-shadow:
-    inset 0 0 0 1px rgba(255, 255, 255, 0.12),
-    0 5px 12px rgba(20, 18, 28, 0.16);
-}
 .brand-mark img {
-  width: 31px;
-  height: 31px;
+  width: 100%;
+  height: 100%;
   display: block;
   object-fit: contain;
 }
@@ -1344,11 +1334,16 @@ body {
     top: auto;
     bottom: 18px;
     width: auto;
-    min-height: 56px;
-    padding: 6px 7px;
+    min-height: 0;
+    padding: 0;
     display: flex;
     gap: 0;
-    border-radius: 30px;
+    /* No celular a navegação é só a navegação: sem o card em volta. */
+    border: 0;
+    border-radius: 0;
+    background: transparent;
+    box-shadow: none;
+    backdrop-filter: none;
   }
   .dock-brand,
   .dock-actions { display: none; }
@@ -1497,7 +1492,7 @@ body {
     0 12px 28px rgba(26, 23, 38, 0.13),
     0 2px 4px rgba(26, 23, 38, 0.06);
 }
-.dock-link:first-child {
+.dock-link[aria-current="page"] {
   background: color-mix(in srgb, var(--signal) 27%, var(--surface));
   color: var(--ink);
 }
@@ -1693,16 +1688,16 @@ body {
   align-items: start;
   margin-top: 34px;
   padding: 18px;
-  border: 1px solid #343d35;
+  border: 1px solid #332e42;
   border-radius: 18px;
-  background: #202721;
+  background: #262231;
   box-shadow: 0 10px 26px rgba(0, 0, 0, 0.14);
 }
 .privacy-inline > svg {
   box-sizing: content-box;
   padding: 10px;
   border-radius: 13px;
-  background: #2b352c;
+  background: #332e42;
   color: var(--signal);
 }
 .privacy-inline strong {
@@ -1940,21 +1935,6 @@ body {
 .hero-screens {
   min-height: 612px;
 }
-.hero-interaction-hint {
-  width: max-content;
-  max-width: 100%;
-  display: flex;
-  align-items: center;
-  gap: 9px;
-  margin: 18px 0 0;
-  padding: 7px 12px;
-  border: 1px solid var(--line);
-  border-radius: 999px;
-  background: color-mix(in srgb, var(--surface) 92%, transparent);
-  box-shadow: 0 6px 16px rgba(26, 23, 38, 0.08);
-  color: var(--muted);
-  font: 400 0.65rem var(--mono);
-}
 .hero-phone {
   top: 0;
 }
@@ -1992,10 +1972,7 @@ body {
   .hero {
     padding-bottom: 52px;
   }
-  .hero-interaction-hint {
-    margin-top: 14px;
   }
-}
 
 /* Keep the hero copy clear and let the phone stack sit decisively to its right. */
 @media (min-width: 981px) {
@@ -2205,13 +2182,13 @@ body {
   margin: 24px 0;
   padding: 16px 17px;
   overflow-x: auto;
-  border: 1px solid #353b35;
+  border: 1px solid #332e42;
   border-radius: 16px;
   background: #14121c;
   box-shadow: 0 9px 22px rgba(10, 8, 16, 0.15);
 }
 .docs-code code {
-  color: #eef3ed;
+  color: #efecfa;
   font: 400 0.74rem/1.7 var(--mono);
   white-space: pre;
 }
@@ -2221,10 +2198,10 @@ body {
 .docs-copy {
   flex: 0 0 auto;
   padding: 7px 10px;
-  border: 1px solid #414a41;
+  border: 1px solid #3b3550;
   border-radius: 9px;
-  background: #252c25;
-  color: #d9e1d8;
+  background: #262231;
+  color: #ded9f0;
   cursor: pointer;
   font: 500 0.6rem var(--mono);
   text-transform: uppercase;

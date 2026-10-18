@@ -167,7 +167,13 @@ backend/   API Go, domínio, ONVIF, mídia, detectores, regras e persistência
 mobile/    aplicativo Android nativo em Kotlin e Jetpack Compose
 web/       landing/documentação Astro; viewer/ contém o painel servido em /app/
 docs/      decisões de arquitetura e notas operacionais do repositório
+scripts/   geração dos ativos da marca (scripts/brand-assets.py)
 ```
+
+A marca (símbolo, ícones, splash e favicon) sai de uma fonte única com
+`python3 scripts/brand-assets.py`, que precisa de `rsvg-convert`. As capturas de
+tela da landing são geradas pelos testes do app e estão descritas em
+[docs/capturas.md](docs/capturas.md).
 
 ## Configuração
 

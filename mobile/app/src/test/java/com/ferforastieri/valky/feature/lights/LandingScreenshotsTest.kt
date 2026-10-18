@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.test.junit4.createComposeRule
@@ -75,7 +76,10 @@ class LandingScreenshotsTest {
     private fun tela(modo: String, titulo: String, selecionado: Int, proprioCabecalho: Boolean = false, conteudo: @androidx.compose.runtime.Composable () -> Unit) {
         compose.setContent {
             ValkyTheme(mode = modo) {
-                Column(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
+                // Surface (e não Modifier.background) para o conteúdo herdar a
+                // cor de texto do tema, exatamente como no aplicativo.
+                Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
+                Column(Modifier.fillMaxSize()) {
                     if (!proprioCabecalho) ValkyTopBar(title = titulo, onNotifications = {}, unreadNotifications = 3)
                     Box(Modifier.weight(1f)) { conteudo() }
                     Box(Modifier.fillMaxWidth().padding(bottom = 18.dp), contentAlignment = Alignment.Center) {
@@ -84,6 +88,7 @@ class LandingScreenshotsTest {
                 }
             }
         }
+    }
     }
 
     private fun capturar(nome: String) = compose.onRoot().captureRoboImage("build/screenshots/$nome.png")

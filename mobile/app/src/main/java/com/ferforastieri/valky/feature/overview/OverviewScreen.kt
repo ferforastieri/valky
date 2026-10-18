@@ -430,7 +430,14 @@ internal fun FavoriteCard(item: FavoriteItem, modifier: Modifier, onClick: () ->
 private fun SectionLabel(text: String, icon: androidx.compose.ui.graphics.vector.ImageVector? = null) {
     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
         icon?.let { Icon(it, null, Modifier.size(19.dp), tint = MaterialTheme.colorScheme.secondary) }
-        Text(text, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+        // Cor explícita: sem ela o rótulo herdava o preto padrão do Compose e
+        // ficava ilegível no tema escuro.
+        Text(
+            text,
+            style = MaterialTheme.typography.titleMedium,
+            fontWeight = FontWeight.SemiBold,
+            color = MaterialTheme.colorScheme.onBackground,
+        )
     }
 }
 

@@ -15,12 +15,12 @@ const links = [
   <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
   <meta name="robots" content="noindex, nofollow" /><meta name="color-scheme" content="light dark" />
   <meta name="referrer" content="strict-origin-when-cross-origin" />
-  <title>Valky · Consulta</title><link rel="icon" href="/app/valky-mark.svg" type="image/svg+xml" />
+  <title>Valky · Consulta</title><link rel="icon" href="/app/valky-mark.svg?v=7" type="image/svg+xml" />
 </head>
 <body>
   <a class="skip-link" href="#main">Pular para o conteúdo</a>
   <section id="login" class="login-shell">
-    <div class="login-story"><a class="brand" href="/app/"><img src="/app/valky-mark.svg" alt="" /><span>Valky</span></a>
+    <div class="login-story"><a class="brand" href="/app/"><img src="/app/valky-mark.svg?v=7" alt="" /><span>Valky</span></a>
       <div><span class="eyebrow">PERTO, MESMO À DISTÂNCIA</span><h1>Um olhar<br />sobre a sua casa.</h1><p>Câmeras, acontecimentos e a família.<br />Tudo reunido, no seu próprio servidor.</p></div>
       <div class="login-note"><ShieldCheck size={19} /><span>Seus dados continuam em casa.</span></div>
     </div>
@@ -33,7 +33,7 @@ const links = [
     </form></div>
   </section>
   <div id="application" class="app-shell" hidden>
-    <aside class="sidebar"><a href="#overview" class="brand" aria-label="Visão geral"><img src="/app/valky-mark.svg" alt="" /></a>
+    <aside class="sidebar"><a href="#overview" class="brand" aria-label="Visão geral"><img src="/app/valky-mark.svg?v=7" alt="" /></a>
       <nav aria-label="Navegação principal">{links.map(([id,label,Icon]) => <a href={`#${id}`} data-page={id} aria-label={label} title={label}><Icon size={20}/><span>{label}</span><span class="nav-count" id={`count-${id}`}></span></a>)}</nav>
       <div class="sidebar-actions">
         <button id="theme" class="quiet" aria-label="Alternar tema" title="Alternar tema"><SunMoon size={19}/><span>Tema</span></button>

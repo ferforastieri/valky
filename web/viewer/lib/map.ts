@@ -31,7 +31,7 @@ export function familyMap(
       if (!Number.isFinite(p.latitude) || !Number.isFinite(p.longitude)) return;
       const circle = L.circle([p.latitude, p.longitude], {
         radius: p.radiusMeters,
-        color: "#5c9853",
+        color: "#806df8",
         fillOpacity: 0.1,
         weight: 2,
       })
