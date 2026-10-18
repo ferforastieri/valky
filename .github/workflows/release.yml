@@ -52,8 +52,10 @@ jobs:
             *BREAKING*|*!*) major=$((major + 1)); minor=0; patch=0 ;;
             feat*|*"(feat)"*) minor=$((minor + 1)); patch=0 ;;
           esac
+          # Mensagens com escopo (chore(x): ...) também não geram release: o
+          # padrão precisa cobrir "tipo:" e "tipo(escopo):".
           case "$mensagem" in
-            docs:*|chore:*|style:*|test:*|ci:*) publica="false" ;;
+            docs:*|docs\(*|chore:*|chore\(*|style:*|style\(*|test:*|test\(*|ci:*|ci\(*|refactor:*|refactor\(*) publica="false" ;;
             *) publica="true" ;;
           esac
           {
