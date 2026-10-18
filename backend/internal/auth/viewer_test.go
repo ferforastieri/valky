@@ -72,7 +72,7 @@ func TestViewerLoginIsIsolatedAndReadOnly(t *testing.T) {
 	if w.Code != 204 {
 		t.Fatal(w.Code)
 	}
-	if _, err = m.authenticateViewer(ctx, viewer.Token); err == nil {
+	if _, _, _, err = m.authenticateViewer(ctx, viewer.Token); err == nil {
 		t.Fatal("logged out token accepted")
 	}
 	viewer, err = testBrowser(t, m, false)
@@ -82,7 +82,7 @@ func TestViewerLoginIsIsolatedAndReadOnly(t *testing.T) {
 	if _, err = db.DB.Exec(`UPDATE viewer_sessions SET expires_at=?`, time.Now().Add(-time.Second).Format(time.RFC3339Nano)); err != nil {
 		t.Fatal(err)
 	}
-	if _, err = m.authenticateViewer(ctx, viewer.Token); err == nil {
+	if _, _, _, err = m.authenticateViewer(ctx, viewer.Token); err == nil {
 		t.Fatal("expired viewer accepted")
 	}
 }
@@ -149,6 +149,9 @@ func TestViewerCookieRenewalCSRFAndLogout(t *testing.T) {
 func TestViewerRequestSafeBehindTLSProxy(t *testing.T) {
 	request := func(origin, forwardedHost, forwardedProto, site string) *http.Request {
 		r := httptest.NewRequest(http.MethodPost, "https://192.0.2.23:8443/login", nil)
+		// O proxy da casa fala com o backend por um endereço privado; só nesse
+		// caso os cabeçalhos encaminhados são considerados.
+		r.RemoteAddr = "10.11.12.13:41234"
 		r.Host = "192.0.2.23:8443"
 		r.Header.Set("X-Valky-Viewer", "1")
 		r.Header.Set("Origin", origin)
@@ -168,5 +171,21 @@ func TestViewerRequestSafeBehindTLSProxy(t *testing.T) {
 	}
 	if ViewerRequestSafe(request("https://valky.example.com", "other.example", "https", "same-origin")) {
 		t.Fatal("mismatched forwarded host was accepted")
+	}
+}
+
+// Um cliente que fala direto com o backend não escolhe o host comparado com o
+// Origin: sem proxy confiável na frente, os cabeçalhos encaminhados são ignorados.
+func TestViewerRequestSafeIgnoresForwardedHeadersFromPublicPeer(t *testing.T) {
+	r := httptest.NewRequest(http.MethodPost, "https://192.0.2.23:8443/login", nil)
+	r.RemoteAddr = "203.0.113.9:51000"
+	r.Host = "192.0.2.23:8443"
+	r.Header.Set("X-Valky-Viewer", "1")
+	r.Header.Set("Sec-Fetch-Site", "same-origin")
+	r.Header.Set("Origin", "https://evil.example")
+	r.Header.Set("X-Forwarded-Host", "evil.example")
+	r.Header.Set("X-Forwarded-Proto", "https")
+	if ViewerRequestSafe(r) {
+		t.Fatal("forwarded host from a public peer was trusted")
 	}
 }

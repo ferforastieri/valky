@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"net/http"
 	"strings"
+	"sync"
 	"time"
 
 	appcrypto "github.com/ferforastieri/valky/backend/internal/crypto"
@@ -21,11 +22,16 @@ type contextKey string
 const (
 	deviceKey contextKey = "deviceID"
 	adminKey  contextKey = "isAdmin"
+	viewerKey contextKey = "isViewer"
 )
 
 type Manager struct {
 	store    *store.Store
 	lifetime time.Duration
+	// lastSeen evita um UPDATE por requisição autenticada: o banco abre uma
+	// única conexão e o heartbeat competia com o caminho de dados.
+	touchMu  sync.Mutex
+	lastSeen map[string]time.Time
 }
 
 type PairingSession struct {
@@ -42,6 +48,9 @@ type LoginRequest struct {
 	DeviceName   string `json:"deviceName"`
 	UserName     string `json:"userName"`
 	Locale       string `json:"locale"`
+	// SetupToken é o código de instalação impresso pelo instalador; só é
+	// exigido na criação do primeiro administrador.
+	SetupToken string `json:"setupToken,omitempty"`
 }
 
 type PairRequest struct {
@@ -61,7 +70,27 @@ type PairResponse struct {
 }
 
 func NewManager(s *store.Store, lifetime time.Duration) *Manager {
-	return &Manager{store: s, lifetime: lifetime}
+	return &Manager{store: s, lifetime: lifetime, lastSeen: map[string]time.Time{}}
+}
+
+// lastSeenInterval é o intervalo mínimo entre gravações de last_seen_at.
+const lastSeenInterval = 5 * time.Minute
+
+// touchDevice grava o heartbeat no máximo uma vez a cada lastSeenInterval.
+func (m *Manager) touchDevice(id string) {
+	now := time.Now()
+	m.touchMu.Lock()
+	previous, ok := m.lastSeen[id]
+	if ok && now.Sub(previous) < lastSeenInterval {
+		m.touchMu.Unlock()
+		return
+	}
+	m.lastSeen[id] = now
+	if len(m.lastSeen) > 4096 {
+		m.lastSeen = map[string]time.Time{id: now}
+	}
+	m.touchMu.Unlock()
+	_, _ = m.store.DB.ExecContext(context.Background(), `UPDATE devices SET last_seen_at=? WHERE id=?`, now.UTC().Format(time.RFC3339Nano), id)
 }
 
 func (m *Manager) AdminInitialized(ctx context.Context) (bool, error) {
@@ -138,11 +167,14 @@ func (m *Manager) Login(ctx context.Context, req LoginRequest) (PairResponse, er
 }
 
 func (m *Manager) CreatePairing(ctx context.Context) (PairingSession, error) {
-	codeRaw, err := appcrypto.RandomToken(6)
+	// 12 bytes viram 16 caracteres: o convite é lido por QR Code, então o
+	// tamanho extra não custa nada e tira o código do alcance de uma busca
+	// offline caso o banco vaze.
+	codeRaw, err := appcrypto.RandomToken(12)
 	if err != nil {
 		return PairingSession{}, err
 	}
-	code := strings.ToUpper(codeRaw[:8])
+	code := strings.ToUpper(codeRaw[:16])
 	now := time.Now().UTC()
 	session := PairingSession{ID: uuid.NewString(), Code: code, ExpiresAt: now.Add(m.lifetime)}
 	_, err = m.store.DB.ExecContext(ctx, `INSERT INTO pairing_sessions(id,code_hash,expires_at,created_at) VALUES(?,?,?,?)`, session.ID, appcrypto.Hash(code), session.ExpiresAt.Format(time.RFC3339Nano), now.Format(time.RFC3339Nano))
@@ -255,22 +287,24 @@ func issueDevice(ctx context.Context, exec contextExecer, name, userName, locale
 }
 
 func (m *Manager) Authenticate(ctx context.Context, token string) (string, error) {
-	id, _, err := m.authenticate(ctx, token)
+	id, _, _, err := m.authenticate(ctx, token)
 	return id, err
 }
 
-func (m *Manager) authenticate(ctx context.Context, token string) (string, bool, error) {
+// authenticate resolve o dispositivo e já devolve o dono e o papel, para o
+// middleware não precisar de mais nenhuma consulta.
+func (m *Manager) authenticate(ctx context.Context, token string) (string, bool, string, error) {
 	if token == "" {
-		return "", false, fmt.Errorf("missing token")
+		return "", false, "", fmt.Errorf("missing token")
 	}
-	var id string
+	var id, userID string
 	var admin int
-	err := m.store.DB.QueryRowContext(ctx, `SELECT d.id,u.is_admin FROM devices d JOIN users u ON u.id=d.user_id WHERE d.token_hash=? AND d.enabled=1 AND u.enabled=1`, appcrypto.Hash(token)).Scan(&id, &admin)
+	err := m.store.DB.QueryRowContext(ctx, `SELECT d.id,d.user_id,u.is_admin FROM devices d JOIN users u ON u.id=d.user_id WHERE d.token_hash=? AND d.enabled=1 AND u.enabled=1`, appcrypto.Hash(token)).Scan(&id, &userID, &admin)
 	if err != nil {
-		return "", false, err
+		return "", false, "", err
 	}
-	_, _ = m.store.DB.ExecContext(ctx, `UPDATE devices SET last_seen_at=? WHERE id=?`, time.Now().UTC().Format(time.RFC3339Nano), id)
-	return id, admin == 1, nil
+	m.touchDevice(id)
+	return id, admin == 1, userID, nil
 }
 
 func (m *Manager) Middleware(next http.Handler) http.Handler {
@@ -278,7 +312,7 @@ func (m *Manager) Middleware(next http.Handler) http.Handler {
 		header := r.Header.Get("Authorization")
 		token := strings.TrimPrefix(header, "Bearer ")
 		cookieAuth := header == ""
-		var id string
+		var id, accountID string
 		var admin bool
 		var err error
 		if cookieAuth {
@@ -288,17 +322,17 @@ func (m *Manager) Middleware(next http.Handler) http.Handler {
 				return
 			}
 			token = cookie.Value
-			id, err = m.authenticateViewer(r.Context(), token)
+			id, accountID, admin, err = m.authenticateViewer(r.Context(), token)
 		} else {
 			if !strings.HasPrefix(header, "Bearer ") {
 				writeUnauthorized(w)
 				return
 			}
-			id, admin, err = m.authenticate(r.Context(), token)
+			id, admin, accountID, err = m.authenticate(r.Context(), token)
 		}
 		viewer := cookieAuth
 		if err != nil && !cookieAuth {
-			id, err = m.authenticateViewer(r.Context(), token)
+			id, accountID, admin, err = m.authenticateViewer(r.Context(), token)
 			viewer = err == nil
 			admin = false
 		}
@@ -307,10 +341,6 @@ func (m *Manager) Middleware(next http.Handler) http.Handler {
 			return
 		}
 		if viewer {
-			if err := m.store.DB.QueryRowContext(r.Context(), `SELECT u.is_admin FROM viewer_sessions v JOIN users u ON u.id=v.user_id WHERE v.id=? AND u.enabled=1`, id).Scan(&admin); err != nil {
-				writeUnauthorized(w)
-				return
-			}
 			if !(viewerRequestAllowed(r) || browserAccountRequestAllowed(r) || (admin && browserAdminRequestAllowed(r))) || (cookieAuth && !ViewerRequestSafe(r)) {
 				w.Header().Set("Content-Type", "application/json")
 				w.WriteHeader(http.StatusForbidden)
@@ -319,7 +349,9 @@ func (m *Manager) Middleware(next http.Handler) http.Handler {
 			}
 			if cookieAuth && !(r.Method == "DELETE" && r.URL.Path == "/viewer-session") {
 				now := time.Now().UTC()
-				result, updateErr := m.store.DB.ExecContext(r.Context(), `UPDATE viewer_sessions SET expires_at=? WHERE id=? AND expires_at<?`, now.Add(30*24*time.Hour).Format(time.RFC3339Nano), id, now.Add(29*24*time.Hour).Format(time.RFC3339Nano))
+				// Renova só quando faltam menos de cinco dias: com o limite em
+				// 29 dias a escrita acontecia em praticamente todo request.
+				result, updateErr := m.store.DB.ExecContext(r.Context(), `UPDATE viewer_sessions SET expires_at=? WHERE id=? AND expires_at<?`, now.Add(30*24*time.Hour).Format(time.RFC3339Nano), id, now.Add(25*24*time.Hour).Format(time.RFC3339Nano))
 				if updateErr != nil {
 					http.Error(w, "Session renewal failed", 500)
 					return
@@ -332,15 +364,7 @@ func (m *Manager) Middleware(next http.Handler) http.Handler {
 		w.Header().Set("Cache-Control", "no-store")
 		ctx := context.WithValue(r.Context(), deviceKey, id)
 		ctx = context.WithValue(ctx, adminKey, admin)
-		var accountID string
-		table := "devices"
-		if viewer {
-			table = "viewer_sessions"
-		}
-		if err := m.store.DB.QueryRowContext(ctx, "SELECT user_id FROM "+table+" WHERE id=?", id).Scan(&accountID); err != nil {
-			writeUnauthorized(w)
-			return
-		}
+		ctx = context.WithValue(ctx, viewerKey, viewer)
 		ctx = context.WithValue(ctx, accountKey, accountID)
 		if r.URL.Path == "/realtime" {
 			connectionCtx, cancel := context.WithCancel(ctx)
@@ -355,9 +379,9 @@ func (m *Manager) Middleware(next http.Handler) http.Handler {
 					case <-ticker.C:
 						var checkErr error
 						if viewer {
-							_, checkErr = m.authenticateViewer(connectionCtx, token)
+							_, _, _, checkErr = m.authenticateViewer(connectionCtx, token)
 						} else {
-							_, _, checkErr = m.authenticate(connectionCtx, token)
+							_, _, _, checkErr = m.authenticate(connectionCtx, token)
 						}
 						if checkErr != nil {
 							cancel()
@@ -388,6 +412,10 @@ func (m *Manager) RequireAdmin(next http.Handler) http.Handler {
 
 func DeviceID(ctx context.Context) string { v, _ := ctx.Value(deviceKey).(string); return v }
 func IsAdmin(ctx context.Context) bool    { v, _ := ctx.Value(adminKey).(bool); return v }
+
+// IsViewerSession distingue o navegador (cookie de consulta) do aplicativo
+// pareado. Operações de administração pedem uma prova extra nesse caso.
+func IsViewerSession(ctx context.Context) bool { v, _ := ctx.Value(viewerKey).(bool); return v }
 
 func writeUnauthorized(w http.ResponseWriter) {
 	w.Header().Set("Content-Type", "application/json")

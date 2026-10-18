@@ -24,6 +24,7 @@ type Config struct {
 	ModelsDir           string
 	ReleaseAPI          string
 	FirebaseCredentials string
+	SetupToken          string
 	RetentionAge        time.Duration
 	RetentionBytes      int64
 	PairingLifetime     time.Duration
@@ -48,6 +49,7 @@ func Load() Config {
 		ModelsDir:           env("VALKY_MODELS_DIR", "./models"),
 		ReleaseAPI:          env("VALKY_RELEASE_API", "https://api.github.com/repos/ferforastieri/valky/releases/latest"),
 		FirebaseCredentials: os.Getenv("VALKY_FIREBASE_CREDENTIALS_FILE"),
+		SetupToken:          os.Getenv("VALKY_SETUP_TOKEN"),
 		RetentionAge:        7 * 24 * time.Hour,
 		RetentionBytes:      5 * 1024 * 1024 * 1024,
 		PairingLifetime:     10 * time.Minute,

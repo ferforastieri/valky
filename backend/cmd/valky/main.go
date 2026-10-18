@@ -5,6 +5,7 @@ import (
 	"crypto/ecdsa"
 	"crypto/elliptic"
 	"crypto/rand"
+	"crypto/tls"
 	"crypto/x509"
 	"crypto/x509/pkix"
 	"encoding/pem"
@@ -87,6 +88,8 @@ func main() {
 	apiServer.SetTracking(trackingService)
 	apiServer.SetLights(lightService)
 	apiServer.SetRemotes(remoteService)
+	apiServer.SetSetupToken(cfg.SetupToken)
+	apiServer.SetDataDir(cfg.DataDir)
 	ctx, cancel := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer cancel()
 	go trackingService.RunAddresses(ctx, cfg.GeocoderURL, logger)
@@ -124,7 +127,7 @@ func main() {
 		return err
 	}}
 	go monitor.Run(ctx)
-	httpServer := &http.Server{Addr: cfg.Listen, Handler: apiServer.Handler(), ReadHeaderTimeout: 10 * time.Second, ReadTimeout: 30 * time.Second, WriteTimeout: 60 * time.Second, IdleTimeout: 2 * time.Minute}
+	httpServer := &http.Server{Addr: cfg.Listen, Handler: apiServer.Handler(), ReadHeaderTimeout: 10 * time.Second, ReadTimeout: 30 * time.Second, WriteTimeout: 60 * time.Second, IdleTimeout: 2 * time.Minute, TLSConfig: &tls.Config{MinVersion: tls.VersionTLS12}}
 	go func() {
 		logger.Info("Valky listening", "address", cfg.Listen, "version", version)
 		if e := httpServer.ListenAndServeTLS(cfg.TLSCert, cfg.TLSKey); e != nil && e != http.ErrServerClosed {

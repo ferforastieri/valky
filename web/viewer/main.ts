@@ -840,19 +840,25 @@ async function ruleDetails(id: string) {
  }
   void snapshots($("#detail-body"), modalController.signal, modalCleanups);
 }
+let permissionsCheckedAt = 0;
 async function refresh(force = false) {
   if (refreshing || !api.token || document.hidden) return;
   refreshing = true;
   void checkForUpdates();
   const token = api.token;
   const connection = alive;
-  try {
-    const permissions = await api.get<{admin:boolean;viewRules:boolean;editRules:boolean}>("/viewer-session", alive.signal);
-    if (token !== api.token || connection !== alive) { refreshing = false; return; }
-    if ((api.viewRules && !permissions.viewRules) || (api.editRules && !permissions.editRules) || (api.admin && !permissions.admin)) dialog.close();
-    api.setPermissions(permissions);
-    if (!api.viewRules) rules = [];
-  } catch { refreshing = false; return; }
+  // As permissões quase nunca mudam: confirmar a cada cinco minutos (ou quando
+  // a atualização é forçada) evita um request extra em cada ciclo.
+  if (force || Date.now() - permissionsCheckedAt > 5 * 60_000) {
+    try {
+      const permissions = await api.get<{admin:boolean;viewRules:boolean;editRules:boolean}>("/viewer-session", alive.signal);
+      if (token !== api.token || connection !== alive) { refreshing = false; return; }
+      if ((api.viewRules && !permissions.viewRules) || (api.editRules && !permissions.editRules) || (api.admin && !permissions.admin)) dialog.close();
+      api.setPermissions(permissions);
+      if (!api.viewRules) rules = [];
+      permissionsCheckedAt = Date.now();
+    } catch { refreshing = false; return; }
+  }
   const response = await Promise.allSettled([
     api.get<Camera[]>("/cameras", alive.signal),
     api.get<LightDevice[]>("/lights", alive.signal),
@@ -1012,7 +1018,7 @@ $("#theme").onclick = () => {
     );
   } catch {}
 };
-setInterval(() => void refresh(), 15000);
+setInterval(() => void refresh(), 30000);
 document.addEventListener("visibilitychange", () => {
   if (!document.hidden) void refresh();
 });
@@ -1045,7 +1051,7 @@ async function renderUsers() {
 function editUser(user: ManagedUser) {
   openDetails(user.name, 'GERENCIAR PESSOA');
   const body = $('#detail-body');
-  body.innerHTML = `<form id="user-editor" class="editor-form"><div class="editor-context"><span class="avatar">${e(user.name.slice(0,1).toUpperCase())}</span><div><strong>${e(user.name)}</strong><small>${user.devices} dispositivo(s) vinculado(s)</small></div></div><section class="editor-section"><h3>Perfil</h3><label class="field-label" for="user-name">Nome da pessoa</label><input id="user-name" name="name" value="${e(user.name)}" required maxlength="100" autocomplete="off"></section><section class="editor-section"><h3>Permissões</h3><label class="field-label" for="user-role">Papel no sistema</label><select id="user-role" name="admin"><option value="false" ${!user.admin ? 'selected' : ''}>Membro</option><option value="true" ${user.admin ? 'selected' : ''}>Administrador</option></select><p class="muted">Administradores podem gerenciar pessoas e configurações do sistema.</p><label class="setting-row"><span><strong>Visualizar regras</strong><small>Consultar as regras das câmeras.</small></span><input class="project-switch" type="checkbox" name="viewRules" ${user.viewRules?'checked':''}></label><label class="setting-row"><span><strong>Editar regras</strong><small>Alterar regras e seus destinatários.</small></span><input class="project-switch" type="checkbox" name="editRules" ${user.editRules?'checked':''}></label><label class="setting-row"><span><strong>Acesso ao sistema</strong><small>Desativar bloqueia os dispositivos desta pessoa.</small></span><input class="project-switch" type="checkbox" role="switch" name="enabled" ${user.enabled ? 'checked' : ''}></label></section><section class="editor-section"><h3>${user.credentialsConfigured ? 'Redefinir acesso' : 'Configurar acesso'}</h3><label for="account-username">Usuário</label><input id="account-username" name="username" value="${e(user.username)}" autocomplete="off"><label for="account-password">Nova senha (opcional)</label><input id="account-password" name="password" type="password" minlength="12" maxlength="72" autocomplete="new-password"><p class="muted">Preencha a senha para definir as credenciais. As sessões desta pessoa serão encerradas.</p></section><p role="status" class="error" id="user-result"></p><div class="editor-footer"><button type="button" class="danger quiet" id="remove-user">Remover pessoa</button><button type="submit" class="primary">Salvar alterações</button></div><div id="remove-confirm" class="notice" hidden><p>Remover ${e(user.name)} e revogar o acesso dos seus dispositivos?</p><button type="button" class="danger" id="confirm-remove">Confirmar remoção</button><button type="button" class="quiet" id="cancel-remove">Cancelar</button></div></form>`;
+  body.innerHTML = `<form id="user-editor" class="editor-form"><div class="editor-context"><span class="avatar">${e(user.name.slice(0,1).toUpperCase())}</span><div><strong>${e(user.name)}</strong><small>${user.devices} dispositivo(s) vinculado(s)</small></div></div><section class="editor-section"><h3>Perfil</h3><label class="field-label" for="user-name">Nome da pessoa</label><input id="user-name" name="name" value="${e(user.name)}" required maxlength="100" autocomplete="off"></section><section class="editor-section"><h3>Permissões</h3><label class="field-label" for="user-role">Papel no sistema</label><select id="user-role" name="admin"><option value="false" ${!user.admin ? 'selected' : ''}>Membro</option><option value="true" ${user.admin ? 'selected' : ''}>Administrador</option></select><p class="muted">Administradores podem gerenciar pessoas e configurações do sistema.</p><label class="field-label" for="actor-password">Sua senha</label><input id="actor-password" name="actorPassword" type="password" autocomplete="current-password" placeholder="Pedida só ao promover alguém"><p class="muted">Transformar um membro em administrador pelo painel exige a sua senha, mesmo com a sessão aberta.</p><label class="setting-row"><span><strong>Visualizar regras</strong><small>Consultar as regras das câmeras.</small></span><input class="project-switch" type="checkbox" name="viewRules" ${user.viewRules?'checked':''}></label><label class="setting-row"><span><strong>Editar regras</strong><small>Alterar regras e seus destinatários.</small></span><input class="project-switch" type="checkbox" name="editRules" ${user.editRules?'checked':''}></label><label class="setting-row"><span><strong>Acesso ao sistema</strong><small>Desativar bloqueia os dispositivos desta pessoa.</small></span><input class="project-switch" type="checkbox" role="switch" name="enabled" ${user.enabled ? 'checked' : ''}></label></section><section class="editor-section"><h3>${user.credentialsConfigured ? 'Redefinir acesso' : 'Configurar acesso'}</h3><label for="account-username">Usuário</label><input id="account-username" name="username" value="${e(user.username)}" autocomplete="off"><label for="account-password">Nova senha (opcional)</label><input id="account-password" name="password" type="password" minlength="12" maxlength="72" autocomplete="new-password"><p class="muted">Preencha a senha para definir as credenciais. As sessões desta pessoa serão encerradas.</p></section><p role="status" class="error" id="user-result"></p><div class="editor-footer"><button type="button" class="danger quiet" id="remove-user">Remover pessoa</button><button type="submit" class="primary">Salvar alterações</button></div><div id="remove-confirm" class="notice" hidden><p>Remover ${e(user.name)} e revogar o acesso dos seus dispositivos?</p><button type="button" class="danger" id="confirm-remove">Confirmar remoção</button><button type="button" class="quiet" id="cancel-remove">Cancelar</button></div></form>`;
   modalCleanups.push(styleSelects(body));
   const form = $<HTMLFormElement>('#user-editor');
   const view = form.querySelector<HTMLInputElement>('[name=viewRules]')!;
@@ -1056,7 +1062,7 @@ function editUser(user: ManagedUser) {
     const buttons = Array.from(form.querySelectorAll('button')); buttons.forEach(button => button.disabled = true);
     try {
       const data = new FormData(form);
-      await api.mutate(`/admin/users/${key(user.id)}`, remove ? 'DELETE' : 'PUT', remove ? undefined : { name: String(data.get('name')).trim(), enabled: data.has('enabled'), admin: data.get('admin') === 'true', viewRules: data.has('viewRules'), editRules: data.has('editRules'), username: String(data.get('username')).trim(), password: String(data.get('password')) });
+      await api.mutate(`/admin/users/${key(user.id)}`, remove ? 'DELETE' : 'PUT', remove ? undefined : { name: String(data.get('name')).trim(), enabled: data.has('enabled'), admin: data.get('admin') === 'true', viewRules: data.has('viewRules'), editRules: data.has('editRules'), username: String(data.get('username')).trim(), password: String(data.get('password')), actorPassword: String(data.get('actorPassword') ?? '') });
       if (form.isConnected) dialog.close();
       await renderUsers();
     } catch (error) { if (form.isConnected) $('#user-result').textContent = (error as Error).message; }

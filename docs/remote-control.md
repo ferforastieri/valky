@@ -92,7 +92,7 @@ MAC — ele é capturado automaticamente ao parear.
 2. Deixe a TV em **standby** (desligada pelo controle), não fora da tomada.
 
 **No servidor:** como o backend roda em Docker, o firewall do CT precisa
-permitir `UDP 9` para o broadcast da LAN (ex.: `192.0.2.0/24`).
+permitir `UDP 9` para o broadcast da LAN (ex.: `192.168.1.0/24`).
 
 **Limites:** Wi‑Fi (WoWLAN) é bem menos confiável que cabo Ethernet — pode
 precisar de 2–3 tentativas e alguns modelos/roteadores não acordam por Wi‑Fi.

@@ -141,6 +141,11 @@ func (s *Service) Enqueue(ctx context.Context, e event.Event) error {
 	query := `SELECT id FROM devices WHERE enabled=1 AND push_endpoint_enc IS NOT NULL`
 	var args []any
 	query += ` AND EXISTS(SELECT 1 FROM users u WHERE u.id=devices.user_id AND u.enabled=1 AND u.` + column + `=1)`
+	if e.RuleID != nil && *e.RuleID != "" {
+		// Uma regra pode limitar quem recebe; sem lista definida, é a família inteira.
+		query += ` AND COALESCE((SELECT CASE WHEN json_extract(actions_json,'$.recipientUserIds') IS NULL THEN 1 ELSE EXISTS(SELECT 1 FROM json_each(json_extract(actions_json,'$.recipientUserIds')) recipient WHERE recipient.value=devices.user_id) END FROM rules WHERE id=?),1)=1`
+		args = append(args, *e.RuleID)
+	}
 	if e.Source == "tracking" && e.SubjectID != "" {
 		// The tracking subject is a family user: skip that user's own devices.
 		query += ` AND COALESCE(user_id,'')<>?`
@@ -200,7 +205,7 @@ func (s *Service) deliverBatch(ctx context.Context) {
 	now := time.Now().UTC()
 	stamp := now.Format(time.RFC3339Nano)
 	cutoff := now.Add(-pushFreshnessWindow).Format(time.RFC3339Nano)
-	rows, err := s.store.DB.QueryContext(ctx, `SELECT p.id,p.attempts,d.push_endpoint_enc,d.push_secret_enc,e.id,COALESCE(e.camera_id,''),e.type,e.confidence,e.occurred_at,e.metadata_json,CASE WHEN e.source='tracking' THEN COALESCE((SELECT value FROM settings WHERE key='location_alerts'),'{}') ELSE COALESCE((SELECT json_extract(actions_json,'$.alerts') FROM rules WHERE id=e.rule_id),'{}') END,COALESCE((SELECT name FROM cameras WHERE id=e.camera_id),'') FROM push_deliveries p JOIN devices d ON d.id=p.device_id JOIN events e ON e.id=p.event_id WHERE d.enabled=1 AND EXISTS(SELECT 1 FROM users u WHERE u.id=d.user_id AND u.enabled=1) AND EXISTS(SELECT 1 FROM users nu WHERE nu.id=d.user_id AND nu.enabled=1 AND (CASE WHEN e.source='tracking' THEN nu.notify_location ELSE nu.notify_camera END)=1) AND NOT (e.source='tracking' AND e.subject_id<>'' AND (COALESCE(d.user_id,'')=e.subject_id)) AND p.delivered_at IS NULL AND p.next_attempt_at<=? AND p.attempts<10 AND julianday(p.created_at)>julianday(?) AND julianday(e.occurred_at)>julianday(?) ORDER BY p.created_at LIMIT 20`, stamp, cutoff, cutoff)
+	rows, err := s.store.DB.QueryContext(ctx, `SELECT p.id,p.attempts,d.push_endpoint_enc,d.push_secret_enc,e.id,COALESCE(e.camera_id,''),e.type,e.confidence,e.occurred_at,e.metadata_json,CASE WHEN e.source='tracking' THEN COALESCE((SELECT value FROM settings WHERE key='location_alerts'),'{}') ELSE COALESCE((SELECT json_extract(actions_json,'$.alerts') FROM rules WHERE id=e.rule_id),'{}') END,COALESCE((SELECT name FROM cameras WHERE id=e.camera_id),'') FROM push_deliveries p JOIN devices d ON d.id=p.device_id JOIN events e ON e.id=p.event_id WHERE d.enabled=1 AND EXISTS(SELECT 1 FROM users u WHERE u.id=d.user_id AND u.enabled=1) AND EXISTS(SELECT 1 FROM users nu WHERE nu.id=d.user_id AND nu.enabled=1 AND (CASE WHEN e.source='tracking' THEN nu.notify_location ELSE nu.notify_camera END)=1) AND NOT (e.source='tracking' AND e.subject_id<>'' AND (COALESCE(d.user_id,'')=e.subject_id)) AND (e.rule_id IS NULL OR COALESCE((SELECT CASE WHEN json_extract(r.actions_json,'$.recipientUserIds') IS NULL THEN 1 ELSE EXISTS(SELECT 1 FROM json_each(json_extract(r.actions_json,'$.recipientUserIds')) recipient WHERE recipient.value=d.user_id) END FROM rules r WHERE r.id=e.rule_id),1)=1) AND p.delivered_at IS NULL AND p.next_attempt_at<=? AND p.attempts<10 AND julianday(p.created_at)>julianday(?) AND julianday(e.occurred_at)>julianday(?) ORDER BY p.created_at LIMIT 20`, stamp, cutoff, cutoff)
 	if err != nil {
 		return
 	}

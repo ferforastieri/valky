@@ -2,6 +2,7 @@ package api
 
 import (
 	"context"
+	"crypto/subtle"
 	"database/sql"
 	_ "embed"
 	"encoding/base64"
@@ -42,6 +43,8 @@ type DetectionSubmitter interface {
 }
 type Server struct {
 	viewerDir    string
+	setupToken   string
+	dataDir      string
 	auth         *auth.Manager
 	cameras      *camera.Repository
 	onvif        *camera.ONVIFClient
@@ -75,6 +78,7 @@ type changePasswordInput struct {
 }
 
 func NewServer(a *auth.Manager, c *camera.Repository, o *camera.ONVIFClient, m *media.Manager, r *rules.Service, e *event.Service, n *notify.Service, h *Hub, logger *slog.Logger) *Server {
+	internalErrorLogger = logger
 	return &Server{auth: a, cameras: c, onvif: o, media: m, rules: r, events: e, notify: n, hub: h, logger: logger, operations: make(map[string]CameraOperation)}
 }
 func (s *Server) SetUpdates(service *updates.Service)         { s.updates = service }
@@ -82,6 +86,15 @@ func (s *Server) SetPreferences(service *preferences.Service) { s.preferences = 
 func (s *Server) SetTracking(service *tracking.Service)       { s.tracking = service }
 func (s *Server) SetLights(service *light.Service)            { s.lights = service }
 func (s *Server) SetRemotes(service *remote.Service)          { s.remotes = service }
+
+// SetSetupToken enables the installation code that the installer prints. With a
+// token configured, the first administrator can only be created by whoever has
+// physical access to the installer output — an exposed instance stops being a
+// race to whoever reaches it first.
+func (s *Server) SetSetupToken(token string) { s.setupToken = strings.TrimSpace(token) }
+
+// SetDataDir bounds the files the API is allowed to serve from disk.
+func (s *Server) SetDataDir(dir string) { s.dataDir = dir }
 
 // ResumeCameraSetups continues cameras that were persisted before an interrupted
 // background probe. Failed cameras remain untouched so their diagnosis is kept.
@@ -168,6 +181,7 @@ func (s *Server) Handler() http.Handler {
 	protected.Handle("POST /rules", s.auth.RequireRules(true, http.HandlerFunc(s.createRule)))
 	protected.Handle("PUT /rules/{id}", s.auth.RequireRules(true, http.HandlerFunc(s.updateRule)))
 	protected.Handle("DELETE /rules/{id}", s.auth.RequireRules(true, http.HandlerFunc(s.deleteRule)))
+	protected.Handle("PUT /rules/{id}/recipients", s.auth.RequireRules(true, http.HandlerFunc(s.updateRuleRecipients)))
 	protected.HandleFunc("GET /users", s.listUsers)
 	protected.Handle("PUT /users/{id}", s.auth.RequireAdmin(http.HandlerFunc(s.updateUser)))
 	protected.HandleFunc("GET /users/{id}/history", s.userHistory)
@@ -231,6 +245,10 @@ func (s *Server) bootstrapAdmin(w http.ResponseWriter, r *http.Request) {
 	if !decode(w, r, &in) {
 		return
 	}
+	if !s.setupTokenMatches(r, in.SetupToken) {
+		writeError(w, http.StatusForbidden, fmt.Errorf("informe o código de instalação exibido pelo instalador do Valky"))
+		return
+	}
 	out, err := s.auth.BootstrapAdmin(r.Context(), in)
 	if err != nil {
 		writeError(w, http.StatusBadRequest, err)
@@ -238,6 +256,21 @@ func (s *Server) bootstrapAdmin(w http.ResponseWriter, r *http.Request) {
 	}
 	writeSuccess(w, http.StatusCreated, "Administrator created successfully", out)
 }
+
+// setupTokenMatches accepts the installation code either as a header or in the
+// body, and only enforces it when the installer configured one. The comparison
+// is constant time so a wrong code cannot be discovered byte by byte.
+func (s *Server) setupTokenMatches(r *http.Request, fromBody string) bool {
+	if s.setupToken == "" {
+		return true
+	}
+	candidate := fromBody
+	if candidate == "" {
+		candidate = r.Header.Get("X-Valky-Setup-Token")
+	}
+	return subtle.ConstantTimeCompare([]byte(candidate), []byte(s.setupToken)) == 1
+}
+
 func (s *Server) login(w http.ResponseWriter, r *http.Request) {
 	var in auth.LoginRequest
 	if !decode(w, r, &in) {
@@ -810,6 +843,54 @@ func (s *Server) updateRule(w http.ResponseWriter, r *http.Request) {
 	writeSuccess(w, http.StatusOK, "Rule updated successfully", out)
 }
 
+type recipientsInput struct {
+	RecipientUserIDs *[]string `json:"recipientUserIds"`
+}
+
+// updateRuleRecipients atende o editor do painel: valida que cada destinatário é
+// uma pessoa cadastrada e grava só esse recorte da regra.
+func (s *Server) updateRuleRecipients(w http.ResponseWriter, r *http.Request) {
+	if s.rules == nil {
+		writeError(w, http.StatusServiceUnavailable, fmt.Errorf("rules service is not configured"))
+		return
+	}
+	var in recipientsInput
+	if !decode(w, r, &in) {
+		return
+	}
+	ids := []string{}
+	if in.RecipientUserIDs != nil {
+		people, err := s.auth.Users(r.Context())
+		if err != nil {
+			respond(w, nil, err)
+			return
+		}
+		valid := make(map[string]bool, len(people))
+		for _, person := range people {
+			valid[person.ID] = true
+		}
+		seen := make(map[string]bool, len(*in.RecipientUserIDs))
+		for _, id := range *in.RecipientUserIDs {
+			id = strings.TrimSpace(id)
+			if id == "" || !valid[id] {
+				writeError(w, http.StatusBadRequest, fmt.Errorf("invalid recipient"))
+				return
+			}
+			if seen[id] {
+				continue
+			}
+			seen[id] = true
+			ids = append(ids, id)
+		}
+	}
+	out, err := s.rules.UpdateRecipients(r.Context(), r.PathValue("id"), ids)
+	if err != nil {
+		respond(w, nil, err)
+		return
+	}
+	writeSuccess(w, http.StatusOK, "Rule recipients saved successfully", out)
+}
+
 func (s *Server) deleteRule(w http.ResponseWriter, r *http.Request) {
 	err := s.rules.Delete(r.Context(), r.PathValue("id"))
 	if err != nil {
@@ -1030,14 +1111,24 @@ func (s *Server) eventClip(w http.ResponseWriter, r *http.Request) {
 		writeError(w, 404, fmt.Errorf("clip is not ready"))
 		return
 	}
-	if _, err = os.Stat(filepath.Clean(e.ClipPath)); err != nil {
-		writeError(w, http.StatusNotFound, fmt.Errorf("event clip file is unavailable: %w", err))
+	// O caminho vem do banco: só serve arquivos que continuam dentro do
+	// diretório de dados, mesmo que a linha tenha sido alterada por fora.
+	clip := filepath.Clean(e.ClipPath)
+	if s.dataDir != "" {
+		rel, relErr := filepath.Rel(filepath.Clean(s.dataDir), clip)
+		if relErr != nil || rel == ".." || strings.HasPrefix(rel, ".."+string(filepath.Separator)) {
+			writeError(w, http.StatusNotFound, fmt.Errorf("clip is not ready"))
+			return
+		}
+	}
+	if _, err = os.Stat(clip); err != nil {
+		writeError(w, http.StatusNotFound, fmt.Errorf("clip is not ready"))
 		return
 	}
 	w.Header().Set("Content-Type", "video/mp4")
 	w.Header().Set("Cache-Control", "private, max-age=3600")
 	setOutcomeHeaders(w, http.StatusOK, "Event clip loaded")
-	http.ServeFile(w, r, filepath.Clean(e.ClipPath))
+	http.ServeFile(w, r, clip)
 }
 func (s *Server) push(w http.ResponseWriter, r *http.Request) {
 	var in notify.Registration
@@ -1171,8 +1262,20 @@ func writeSuccess(w http.ResponseWriter, status int, message string, value any) 
 	}
 	_ = json.NewEncoder(w).Encode(map[string]any{"success": true, "message": message, "data": value})
 }
+
+// internalErrorLogger keeps the detail of a failure in the server log while the
+// client receives only a generic message: file paths, SQL text and decryption
+// errors must not travel back in a response.
+var internalErrorLogger *slog.Logger
+
 func writeError(w http.ResponseWriter, status int, err error) {
 	message := err.Error()
+	if status >= http.StatusInternalServerError {
+		if internalErrorLogger != nil {
+			internalErrorLogger.Error("request failed", "status", status, "error", err)
+		}
+		message = "internal error"
+	}
 	w.Header().Set("Content-Type", "application/json")
 	setOutcomeHeaders(w, status, message)
 	w.WriteHeader(status)
@@ -1226,11 +1329,20 @@ func securityHeaders(next http.Handler) http.Handler {
 		w.Header().Set("X-Content-Type-Options", "nosniff")
 		w.Header().Set("X-Frame-Options", "DENY")
 		w.Header().Set("Referrer-Policy", "no-referrer")
+		// O backend fala HTTPS direto (e o proxy opcional herda o cabeçalho);
+		// sem HSTS o primeiro acesso continuaria aceitando rebaixamento.
+		w.Header().Set("Strict-Transport-Security", "max-age=31536000")
 		next.ServeHTTP(w, r)
 	})
 }
 func requestLog(logger *slog.Logger, next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// Arquivos do painel e imagens são muitos e baratos: só a API e a saúde
+		// entram no log, para o registro continuar útil sem ruído.
+		if !strings.HasPrefix(r.URL.Path, "/api/v1/") && r.URL.Path != "/health" {
+			next.ServeHTTP(w, r)
+			return
+		}
 		start := time.Now()
 		next.ServeHTTP(w, r)
 		logger.Info("request", "method", r.Method, "path", r.URL.Path, "duration", time.Since(start))

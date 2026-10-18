@@ -58,7 +58,7 @@ func TestManagedUserRevocationAndLastAdmin(t *testing.T) {
 	if err := m.ManageUser(ctx, member.ID, member, false); err != nil {
 		t.Fatal(err)
 	}
-	if _, isAdmin, err := m.authenticate(ctx, b.Token); err != nil || !isAdmin {
+	if _, isAdmin, _, err := m.authenticate(ctx, b.Token); err != nil || !isAdmin {
 		t.Fatalf("role not loaded from database: %v", err)
 	}
 	if err := m.ManageUser(ctx, member.ID, member, true); err != nil {

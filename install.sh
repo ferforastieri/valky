@@ -16,6 +16,16 @@ fail() {
   exit 1
 }
 
+# 16 caracteres hexadecimais (64 bits) que o administrador informa no primeiro
+# acesso do aplicativo.
+generate_setup_token() {
+  if command -v openssl >/dev/null 2>&1; then
+    openssl rand -hex 8
+  else
+    head -c 32 /dev/urandom | sha256sum | cut -c1-16
+  fi
+}
+
 command -v curl >/dev/null 2>&1 || fail "curl não foi encontrado."
 command -v docker >/dev/null 2>&1 || fail "Docker não foi encontrado. Instale-o antes de continuar."
 docker compose version >/dev/null 2>&1 || fail "Docker Compose v2 não foi encontrado."
@@ -29,7 +39,7 @@ fi
 
 printf 'Valky: baixando a release %s...\n' "$REQUESTED_VERSION"
 for asset in compose.yaml mediamtx.yml VERSION SHA256SUMS; do
-  curl -fsSL --retry 3 --proto '=https' --tlsv1.2 \
+  curl -fsSL --retry 3 --proto '=https' --proto-redir '=https' --tlsv1.2 \
     "${RELEASE_URL}/${asset}" -o "${TEMP_ROOT}/${asset}" || fail "não foi possível baixar ${asset}."
 done
 
@@ -71,7 +81,9 @@ if [ ! -f "$ENV_FILE" ]; then
     printf 'VALKY_PORT=8443\n'
   } > "$ENV_FILE"
 else
-  sed '/^VALKY_PUBLIC_URL=/d; /^VALKY_SETUP_TOKEN=/d; /^VALKY_UPDATER_URL=/d; /^VALKY_UPDATER_TOKEN=/d' "$ENV_FILE" > "${TEMP_ROOT}/env-clean"
+  # Também remove as variáveis da instalação antiga (VALKYRIS_*), que ficavam
+  # no arquivo depois da troca de nome e confundiam a configuração.
+  sed '/^VALKY_PUBLIC_URL=/d; /^VALKY_SETUP_TOKEN=/d; /^VALKY_UPDATER_URL=/d; /^VALKY_UPDATER_TOKEN=/d; /^VALKYRIS_/d' "$ENV_FILE" > "${TEMP_ROOT}/env-clean"
   mv "${TEMP_ROOT}/env-clean" "$ENV_FILE"
   if grep -q '^VALKY_VERSION=' "$ENV_FILE"; then
     sed "s/^VALKY_VERSION=.*/VALKY_VERSION=${RELEASE_VERSION}/" "$ENV_FILE" > "${TEMP_ROOT}/env"
@@ -80,6 +92,14 @@ else
     printf '\nVALKY_VERSION=%s\n' "$RELEASE_VERSION" >> "$ENV_FILE"
   fi
 fi
+
+# O código de instalação é gerado aqui e só existe no servidor: é ele que
+# autoriza criar o primeiro administrador, em vez de deixar a instância aberta
+# para quem alcançá-la primeiro. Uma atualização preserva o código existente.
+if ! grep -Eq '^VALKY_SETUP_TOKEN=.+$' "$ENV_FILE"; then
+  printf '\nVALKY_SETUP_TOKEN=%s\n' "$(generate_setup_token)" >> "$ENV_FILE"
+fi
+SETUP_TOKEN="$(sed -n 's/^VALKY_SETUP_TOKEN=//p' "$ENV_FILE" | head -1)"
 # Preserve explicitly configured public/LAN candidates across upgrades.
 if ! grep -Eq '^VALKY_WEBRTC_HOSTS=.+$' "$ENV_FILE"; then
   printf '\nVALKY_WEBRTC_HOSTS=%s\n' "$LAN_ADDRESS" >> "$ENV_FILE"
@@ -103,5 +123,7 @@ done
 
 printf '\nValky %s está pronto. Abra o app para criar o primeiro administrador:\n\n' "$RELEASE_VERSION"
 printf 'Endereço local: https://%s:%s\n' "$LAN_ADDRESS" "$PORT"
-printf '\nSe você usa Caddy ou outro proxy, informe o domínio HTTPS no app no lugar do endereço local.\n'
+printf 'Código de instalação: %s\n' "$SETUP_TOKEN"
+printf '\nO código acima só é pedido ao criar a PRIMEIRA conta; guarde-o com o seu .env.\n'
+printf 'Se você usa Caddy ou outro proxy, informe o domínio HTTPS no app no lugar do endereço local.\n'
 printf 'Para receber alertas nativos, configure a conta de serviço FCM conforme https://valkyris.vercel.app/pt-BR/docs\n'

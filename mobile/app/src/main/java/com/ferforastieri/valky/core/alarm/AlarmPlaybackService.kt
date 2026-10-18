@@ -38,12 +38,19 @@ class AlarmPlaybackService : Service() {
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         val eventId = intent?.getStringExtra("eventId") ?: return START_NOT_STICKY
         @Suppress("DEPRECATION")
-        val notification = intent.getParcelableExtra<Notification>("notification") ?: return START_NOT_STICKY
+        val notification = runCatching { intent.getParcelableExtra<Notification>("notification") }.getOrNull() ?: return START_NOT_STICKY
         if (activeEventId != eventId) stopPlayback()
         activeEventId = eventId
-        if (Build.VERSION.SDK_INT >= 29) {
-            startForeground(eventId.hashCode(), notification, ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PLAYBACK)
-        } else startForeground(eventId.hashCode(), notification)
+        // Android 12+ recusa iniciar o serviço em primeiro plano a partir do background
+        // (ForegroundServiceStartNotAllowedException) e alguns aparelhos negam o tipo
+        // mediaPlayback (SecurityException): sem a notificação o alarme não pode tocar
+        // aqui, então apenas encerra em vez de derrubar o processo.
+        val foreground = runCatching {
+            if (Build.VERSION.SDK_INT >= 29) {
+                startForeground(eventId.hashCode(), notification, ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PLAYBACK)
+            } else startForeground(eventId.hashCode(), notification)
+        }.onFailure { Log.w("ValkyAlarm", "Foreground notification unavailable: ${it.javaClass.simpleName}") }.isSuccess
+        if (!foreground) { stopSelf(); return START_NOT_STICKY }
         handler.removeCallbacks(timeout)
         handler.postDelayed(timeout, 120_000)
         if (player != null) return START_NOT_STICKY
@@ -54,7 +61,8 @@ class AlarmPlaybackService : Service() {
                 if (change == AudioManager.AUDIOFOCUS_LOSS || change == AudioManager.AUDIOFOCUS_LOSS_TRANSIENT) stopSelf()
             }.build()
         focus = request
-        if (audio.requestAudioFocus(request) != AudioManager.AUDIOFOCUS_REQUEST_GRANTED) {
+        val granted = runCatching { audio.requestAudioFocus(request) }.getOrDefault(AudioManager.AUDIOFOCUS_REQUEST_FAILED)
+        if (granted != AudioManager.AUDIOFOCUS_REQUEST_GRANTED) {
             stopSelf()
             return START_NOT_STICKY
         }
@@ -64,7 +72,8 @@ class AlarmPlaybackService : Service() {
         // applied, so it always matches the system alarm level.
         play(uri ?: fallbackUri(), fallback = uri == null)
         if (intent.getBooleanExtra("vibrate", true)) {
-            getSystemService(Vibrator::class.java).vibrate(VibrationEffect.createWaveform(longArrayOf(0, 800, 400), 0), attributes)
+            runCatching { getSystemService(Vibrator::class.java).vibrate(VibrationEffect.createWaveform(longArrayOf(0, 800, 400), 0), attributes) }
+                .onFailure { Log.w("ValkyAlarm", "Vibration unavailable: ${it.javaClass.simpleName}") }
         }
         return START_NOT_STICKY
     }
@@ -72,9 +81,9 @@ class AlarmPlaybackService : Service() {
     private fun fallbackUri() = Uri.parse("android.resource://$packageName/${R.raw.alarm_fallback}")
 
     private fun play(uri: Uri, fallback: Boolean) {
-        val next = MediaPlayer()
-        player = next
         runCatching {
+            val next = MediaPlayer()
+            player = next
             next.setAudioAttributes(attributes)
             next.setWakeMode(this, PowerManager.PARTIAL_WAKE_LOCK)
             next.setDataSource(this, uri)
@@ -88,17 +97,22 @@ class AlarmPlaybackService : Service() {
             }
             next.prepareAsync()
         }.onFailure {
-            next.release()
+            // O MediaPlayer pode falhar ao ser criado ou ao receber a fonte de áudio
+            // (ringtone removido, arquivo corrompido): cai no som embutido e, se nem
+            // isso funcionar, encerra o serviço sem derrubar o app.
+            player?.release()
             player = null
             if (!fallback) play(fallbackUri(), true) else stopSelf()
         }
     }
 
     private fun stopPlayback() {
-        player?.release()
+        runCatching {
+            player?.release()
+            getSystemService(Vibrator::class.java).cancel()
+            focus?.let { getSystemService(AudioManager::class.java).abandonAudioFocusRequest(it) }
+        }
         player = null
-        getSystemService(Vibrator::class.java).cancel()
-        focus?.let { getSystemService(AudioManager::class.java).abandonAudioFocusRequest(it) }
         focus = null
     }
 

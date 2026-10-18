@@ -24,6 +24,7 @@ services:
       VALKY_MEDIA_RTSP: rtsp://mediamtx:8554
       VALKY_MEDIA_RECORDINGS: /data/recordings
       VALKY_FIREBASE_CREDENTIALS_FILE: ${VALKY_FIREBASE_CREDENTIALS_FILE:-/data/secrets/firebase-service-account.json}
+      VALKY_SETUP_TOKEN: ${VALKY_SETUP_TOKEN:-}
     ports:
       - "${VALKY_PORT:-8443}:8443"
     volumes:
@@ -41,6 +42,11 @@ services:
       retries: 10
     security_opt:
       - no-new-privileges:true
+    cap_drop:
+      - ALL
+    read_only: true
+    tmpfs:
+      - /tmp
 
   mediamtx:
     image: bluenviron/mediamtx:1.15.4-ffmpeg
@@ -58,7 +64,8 @@ services:
         read_only: true
         bind:
           create_host_path: false
-      - valky-data:/data
+      # Só o buffer temporário: o MediaMTX nunca vê o banco, a chave-mestra nem
+      # os certificados que ficam no volume valky-data.
       - type: volume
         source: recording-buffer
         target: /data/recordings
@@ -72,10 +79,21 @@ services:
     networks: [valky]
     security_opt:
       - no-new-privileges:true
+    cap_drop:
+      - ALL
+    read_only: true
+    tmpfs:
+      - /tmp
 
 networks:
   valky:
     internal: false
+    # Sub-rede fixa: o MediaMTX autoriza a API pela faixa exata deste projeto,
+    # e não pela faixa 172.16/12 inteira (que alcançaria qualquer container do
+    # host, de qualquer outro projeto).
+    ipam:
+      config:
+        - subnet: 172.28.0.0/24
 
 volumes:
   valky-data:

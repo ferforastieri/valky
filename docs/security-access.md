@@ -8,7 +8,7 @@ A interface não concede permissões. Em cada requisição, o backend resolve o 
 - `/openapi.yaml`: contrato público, sem credenciais.
 - `/app/`: arquivos estáticos com CSP, sem listagem de diretórios; dados vêm da API autenticada.
 - `/api/v1/auth/status`: indica apenas se o primeiro administrador existe.
-- `POST /api/v1/admin/bootstrap`: cria o primeiro administrador uma única vez, com transação e índice único. Uma instalação nova deve ser inicializada antes de ser exposta publicamente.
+- `POST /api/v1/admin/bootstrap`: cria o primeiro administrador uma única vez, com transação e índice único. Quando o instalador grava `VALKY_SETUP_TOKEN` no `.env`, a mesma requisição precisa enviar `setupToken` (ou o cabeçalho `X-Valky-Setup-Token`); sem o código, quem alcançar a instalação primeiro não cria conta. Uma instalação nova deve ser inicializada antes de ser exposta publicamente.
 - `POST /api/v1/login`: valida usuário e senha pessoais com bcrypt antes de emitir credencial.
 - `POST /api/v1/pair`: exige convite temporário, de uso único, criado por administrador. Não aceita papel administrativo no payload.
 
@@ -24,11 +24,13 @@ Todas as rotas registradas no mux protegido são verificadas por um teste que ex
 
 Login com `browserAdmin:true` solicita uma sessão de navegador após validar usuário e senha. O papel é lido da conta vinculada, nunca do payload ou cookie. Cookie `__Host-valky-viewer` é Secure, HttpOnly, SameSite=Strict, com renovação e validade de 30 dias. Trocar a senha pessoal revoga as outras sessões da conta.
 
-O painel permite apenas as mutações explicitamente autorizadas: gerenciamento de usuários, destinatários por regra e convites. Requisições por cookie exigem cabeçalho customizado e validação de Origin/Sec-Fetch-Site. Não há CORS permissivo. O WebSocket usa a política padrão de mesma origem. Conexões realtime revalidam a credencial a cada 15 segundos e são encerradas após revogação ou desativação; novas requisições são bloqueadas imediatamente.
+O painel permite apenas as mutações explicitamente autorizadas: gerenciamento de usuários, destinatários por regra e convites. Requisições por cookie exigem cabeçalho customizado e validação de Origin/Sec-Fetch-Site; `X-Forwarded-Host`/`X-Forwarded-Proto` só são considerados quando a conexão vem de um proxy em endereço privado ou loopback, então um cliente direto não escolhe o host comparado com o `Origin`. Não há CORS permissivo. O WebSocket usa a política padrão de mesma origem. Conexões realtime revalidam a credencial a cada 15 segundos e são encerradas após revogação ou desativação; novas requisições são bloqueadas imediatamente.
+
+Promover alguém a administrador por uma sessão de navegador exige, além do papel de administrador, a senha de quem está operando (`actorPassword` em `PUT /admin/users/{id}`). Sem esse passo, um cookie de consulta roubado criaria um convite, parearia um dispositivo novo e o promoveria sem nunca conhecer a senha. Edições que mantêm o papel atual, e a mesma operação por token de dispositivo, não pedem a senha.
 
 ## Destinatários
 
-`actions.recipientUserIds`: `null`/ausente mantém todos os usuários ativos; lista explícita limita os dispositivos aos usuários escolhidos; `[]` envia a ninguém. O filtro vale para notificação e alarme, no enfileiramento e na entrega. A gravação e consulta dos eventos continuam compartilhadas; destinatário não é uma ACL de acesso ao histórico. IDs desconhecidos, desativados ou duplicados são rejeitados. No painel, quem possui permissão de edição usa `PUT /rules/{id}/recipients`, sem alterar os outros campos.
+`actions.recipientUserIds`: `null`/ausente mantém todos os usuários ativos; lista explícita limita os dispositivos aos usuários escolhidos; `[]` envia a ninguém. O filtro vale para notificação e alarme, no enfileiramento e na entrega (`PUT /rules/{id}/recipients`, guardado pela permissão de edição de regras). A gravação e consulta dos eventos continuam compartilhadas; destinatário não é uma ACL de acesso ao histórico. IDs desconhecidos, desativados ou duplicados são rejeitados. Uma edição comum da regra preserva a lista escolhida, porque o campo ausente no payload significa "não mexer" e `null` significa "toda a família".
 
 Validação: testes de todas as rotas protegidas sem autenticação, operações administrativas com membro comum, cookie de consulta com papel forjado, origem externa, revogação, último administrador e destinatários. Esta revisão de código e testes não equivale a um teste de invasão externo.
 

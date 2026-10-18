@@ -26,6 +26,9 @@ android {
         versionName = valkyVersionName.get()
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables.useSupportLibrary = true
+        // O APK é o artefato de distribuição: sem filtro ele carrega a libjingle
+        // do WebRTC para x86/x86_64 (emuladores), o que sozinho soma 24 MB.
+        ndk { abiFilters += listOf("arm64-v8a", "armeabi-v7a") }
     }
 
     signingConfigs {
@@ -97,8 +100,6 @@ dependencies {
     implementation("androidx.media3:media3-datasource-okhttp:1.11.0")
     implementation("androidx.media3:media3-ui:1.11.0")
     implementation("io.getstream:stream-webrtc-android:1.3.10")
-    implementation("io.coil-kt.coil3:coil-compose:3.3.0")
-    implementation("io.coil-kt.coil3:coil-network-okhttp:3.3.0")
     implementation("org.osmdroid:osmdroid-android:6.1.20")
     implementation(platform("com.google.firebase:firebase-bom:34.18.0"))
     implementation("com.google.firebase:firebase-messaging")

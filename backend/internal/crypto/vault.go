@@ -28,6 +28,11 @@ func LoadOrCreate(path string) (*Vault, error) {
 	if len(key) != 32 {
 		return nil, fmt.Errorf("master key must contain 32 bytes")
 	}
+	// A chave já existente não é revalidada na criação: um backup ou uma
+	// ferramenta externa pode tê-la deixado legível por outros usuários.
+	if err = os.Chmod(path, 0o600); err != nil {
+		return nil, fmt.Errorf("restrict master key permissions: %w", err)
+	}
 	block, err := aes.NewCipher(key)
 	if err != nil {
 		return nil, err

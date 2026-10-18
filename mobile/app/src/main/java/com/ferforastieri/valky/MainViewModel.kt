@@ -124,7 +124,7 @@ class MainViewModel @Inject constructor(
         }
     }
 
-    fun login(url: String, password: String, bootstrap: Boolean, userName: String, username: String) {
+    fun login(url: String, password: String, bootstrap: Boolean, userName: String, username: String, setupToken: String = "") {
         val base = url.trim().replace(Regex("/+$"), "")
         if (!base.startsWith("https://") || password.isBlank()) { _error.value = "Use um endereço HTTPS e informe seu usuário e senha."; return }
         if (!actionGate.tryAcquire()) return
@@ -132,7 +132,7 @@ class MainViewModel @Inject constructor(
         _error.value = null
         viewModelScope.launch {
             try {
-                runCatching { api.login(base, com.ferforastieri.valky.core.model.LoginRequest(password, android.os.Build.MODEL, userName.trim(), Locale.getDefault().toLanguageTag(), username.trim()), bootstrap, sessions.savedFingerprint(base)) }
+                runCatching { api.login(base, com.ferforastieri.valky.core.model.LoginRequest(password, android.os.Build.MODEL, userName.trim(), Locale.getDefault().toLanguageTag(), username.trim(), setupToken.trim()), bootstrap, sessions.savedFingerprint(base)) }
                     .onSuccess { sessions.save(Session(base, it.token, fingerprint = sessions.savedFingerprint(base), admin = it.admin)); _admin.value = it.admin; _paired.value = true; runCatching { api.sessionPermissions() }; push.registerCurrent(); checkForUpdates(force = true) }
                     .onFailure { _error.value = it.message }
             } finally {

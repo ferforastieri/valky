@@ -22,8 +22,11 @@ metrics: false
 pprof: false
 authMethod: internal
 authInternalUsers:
+  # A API e os streams ficam restritos à sub-rede fixa do projeto (definida no
+  # compose). Antes a faixa 172.16/12 inteira era aceita, o que dava a qualquer
+  # outro container do host acesso de leitura, publicação e API sem senha.
   - user: any
-    ips: ["127.0.0.1", "::1", "172.16.0.0/12"]
+    ips: ["127.0.0.1", "::1", "172.28.0.0/24"]
     permissions:
       - action: read
       - action: publish

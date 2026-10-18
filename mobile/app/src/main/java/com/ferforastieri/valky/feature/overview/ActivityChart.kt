@@ -154,4 +154,8 @@ internal fun ActivitySheet(bucket: ActivityBucket, load: suspend (Int) -> List<V
     }
 }
 
-private fun activityTime(value: String): String = DateTimeFormatter.ofPattern("dd/MM HH:mm").withZone(ZoneId.systemDefault()).format(Instant.parse(value))
+// O servidor pode mandar uma data vazia ou malformada; parse direto na composição
+// derrubava a tela inicial, então devolvemos o valor original como fallback.
+private fun activityTime(value: String): String = runCatching {
+    DateTimeFormatter.ofPattern("dd/MM HH:mm").withZone(ZoneId.systemDefault()).format(Instant.parse(value))
+}.getOrDefault(value)

@@ -6,6 +6,8 @@ import (
 	"fmt"
 	"strings"
 	"time"
+
+	"golang.org/x/crypto/bcrypt"
 )
 
 type ManagedUser struct {
@@ -22,6 +24,36 @@ type ManagedUser struct {
 	AvatarData            string `json:"avatarData"`
 	NotifyCamera          bool   `json:"notifyCamera"`
 	NotifyLocation        bool   `json:"notifyLocation"`
+	// ActorPassword é a senha de quem está operando o painel; nunca é devolvida
+	// em resposta e só é exigida quando a sessão de consulta promove alguém.
+	ActorPassword string `json:"actorPassword,omitempty"`
+}
+
+// ConfirmPassword prova que quem está no navegador é a pessoa da sessão. Sem
+// esse passo, um cookie de consulta roubado criaria um convite, parearia um
+// dispositivo novo e o promoveria a administrador sem nunca saber a senha.
+func (m *Manager) ConfirmPassword(ctx context.Context, userID, password string) error {
+	if userID == "" || password == "" {
+		return fmt.Errorf("informe sua senha para alterar o papel de uma pessoa")
+	}
+	var hash string
+	if err := m.store.DB.QueryRowContext(ctx, `SELECT COALESCE(password_hash,'') FROM users WHERE id=? AND enabled=1`, userID).Scan(&hash); err != nil {
+		return fmt.Errorf("informe sua senha para alterar o papel de uma pessoa")
+	}
+	if hash == "" || bcrypt.CompareHashAndPassword([]byte(hash), []byte(password)) != nil {
+		return fmt.Errorf("senha incorreta")
+	}
+	return nil
+}
+
+// UserIsAdmin informa o papel atual da pessoa: uma edição que mantém quem já
+// era administrador não precisa de prova extra, só a promoção precisa.
+func (m *Manager) UserIsAdmin(ctx context.Context, userID string) (bool, error) {
+	var admin int
+	if err := m.store.DB.QueryRowContext(ctx, `SELECT is_admin FROM users WHERE id=?`, userID).Scan(&admin); err != nil {
+		return false, err
+	}
+	return admin == 1, nil
 }
 
 func (m *Manager) Users(ctx context.Context) ([]ManagedUser, error) {

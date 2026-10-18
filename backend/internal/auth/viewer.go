@@ -6,6 +6,7 @@ import (
 	"fmt"
 	appcrypto "github.com/ferforastieri/valky/backend/internal/crypto"
 	"github.com/google/uuid"
+	"net"
 	"net/http"
 	"net/url"
 	"strings"
@@ -26,17 +27,20 @@ func (m *Manager) issueBrowserForUser(ctx context.Context, userID string, admin 
 	_, err = m.store.DB.ExecContext(ctx, `INSERT INTO viewer_sessions(id,token_hash,expires_at,created_at,user_id) VALUES(?,?,?,?,?)`, id, appcrypto.Hash(token), now.Add(30*24*time.Hour).Format(time.RFC3339Nano), now.Format(time.RFC3339Nano), userID)
 	return PairResponse{DeviceID: id, Token: token, ReadOnly: !admin, Admin: admin}, err
 }
-func (m *Manager) authenticateViewer(ctx context.Context, token string) (string, error) {
-	var id, expiry string
-	err := m.store.DB.QueryRowContext(ctx, `SELECT v.id,v.expires_at FROM viewer_sessions v JOIN users u ON u.id=v.user_id WHERE v.token_hash=? AND u.enabled=1`, appcrypto.Hash(token)).Scan(&id, &expiry)
+
+// authenticateViewer devolve a sessão, o dono e o papel na mesma consulta.
+func (m *Manager) authenticateViewer(ctx context.Context, token string) (string, string, bool, error) {
+	var id, userID, expiry string
+	var admin int
+	err := m.store.DB.QueryRowContext(ctx, `SELECT v.id,v.expires_at,u.id,u.is_admin FROM viewer_sessions v JOIN users u ON u.id=v.user_id WHERE v.token_hash=? AND u.enabled=1`, appcrypto.Hash(token)).Scan(&id, &expiry, &userID, &admin)
 	if err != nil {
-		return "", err
+		return "", "", false, err
 	}
 	at, err := time.Parse(time.RFC3339Nano, expiry)
 	if err != nil || !time.Now().Before(at) {
-		return "", fmt.Errorf("viewer session expired")
+		return "", "", false, fmt.Errorf("viewer session expired")
 	}
-	return id, nil
+	return id, userID, admin == 1, nil
 }
 
 // WHEP negotiates playback; it does not modify camera settings. No other
@@ -89,13 +93,32 @@ func ViewerRequestSafe(r *http.Request) bool {
 // Caddy terminates public TLS before forwarding to the private HTTPS service.
 // In that setup r.Host may be the upstream address, while X-Forwarded-Host
 // retains the host that the browser actually used.
+//
+// Os cabeçalhos encaminhados só valem quando a conexão vem de um proxy da
+// própria rede (loopback ou faixa privada). Um cliente que fale direto com o
+// backend não pode escolher o host que a checagem de Origin vai comparar.
 func viewerRequestHost(r *http.Request) string {
+	if !requestFromPrivatePeer(r.RemoteAddr) {
+		return r.Host
+	}
 	forwardedHost := strings.TrimSpace(strings.Split(r.Header.Get("X-Forwarded-Host"), ",")[0])
 	forwardedProto := strings.TrimSpace(strings.Split(r.Header.Get("X-Forwarded-Proto"), ",")[0])
 	if forwardedHost != "" && forwardedProto == "https" {
 		return forwardedHost
 	}
 	return r.Host
+}
+
+func requestFromPrivatePeer(remoteAddr string) bool {
+	host, _, err := net.SplitHostPort(remoteAddr)
+	if err != nil {
+		host = remoteAddr
+	}
+	ip := net.ParseIP(strings.Trim(host, "[]"))
+	if ip == nil {
+		return false
+	}
+	return ip.IsLoopback() || ip.IsPrivate() || ip.IsLinkLocalUnicast()
 }
 
 func (m *Manager) ViewerSession(w http.ResponseWriter, r *http.Request) {
@@ -136,9 +159,11 @@ func browserAdminRequestAllowed(r *http.Request) bool {
 // Mutations that are available to personal browser accounts still pass the
 // endpoint's authorization middleware and same-origin cookie checks.
 func browserAccountRequestAllowed(r *http.Request) bool {
-	if r.URL.Path == "/me/credentials" || r.URL.Path == "/me/password" {
-		return r.Method == "POST"
+	if (r.URL.Path == "/me/credentials" || r.URL.Path == "/me/password") && r.Method == http.MethodPost {
+		return true
 	}
+	// Quem tem permissão de edição de regras ajusta destinatários pelo painel; a
+	// autorização real continua no middleware de regras.
 	parts := strings.Split(strings.Trim(r.URL.Path, "/"), "/")
-	return len(parts) == 3 && parts[0] == "rules" && parts[1] != "" && parts[2] == "recipients" && r.Method == "PUT"
+	return len(parts) == 3 && parts[0] == "rules" && parts[1] != "" && parts[2] == "recipients" && r.Method == http.MethodPut
 }

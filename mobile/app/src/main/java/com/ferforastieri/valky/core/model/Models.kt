@@ -44,7 +44,7 @@ import kotlinx.serialization.json.JsonElement
 @Serializable data class RuleUpsertRequest(val cameraId:String,val name:String,val detectorTypes:List<String>,val actions:RuleActionsRequest,val schedule:RuleSchedule=RuleSchedule(),val motion:MotionSettings?=null,@kotlinx.serialization.EncodeDefault val cooldownSeconds:Int=60,@kotlinx.serialization.EncodeDefault val confirmations:Int=1)
 @Serializable data class DetectorKind(val id:String,val label:String,val source:String)
 @Serializable data class AuthStatus(val initialized:Boolean)
-@Serializable data class LoginRequest(val password:String,val deviceName:String,val userName:String="",val locale:String,val username:String="")
+@Serializable data class LoginRequest(val password:String,val deviceName:String,val userName:String="",val locale:String,val username:String="",val setupToken:String="")
 @Serializable data class ChangePasswordRequest(val currentPassword:String,val newPassword:String)
 @Serializable data class PairRequest(val code:String,val deviceName:String,val userName:String="",val locale:String,val username:String="",val password:String="")
 @Serializable data class PairResponse(val deviceId:String,val token:String,val admin:Boolean=false)

@@ -31,6 +31,7 @@ paths:
                 name: {type: string, maxLength: 100}
                 enabled: {type: boolean}
                 admin: {type: boolean}
+                actorPassword: {type: string, description: Senha de quem está operando o painel; obrigatória quando uma sessão de consulta promove alguém a administrador.}
                 devices: {type: integer, readOnly: true}
       responses:
         '200': {description: Updated}
@@ -46,7 +47,7 @@ paths:
     parameters:
       - {in: path, name: id, required: true, schema: {type: string}}
     put:
-      summary: Change notification and alarm recipients (administrator only)
+      summary: Change notification and alarm recipients (rules editing permission)
       requestBody:
         required: true
         content:
@@ -58,7 +59,7 @@ paths:
       responses:
         '200': {description: Recipients saved}
         '400': {description: Invalid recipients}
-        '403': {description: Administrator required}
+        '403': {description: Rules editing permission required}
   /auth/status:
     get:
       security: []
@@ -69,6 +70,7 @@ paths:
     post:
       security: []
       summary: Create the first administrator account and device
+      description: Quando o instalador grava VALKY_SETUP_TOKEN no .env, o mesmo código precisa ser enviado em `setupToken` (ou no cabeçalho X-Valky-Setup-Token).
       requestBody:
         required: true
         content:
@@ -76,6 +78,7 @@ paths:
             schema: {$ref: '#/components/schemas/LoginRequest'}
       responses:
         '201': {description: Administrator created, content: {application/json: {schema: {$ref: '#/components/schemas/APIResponse'}}}}
+        '403': {description: Setup token missing or invalid}
         '409': {description: Administrator already configured}
   /viewer-session:
     get:
@@ -995,6 +998,7 @@ components:
         deviceName: {type: string}
         readOnly: {type: boolean, default: false, description: "Issue a renewable 30-day HttpOnly cookie session; requires X-Valky-Viewer: 1; no token is returned in JSON."}
         locale: {type: string, default: pt-BR}
+        setupToken: {type: string, description: Código de instalação impresso pelo instalador; exigido apenas na criação do primeiro administrador.}
     PairRequest:
       type: object
       required: [code, deviceName, username, password]

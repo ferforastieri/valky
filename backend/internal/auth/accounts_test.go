@@ -98,7 +98,7 @@ func TestPersonalAccountsPairOnceAndReconnectWithoutNewProfile(t *testing.T) {
 	if err = m.ManageUser(ctx, u.ID, u, false); err != nil {
 		t.Fatal(err)
 	}
-	if _, err = m.authenticateViewer(ctx, browser.Token); err == nil {
+	if _, _, _, err = m.authenticateViewer(ctx, browser.Token); err == nil {
 		t.Fatal("disabled browser accepted")
 	}
 	if _, err = m.Authenticate(ctx, member.Token); err == nil {
@@ -137,7 +137,7 @@ func TestLegacyCredentialsKeepProfileAndRevokeOtherSessions(t *testing.T) {
 	if err = m.SaveCredentials(ctx, CredentialsRequest{Username: "legacy", CurrentPassword: "new password 123", NewPassword: "changed password 123"}); err != nil {
 		t.Fatal(err)
 	}
-	if _, err = m.authenticateViewer(ctx, browser.Token); err == nil {
+	if _, _, _, err = m.authenticateViewer(ctx, browser.Token); err == nil {
 		t.Fatal("old browser survived password change")
 	}
 	var hash string

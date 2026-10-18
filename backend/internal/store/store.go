@@ -173,6 +173,21 @@ func Open(path string) (*Store, error) {
 		db.Close()
 		return nil, fmt.Errorf("index event activity: %w", err)
 	}
+	// Índices das consultas quentes: sem eles a lista de eventos, a fila de push
+	// e o resolvedor de endereços varriam a tabela e ordenavam em memória.
+	for name, statement := range map[string]string{
+		"idx_events_camera_time": `CREATE INDEX IF NOT EXISTS idx_events_camera_time ON events(camera_id, occurred_at DESC)`,
+		"idx_events_order":       `CREATE INDEX IF NOT EXISTS idx_events_order ON events(occurred_at DESC, id DESC)`,
+		"idx_push_pending":       `CREATE INDEX IF NOT EXISTS idx_push_pending ON push_deliveries(delivered_at, next_attempt_at, created_at)`,
+		"idx_locations_pending":  `CREATE INDEX IF NOT EXISTS idx_locations_pending ON user_locations(occurred_at DESC) WHERE address=''`,
+		"idx_viewer_expires":     `CREATE INDEX IF NOT EXISTS idx_viewer_expires ON viewer_sessions(expires_at)`,
+		"idx_pairing_open":       `CREATE INDEX IF NOT EXISTS idx_pairing_open ON pairing_sessions(used_at, expires_at)`,
+	} {
+		if _, err = db.ExecContext(ctx, statement); err != nil {
+			db.Close()
+			return nil, fmt.Errorf("index %s: %w", name, err)
+		}
+	}
 	if err = migrateRuleAlerts(ctx, db); err != nil {
 		db.Close()
 		return nil, err

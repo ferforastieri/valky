@@ -28,7 +28,13 @@ func (s *Server) viewerHandler() http.Handler {
 			http.NotFound(w, r)
 			return
 		}
-		w.Header().Set("Cache-Control", "no-cache")
+		// Os nomes em _astro/ carregam o hash do conteúdo: podem ser cacheados
+		// para sempre. O resto (index.html) continua sendo revalidado.
+		if strings.HasPrefix(name, "_astro/") {
+			w.Header().Set("Cache-Control", "public, max-age=31536000, immutable")
+		} else {
+			w.Header().Set("Cache-Control", "no-cache")
+		}
 		w.Header().Set("X-Robots-Tag", "noindex, nofollow")
 		w.Header().Set("Permissions-Policy", "camera=(), microphone=(), geolocation=()")
 		w.Header().Set("Content-Security-Policy", "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' blob: data: https://tile.openstreetmap.org; media-src 'self' blob:; connect-src 'self'; font-src 'self'; object-src 'none'; base-uri 'self'; frame-ancestors 'none'")

@@ -74,7 +74,8 @@ class LocationTrackingService : Service() {
         super.onCreate()
         locationClient = LocationServices.getFusedLocationProviderClient(this)
         preferences = getSharedPreferences(PREFERENCES, Context.MODE_PRIVATE)
-        createChannel()
+        runCatching { createChannel() }
+            .onFailure { Log.w("ValkyLocation", "Notification channel unavailable: ${it.javaClass.simpleName}") }
         runCatching {
             getSystemService(ConnectivityManager::class.java).registerDefaultNetworkCallback(networkCallback)
             networkRegistered = true
@@ -91,7 +92,15 @@ class LocationTrackingService : Service() {
         if (owner == null) { stopSelf(); return START_NOT_STICKY }
         if (preferences.getString("owner", null) != owner) preferences.edit().clear().putString("owner", owner).apply()
         preferences.edit().putBoolean(TRACKING_ENABLED, true).apply()
-        startForeground(NOTIFICATION_ID, notification())
+        // Android 12+ proíbe iniciar o serviço em primeiro plano a partir do background
+        // (ForegroundServiceStartNotAllowedException) e o Android 14+ exige a permissão
+        // de localização para o tipo "location" (SecurityException). O serviço é acordado
+        // pelo AlarmManager e pelo watchdog, então a falha aqui é esperada: sem a
+        // notificação não há serviço — apenas encerra sem derrubar o processo.
+        val foreground = runCatching { startForeground(NOTIFICATION_ID, notification()) }
+            .onFailure { Log.w("ValkyLocation", "Foreground notification unavailable: ${it.javaClass.simpleName}") }
+            .isSuccess
+        if (!foreground) { stopSelf(); return START_NOT_STICKY }
         scheduleWatchdog()
         // Re-entering the app must request a new fix even if periodic updates
         // were already registered before an OEM suspended location delivery.

@@ -3,6 +3,7 @@ package com.ferforastieri.valky.core.push
 import android.util.Base64
 import android.util.Log
 import com.ferforastieri.valky.core.alarm.AlarmNotifier
+import com.google.firebase.FirebaseApp
 import com.google.firebase.messaging.FirebaseMessagingService
 import com.google.firebase.messaging.RemoteMessage
 import dagger.hilt.android.AndroidEntryPoint
@@ -21,10 +22,21 @@ class ValkyPushService : FirebaseMessagingService() {
     @Inject lateinit var notifier: AlarmNotifier
 
     override fun onRegistered(token: String) {
-        registration.register(token)
+        // O SDK do FCM acorda este processo mesmo num APK sem google-services.json;
+        // sem o app Firebase inicializado o getInstance() lança IllegalStateException.
+        if (FirebaseApp.getApps(this).isEmpty()) {
+            Log.w("ValkyPush", "Firebase configuration is missing from this APK")
+            return
+        }
+        runCatching { registration.register(token) }
+            .onFailure { Log.w("ValkyPush", "Token registration failed: ${it.javaClass.simpleName}") }
     }
 
     override fun onMessageReceived(message: RemoteMessage) {
+        if (FirebaseApp.getApps(this).isEmpty()) {
+            Log.w("ValkyPush", "Firebase configuration is missing from this APK")
+            return
+        }
         val ciphertext = message.data["ciphertext"] ?: return
         runCatching {
             val payload = JSONObject(String(open(ciphertext, secrets.getOrCreate())))

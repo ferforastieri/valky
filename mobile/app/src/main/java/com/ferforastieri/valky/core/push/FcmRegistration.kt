@@ -29,12 +29,14 @@ class FcmRegistration @Inject constructor(
     private var registrationJob: Job? = null
 
     fun registerCurrent() {
-        if (sessions.get() == null) return
-        if (FirebaseApp.getApps(context).isEmpty() && FirebaseApp.initializeApp(context) == null) {
-            Log.w("ValkyPush", "Firebase configuration is missing from this APK")
-            return
-        }
+        // Tudo aqui pode lançar em APK sem google-services.json (FirebaseApp/FirebaseMessaging
+        // lançam IllegalStateException) e isto é chamado do onCreate da Application.
         runCatching {
+            if (sessions.get() == null) return
+            if (FirebaseApp.getApps(context).isEmpty() && FirebaseApp.initializeApp(context) == null) {
+                Log.w("ValkyPush", "Firebase configuration is missing from this APK")
+                return
+            }
             FirebaseMessaging.getInstance().register().addOnFailureListener {
                 Log.w("ValkyPush", "Firebase registration failed: ${it.javaClass.simpleName}")
             }

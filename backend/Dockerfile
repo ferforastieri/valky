@@ -6,7 +6,7 @@ RUN pnpm install --frozen-lockfile
 COPY web/ ./
 RUN pnpm build:viewer
 
-FROM golang:1.26.5-bookworm AS build
+FROM golang:1.26.9-bookworm AS build
 WORKDIR /src/backend
 COPY backend/go.mod backend/go.sum* ./
 RUN go mod download
@@ -17,8 +17,21 @@ RUN mkdir -p /out/lib && cp /go/pkg/mod/github.com/k2-fsa/sherpa-onnx-go-linux@*
 ADD --checksum=sha256:07e2fafcdcbc461f2816188d9b0bbafced12584030cf67d5652e549ef256a2c6 https://github.com/k2-fsa/sherpa-onnx/releases/download/audio-tagging-models/sherpa-onnx-zipformer-small-audio-tagging-2024-04-15.tar.bz2 /tmp/audio-model.tar.bz2
 RUN apt-get update && apt-get install -y --no-install-recommends bzip2 && mkdir -p /out/models && tar -xjf /tmp/audio-model.tar.bz2 --strip-components=1 -C /out/models && rm -rf /var/lib/apt/lists/* /tmp/audio-model.tar.bz2 /out/models/test_wavs /out/models/model.onnx
 
+FROM debian:bookworm-slim AS ffmpeg
+# O pacote ffmpeg do Debian puxa ~430 MB de dependências que nunca são
+# carregadas (mesa/dri, libLLVM, libz3, icudata). Copiamos só o binário e o
+# fecho real de bibliotecas que ele usa: RTSP, MJPEG, JPEG e PCM.
+RUN apt-get update && apt-get install -y --no-install-recommends ffmpeg \
+ && mkdir -p /slim/usr/bin /slim/lib \
+ && cp /usr/bin/ffmpeg /slim/usr/bin/ffmpeg \
+ && ldd /usr/bin/ffmpeg | awk '/=> \//{print $3}' | sort -u | xargs -I{} cp -L {} /slim/lib/ \
+ && rm -rf /var/lib/apt/lists/*
+
 FROM debian:bookworm-slim
-RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates ffmpeg openssl wget && rm -rf /var/lib/apt/lists/*
+RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates wget && rm -rf /var/lib/apt/lists/*
+COPY --from=ffmpeg /slim/usr/bin/ffmpeg /usr/local/bin/ffmpeg
+COPY --from=ffmpeg /slim/lib /usr/local/lib
+RUN ldconfig
 RUN useradd --system --uid 10001 --home /data valky
 RUN install -d -o valky -g valky -m 0700 /data
 COPY --from=build /out/valky /usr/local/bin/valky

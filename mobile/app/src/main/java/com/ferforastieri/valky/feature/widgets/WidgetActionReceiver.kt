@@ -3,6 +3,7 @@ package com.ferforastieri.valky.feature.widgets
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
+import android.util.Log
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -19,32 +20,36 @@ class WidgetActionReceiver : BroadcastReceiver() {
         val pending = goAsync()
         CoroutineScope(SupervisorJob() + Dispatchers.IO).launch {
             try {
-                when (action) {
-                    ACTION_TOGGLE_LIGHT -> intent.getStringExtra(EXTRA_ID)?.let { WidgetBridge.toggleLight(app, it) }
-                    // Toque numa linha da lista do widget: acende ou abre a luz.
-                    // O que fazer e qual lâmpada vêm nos extras ou no endereço.
-                    ACTION_LIGHT_ITEM -> {
-                        val segments = intent.data?.pathSegments.orEmpty()
-                        WidgetBridge.lightItem(
-                            app,
-                            intent.getStringExtra(EXTRA_ITEM_ACTION) ?: segments.getOrNull(0).orEmpty(),
-                            intent.getStringExtra(EXTRA_ID) ?: segments.getOrNull(1).orEmpty(),
-                        )
+                // Uma falha aqui (rede, intent recusada) subiria como exceção não
+                // tratada da corrotina e fecharia o app a partir do toque no widget.
+                runCatching {
+                    when (action) {
+                        ACTION_TOGGLE_LIGHT -> intent.getStringExtra(EXTRA_ID)?.let { WidgetBridge.toggleLight(app, it) }
+                        // Toque numa linha da lista do widget: acende ou abre a luz.
+                        // O que fazer e qual lâmpada vêm nos extras ou no endereço.
+                        ACTION_LIGHT_ITEM -> {
+                            val segments = intent.data?.pathSegments.orEmpty()
+                            WidgetBridge.lightItem(
+                                app,
+                                intent.getStringExtra(EXTRA_ITEM_ACTION) ?: segments.getOrNull(0).orEmpty(),
+                                intent.getStringExtra(EXTRA_ID) ?: segments.getOrNull(1).orEmpty(),
+                            )
+                        }
+                        ACTION_REMOTE_KEY -> intent.getStringExtra(EXTRA_KEY)?.let { WidgetBridge.sendKey(app, it) }
+                        // Igual ao botão do app: uma tecla, um texto digitado.
+                        ACTION_REMOTE_TEXT -> intent.getStringExtra(EXTRA_TEXT)?.let { WidgetBridge.sendText(app, it) }
+                        // Energia igual à do app: desliga se estiver ligada e acorda
+                        // a TV pela rede quando ela estiver em espera.
+                        ACTION_REMOTE_POWER -> WidgetBridge.toggleRemotePower(app, intent.getStringExtra(EXTRA_ID).orEmpty())
+                        // Troca o teclado do widget (números/letras) sem sair da home.
+                        ACTION_REMOTE_KEYPAD -> WidgetBridge.setKeypadLetters(app, !WidgetBridge.keypadLetters(app))
+                        // Só a imagem da câmera: mantém o widget perto do tempo real
+                        // sem repetir todas as chamadas do estado.
+                        ACTION_PHOTO_ALARM -> WidgetBridge.refreshPhoto(app)
+                        else -> WidgetBridge.refresh(app)
                     }
-                    ACTION_REMOTE_KEY -> intent.getStringExtra(EXTRA_KEY)?.let { WidgetBridge.sendKey(app, it) }
-                    // Igual ao botão do app: uma tecla, um texto digitado.
-                    ACTION_REMOTE_TEXT -> intent.getStringExtra(EXTRA_TEXT)?.let { WidgetBridge.sendText(app, it) }
-                    // Energia igual à do app: desliga se estiver ligada e acorda
-                    // a TV pela rede quando ela estiver em espera.
-                    ACTION_REMOTE_POWER -> WidgetBridge.toggleRemotePower(app, intent.getStringExtra(EXTRA_ID).orEmpty())
-                    // Troca o teclado do widget (números/letras) sem sair da home.
-                    ACTION_REMOTE_KEYPAD -> WidgetBridge.setKeypadLetters(app, !WidgetBridge.keypadLetters(app))
-                    // Só a imagem da câmera: mantém o widget perto do tempo real
-                    // sem repetir todas as chamadas do estado.
-                    ACTION_PHOTO_ALARM -> WidgetBridge.refreshPhoto(app)
-                    else -> WidgetBridge.refresh(app)
-                }
-                refreshWidgetViews(app)
+                    refreshWidgetViews(app)
+                }.onFailure { Log.w("ValkyWidget", "Widget action failed: ${it.javaClass.simpleName}") }
             } finally {
                 pending.finish()
             }

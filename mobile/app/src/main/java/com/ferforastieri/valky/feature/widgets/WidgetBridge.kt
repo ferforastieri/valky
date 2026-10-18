@@ -100,7 +100,7 @@ internal object WidgetBridge {
         prefs(context).edit().putString(KEY_STATE, json.encodeToString(snapshot)).apply()
     }
 
-    fun signedIn(context: Context): Boolean = SessionStore(context.applicationContext).get() != null
+    fun signedIn(context: Context): Boolean = runCatching { SessionStore(context.applicationContext).get() != null }.getOrDefault(false)
 
     /** Asks the backend for the current bulbs, cameras and remotes. */
     suspend fun refresh(context: Context): Boolean = withContext(Dispatchers.IO) {
@@ -219,12 +219,16 @@ internal object WidgetBridge {
 
     private fun openLight(context: Context, id: String) {
         val launcher = context.packageManager.getLaunchIntentForPackage(context.packageName) ?: return
-        context.startActivity(
-            Intent(launcher)
-                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                .setPackage(context.packageName)
-                .putExtra(ValkyWidgetProvider.EXTRA_SECTION, "light:$id"),
-        )
+        // O toque no widget é um receiver: se o aparelho não tiver a tela do app
+        // (ou a intent for recusada) a falha não pode derrubar o processo.
+        runCatching {
+            context.startActivity(
+                Intent(launcher)
+                    .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                    .setPackage(context.packageName)
+                    .putExtra(ValkyWidgetProvider.EXTRA_SECTION, "light:$id"),
+            )
+        }
     }
 
     /**

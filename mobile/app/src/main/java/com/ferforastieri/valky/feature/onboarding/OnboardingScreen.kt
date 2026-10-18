@@ -28,6 +28,9 @@ fun OnboardingScreen(viewModel: MainViewModel) {
     var username by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
     var confirmation by remember { mutableStateOf("") }
+    // Código que o instalador imprime. Só é exigido quando o servidor define
+    // VALKY_SETUP_TOKEN; em instalações antigas o campo fica vazio e funciona.
+    var setupCode by remember { mutableStateOf("") }
     val error by viewModel.error.collectAsStateWithLifecycle()
     val connecting by viewModel.connecting.collectAsStateWithLifecycle()
     val initialized by viewModel.authInitialized.collectAsStateWithLifecycle()
@@ -51,6 +54,7 @@ fun OnboardingScreen(viewModel: MainViewModel) {
                 Text("Use uma frase com pelo menos 12 caracteres.", style = MaterialTheme.typography.bodySmall)
                 PasswordField(confirmation, { confirmation = it }, "Confirmar senha", !connecting)
                 if (confirmation.isNotEmpty() && confirmation != password) Text("As senhas precisam ser iguais.", color = MaterialTheme.colorScheme.error)
+                OutlinedTextField(setupCode, { setupCode = it }, label = { Text("Código de instalação") }, placeholder = { Text("exibido no fim da instalação") }, singleLine = true, enabled = !connecting, modifier = Modifier.fillMaxWidth())
             }
         }
         error?.let { /* errors surface as a toast */ }
@@ -58,7 +62,7 @@ fun OnboardingScreen(viewModel: MainViewModel) {
             when {
                 invitation != null -> viewModel.registerAccount(username, password, name)
                 initialized == null -> viewModel.inspectServer(url)
-                else -> viewModel.login(url, password, initialized == false, name, username)
+                else -> viewModel.login(url, password, initialized == false, name, username, setupCode)
             }
         }, enabled = !connecting && url.isNotBlank() && (initialized == null || username.isNotBlank() && password.isNotEmpty() && (!firstAccess || name.isNotBlank() && password == confirmation && password.toByteArray().size in 12..72)), modifier = Modifier.fillMaxWidth()) {
             if (connecting) ValkySkeleton(Modifier.size(20.dp), CircleShape)

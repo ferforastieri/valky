@@ -2,6 +2,7 @@ package com.ferforastieri.valky.feature.widgets
 
 import android.appwidget.AppWidgetManager
 import android.content.Context
+import android.util.Log
 import android.view.View
 import android.widget.RemoteViews
 import com.ferforastieri.valky.R
@@ -16,12 +17,16 @@ class CameraWidgetProvider : ValkyWidgetProvider() {
     }
 
     override fun onUpdate(context: Context, manager: AppWidgetManager, ids: IntArray) {
-        val snapshot = WidgetBridge.state(context)
-        // The home screen can ask for a redraw long after the last alarm: keep
-        // the cached state fresh without waiting for the next scheduled refresh.
-        if (System.currentTimeMillis() - snapshot.updatedAt > STALE_AFTER) requestRefresh(context)
-        val photo = WidgetBridge.photo(context)
-        ids.forEach { id -> manager.updateAppWidget(id, views(context, snapshot, photo)) }
+        // Chamado pelo launcher a qualquer momento: nenhuma falha aqui pode
+        // derrubar o processo, no pior caso o widget fica desatualizado.
+        runCatching {
+            val snapshot = WidgetBridge.state(context)
+            // The home screen can ask for a redraw long after the last alarm: keep
+            // the cached state fresh without waiting for the next scheduled refresh.
+            if (System.currentTimeMillis() - snapshot.updatedAt > STALE_AFTER) requestRefresh(context)
+            val photo = WidgetBridge.photo(context)
+            ids.forEach { id -> manager.updateAppWidget(id, views(context, snapshot, photo)) }
+        }.onFailure { Log.w("ValkyWidget", "Camera widget update failed: ${it.javaClass.simpleName}") }
     }
 
     private fun views(context: Context, snapshot: WidgetSnapshot, photo: android.graphics.Bitmap?): RemoteViews {

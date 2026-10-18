@@ -25,16 +25,32 @@ type Service struct {
 	pending       map[string]int
 	audioPending  map[string]audioConfirmation
 	motionPending map[string]motionWindow
+	// cache evita reconsultar as regras em cada janela de detecção: o monitor de
+	// região chama List a cada 2 s por câmera e cada detecção chamava de novo.
+	// Qualquer escrita limpa o cache, então o atraso máximo é o TTL.
+	cache map[string]ruleCache
 }
 
-func NewService(s *store.Store) *Service {
-	return &Service{store: s, pending: map[string]int{}, audioPending: map[string]audioConfirmation{}, motionPending: map[string]motionWindow{}}
+type ruleCache struct {
+	at    time.Time
+	rules []Rule
 }
+
+// ruleCacheTTL é curto de propósito: uma regra nova passa a valer em segundos.
+const ruleCacheTTL = 2 * time.Second
+
+func NewService(s *store.Store) *Service {
+	return &Service{store: s, pending: map[string]int{}, audioPending: map[string]audioConfirmation{}, motionPending: map[string]motionWindow{}, cache: map[string]ruleCache{}}
+}
+
+// invalidateCache roda sob o mutex do serviço, junto da escrita que a motivou.
+func (s *Service) invalidateCache() { s.cache = map[string]ruleCache{} }
 
 func (s *Service) Create(ctx context.Context, r Rule) (Rule, error) {
 	if err := normalizeRule(&r); err != nil {
 		return r, err
 	}
+	defer s.invalidateCache()
 	r.ID = uuid.NewString()
 	r.Enabled = true
 	r.CreatedAt = time.Now().UTC()
@@ -64,8 +80,9 @@ func (s *Service) Create(ctx context.Context, r Rule) (Rule, error) {
 func (s *Service) Update(ctx context.Context, id string, r Rule) (Rule, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
+	defer s.invalidateCache()
 	// Older clients omit presentation settings. Preserve them on ordinary edits.
-	if r.Actions.Alerts == nil {
+	if r.Actions.Alerts == nil || !r.Actions.Recipients.Set {
 		var data string
 		if err := s.store.DB.QueryRowContext(ctx, `SELECT actions_json FROM rules WHERE id=?`, id).Scan(&data); err != nil {
 			return r, err
@@ -74,7 +91,13 @@ func (s *Service) Update(ctx context.Context, id string, r Rule) (Rule, error) {
 		if err := json.Unmarshal([]byte(data), &current); err != nil {
 			return r, err
 		}
-		r.Actions.Alerts = current.Alerts
+		if r.Actions.Alerts == nil {
+			r.Actions.Alerts = current.Alerts
+		}
+		// Quem recebe os alertas só muda pela rota dedicada de destinatários.
+		if !r.Actions.Recipients.Set {
+			r.Actions.Recipients = current.Recipients
+		}
 	}
 	if err := normalizeRule(&r); err != nil {
 		return r, err
@@ -95,6 +118,31 @@ func (s *Service) Update(ctx context.Context, id string, r Rule) (Rule, error) {
 	}
 	if affected, _ := result.RowsAffected(); affected == 0 {
 		return r, sql.ErrNoRows
+	}
+	return scanRule(s.store.DB.QueryRowContext(ctx, `SELECT id,camera_id,name,detector_types_json,confirmations,cooldown_seconds,schedule_json,actions_json,motion_json,enabled,last_triggered_at,created_at,updated_at FROM rules WHERE id=?`, id))
+}
+
+// UpdateRecipients grava apenas quem recebe os alertas da regra, sem tocar no
+// resto da configuração — é o que o painel usa.
+func (s *Service) UpdateRecipients(ctx context.Context, id string, recipients []string) (Rule, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	defer s.invalidateCache()
+	var data string
+	if err := s.store.DB.QueryRowContext(ctx, `SELECT actions_json FROM rules WHERE id=?`, id).Scan(&data); err != nil {
+		return Rule{}, err
+	}
+	var actions Actions
+	if err := json.Unmarshal([]byte(data), &actions); err != nil {
+		return Rule{}, err
+	}
+	actions.Recipients = Recipients{Set: true, Value: recipients}
+	encoded, err := json.Marshal(actions)
+	if err != nil {
+		return Rule{}, err
+	}
+	if _, err = s.store.DB.ExecContext(ctx, `UPDATE rules SET actions_json=?,updated_at=? WHERE id=?`, string(encoded), time.Now().UTC().Format(time.RFC3339Nano), id); err != nil {
+		return Rule{}, err
 	}
 	return scanRule(s.store.DB.QueryRowContext(ctx, `SELECT id,camera_id,name,detector_types_json,confirmations,cooldown_seconds,schedule_json,actions_json,motion_json,enabled,last_triggered_at,created_at,updated_at FROM rules WHERE id=?`, id))
 }
@@ -175,6 +223,23 @@ func compactStrings(values []string) []string {
 }
 
 func (s *Service) List(ctx context.Context, cameraID string) ([]Rule, error) {
+	s.mu.Lock()
+	if entry, ok := s.cache[cameraID]; ok && time.Since(entry.at) < ruleCacheTTL {
+		s.mu.Unlock()
+		return entry.rules, nil
+	}
+	s.mu.Unlock()
+	rules, err := s.listFromStore(ctx, cameraID)
+	if err != nil {
+		return nil, err
+	}
+	s.mu.Lock()
+	s.cache[cameraID] = ruleCache{at: time.Now(), rules: rules}
+	s.mu.Unlock()
+	return rules, nil
+}
+
+func (s *Service) listFromStore(ctx context.Context, cameraID string) ([]Rule, error) {
 	query := `SELECT id,camera_id,name,detector_types_json,confirmations,cooldown_seconds,schedule_json,actions_json,motion_json,enabled,last_triggered_at,created_at,updated_at FROM rules`
 	var args []any
 	if cameraID != "" {
@@ -201,6 +266,7 @@ func (s *Service) List(ctx context.Context, cameraID string) ([]Rule, error) {
 func (s *Service) Delete(ctx context.Context, id string) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
+	defer s.invalidateCache()
 	delete(s.motionPending, id)
 	result, err := s.store.DB.ExecContext(ctx, `DELETE FROM rules WHERE id=?`, id)
 	if err != nil {
@@ -217,12 +283,14 @@ func (s *Service) Match(ctx context.Context, d Detection) ([]Rule, error) {
 	if d.Motion == nil && d.Audio == nil && !reliableDetection(d) {
 		return nil, nil
 	}
-	s.mu.Lock()
-	defer s.mu.Unlock()
+	// A leitura acontece fora do mutex: List também tranca, e segurar o lock
+	// durante a query serializava todas as detecções de todas as câmeras.
 	all, err := s.List(ctx, d.CameraID)
 	if err != nil {
 		return nil, err
 	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
 	matched := make([]Rule, 0)
 	for _, r := range all {
 		if d.Motion != nil && (r.ID != d.Motion.RuleID || r.Motion == nil) {
@@ -265,6 +333,9 @@ func (s *Service) Match(ctx context.Context, d Detection) ([]Rule, error) {
 		if err != nil {
 			return nil, err
 		}
+		// O cooldown lê last_triggered_at da próxima consulta: o cache precisa
+		// cair aqui, senão a mesma janela dispararia duas vezes.
+		s.invalidateCache()
 		r.LastTriggeredAt = &now
 		matched = append(matched, r)
 	}

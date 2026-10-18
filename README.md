@@ -66,7 +66,7 @@ Câmera ONVIF / RTSP
  Detectores locais → Regras → Evento + mídia → FCM → alerta nativo Android
 ```
 
-O backend Go é o limite de segurança: o app nunca recebe a senha da câmera e as APIs internas do MediaMTX não são expostas. Apenas a porta de mídia WebRTC 8189 UDP/TCP é publicada. SQLite, certificados, segredos, snapshots e clipes vivem no volume persistente `valky-data`. O buffer temporário de dez minutos fica em RAM, no volume compartilhado `recording-buffer`, limitado a 384 MiB, evitando gravações contínuas em disco. Veja [dimensionamento e operação 24/7](docs/energy-efficiency.md).
+O backend Go é o limite de segurança: o app nunca recebe a senha da câmera e as APIs internas do MediaMTX não são expostas. Apenas a porta de mídia WebRTC 8189 UDP/TCP é publicada. SQLite, certificados, segredos, snapshots e clipes vivem no volume persistente `valky-data`, que só o container da aplicação enxerga — o MediaMTX recebe apenas o volume do buffer. A API do MediaMTX aceita somente a sub-rede fixa do projeto (`172.28.0.0/24`), não a faixa `172.16/12` inteira. O buffer temporário de dez minutos fica em RAM, no volume compartilhado `recording-buffer`, limitado a 384 MiB, evitando gravações contínuas em disco. Veja [dimensionamento e operação 24/7](docs/energy-efficiency.md).
 
 ## Tecnologias
 
@@ -86,7 +86,7 @@ O backend Go é o limite de segurança: o app nunca recebe a senha da câmera e 
 - Servidor, câmera e celular na mesma LAN, ou conectados por uma VPN privada.
 - Para iluminação local, servidor e lâmpada precisam conseguir se alcançar pela rede doméstica.
 
-Não encaminhe no roteador as portas RTSP/ONVIF da câmera nem as portas internas `8888` e `9997` do MediaMTX.
+Não encaminhe no roteador as portas RTSP/ONVIF da câmera nem as portas internas `8889` e `9997` do MediaMTX.
 
 ## Instalação
 
@@ -98,13 +98,13 @@ No servidor, execute:
 curl -fsSL https://valkyris.vercel.app/install.sh | sh
 ```
 
-O instalador verifica o Compose, baixa os artefatos da release, cria os segredos e o certificado TLS, prepara os arquivos locais e inicia `valky` e `mediamtx` de forma idempotente.
+O instalador verifica o Compose, baixa os artefatos da release, cria os segredos, o código de instalação e o certificado TLS, prepara os arquivos locais e inicia `valky` e `mediamtx` de forma idempotente. O código de instalação (`VALKY_SETUP_TOKEN`) fica no `.env` e é impresso no fim da execução.
 
 Depois:
 
 1. Instale o APK da [última release](https://github.com/ferforastieri/valky/releases/latest).
 2. Abra o app e informe a URL HTTPS pela qual o celular alcança o servidor.
-3. No primeiro acesso, crie a conta com usuário e senha; esse dispositivo se torna administrador.
+3. No primeiro acesso, informe o código de instalação exibido pelo instalador e crie a conta com usuário e senha; esse dispositivo se torna administrador.
 4. Cadastre a câmera com nome, ícone, IP, usuário e senha. Para Tapo, o RTSP principal é montado automaticamente.
 
 Para acessar de fora de casa, use uma VPN como Tailscale ou WireGuard, ou publique o HTTPS por proxy/túnel. O Cloudflare Tunnel transporta a API e a negociação WHEP, mas não a mídia WebRTC: o cliente precisa alcançar a porta 8189 UDP/TCP por LAN, VPN ou outra rota ICE configurada. O instalador preserva VALKY_WEBRTC_HOSTS com o endereço do servidor; não use o domínio do túnel como endereço de mídia. Veja [conectividade WebRTC](docs/webrtc-connectivity.md).
@@ -293,7 +293,8 @@ Veja [movimento em regiões](docs/motion-regions.md).
 
 A sessão web usa cookie Secure, HttpOnly e SameSite=Strict, com 30 dias de validade
 renovada durante o uso. Logout e troca de senha revogam a sessão; o JavaScript
-não recebe a credencial. Os limites por minuto são 3000 globais / 1200 por endereço,
+não recebe a credencial. Promover alguém a administrador pelo painel pede a senha
+de quem está operando. Os limites por minuto são 3000 globais / 1200 por endereço,
 30 globais / 10 por endereço para autenticação, 60 para snapshots/gravações e
 12 aberturas WHEP por sessão/endereço. Respostas 429 incluem Retry-After. Cabeçalhos
 encaminhados não são usados como identidade: usuários de um proxy compartilham
@@ -329,7 +330,8 @@ Valky apresenta apenas recursos anunciados por ONVIF/RTSP. Ausências degradam a
 
 Não há gravação contínua, nuvem central, cadastro público nem promessa de entrega absoluta de alarmes quando faltam energia, rede ou permissões do Android.
 
-Veja também o [registro da revisão 2.0](docs/review-2.0.md).
+Veja também o [registro da revisão 2.0](docs/review-2.0.md) e a
+[revisão de segurança e estabilidade 4.4](docs/security-review-4.4.md).
 
 ## Licença
 

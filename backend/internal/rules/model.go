@@ -1,6 +1,8 @@
 package rules
 
 import (
+	"bytes"
+	"encoding/json"
 	"github.com/ferforastieri/valky/backend/internal/camera"
 	"time"
 )
@@ -10,7 +12,35 @@ type Actions struct {
 	Record bool                      `json:"record"`
 	Notify bool                      `json:"notify"`
 	Alarm  bool                      `json:"alarm"`
+	// Recipients é quem recebe os alertas desta regra. `null` (o padrão) é a
+	// família inteira; uma lista vazia não avisa ninguém.
+	Recipients Recipients `json:"recipientUserIds"`
 }
+
+// Recipients precisa distinguir "toda a família" (null) de "o cliente não falou
+// nada sobre isso" (campo ausente), porque uma edição comum da regra não pode
+// apagar quem foi escolhido no painel.
+type Recipients struct {
+	Set   bool
+	Value []string
+}
+
+func (r *Recipients) UnmarshalJSON(data []byte) error {
+	r.Set = true
+	if string(bytes.TrimSpace(data)) == "null" {
+		r.Value = nil
+		return nil
+	}
+	return json.Unmarshal(data, &r.Value)
+}
+
+func (r Recipients) MarshalJSON() ([]byte, error) {
+	if r.Value == nil {
+		return []byte("null"), nil
+	}
+	return json.Marshal(r.Value)
+}
+
 type Schedule struct {
 	Days     []int  `json:"days"`
 	Start    string `json:"start"`
