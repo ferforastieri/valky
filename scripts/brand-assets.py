@@ -68,11 +68,19 @@ def path_data(pts):
     return ' '.join(f'{"M" if i == 0 else "L"}{x:g},{y:g}' for i, (x, y) in enumerate(pts)) + 'Z'
 
 
+# Centro de massa do desenho, medido no SVG rasterizado (a marca é mais pesada
+# em cima: as asas concentram a área e o bico embaixo é fino). Centralizar pela
+# caixa deixava o símbolo parecendo baixo no ícone; por isso o encaixe usa a
+# massa, que é o que o olho lê como centro.
+MASS_RATIO = 0.396
+
+
 def fit(target, pad):
     x0, y0, x1, y1 = BBOX
     scale = min((target - 2 * pad) / (x1 - x0), (target - 2 * pad) / (y1 - y0))
     dx = (target - (x1 - x0) * scale) / 2 - x0 * scale
-    dy = (target - (y1 - y0) * scale) / 2 - y0 * scale
+    mass_y = y0 + (y1 - y0) * MASS_RATIO
+    dy = target / 2 - mass_y * scale
     return scale, dx, dy
 
 
@@ -153,8 +161,9 @@ def main():
     rsvg(svg, ROOT / 'web/public/apple-touch-icon.png', 180, DARK)
 
     square = out / 'valky-mark-square.svg'
+    altura = 512 * VH / VW
     square.write_text(f'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">'
-                      f'<image x="0" y="{(512 - 512 * VH / VW) / 2:g}" width="512" height="{512 * VH / VW:g}"'
+                      f'<image x="0" y="{512 / 2 - altura * MASS_RATIO:g}" width="512" height="{altura:g}"'
                       f' href="{svg}"/></svg>')
     rsvg(square, ROOT / 'mobile/app/src/main/res/drawable-nodpi/valky_mark.png', 512)
 
@@ -181,9 +190,9 @@ def main():
         f'    <path android:fillColor="{DARK}" android:pathData="M14,0h80a14,14 0 0 1 14,14v80a14,14 0 0 1 -14,14H14A14,14 0 0 1 0,94V14A14,14 0 0 1 14,0Z" />')
     legacy.write_text(body)
 
-    # Notificação: a marca preenche quase todo o quadro (o sistema mostra este
-    # ícone em 24dp na barra de status, então sobra só uma margem mínima).
-    nscale, ndx, ndy = fit(108, 4)
+    # Notificação: o sistema mostra este ícone em 24dp na barra de status, então
+    # a marca precisa de uma margem pequena (sem ela encosta nas bordas).
+    nscale, ndx, ndy = fit(108, 10)
     vector(res / 'ic_notification.xml',
            [(place(LEFT, nscale, ndx, ndy), '#FFFFFFFF', None), (place(RIGHT, nscale, ndx, ndy), '#FFFFFFFF', None),
             (place(GEM, nscale, ndx, ndy), '#FFFFFFFF', None)])

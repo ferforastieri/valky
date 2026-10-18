@@ -14,6 +14,7 @@ import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.material3.Icon
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -74,6 +75,16 @@ fun AnimatedBulbIcon(
                     radius = this.size.minDimension / 2f,
                 )
             }
+        }
+        // No tema claro o tile é claro: uma lâmpada acesa em branco quente sumiria
+        // nele. O contorno escuro discreto mantém a cor do estado legível.
+        if (on && !isSystemInDarkTheme()) {
+            Icon(
+                Lucide.Lightbulb,
+                null,
+                Modifier.fillMaxSize().scale(breathe * 1.09f),
+                tint = Color.Black.copy(alpha = .32f),
+            )
         }
         Icon(
             if (on) Lucide.Lightbulb else Lucide.LightbulbOff,
