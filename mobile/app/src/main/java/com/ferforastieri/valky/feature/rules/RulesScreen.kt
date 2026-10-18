@@ -108,8 +108,7 @@ fun RulesContent(
                 containerColor = MaterialTheme.colorScheme.secondary,
                 contentColor = MaterialTheme.colorScheme.onSecondary,
             ) {
-                if (saving) ValkySkeleton(Modifier.size(22.dp), CircleShape)
-                else Icon(Lucide.Plus, contentDescription = stringResource(R.string.add_rule))
+                Icon(Lucide.Plus, contentDescription = stringResource(R.string.add_rule))
             }
         }
     }
@@ -205,8 +204,7 @@ fun RuleEditorDialog(cameras: List<Camera>, detectors: List<DetectorKind>, exist
                 },
                 enabled = !saving && camera != null && detector != null && name.isNotBlank() && validSchedule && validMotion && cooldown.toIntOrNull() in 10..3600,
             ) {
-                if (saving) ValkySkeleton(Modifier.size(18.dp), CircleShape)
-                else Text(stringResource(R.string.save))
+                Text(stringResource(R.string.save))
             }
         },
     ) {

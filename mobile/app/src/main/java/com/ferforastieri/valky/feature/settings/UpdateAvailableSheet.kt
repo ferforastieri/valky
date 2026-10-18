@@ -53,10 +53,6 @@ fun UpdateAvailableSheet(
                 enabled = !updating,
                 modifier = Modifier.fillMaxWidth(),
             ) {
-                if (updating) {
-                    ValkySkeleton(Modifier.size(18.dp), CircleShape)
-                    Spacer(Modifier.width(8.dp))
-                }
                 Text(stringResource(if (updating) R.string.update_downloading else R.string.update_now))
             }
         },

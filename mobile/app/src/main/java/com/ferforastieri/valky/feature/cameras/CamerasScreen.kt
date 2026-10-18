@@ -88,6 +88,8 @@ import com.composables.icons.lucide.VolumeX
 import org.webrtc.SurfaceViewRenderer
 import okhttp3.OkHttpClient
 import com.ferforastieri.valky.core.design.SkeletonList
+import com.ferforastieri.valky.core.design.SkeletonMedia
+import com.ferforastieri.valky.core.design.SkeletonLine
 import com.ferforastieri.valky.core.design.ValkySkeleton
 
 internal data class CameraListStream(
@@ -140,7 +142,7 @@ internal fun CamerasContent(state: CamerasState, stream: CameraListStream? = nul
             if(state.creating){Spacer(Modifier.height(10.dp));LinearProgressIndicator(Modifier.fillMaxWidth());Text(stringResource(R.string.validating_camera),style=MaterialTheme.typography.labelSmall,color=MaterialTheme.colorScheme.onSurfaceVariant)}
             Spacer(Modifier.height(10.dp))
             when{
-                state.loading->Box(Modifier.fillMaxSize()){ValkySkeleton(Modifier.size(22.dp), CircleShape)}
+                state.loading->SkeletonList(rows = 3, horizontal = 0.dp, trailing = true)
                 state.cameras.isEmpty()->EmptyCameras()
                 else->LazyColumn(verticalArrangement=Arrangement.spacedBy(12.dp),contentPadding=PaddingValues(bottom=96.dp)){items(state.cameras,key={it.id}){camera->CameraCard(camera,stream,onClick={onCamera(camera.id)},onEdit=if(canManage){{onEdit(camera.id)}}else null,onDelete=if(canManage){{onDelete(camera.id)}}else null,onFavorite=onFavorite?.let{cb->{cb(camera.id,!camera.favorite)}})}}
             }
@@ -151,8 +153,7 @@ internal fun CamerasContent(state: CamerasState, stream: CameraListStream? = nul
             containerColor = if (state.creating) MaterialTheme.colorScheme.surfaceVariant else MaterialTheme.colorScheme.secondary,
             contentColor = if (state.creating) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.onSecondary,
         ) {
-            if (state.creating) ValkySkeleton(Modifier.size(22.dp), CircleShape)
-            else Icon(Lucide.Plus, stringResource(R.string.add_camera))
+            Icon(Lucide.Plus, stringResource(R.string.add_camera))
         }
     }
 }
@@ -191,7 +192,7 @@ fun CameraFailureSheet(camera:Camera,onDismiss:()->Unit,onEdit:(()->Unit)?=null,
         actions = {
             TextButton(onClick=onDismiss,enabled=!saving) { Text(stringResource(R.string.cancel)) }
             Button(onClick={onSave(CreateCameraRequest(name=name,icon=icon,host=host,port=port.toIntOrNull()?:2020,username=username,password=password,alerts=camera?.alerts ?: com.ferforastieri.valky.core.model.AlertPresentation()))},enabled=!saving&&name.isNotBlank()&&host.isNotBlank()&&(editing || (username.isNotBlank()&&password.isNotBlank()))){
-                if(saving)ValkySkeleton(Modifier.size(18.dp), CircleShape) else Text(stringResource(R.string.save))
+                Text(stringResource(R.string.save))
             }
         },
     ) {
@@ -227,8 +228,7 @@ private fun CameraCard(camera: Camera, stream: CameraListStream?, onClick: () ->
                 else SignalLine(Modifier.fillMaxWidth().height(70.dp).align(Alignment.Center), if (failed) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.secondary)
                 Surface(Modifier.padding(12.dp).align(Alignment.TopEnd), shape = CircleShape, color = MaterialTheme.colorScheme.surface.copy(alpha = .9f)) {
                     Row(Modifier.padding(horizontal = 10.dp, vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
-                        if (!ready && !failed) ValkySkeleton(Modifier.size(12.dp), CircleShape)
-                        else Box(Modifier.size(7.dp).background(if (failed) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.secondary, CircleShape))
+                        Box(Modifier.size(7.dp).background(if (failed) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.secondary, CircleShape))
                         Spacer(Modifier.width(6.dp))
                         Text(if (ready) stringResource(R.string.live) else setupLabel(camera), style = MaterialTheme.typography.labelSmall, color = if (failed) MaterialTheme.colorScheme.error else LocalContentColor.current)
                     }
@@ -280,8 +280,10 @@ private fun CameraListLivePlayer(camera: Camera, stream: CameraListStream, modif
     }
     Box(modifier, contentAlignment = Alignment.Center) {
         if (streamForeground) LivePlayer(controller, Modifier.fillMaxSize())
+        // Enquanto o primeiro quadro não chega, o lugar do vídeo já aparece no
+        // formato dele.
         if (streamForeground && !renderedFirstFrame) {
-            ValkySkeleton(Modifier.size(28.dp), CircleShape)
+            ValkySkeleton(Modifier.fillMaxSize(), MaterialTheme.shapes.medium)
         }
         failure?.let {
             Surface(
@@ -389,7 +391,14 @@ fun CameraLiveScreen(
         when (camera?.setupStatus) {
             "ready" -> ReadyCameraContent(requireNotNull(camera), vm, onEvent)
             "failed" -> CameraSetupContent(requireNotNull(camera), failed = true)
-            null -> Box(Modifier.fillMaxSize()) { ValkySkeleton(Modifier.size(22.dp), CircleShape) }
+            null -> Column(
+                Modifier.fillMaxSize().padding(18.dp),
+                verticalArrangement = Arrangement.spacedBy(14.dp),
+            ) {
+                SkeletonMedia()
+                SkeletonLine(width = 190.dp, height = 14.dp)
+                SkeletonLine(height = 46.dp, shape = MaterialTheme.shapes.large)
+            }
             else -> CameraSetupContent(requireNotNull(camera), failed = false)
         }
     }
@@ -401,7 +410,7 @@ private fun CameraSetupContent(camera: Camera, failed: Boolean) {
         Card(Modifier.align(Alignment.Center).fillMaxWidth(), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface), border = androidx.compose.foundation.BorderStroke(1.dp, if (failed) MaterialTheme.colorScheme.error.copy(alpha = .45f) else MaterialTheme.colorScheme.outlineVariant)) {
             Column(Modifier.padding(24.dp), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 if (failed) Icon(Lucide.VideoOff, null, Modifier.size(38.dp), tint = MaterialTheme.colorScheme.error)
-                else ValkySkeleton(Modifier.size(38.dp), CircleShape)
+                else Icon(Lucide.Video, null, Modifier.size(38.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = .45f))
                 Text(if (failed) stringResource(R.string.camera_setup_failed) else setupDescription(camera), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
                 if (failed) {
                     Text(stringResource(R.string.camera_setup_error_label), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -568,7 +577,8 @@ private fun ZoomableLivePlayer(controller:WhepLiveController,preview:android.gra
             LivePlayer(controller,Modifier.fillMaxSize())
             if(!rendered)preview?.let{Image(it.asImageBitmap(),null,Modifier.fillMaxSize(),contentScale=ContentScale.Crop)}
         }
-        if(!rendered&&preview==null)ValkySkeleton(Modifier.size(22.dp), CircleShape)
+        // O lugar do vídeo já aparece no formato dele enquanto o quadro não chega.
+        if(!rendered&&preview==null)ValkySkeleton(Modifier.fillMaxSize(), RoundedCornerShape(22.dp))
     }
 }
 
@@ -603,7 +613,7 @@ private fun FullscreenLivePlayer(controller: WhepLiveController,preview:android.
             ) {
                 LivePlayer(controller, Modifier.fillMaxSize())
                 if(!rendered)preview?.let{Image(it.asImageBitmap(),null,Modifier.fillMaxSize(),contentScale=ContentScale.Fit)}
-                if(!rendered&&preview==null)ValkySkeleton(Modifier.size(22.dp), CircleShape)
+                if(!rendered&&preview==null)ValkySkeleton(Modifier.fillMaxSize(), RoundedCornerShape(22.dp))
             }
             Text(
                 stringResource(R.string.pinch_to_zoom),
@@ -625,7 +635,7 @@ private tailrec fun Context.findActivity(): Activity? = when (this) {
     is ContextWrapper -> baseContext.findActivity()
     else -> null
 }
-@Composable private fun CameraAction(icon:ImageVector,label:String,onClick:()->Unit,modifier:Modifier=Modifier,loading:Boolean=false){Surface(onClick=onClick,enabled=!loading,modifier=modifier.heightIn(min=66.dp),shape=RoundedCornerShape(17.dp),color=MaterialTheme.colorScheme.surface,border=androidx.compose.foundation.BorderStroke(1.dp,MaterialTheme.colorScheme.outlineVariant),shadowElevation=3.dp){Column(Modifier.fillMaxWidth().padding(12.dp),horizontalAlignment=Alignment.CenterHorizontally,verticalArrangement=Arrangement.Center){if(loading)ValkySkeleton(Modifier.size(20.dp), CircleShape)else Icon(icon,label,Modifier.size(20.dp),tint=MaterialTheme.colorScheme.secondary);Spacer(Modifier.height(5.dp));Text(label,style=MaterialTheme.typography.labelSmall,fontWeight=FontWeight.Medium)}}}
+@Composable private fun CameraAction(icon:ImageVector,label:String,onClick:()->Unit,modifier:Modifier=Modifier,loading:Boolean=false){Surface(onClick=onClick,enabled=!loading,modifier=modifier.heightIn(min=66.dp),shape=RoundedCornerShape(17.dp),color=MaterialTheme.colorScheme.surface,border=androidx.compose.foundation.BorderStroke(1.dp,MaterialTheme.colorScheme.outlineVariant),shadowElevation=3.dp){Column(Modifier.fillMaxWidth().padding(12.dp),horizontalAlignment=Alignment.CenterHorizontally,verticalArrangement=Arrangement.Center){Icon(icon,label,Modifier.size(20.dp),tint=MaterialTheme.colorScheme.secondary.copy(alpha=if(loading).45f else 1f));Spacer(Modifier.height(5.dp));Text(label,style=MaterialTheme.typography.labelSmall,fontWeight=FontWeight.Medium)}}}
 private enum class MediaAction { Snapshot, Recording }
 private data class CameraActionItem(val icon:ImageVector,val label:String,val onClick:()->Unit,val loading:Boolean=false)
 @Composable private fun PTZPad(vm:CameraLiveViewModel){Surface(Modifier.size(190.dp),CircleShape,color=MaterialTheme.colorScheme.surfaceVariant,border=androidx.compose.foundation.BorderStroke(1.dp,MaterialTheme.colorScheme.outlineVariant),tonalElevation=1.dp){Box(Modifier.fillMaxSize().padding(10.dp)){Surface(Modifier.size(72.dp).align(Alignment.Center),CircleShape,color=MaterialTheme.colorScheme.surface,border=androidx.compose.foundation.BorderStroke(1.dp,MaterialTheme.colorScheme.outlineVariant)){Box(contentAlignment=Alignment.Center){Icon(Lucide.Video,null,tint=MaterialTheme.colorScheme.secondary)}};PTZButton(Lucide.ChevronUp,stringResource(R.string.move_up),{vm.move(0.0,.65)},{vm.stop()},Modifier.align(Alignment.TopCenter));PTZButton(Lucide.ChevronLeft,stringResource(R.string.move_left),{vm.move(-.65,0.0)},{vm.stop()},Modifier.align(Alignment.CenterStart));PTZButton(Lucide.ChevronRight,stringResource(R.string.move_right),{vm.move(.65,0.0)},{vm.stop()},Modifier.align(Alignment.CenterEnd));PTZButton(Lucide.ChevronDown,stringResource(R.string.move_down),{vm.move(0.0,-.65)},{vm.stop()},Modifier.align(Alignment.BottomCenter))}}}
@@ -657,8 +667,7 @@ private fun PresetsSection(camera: Camera, vm: CameraLiveViewModel) {
                     Text(stringResource(R.string.camera_positions_hint), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
                 TextButton(onClick = { naming = true }, enabled = !busy) {
-                    if (busy) ValkySkeleton(Modifier.size(16.dp), CircleShape)
-                    else Icon(Lucide.Plus, null, Modifier.size(17.dp))
+                    Icon(Lucide.Plus, null, Modifier.size(17.dp), tint = LocalContentColor.current.copy(alpha = if (busy) .45f else 1f))
                     Spacer(Modifier.width(4.dp))
                     Text(stringResource(R.string.camera_position_save))
                 }
@@ -717,7 +726,15 @@ private fun CameraStatsSheet(
     var selected by remember { mutableStateOf<ActivityBucket?>(null) }
     ValkyBottomSheet(title = stringResource(R.string.camera_stats), onDismiss = onDismiss) {
         when {
-            stats == null && loading -> Box(Modifier.fillMaxWidth().padding(28.dp), contentAlignment = Alignment.Center) { ValkySkeleton(Modifier.size(22.dp), CircleShape) }
+            // Estatísticas: o mesmo desenho dos números que vêm (título, barras e legenda).
+            stats == null && loading -> Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(14.dp)) {
+                SkeletonLine(width = 170.dp, height = 13.dp)
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    repeat(3) { ValkySkeleton(Modifier.weight(1f).height(66.dp), RoundedCornerShape(16.dp)) }
+                }
+                SkeletonLine(height = 12.dp)
+                SkeletonLine(width = 210.dp, height = 12.dp)
+            }
             stats == null -> Text(stringResource(R.string.camera_stats_empty), color = MaterialTheme.colorScheme.onSurfaceVariant)
             else -> Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(14.dp)) {
                 Text(stringResource(R.string.camera_stats_period, stats.days), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)

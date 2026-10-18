@@ -58,6 +58,7 @@ import com.composables.icons.lucide.UserPlus
 import com.ferforastieri.valky.feature.people.LocationTrackingService
 import androidx.compose.foundation.shape.CircleShape
 import com.ferforastieri.valky.core.design.SkeletonList
+import com.ferforastieri.valky.core.design.SkeletonQr
 import com.ferforastieri.valky.core.design.ValkySkeleton
 
 @Composable
@@ -295,10 +296,6 @@ fun RetentionSheet(
         actions = {
             TextButton(onDismiss, enabled = !saving) { Text(stringResource(R.string.cancel)) }
             Button(onClick = { onSave(RetentionSettings(days, storage)) }, enabled = !saving) {
-                if (saving) {
-                    ValkySkeleton(Modifier.size(18.dp), CircleShape)
-                    Spacer(Modifier.width(8.dp))
-                }
                 Text(stringResource(R.string.save))
             }
         },
@@ -449,7 +446,7 @@ private fun InvitationDialog(state: InvitationState, onCreate: () -> Unit, onDis
     ) {
         Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(12.dp)) {
             when {
-                state.loading -> ValkySkeleton(Modifier.size(22.dp), CircleShape)
+                state.loading -> SkeletonQr()
                 bitmap != null -> {
                     Image(
                         bitmap.asImageBitmap(),

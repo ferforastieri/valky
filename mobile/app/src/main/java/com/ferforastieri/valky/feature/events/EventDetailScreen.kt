@@ -33,6 +33,9 @@ import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import androidx.compose.foundation.shape.CircleShape
 import com.ferforastieri.valky.core.design.SkeletonList
+import com.ferforastieri.valky.core.design.SkeletonNotice
+import com.ferforastieri.valky.core.design.SkeletonDetailLines
+import com.ferforastieri.valky.core.design.SkeletonMedia
 import com.ferforastieri.valky.core.design.ValkySkeleton
 
 @Composable
@@ -54,7 +57,13 @@ fun EventDetailScreen(vm: EventDetailViewModel = hiltViewModel()) {
 
     val value = event
     if (value == null) {
-        SkeletonList(rows = 5, horizontal = 0.dp)
+        Column(
+            Modifier.fillMaxSize().padding(horizontal = 18.dp, vertical = 10.dp),
+            verticalArrangement = Arrangement.spacedBy(14.dp),
+        ) {
+            SkeletonMedia()
+            SkeletonDetailLines()
+        }
         return
     }
     Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = 18.dp, vertical = 10.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
@@ -92,11 +101,7 @@ fun EventDetailScreen(vm: EventDetailViewModel = hiltViewModel()) {
             }
         } else Surface(Modifier.fillMaxWidth().aspectRatio(16 / 9f), RoundedCornerShape(22.dp), color = MaterialTheme.colorScheme.surface, border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant), shadowElevation = 5.dp) {
             if (player == null && value.clipStatus == "processing") {
-                Column(Modifier.fillMaxSize(), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center) {
-                    ValkySkeleton(Modifier.size(30.dp), CircleShape)
-                    Spacer(Modifier.height(12.dp))
-                    Text(stringResource(R.string.media_processing), color = MaterialTheme.colorScheme.onSurfaceVariant)
-                }
+                SkeletonNotice(stringResource(R.string.media_processing))
             } else if (player == null) {
                 Column(Modifier.fillMaxSize().padding(22.dp), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center) {
                     Text(if (value.clipStatus == "failed") "Não foi possível preparar o clipe." else "Este alerta não tem clipe salvo.", fontWeight = FontWeight.SemiBold)

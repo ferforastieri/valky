@@ -38,6 +38,7 @@ import com.ferforastieri.valky.core.model.LightColor
 import com.ferforastieri.valky.core.model.LightDevice
 import com.ferforastieri.valky.core.model.LightStatePatch
 import com.ferforastieri.valky.core.design.SkeletonList
+import com.ferforastieri.valky.core.design.SkeletonLightDetail
 import com.ferforastieri.valky.core.design.ValkySkeleton
 
 /**
@@ -64,7 +65,7 @@ fun LightDetailScreen(
         LaunchedEffect(lightId) { vm.ensure(lightId) }
         Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
             if (missing) Text(stringResource(R.string.light_missing), color = MaterialTheme.colorScheme.onSurfaceVariant)
-            else ValkySkeleton(Modifier.size(22.dp), CircleShape)
+            else SkeletonLightDetail(Modifier.padding(18.dp))
         }
         return
     }

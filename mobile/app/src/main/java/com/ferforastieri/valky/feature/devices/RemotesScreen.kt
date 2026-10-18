@@ -103,7 +103,7 @@ fun RemotesScreen(admin: Boolean, onRemote: (String) -> Unit = {}, vm: RemotesVi
                     item { Text(stringResource(R.string.remote_discover_empty), color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodySmall) }
                 }
                 if (state.loading && state.remotes.isEmpty()) {
-                    item { Box(Modifier.fillMaxWidth().padding(top = 40.dp), contentAlignment = Alignment.Center) { ValkySkeleton(Modifier.size(22.dp), CircleShape) } }
+                    item { SkeletonList(rows = 3, horizontal = 0.dp) }
                 }
                 if (state.remotes.isNotEmpty()) {
                     items(state.remotes, key = { it.id }) { remote ->
@@ -284,8 +284,7 @@ private fun RemoteEditorSheet(
                 onClick = { onSave(RemoteInput(name = name.trim(), host = host.trim(), port = port.toIntOrNull() ?: 8002)) },
                 enabled = !saving && name.isNotBlank() && host.isNotBlank(),
             ) {
-                if (saving) ValkySkeleton(Modifier.size(18.dp), CircleShape)
-                else Text(stringResource(R.string.save))
+                Text(stringResource(R.string.save))
             }
         },
     ) {

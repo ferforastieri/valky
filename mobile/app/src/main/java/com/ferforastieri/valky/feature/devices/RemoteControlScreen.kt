@@ -67,6 +67,7 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import com.ferforastieri.valky.core.design.SkeletonList
+import com.ferforastieri.valky.core.design.SkeletonKeypad
 import com.ferforastieri.valky.core.design.ValkySkeleton
 
 /** Espaço único entre os botões do controle. */
@@ -107,7 +108,7 @@ fun RemoteControlScreen(
         Spacer(Modifier.height(14.dp))
         state.error?.let { /* errors surface as a toast */ }
         when {
-            remote == null -> SkeletonList(rows = 5, horizontal = 0.dp)
+            remote == null -> SkeletonKeypad(Modifier.padding(horizontal = 18.dp, vertical = 12.dp))
             !remote.tokenConfigured -> PairingPanel(pairing = state.pairing, onPair = vm::pair)
             else -> ConnectedRemote(state, vm, qwerty)
         }
@@ -126,11 +127,14 @@ private fun PowerButton(powering: Boolean, onPower: () -> Unit, modifier: Modifi
         border = BorderStroke(1.dp, MaterialTheme.colorScheme.error.copy(alpha = .35f)),
     ) {
         Box(contentAlignment = Alignment.Center) {
-            if (powering) {
-                ValkySkeleton(Modifier.size(22.dp), CircleShape)
-            } else {
-                Icon(Lucide.Power, stringResource(R.string.remote_power), Modifier.size(26.dp), tint = MaterialTheme.colorScheme.onErrorContainer)
-            }
+            // O botão continua sendo o botão: enquanto o comando vai para a TV
+            // ele fica esmaecido e desabilitado, sem virar bolinha de espera.
+            Icon(
+                Lucide.Power,
+                stringResource(R.string.remote_power),
+                Modifier.size(26.dp),
+                tint = MaterialTheme.colorScheme.onErrorContainer.copy(alpha = if (powering) .4f else 1f),
+            )
         }
     }
 }

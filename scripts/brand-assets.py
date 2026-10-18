@@ -181,7 +181,9 @@ def main():
         f'    <path android:fillColor="{DARK}" android:pathData="M14,0h80a14,14 0 0 1 14,14v80a14,14 0 0 1 -14,14H14A14,14 0 0 1 0,94V14A14,14 0 0 1 14,0Z" />')
     legacy.write_text(body)
 
-    nscale, ndx, ndy = fit(108, 30)
+    # Notificação: a marca preenche quase todo o quadro (o sistema mostra este
+    # ícone em 24dp na barra de status, então sobra só uma margem mínima).
+    nscale, ndx, ndy = fit(108, 4)
     vector(res / 'ic_notification.xml',
            [(place(LEFT, nscale, ndx, ndy), '#FFFFFFFF', None), (place(RIGHT, nscale, ndx, ndy), '#FFFFFFFF', None),
             (place(GEM, nscale, ndx, ndy), '#FFFFFFFF', None)])

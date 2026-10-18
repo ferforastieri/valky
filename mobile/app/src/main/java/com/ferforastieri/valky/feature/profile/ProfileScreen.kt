@@ -56,6 +56,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import com.ferforastieri.valky.core.design.SkeletonList
+import com.ferforastieri.valky.core.design.SkeletonProfile
 import com.ferforastieri.valky.core.design.ValkySkeleton
 
 @Composable
@@ -85,8 +86,7 @@ fun ProfileScreen(admin: Boolean, vm: ProfileViewModel = hiltViewModel()) {
     ) {
         val profile = current
         if (profile == null) {
-            Spacer(Modifier.height(48.dp))
-            ValkySkeleton(Modifier.size(22.dp), CircleShape)
+            SkeletonProfile()
         } else {
             Card(
                 modifier = Modifier.fillMaxWidth(),

@@ -65,8 +65,7 @@ fun OnboardingScreen(viewModel: MainViewModel) {
                 else -> viewModel.login(url, password, initialized == false, name, username, setupCode)
             }
         }, enabled = !connecting && url.isNotBlank() && (initialized == null || username.isNotBlank() && password.isNotEmpty() && (!firstAccess || name.isNotBlank() && password == confirmation && password.toByteArray().size in 12..72)), modifier = Modifier.fillMaxWidth()) {
-            if (connecting) ValkySkeleton(Modifier.size(20.dp), CircleShape)
-            else Text(if (initialized == null) "Continuar" else if (firstAccess) "Criar conta" else "Entrar")
+            Text(if (initialized == null) "Continuar" else if (firstAccess) "Criar conta" else "Entrar")
         }
         if (initialized != null) TextButton(onClick = { viewModel.cancelInvitation(); password = ""; confirmation = "" }, enabled = !connecting, modifier = Modifier.fillMaxWidth()) { Text(if (invitation != null) "Já tenho uma conta" else "Alterar servidor") }
         if (invitation == null) {

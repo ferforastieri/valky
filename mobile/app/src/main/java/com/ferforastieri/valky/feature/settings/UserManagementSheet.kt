@@ -79,7 +79,7 @@ fun UserManagementSheet(users: List<ManagedUser>, error: String?, busy: Boolean,
                             com.ferforastieri.valky.core.design.AdaptiveRow(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                                 TextButton({ removing = user }, enabled = !busy) { Text("Remover pessoa", color = MaterialTheme.colorScheme.error) }
                                 Button({ onSave(user.copy(name = name.trim(), enabled = enabled, admin = admin, viewRules = viewRules, editRules = editRules, notifyCamera = notifyCamera, notifyLocation = notifyLocation, avatarData = avatarEdits[user.id] ?: user.avatarData, username = username.trim(), password = password)); password = "" }, enabled = !busy && name.isNotBlank() && (password.isEmpty() || username.isNotBlank() && password.toByteArray().size in 12..72)) {
-                                    if (busy) ValkySkeleton(Modifier.size(18.dp), CircleShape) else Text("Salvar alterações")
+                                    Text("Salvar alterações")
                                 }
                             }
                         }
