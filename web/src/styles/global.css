@@ -1321,16 +1321,17 @@ body {
   gap: 5px;
   padding-left: 2px;
 }
-/* Tema e GitHub são irmãos dos links da barra: mesma cor, sem borda nem fundo
-   próprios (o destaque aparece só no hover). */
+/* Tema e GitHub são irmãos dos links da barra: mesma cor dos ícones deles
+   (--signal) e sem borda, fundo ou sombra próprios; o destaque aparece só no
+   hover. Sem o box-shadow sobrava um quadrado em volta dos dois. */
 .dock-actions .icon-button {
   border: 0;
   background: transparent;
-  color: var(--muted);
+  box-shadow: none;
+  color: var(--signal);
 }
 .dock-actions .icon-button:hover {
   background: var(--surface-soft);
-  color: var(--ink);
 }
 
 @media (max-width: 760px) {
@@ -2777,7 +2778,8 @@ body {
     height: auto;
     border: 0;
     background: transparent;
-    color: var(--muted);
+    box-shadow: none;
+    color: var(--signal);
   }
   /* Ordem na barra: Início, App, Instalar, MARCA, Documentação, tema, GitHub. */
   .dock-links > :nth-child(1) { grid-column: 1; }
