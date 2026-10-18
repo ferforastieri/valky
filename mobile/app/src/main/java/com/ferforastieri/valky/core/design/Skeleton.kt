@@ -106,6 +106,42 @@ fun SkeletonList(rows: Int = 5, modifier: Modifier = Modifier, horizontal: Dp = 
     }
 }
 
+/**
+ * Cartão de câmera: a área do vídeo em cima (16:9) e o nome com a situação
+ * embaixo — a mesma divisão do cartão real.
+ */
+@Composable
+fun SkeletonCameraCard() {
+    Surface(
+        Modifier.fillMaxWidth(),
+        shape = MaterialTheme.shapes.large,
+        color = MaterialTheme.colorScheme.surface,
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+    ) {
+        Column {
+            ValkySkeleton(Modifier.fillMaxWidth().aspectRatio(16 / 9f), RoundedCornerShape(0.dp))
+            Row(Modifier.fillMaxWidth().padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
+                ValkySkeleton(Modifier.size(44.dp), RoundedCornerShape(13.dp))
+                Column(Modifier.weight(1f).padding(start = 12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    SkeletonLine(width = 150.dp, height = 15.dp)
+                    SkeletonLine(width = 100.dp, height = 11.dp)
+                }
+            }
+        }
+    }
+}
+
+/** A lista de câmeras em espera. */
+@Composable
+fun SkeletonCameraList(rows: Int = 3, modifier: Modifier = Modifier, horizontal: Dp = 18.dp) {
+    Column(
+        modifier.fillMaxWidth().padding(horizontal = horizontal, vertical = 12.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+        repeat(rows) { SkeletonCameraCard() }
+    }
+}
+
 /** A área de mídia de um evento, no mesmo 16:9 em que o vídeo aparece. */
 @Composable
 fun SkeletonMedia(modifier: Modifier = Modifier) {

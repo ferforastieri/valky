@@ -61,7 +61,7 @@ test('respeita a preferência por movimento reduzido', async () => {
   assert.match(styles, /@media\(max-width:760px\)[^{]*\{[^}]*body\{padding-top:0;padding-bottom:calc\(100px \+ env\(safe-area-inset-bottom,0px\)\)\}/);
   // A barra do celular é a pílula do painel, com a marca no meio.
   assert.match(styles, /\.floating-dock\{[^}]*grid-template-columns:repeat\(3,minmax\(0,1fr\)\) auto repeat\(3,minmax\(0,1fr\)\)/);
-  assert.match(styles, /\.dock-brand\{grid-column:4/);
+  assert.match(styles, /\.dock-brand\{[^}]*grid-column:4/);
   assert.match(styles, /\.dock-link span\{display:none\}/);
 });
 

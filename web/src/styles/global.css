@@ -2710,10 +2710,19 @@ body {
   .dock-actions {
     display: contents;
   }
+  /* display explícito: uma regra anterior do breakpoint escondia a marca
+     (.dock-brand { display: none }), o que deixava a coluna do meio vazia. */
   .dock-brand {
+    display: flex;
+    align-items: center;
     grid-column: 4;
+    grid-row: 1;
     justify-self: center;
+    /* Sem a borda e o respiro do desktop: aqui a marca é só a marca e precisa
+       ficar exatamente no meio da barra. */
     margin: 0;
+    padding: 0;
+    border: 0;
   }
   .dock-brand .dock-identity {
     display: none;
@@ -2724,6 +2733,7 @@ body {
     aspect-ratio: 403 / 292;
   }
   .dock-link {
+    grid-row: 1;
     justify-self: center;
     width: 100%;
     max-width: 44px;
@@ -2752,6 +2762,7 @@ body {
     justify-self: center;
   }
   .dock-actions .icon-button {
+    grid-row: 1;
     width: 100%;
     max-width: 44px;
     aspect-ratio: 1;

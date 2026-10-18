@@ -87,7 +87,7 @@ import com.composables.icons.lucide.Volume2
 import com.composables.icons.lucide.VolumeX
 import org.webrtc.SurfaceViewRenderer
 import okhttp3.OkHttpClient
-import com.ferforastieri.valky.core.design.SkeletonList
+import com.ferforastieri.valky.core.design.SkeletonCameraList
 import com.ferforastieri.valky.core.design.SkeletonMedia
 import com.ferforastieri.valky.core.design.SkeletonLine
 import com.ferforastieri.valky.core.design.ValkySkeleton
@@ -142,7 +142,7 @@ internal fun CamerasContent(state: CamerasState, stream: CameraListStream? = nul
             if(state.creating){Spacer(Modifier.height(10.dp));LinearProgressIndicator(Modifier.fillMaxWidth());Text(stringResource(R.string.validating_camera),style=MaterialTheme.typography.labelSmall,color=MaterialTheme.colorScheme.onSurfaceVariant)}
             Spacer(Modifier.height(10.dp))
             when{
-                state.loading->SkeletonList(rows = 3, horizontal = 0.dp, trailing = true)
+                state.loading->SkeletonCameraList(rows = 3, horizontal = 0.dp)
                 state.cameras.isEmpty()->EmptyCameras()
                 else->LazyColumn(verticalArrangement=Arrangement.spacedBy(12.dp),contentPadding=PaddingValues(bottom=96.dp)){items(state.cameras,key={it.id}){camera->CameraCard(camera,stream,onClick={onCamera(camera.id)},onEdit=if(canManage){{onEdit(camera.id)}}else null,onDelete=if(canManage){{onDelete(camera.id)}}else null,onFavorite=onFavorite?.let{cb->{cb(camera.id,!camera.favorite)}})}}
             }
