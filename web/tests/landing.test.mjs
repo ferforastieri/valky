@@ -103,22 +103,25 @@ test('carrossel avança automaticamente sem controle visual redundante', () => {
   assert.doesNotMatch(stylesSource, /\.carousel-hit(?:-next)?:hover/);
 });
 
-test('documentação é uma rota separada, localizada e completa', async () => {
+test('documentação é uma rota separada e vem dos arquivos do repositório', async () => {
   assert.match(ptDocs, /<html lang="pt-BR"/);
   assert.match(enDocs, /<html lang="en"/);
   assert.match(ptDocs, /Documentação do Valky/);
   assert.match(enDocs, /Valky documentation/);
-  assert.match(ptDocs, /\/api\/v1\/cameras/);
-  assert.match(ptDocs, /Iluminação inteligente/);
-  assert.match(ptDocs, /\/api\/v1\/lights\/\{id\}\/state/);
-  assert.match(enDocs, /Smart lighting/);
-  assert.match(ptDocs, /\/api\/v1\/realtime/);
   assert.match(ptDocs, /href="\/openapi.yaml"/);
   assert.match(ptDocs, /href="\/pt-BR"/);
   assert.match(ptDocs, /href="\/pt-BR#app"/);
   assert.match(ptDocs, /href="\/pt-BR#install"/);
   assert.match(ptDocs, /href="\/pt-BR\/docs" aria-current="page"/);
   assert.match(ptDocs, /© 2026 Fernando Forastieri · MIT/);
+  // A página não tem texto próprio: cada seção vem de um arquivo em docs/.
+  const sections = ptDocs.match(/class="docs-source"/g) || [];
+  assert.ok(sections.length >= 7, `esperava os documentos do repositório, veio ${sections.length}`);
+  assert.match(ptDocs, /docs-source" href="https:\/\/github\.com\/ferforastieri\/valky\/blob\/main\/docs\/[a-z-]+\.md"/);
+  assert.match(ptDocs, /<pre/);
+  assert.match(ptDocs, /<h3/);
+  // O inglês recebe o mesmo conteúdo com um aviso.
+  assert.match(enDocs, /docs-notice/);
   assert.match(ptDocs, /hreflang="en" href="https:\/\/valkyris\.vercel\.app\/en\/docs"/);
   assert.match(enDocs, /hreflang="pt-BR" href="https:\/\/valkyris\.vercel\.app\/pt-BR\/docs"/);
   const sitemap = await readFile(new URL('../dist/sitemap-0.xml', import.meta.url), 'utf8');
@@ -126,6 +129,7 @@ test('documentação é uma rota separada, localizada e completa', async () => {
   assert.match(sitemap, /https:\/\/valkyris\.vercel\.app\/en\/docs/);
   assert.match(stylesSource, /@media \(max-width: 620px\)[\s\S]*\.endpoint-list article\s*\{[\s\S]*grid-template-columns: minmax\(0, auto\) minmax\(0, 1fr\)/);
 });
+
 
 test('artefatos públicos acompanham a documentação', async () => {
   const installer = await readFile(new URL('../dist/install.sh', import.meta.url), 'utf8');

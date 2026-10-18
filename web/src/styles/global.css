@@ -2779,3 +2779,99 @@ body {
   .dock-actions > :nth-child(1) { grid-column: 6; }
   .dock-actions > :nth-child(2) { grid-column: 7; }
 }
+
+/* Página de documentação: o texto vem de docs/*.md, então o estilo cobre só o
+   aviso de idioma e o link para editar o arquivo no repositório. */
+.docs-notice {
+  margin: 0 0 28px;
+  padding: 14px 16px;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  background: var(--surface);
+  color: var(--muted);
+  font-size: .84rem;
+}
+.docs-source {
+  margin-left: auto;
+  flex: 0 0 auto;
+  color: var(--muted);
+  font: 500 .62rem var(--mono);
+  text-transform: uppercase;
+  letter-spacing: .06em;
+}
+.docs-source:hover {
+  color: var(--signal);
+}
+
+/* Conteúdo da documentação: agora vem dos MDs, então o estilo cobre o que o
+   markdown gera (títulos, listas, tabelas, código, citações e links). */
+.docs-content table {
+  width: 100%;
+  margin: 22px 0;
+  border-collapse: collapse;
+  font-size: .86rem;
+}
+.docs-content th,
+.docs-content td {
+  padding: 11px 13px;
+  border-bottom: 1px solid var(--line);
+  text-align: left;
+  vertical-align: top;
+}
+.docs-content th {
+  color: var(--ink);
+  font-weight: 600;
+}
+.docs-content td {
+  color: var(--muted);
+}
+.docs-content pre {
+  margin: 22px 0;
+  padding: 16px 17px;
+  overflow-x: auto;
+  border: 1px solid #332e42;
+  border-radius: 16px;
+  background: #14121c;
+  color: #efecfa;
+  font: 400 .74rem/1.7 var(--mono);
+}
+.docs-content pre code {
+  color: inherit;
+  font: inherit;
+}
+.docs-content code {
+  font-family: var(--mono);
+  font-size: .84em;
+}
+.docs-content ul,
+.docs-content ol {
+  padding-left: 22px;
+  color: var(--muted);
+}
+.docs-content li {
+  margin-bottom: 6px;
+}
+.docs-content h3 {
+  margin: 32px 0 12px;
+}
+.docs-content h4 {
+  margin: 24px 0 10px;
+}
+.docs-content a {
+  color: var(--signal);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.docs-content blockquote {
+  margin: 20px 0;
+  padding: 12px 16px;
+  border-left: 3px solid var(--signal);
+  border-radius: 0 12px 12px 0;
+  background: var(--surface);
+  color: var(--muted);
+}
+.docs-content hr {
+  margin: 34px 0;
+  border: 0;
+  border-top: 1px solid var(--line);
+}

@@ -31,3 +31,4 @@ web/public/screenshots/landing/
 web/dist-viewer/
 __pycache__/
 *.pyc
+web/src/content/docs/

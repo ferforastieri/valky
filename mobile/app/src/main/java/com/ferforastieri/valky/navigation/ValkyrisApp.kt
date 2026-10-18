@@ -124,7 +124,9 @@ private fun ConnectedValkyApp(main: MainViewModel) {
     val currentRoute = entry?.destination?.route
     val selectedIndex = destinations.indexOfFirst { it.route == currentRoute }
     val showBottomBar = currentRoute == "overview" || selectedIndex >= 0 || currentRoute == "events" || currentRoute == "event/{id}" || currentRoute == "camera/{id}" || currentRoute == "lights" || currentRoute == "light/{id}" || currentRoute == "remote/{id}" || currentRoute == "person/{id}"
-    val showTopBar = selectedIndex >= 0 || currentRoute == "events" || currentRoute == "event/{id}" || currentRoute == "lights"
+    // A visão geral também tem cabeçalho: sem o item na barra, o índice dela é -1
+    // e a checagem antiga escondia o título e o sino dessa tela.
+    val showTopBar = currentRoute == "overview" || selectedIndex >= 0 || currentRoute == "events" || currentRoute == "event/{id}" || currentRoute == "lights"
     val pendingEvent by main.pendingEvent.collectAsStateWithLifecycle()
     val pendingCamera by main.pendingCamera.collectAsStateWithLifecycle()
     val pendingSection by main.pendingSection.collectAsStateWithLifecycle()

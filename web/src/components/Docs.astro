@@ -1,5 +1,6 @@
 ---
-import { Boxes, CodeXml, Download, ExternalLink, Lightbulb, Menu, Network, ServerCog, ShieldCheck, Smartphone, SquareTerminal } from '@lucide/astro';
+import { Download } from '@lucide/astro';
+import { getCollection, render } from 'astro:content';
 import type { Locale } from '../content/copy';
 import BaseLayout from '../layouts/BaseLayout.astro';
 import Navigation from './Navigation.astro';
@@ -7,107 +8,27 @@ import Navigation from './Navigation.astro';
 interface Props { locale: Locale }
 const { locale } = Astro.props;
 const pt = locale === 'pt-BR';
-const installCommand = 'curl -fsSL https://valkyris.vercel.app/install.sh | sh';
 
-const text = pt ? {
-  title: 'Documentação do Valky',
-  description: 'Guia de instalação, câmeras ONVIF, iluminação inteligente, segurança, operação e referência completa da API HTTP do Valky.',
+// Nada de texto próprio aqui: a página apresenta a documentação versionada em
+// docs/*.md (ver web/scripts/sync-docs.mjs). O português é a fonte; quem está em
+// inglês recebe o mesmo conteúdo com um aviso no topo.
+const docs = (await getCollection('docs')).sort((a, b) => a.data.order - b.data.order);
+const sections = await Promise.all(
+  docs.map(async (doc) => ({ doc, ...(await render(doc)) })),
+);
+
+const text = {
+  title: pt ? 'Documentação do Valky' : 'Valky documentation',
+  description: 'Instalação, arquitetura, API, recursos, segurança e desenvolvimento do Valky.',
   eyebrow: 'GUIA OPERACIONAL · API V1',
-  intro: 'Tudo o que você precisa para instalar o servidor, preparar câmeras e iluminação, conectar o Android e integrar a API.',
+  intro: 'Instalar o servidor, preparar câmeras e iluminação, conectar o Android, integrar a API e contribuir no projeto.',
   onThisPage: 'Nesta página',
-  toc: [['start','Começar'],['architecture','Arquitetura'],['camera','Preparar a câmera'],['lighting','Iluminação'],['android','Android'],['viewer','Painel web'],['family','Localização e regras'],['configuration','Configuração'],['api','API HTTP'],['updates','Atualizações'],['security','Segurança'],['diagnostics','Diagnóstico']],
-  requirements: ['Linux em amd64 ou arm64', 'Docker Engine com Docker Compose v2', 'Android 8.0 (SDK 26) ou mais recente', 'Câmera ONVIF Profile S com RTSP', 'Servidor, celular e câmera acessíveis por LAN ou VPN'],
-  methods: 'Bearer no Android e integrações; o painel usa cookie HttpOnly e X-Valky-Viewer: 1. Rotas públicas dispensam sessão.',
-} : {
-  title: 'Valky documentation',
-  description: 'Installation, ONVIF camera setup, smart lighting, security, operations and complete Valky HTTP API reference.',
-  eyebrow: 'OPERATIONS GUIDE · API V1',
-  intro: 'Everything needed to install the server, prepare cameras and lighting, connect Android and integrate the API.',
-  onThisPage: 'On this page',
-  toc: [['start','Get started'],['architecture','Architecture'],['camera','Prepare a camera'],['lighting','Lighting'],['android','Android'],['viewer','Web dashboard'],['family','Location and rules'],['configuration','Configuration'],['api','HTTP API'],['updates','Updates'],['security','Security'],['diagnostics','Diagnostics']],
-  requirements: ['Linux on amd64 or arm64', 'Docker Engine with Docker Compose v2', 'Android 8.0 (SDK 26) or later', 'ONVIF Profile S camera with RTSP', 'Server, phone and camera reachable over LAN or VPN'],
-  methods: 'Android and integrations use bearer tokens; the dashboard uses an HttpOnly cookie and X-Valky-Viewer: 1. Public routes require no session.',
+  status: 'Documentação versionada no repositório',
+  notice: 'The documentation is maintained in Portuguese; the files in the repository are the source.',
+  source: 'Editar no GitHub',
 };
 
-const endpoints = pt ? [
-  ['GET','/health','Público','Saúde do servidor.'],
-  ['GET','/openapi.yaml','Público','Contrato OpenAPI 3.1 servido pelo backend.'],
-  ['GET','/api/v1/auth/status','Público','Informa se o primeiro administrador já existe.'],
-  ['POST','/api/v1/admin/bootstrap','Público','Cria a conta com usuário e senha e o primeiro administrador, uma única vez.'],
-  ['POST','/api/v1/login','Público','Autentica uma conta pessoal sem recriar o perfil.'],
-  ['POST','/api/v1/pair','Público','Consome um convite de uso único.'],
-  ['POST','/api/v1/pairing-sessions','Admin','Cria um convite temporário para outro celular.'],
-  ['GET · POST','/api/v1/cameras','Autenticado','Lista câmeras ou inicia o cadastro assíncrono.'],
-  ['PUT · DELETE','/api/v1/cameras/{id}','Autenticado','Edita ou remove uma câmera; uma mudança de conexão reinicia sua configuração.'],
-  ['POST','/api/v1/cameras/{id}/ptz','Autenticado','Move, para ou aplica zoom quando suportado.'],
-  ['GET','/api/v1/lights','Autenticado','Lista a iluminação fornecida pelo adaptador local instalado.'],
-  ['GET · DELETE','/api/v1/lights/{id}','Autenticado / Admin ao remover','Consulta ou remove uma iluminação.'],
-  ['PUT','/api/v1/lights/{id}/state','Autenticado','Liga, desliga e altera brilho, branco ou cor.'],
-  ['GET','/api/v1/cameras/{id}/snapshot','Autenticado','Retorna um frame JPEG do stream local atual.'],
-  ['GET','/api/v1/cameras/{id}/recording','Autenticado','Baixa os últimos 10 segundos do buffer em MP4.'],
-  ['POST · PATCH · DELETE','/api/v1/cameras/{id}/live/webrtc/whep','Autenticado','Negocia e encerra o stream WebRTC autenticado.'],
-  ['GET','/api/v1/detectors','Autenticado','Lista os tipos normalizados de detecção.'],
-  ['GET · POST','/api/v1/rules','Autenticado','Lista ou cria regras de automação.'],
-  ['PUT · DELETE','/api/v1/rules/{id}','Autenticado','Edita ou remove uma regra.'],
-  ['GET','/api/v1/users','Autenticado','Lista os perfis da família vinculados aos dispositivos pareados.'],
-  ['GET','/api/v1/users/{id}/history','Autenticado','Retorna o histórico de localização de um usuário.'],
-  ['POST','/api/v1/me/location','Autenticado','Registra a localização do usuário vinculado ao dispositivo atual.'],
-  ['GET · POST','/api/v1/places','Autenticado / Admin ao alterar','Lista áreas ou cria uma área de alerta.'],
-  ['PUT · DELETE','/api/v1/places/{id}','Admin','Edita ou remove uma área.'],
-  ['GET · PUT','/api/v1/me','Autenticado','Consulta ou atualiza o perfil do próprio dispositivo.'],
-  ['POST','/api/v1/me/password','Usuário','Altera a própria senha e revoga as outras sessões.'],
-  ['GET · DELETE','/api/v1/viewer-session','Sessão web','Restaura ou revoga a sessão do painel.'],
-  ['GET','/api/v1/events','Autenticado','Lista eventos recentes.'],
-  ['GET','/api/v1/events/{id}','Autenticado','Retorna metadados de um evento.'],
-  ['POST','/api/v1/events/{id}/acknowledge','Autenticado','Reconhece o evento e interrompe o alarme.'],
-  ['POST','/api/v1/events/acknowledge-all','Autenticado','Reconhece todos os eventos pendentes.'],
-  ['GET','/api/v1/events/{id}/snapshot','Autenticado','Retorna o JPEG preservado no evento.'],
-  ['GET','/api/v1/events/{id}/clip','Autenticado','Transmite o clipe MP4 do evento.'],
-  ['POST','/api/v1/devices/push','Autenticado','Registra o token FCM e o segredo do payload cifrado.'],
-  ['GET · PUT','/api/v1/settings/push','Admin ao alterar','Consulta a configuração FCM ou envia a conta de serviço Base64, cifrada no SQLite.'],
-  ['GET · PUT','/api/v1/settings/retention','Admin ao alterar','Lê ou altera os limites de retenção.'],
-  ['GET','/api/v1/system/update','Autenticado','Consulta a release e o link do APK, sem executar atualizações.'],
-  ['GET','/api/v1/realtime','Autenticado','WebSocket para mudanças de câmeras, iluminação e eventos.'],
-] : [
-  ['GET','/health','Public','Server health.'],
-  ['GET','/openapi.yaml','Public','OpenAPI 3.1 contract served by the backend.'],
-  ['GET','/api/v1/auth/status','Public','Reports whether the first administrator exists.'],
-  ['POST','/api/v1/admin/bootstrap','Public','Creates the personal username and password and first administrator once.'],
-  ['POST','/api/v1/login','Public','Exchanges the personal username and password for a device token.'],
-  ['POST','/api/v1/pair','Public','Consumes a single-use invitation.'],
-  ['POST','/api/v1/pairing-sessions','Admin','Creates a temporary invitation for another phone.'],
-  ['GET · POST','/api/v1/cameras','Authenticated','Lists cameras or starts asynchronous setup.'],
-  ['PUT · DELETE','/api/v1/cameras/{id}','Authenticated','Edits or deletes a camera; connection changes restart its setup.'],
-  ['POST','/api/v1/cameras/{id}/ptz','Authenticated','Moves, stops or zooms when supported.'],
-  ['GET','/api/v1/lights','Authenticated','Lists lighting exposed by the installed local adapter.'],
-  ['GET · DELETE','/api/v1/lights/{id}','Authenticated / Admin to remove','Reads or removes a light.'],
-  ['PUT','/api/v1/lights/{id}/state','Authenticated','Turns a bulb on or off and changes brightness, white temperature or color.'],
-  ['GET','/api/v1/cameras/{id}/snapshot','Authenticated','Returns a JPEG frame from the current local stream.'],
-  ['GET','/api/v1/cameras/{id}/recording','Authenticated','Downloads the latest 10 seconds from the rolling buffer as MP4.'],
-  ['POST · PATCH · DELETE','/api/v1/cameras/{id}/live/webrtc/whep','Authenticated','Negotiates and closes the authenticated WebRTC stream.'],
-  ['GET','/api/v1/detectors','Authenticated','Lists normalized detector types.'],
-  ['GET · POST','/api/v1/rules','Authenticated','Lists or creates automation rules.'],
-  ['PUT · DELETE','/api/v1/rules/{id}','Authenticated','Edits or deletes a rule.'],
-  ['GET','/api/v1/users','Authenticated','Lists family profiles linked to paired devices.'],
-  ['GET','/api/v1/users/{id}/history','Authenticated','Returns a user location history.'],
-  ['POST','/api/v1/me/location','Authenticated','Records the location of the user linked to the current device.'],
-  ['GET · POST','/api/v1/places','Authenticated / Admin to change','Lists areas or creates an alert area.'],
-  ['PUT · DELETE','/api/v1/places/{id}','Admin','Edits or removes an area.'],
-  ['GET · PUT','/api/v1/me','Authenticated','Reads or updates this device owner profile.'],
-  ['POST','/api/v1/me/password','User','Changes the personal password and revokes other sessions.'],
-  ['GET · DELETE','/api/v1/viewer-session','Browser session','Restores or revokes the dashboard session.'],
-  ['GET','/api/v1/events','Authenticated','Lists recent events.'],
-  ['GET','/api/v1/events/{id}','Authenticated','Returns event metadata.'],
-  ['POST','/api/v1/events/{id}/acknowledge','Authenticated','Acknowledges the event and stops its alarm.'],
-  ['POST','/api/v1/events/acknowledge-all','Authenticated','Acknowledges all pending events.'],
-  ['GET','/api/v1/events/{id}/snapshot','Authenticated','Returns the event JPEG.'],
-  ['GET','/api/v1/events/{id}/clip','Authenticated','Streams the event MP4 clip.'],
-  ['POST','/api/v1/devices/push','Authenticated','Registers the FCM token and encrypted payload secret.'],
-  ['GET · PUT','/api/v1/settings/push','Admin to change','Reads FCM setup or stores a Base64 service account encrypted in SQLite.'],
-  ['GET · PUT','/api/v1/settings/retention','Admin to change','Reads or changes retention limits.'],
-  ['GET','/api/v1/system/update','Authenticated','Checks release metadata and the APK link without executing updates.'],
-  ['GET','/api/v1/realtime','Authenticated','WebSocket for camera, lighting and event changes.'],
-];
+const repository = 'https://github.com/ferforastieri/valky/blob/main';
 ---
 <BaseLayout locale={locale} title={`${text.title} | Valky`} description={text.description}>
   <main class="docs-shell">
@@ -118,155 +39,33 @@ const endpoints = pt ? [
         <p>{text.intro}</p>
       </div>
       <div class="docs-status" aria-label={pt ? 'Estado da documentação' : 'Documentation status'}>
-        <span><i></i>{pt ? 'Documentação sempre atualizada' : 'Continuously updated documentation'}</span>
+        <span><i></i>{pt ? text.status : 'Documentation versioned in the repository'}</span>
         <a href="/openapi.yaml" download>OpenAPI 3.1 <Download size={16}/></a>
       </div>
     </header>
 
+    {!pt && <p class="docs-notice">{text.notice}</p>}
+
     <div class="docs-grid">
       <aside class="docs-toc">
         <p>{text.onThisPage}</p>
-        <nav>{text.toc.map(([id,label],index)=><a href={`#${id}`}><span>{String(index + 1).padStart(2,'0')}</span>{label}</a>)}</nav>
+        <nav>
+          {sections.map(({ doc }, index) => (
+            <a href={`#${doc.id}`}><span>{String(index + 1).padStart(2, '0')}</span>{doc.data.title}</a>
+          ))}
+        </nav>
       </aside>
 
       <article class="docs-content">
-        <section id="start">
-          <div class="docs-heading"><SquareTerminal size={22}/><div><span>01</span><h2>{pt ? 'Começar' : 'Get started'}</h2></div></div>
-          <p>{pt ? 'O instalador baixa artefatos da release, gera os segredos locais e o certificado TLS, prepara o Compose e inicia Valky e MediaMTX.' : 'The installer downloads release artifacts, generates local secrets and a TLS certificate, prepares Compose, then starts Valky and MediaMTX.'}</p>
-          <div class="docs-code"><code>{installCommand}</code><button class="docs-copy" type="button" data-command={installCommand}>{pt ? 'Copiar' : 'Copy'}</button></div>
-          <h3>{pt ? 'Requisitos' : 'Requirements'}</h3>
-          <ul class="check-list">{text.requirements.map(item=><li><span>✓</span>{item}</li>)}</ul>
-          <div class="docs-note"><ShieldCheck size={19}/><p>{pt ? 'Mantenha as portas ONVIF e RTSP acessíveis apenas na rede privada. Para acesso externo, conecte o celular por VPN; não publique a câmera na internet.' : 'Keep ONVIF and RTSP ports reachable only on the private network. For remote access, connect the phone through a VPN; never publish the camera to the internet.'}</p></div>
-        </section>
-
-        <section id="architecture">
-          <div class="docs-heading"><Boxes size={22}/><div><span>02</span><h2>{pt ? 'Arquitetura' : 'Architecture'}</h2></div></div>
-          <div class="architecture-flow">
-            <article><strong>{pt ? 'Câmera' : 'Camera'}</strong><small>ONVIF · RTSP</small></article><i>→</i>
-            <article><strong>MediaMTX</strong><small>WebRTC · buffer · Opus</small></article><i>→</i>
-            <article><strong>Go + SQLite</strong><small>{pt ? 'regras · eventos' : 'rules · events'}</small></article><i>→</i>
-            <article><strong>Android</strong><small>Compose · push</small></article>
-          </div>
-          <p>{pt ? 'O backend é o limite de segurança. O app nunca recebe a senha da câmera nem segredos de adaptadores locais. Câmeras passam pelo MediaMTX; a iluminação usa uma fronteira de driver independente de fabricante. Credenciais ficam cifradas com AES-256-GCM; tokens são persistidos somente como hash.' : 'The backend is the security boundary. The app never receives camera passwords or local adapter secrets. Cameras pass through MediaMTX; lighting uses a vendor-neutral driver boundary. Credentials use AES-256-GCM encryption; tokens are stored only as hashes.'}</p>
-        </section>
-
-        <section id="camera">
-          <div class="docs-heading"><Network size={22}/><div><span>03</span><h2>{pt ? 'Preparar a câmera' : 'Prepare a camera'}</h2></div></div>
-          <ol class="docs-steps">
-            <li><span>1</span><div><strong>{pt ? 'Conecte ao Wi-Fi' : 'Connect to Wi-Fi'}</strong><p>{pt ? 'Na TC40, use o Tapo uma vez para concluir a configuração inicial.' : 'For a TC40, use Tapo once to complete initial provisioning.'}</p></div></li>
-            <li><span>2</span><div><strong>{pt ? 'Crie a Camera Account' : 'Create the Camera Account'}</strong><p>{pt ? 'Use uma credencial exclusiva nas configurações avançadas. Não é a senha da sua conta TP-Link.' : 'Use dedicated credentials in advanced settings. This is not your TP-Link account password.'}</p></div></li>
-            <li><span>3</span><div><strong>{pt ? 'Confirme a rede local' : 'Check the local network'}</strong><p>{pt ? 'O servidor precisa alcançar a câmera pelas portas ONVIF e RTSP na rede privada.' : 'The server must reach the camera ONVIF and RTSP ports on the private network.'}</p></div></li>
-            <li><span>4</span><div><strong>{pt ? 'Cadastre no app' : 'Add it in the app'}</strong><p>{pt ? 'Informe nome, ícone, IP, usuário e senha. O RTSP principal da Tapo é montado automaticamente; use o campo avançado apenas para sobrescrever.' : 'Enter name, icon, IP, username and password. The primary Tapo RTSP URL is built automatically; use the advanced field only to override it.'}</p></div></li>
-          </ol>
-          <p>{pt ? 'O cadastro é persistido imediatamente. A tela da câmera acompanha queued, probing, stream, ready ou failed em tempo real, e o último erro sanitizado permanece salvo para diagnóstico.' : 'The camera is persisted immediately. Its screen follows queued, probing, stream, ready or failed in real time, and the last sanitized error remains stored for diagnosis.'}</p>
-        </section>
-
-        <section id="lighting">
-          <div class="docs-heading"><Lightbulb size={22}/><div><h2>{pt ? 'Iluminação inteligente' : 'Smart lighting'}</h2></div></div>
-          <p>{pt ? 'O modelo comum de energia, brilho, temperatura do branco e RGB permanece no aplicativo e no painel, mas o núcleo não inclui integração proprietária com contas de fabricante. Adaptadores locais padronizados podem ser adicionados atrás da fronteira de driver sem redesenhar as interfaces.' : 'The common power, brightness, white-temperature and RGB model remains available in the app and dashboard, but the core includes no proprietary manufacturer-account integration. Standard local adapters can be added behind the driver boundary without redesigning the interfaces.'}</p>
-          <p>{pt ? 'Registros antigos não são apagados automaticamente durante essa transição. Um administrador ainda pode removê-los pelo aplicativo.' : 'Existing records are not deleted automatically during this transition. An administrator can still remove them from the app.'}</p>
-        </section>
-
-        <section id="android">
-          <div class="docs-heading"><Smartphone size={22}/><div><span>04</span><h2>Android</h2></div></div>
-          <p>{pt ? 'Instale o APK da release mais recente. No primeiro acesso, informe a URL HTTPS pela qual o celular alcança o servidor e crie a conta com usuário e senha. O primeiro dispositivo vira administrador.' : 'Install the APK from the latest release. On first access, enter the HTTPS URL through which the phone reaches the server and create the personal username and password. The first device becomes administrator.'}</p>
-          <div class="docs-actions"><a class="button dark" href="https://github.com/ferforastieri/valky/releases/latest"><Download size={17}/>{pt ? 'Baixar APK' : 'Download APK'}</a><a class="button quiet" href="https://github.com/ferforastieri/valky/releases"><ExternalLink size={17}/>{pt ? 'Todas as releases' : 'All releases'}</a></div>
-          <h3>{pt ? 'Outros celulares' : 'Other phones'}</h3>
-          <p>{pt ? 'Em Ajustes, o administrador cria um convite temporário e de uso único. O QR é montado dentro do app com a URL já conhecida; o backend não possui página pública de pareamento.' : 'In Settings, the administrator creates a temporary, single-use invitation. The QR is assembled inside the app using the known server URL; the backend has no public pairing page.'}</p>
-          <h3>{pt ? 'Notificações nativas' : 'Native notifications'}</h3>
-          <p>{pt ? 'O APK usa Firebase Cloud Messaging diretamente e não exige aplicativo auxiliar. Após o login, o token deste celular é registrado automaticamente; o Android recebe um payload mínimo cifrado e o Valky cria a notificação ou o alarme nativo.' : 'The APK uses Firebase Cloud Messaging directly and requires no companion app. After login, this phone token is registered automatically; Android receives a minimal encrypted payload and Valky creates the native notification or alarm.'}</p>
-          <ol class="docs-steps">
-            <li><span>1</span><div><strong>{pt ? 'Configure o APK' : 'Configure the APK'}</strong><p>{pt ? 'Adicione com.ferforastieri.valky ao projeto Firebase, baixe google-services.json e grave seu base64 no secret FIREBASE_ANDROID_CONFIG_BASE64 do GitHub.' : 'Add com.ferforastieri.valky to the Firebase project, download google-services.json and store its base64 in the FIREBASE_ANDROID_CONFIG_BASE64 GitHub secret.'}</p></div></li>
-            <li><span>2</span><div><strong>{pt ? 'Configure o servidor' : 'Configure the server'}</strong><p>{pt ? 'Gere uma chave JSON em Configurações do projeto → Contas de serviço. No sheet de alertas do app, envie esse JSON: ele é validado e cifrado no SQLite do seu servidor.' : 'Generate a JSON key under Project settings → Service accounts. In the app alert sheet, upload this JSON: it is validated and encrypted in your server SQLite database.'}</p></div></li>
-            <li><span>3</span><div><strong>{pt ? 'Conceda a permissão' : 'Grant permission'}</strong><p>{pt ? 'Abra o APK da nova release, faça login e permita notificações. O registro no FCM acontece automaticamente.' : 'Open the APK from the new release, sign in and allow notifications. FCM registration happens automatically.'}</p></div></li>
-          </ol>
-          <p>{pt ? 'A API aceita a mesma configuração para integrações administrativas em PUT /api/v1/settings/push, usando serviceAccountBase64. A conta nunca é retornada pela API.' : 'The API accepts the same setup for administrative integrations at PUT /api/v1/settings/push with serviceAccountBase64. The account is never returned by the API.'}</p>
-        
-          <h3>{pt ? 'Controle de TV' : 'TV remote'}</h3>
-          <p>{pt ? 'O aplicativo liga, desliga e também acorda a TV pela rede (Wake-on-LAN), com teclado numérico e de letras digitando direto no campo de texto da TV. O mesmo controle funciona no painel web e no widget da tela inicial.' : 'The app powers the TV on and off and wakes it over the network (Wake-on-LAN), with numeric and letter keypads typing straight into the TV text field. The same remote works on the web panel and on the home screen widget.'}</p>
-          <h3 id="remote-tv">{pt ? 'Widgets da tela inicial' : 'Home screen widgets'}</h3>
-          <p>{pt ? 'Três widgets: câmera (imagem sempre fresca), lâmpadas (a lista rola e mostra todas, tocando na lâmpada para acender e na linha para abrir a tela) e controle da TV (com o botão de energia que acorda a TV desligada).' : 'Three widgets: camera (always fresh picture), bulbs (scrolling list with every lamp — tap the bulb to switch, tap the row to open it) and TV remote (with the power button that wakes a sleeping TV).'}</p>
-</section>
-
-
-        <section id="viewer">
-          <div class="docs-heading"><Network size={22}/><div><h2>{pt ? 'Painel web no seu servidor' : 'Web dashboard on your server'}</h2></div></div>
-          <p>{pt ? 'Abra /app/ na URL HTTPS da instalação e use seu usuário e senha. O painel consulta câmeras ao vivo, controla as lâmpadas cadastradas, exibe eventos, família, percursos e informações do servidor. Cadastro e configuração dos dispositivos continuam no Android.' : 'Open /app/ at your installation HTTPS URL and use the personal username and password. The dashboard displays live cameras, controls registered bulbs, and shows events, family, routes and server information. Device registration and setup remain on Android.'}</p>
-          <p>{pt ? 'A sessão usa cookie Secure, HttpOnly e SameSite=Strict, válido por 30 dias e renovado durante o uso. Sair ou trocar a senha revoga a sessão. O painel vem na imagem Docker e não exige Node nem deploy na Vercel. Dados são consultados a cada 15 segundos com a aba visível.' : 'Sessions use a Secure, HttpOnly, SameSite=Strict cookie, valid for 30 days and renewed during use. Logout or password changes revoke sessions. The dashboard ships in the Docker image and requires neither Node nor Vercel deployment. Data refreshes every 15 seconds while the tab is visible.'}</p>
-          <h3>WebRTC · Cloudflare Tunnel</h3>
-          <p>{pt ? 'Android e painel usam os mesmos endpoints WHEP. O túnel leva HTTPS e a negociação, mas áudio e vídeo precisam alcançar o MediaMTX por ICE. Libere 8189 UDP/TCP na rede privada e configure VALKY_WEBRTC_HOSTS com endereços LAN/VPN alcançáveis. O domínio do túnel não é endereço de mídia. STUN pode auxiliar conexão direta; NAT restritivo exige VPN, rota pública de mídia ou TURN configurado.' : 'Android and the dashboard use the same WHEP endpoints. The tunnel carries HTTPS and signaling, but audio and video must reach MediaMTX through ICE. Allow 8189 UDP/TCP on the private network and set VALKY_WEBRTC_HOSTS to reachable LAN/VPN addresses. The tunnel hostname is not a media address. STUN can assist direct connections; restrictive NAT requires VPN, a public media route or configured TURN.'}</p>
-          <p>{pt ? 'O player não substitui WebRTC por imagem ou HLS. A espera ICE de oito segundos não encerra a conexão Android quando já existem candidatos utilizáveis. Um HTTP 201 na negociação não comprova reprodução: verifique frames recebidos.' : 'The player does not replace WebRTC with a snapshot or HLS. An eight-second ICE wait does not abort Android negotiation when usable candidates already exist. HTTP 201 during signaling does not prove playback: verify received frames.'}</p>
-        </section>
-
-        <section id="family">
-          <div class="docs-heading"><Smartphone size={22}/><div><h2>{pt ? 'Localização, eventos e movimento' : 'Location, events and motion'}</h2></div></div>
-          <p>{pt ? 'O Android integra fontes de localização com Fused Location Provider. Uma entrada ou saída exige três leituras por pelo menos dois minutos, além da margem de precisão. Leitura inconclusiva ou retorno cancela a confirmação. O servidor pede amostras enquanto há confirmação pendente, sem preencher o histórico com pontos estacionários.' : 'Android combines location sources through Fused Location Provider. Entering or leaving requires three readings spanning at least two minutes, beyond the accuracy margin. An uncertain reading or return cancels confirmation. The server requests samples while confirmation is pending without filling history with stationary points.'}</p>
-          <p>{pt ? 'Alertas mostram pessoa e área, e não são enviados ao próprio usuário que se deslocou. O histórico tem pontos numerados, horário e precisão; os mapas aproximam pessoas próximas. A precisão é estimada, e falta de rede ou sinal pode adiar alertas. Instale o APK atualizado em cada celular.' : 'Alerts name the person and area and are not sent to the moving user. History shows numbered points, time and accuracy; maps zoom in on nearby people. Accuracy is estimated, and missing signal or connectivity may delay alerts. Install the current APK on every phone.'}</p>
-          <p>{pt ? 'Nas regras da câmera, movimento persistente permite selecionar uma região da imagem, duração, sensibilidade e dias/horários, inclusive 22:00–06:00. Mantenha a câmera fixa e redesenhe a região após mover PTZ. A análise detecta movimento na região, não identifica o bebê, postura, respiração ou perigo médico; não substitui supervisão.' : 'Camera rules support persistent motion in an image region, duration, sensitivity and days/time windows, including 22:00–06:00. Keep the camera fixed and redraw the region after PTZ movement. Analysis detects regional motion, not baby identity, posture, breathing or medical danger; it does not replace supervision.'}</p>
-          <p>{pt ? 'Eventos são separados em localização, áudio e câmera. Detalhes mostram pessoa/área e posição quando disponíveis; clipes indicam se estão processando, prontos ou indisponíveis.' : 'Events are grouped into location, audio and camera categories. Details show person/area and position when available; clips report processing, ready or unavailable states.'}</p>
-        </section>
-
-        <section id="configuration">
-          <div class="docs-heading"><ServerCog size={22}/><div><span>05</span><h2>{pt ? 'Configuração' : 'Configuration'}</h2></div></div>
-          <div class="config-table" role="table">
-            {[
-              ['VALKY_WEBRTC_HOSTS','IP LAN/VPN',pt?'Endereços de mídia anunciados, separados por vírgula.':'Advertised media addresses, comma separated.'],
-              ['VALKY_WEB_DIR','/opt/valky/web',pt?'Build estático do painel no backend.':'Static dashboard build served by the backend.'],
-              ['VALKY_LISTEN',':8443',pt?'Endereço interno do serviço HTTPS.':'Internal HTTPS listen address.'],
-              ['VALKY_DATA_DIR','/data',pt?'Volume persistente.':'Persistent data volume.'],
-              ['VALKY_DATABASE','/data/valky.db','SQLite.'],
-              ['VALKY_TLS_CERT','/data/tls/server.crt',pt?'Certificado TLS.':'TLS certificate.'],
-              ['VALKY_TLS_KEY','/data/tls/server.key',pt?'Chave TLS.':'TLS key.'],
-              ['VALKY_MASTER_KEY_FILE','/data/secrets/master.key',pt?'Chave mestra de criptografia.':'Encryption master key.'],
-              ['VALKY_MEDIA_API','http://mediamtx:9997',pt?'API interna do MediaMTX.':'Internal MediaMTX API.'],
-              ['VALKY_MEDIA_RTSP','rtsp://mediamtx:8554',pt?'Stream interno para monitoramento e detectores.':'Internal stream for monitoring and detectors.'],
-              ['VALKY_MEDIA_WEBRTC','http://mediamtx:8889',pt?'Origem WHEP interna; a mídia WebRTC segue direto ao celular após ICE.':'Internal WHEP origin; WebRTC media goes directly to the phone after ICE.'],
-              ['VALKY_MEDIA_PLAYBACK','http://mediamtx:9996',pt?'API interna para gerar clipes recentes.':'Internal API used to generate recent clips.'],
-              ['VALKY_RELEASE_API','api.github.com/…/releases/latest',pt?'Release estável consultada.':'Stable release lookup.'],
-              ['VALKY_FIREBASE_CREDENTIALS_FILE','/data/secrets/firebase-service-account.json',pt?'Alternativa legada: arquivo de conta de serviço FCM. O app usa o armazenamento cifrado do SQLite.':'Legacy alternative: FCM service-account file. The app uses encrypted SQLite storage.'],
-            ].map(([name,value,meaning])=><div role="row"><code>{name}</code><code>{value}</code><span>{meaning}</span></div>)}
-          </div>
-          <p>{pt ? 'O arquivo mediamtx.yml deve existir como arquivo antes de subir o Compose.' : 'mediamtx.yml must exist as a file before Compose starts.'}</p>
-        </section>
-
-        <section id="api">
-          <div class="docs-heading"><CodeXml size={22}/><div><span>06</span><h2>{pt ? 'API HTTP' : 'HTTP API'}</h2></div></div>
-          <p>{text.methods} {pt ? 'A base é /api/v1. Respostas JSON usam o envelope success, message e data; erros usam success, message e error.' : 'The base path is /api/v1. JSON responses use the success, message and data envelope; errors use success, message and error.'}</p>
-          <div class="docs-code multiline"><code>{`curl -k https://SEU_SERVIDOR:8443/api/v1/cameras \\\n  -H 'Authorization: Bearer SEU_TOKEN'`}</code></div>
-          <div class="endpoint-head"><h3>{pt ? 'Referência de endpoints' : 'Endpoint reference'}</h3><a href="/openapi.yaml">OpenAPI YAML <ExternalLink size={14}/></a></div>
-          <div class="endpoint-list">{endpoints.map(([method,path,access,description])=><article><span class:list={['method', method.includes('POST') ? 'write' : 'read']}>{method}</span><code>{path}</code><small>{access}</small><p>{description}</p></article>)}</div>
-        </section>
-
-        <section id="updates">
-          <div class="docs-heading"><Download size={22}/><div><span>07</span><h2>{pt ? 'Atualizações' : 'Updates'}</h2></div></div>
-          <p>{pt ? 'Quando uma release estável mais nova existir, o app e o web exibem um toast, sem atualizar automaticamente. Nas configurações do app, o usuário pode iniciar o download do APK assinado do GitHub; o Android solicita confirmação para instalar.' : 'When a newer stable release exists, mobile and web show a toast without updating automatically. In app settings, the user can start downloading the signed APK from GitHub; Android requests installation confirmation.'}</p>
-          <p>{pt ? 'SQLite, clipes e snapshots permanecem no volume valky-data. A API apenas consulta versões; não executa atualizações do servidor.' : 'SQLite, clips and snapshots remain in the valky-data volume. The API only checks releases; it cannot execute server updates.'}</p>
-
-          <p>{pt ? 'Na série 2.x, a API permanece /api/v1 e a migração preserva dados. Execute o instalador novamente no host para atualizar o backend, o web, Compose e MediaMTX. O APK precisa ser instalado em cada celular com confirmação do Android. A consulta de releases tem cache de até 15 minutos.' : 'In the 2.x series the API remains /api/v1 and migration preserves data. Rerun the installer on the host to update the backend, web, Compose and MediaMTX. Install the APK on each phone with Android confirmation. Release checks are cached for up to 15 minutes.'}</p>
-        </section>
-
-        <section id="security">
-          <div class="docs-heading"><ShieldCheck size={22}/><div><span>08</span><h2>{pt ? 'Segurança e backup' : 'Security and backup'}</h2></div></div>
-
-          <p>{pt ? 'A API limita por minuto: 3000 requisições globais e 1200 por endereço; autenticação tem 30 globais e 10 por endereço; snapshots/gravações têm 60 por sessão/endereço, e abertura WHEP tem 12. Respostas 429 incluem Retry-After. O backend não confia em X-Forwarded-For ou CF-Connecting-IP do cliente; usuários de um proxy compartilham o orçamento. Os contadores são locais ao processo.' : 'Per-minute API limits: 3000 global and 1200 per address; authentication has 30 global and 10 per address; snapshots/recordings have 60 per session/address, and WHEP creation has 12. A 429 response includes Retry-After. The backend does not trust client X-Forwarded-For or CF-Connecting-IP headers; proxy users share its budget. Counters are process-local.'}</p>
-          <p>{pt ? 'Para backup, use a API de backup SQLite ou pare a stack antes de copiar o volume. Preserve banco, WAL quando aplicável, chave mestra, certificados, mídia, .env, Compose e mediamtx.yml. Copiar apenas o .db em execução pode gerar backup incompleto.' : 'For backups, use the SQLite backup API or stop the stack before copying the volume. Preserve the database, WAL when applicable, master key, certificates, media, .env, Compose and mediamtx.yml. Copying only a running .db can produce an incomplete backup.'}</p>
-          <ul>
-            <li>{pt ? 'Não encaminhe 554, 2020, 8888 ou 9997 no roteador.' : 'Do not forward ports 554, 2020, 8888 or 9997 on the router.'}</li>
-            <li>{pt ? 'Use TLS confiável por proxy reverso ou instale a CA privada no celular.' : 'Use trusted TLS through a reverse proxy or install the private CA on the phone.'}</li>
-            <li>{pt ? 'Use Tailscale, WireGuard ou outra VPN para acesso fora de casa.' : 'Use Tailscale, WireGuard or another VPN away from home.'}</li>
-            <li>{pt ? 'Faça backup do volume valky-data e do .env juntos, com acesso restrito.' : 'Back up the valky-data volume and .env together with restricted access.'}</li>
-          </ul>
-        </section>
-
-        <section id="diagnostics">
-          <div class="docs-heading"><Menu size={22}/><div><span>09</span><h2>{pt ? 'Diagnóstico' : 'Diagnostics'}</h2></div></div>
-          <div class="docs-code multiline"><code>{`docker compose ps\ndocker compose logs --tail=200 valky\ndocker compose logs --tail=200 mediamtx\ncurl -k https://localhost:8443/health`}</code></div>
-          <div class="diagnostic-grid">
-            <article><strong>setup failed</strong><p>{pt ? 'Abra a câmera no app: a etapa e o erro persistido indicam se a falha ocorreu no ONVIF ou no stream.' : 'Open the camera in the app: persisted setup state and error show whether ONVIF or stream setup failed.'}</p></article>
-            <article><strong>EOFException</strong><p>{pt ? 'Verifique primeiro se MediaMTX está saudável e se mediamtx.yml foi montado como arquivo.' : 'First verify MediaMTX health and that mediamtx.yml is mounted as a file.'}</p></article>
-            <article><strong>{pt ? 'Sem preview' : 'No preview'}</strong><p>{pt ? 'Confira snapshot, perfil ONVIF escolhido e conectividade RTSP entre o host e a câmera.' : 'Check snapshot, selected ONVIF profile and RTSP connectivity between host and camera.'}</p></article>
-          </div>
-        </section>
+        {sections.map(({ doc, Content }, index) => (
+          <section id={doc.id}>
+            <div class="docs-heading">
+              <div><span>{String(index + 1).padStart(2, '0')}</span><h2>{doc.data.title}</h2></div>
+              <a class="docs-source" href={`${repository}/docs/${doc.id}.md`} rel="noreferrer">{text.source}</a>
+            </div>
+            <Content />
+          </section>
+        ))}
       </article>
     </div>
   </main>
@@ -274,10 +73,12 @@ const endpoints = pt ? [
   <Navigation locale={locale} current="docs" />
 
   <script>
-    const root=document.documentElement;
-    const systemTheme=matchMedia('(prefers-color-scheme: dark)');
-    const isDark=()=>root.dataset.theme==='dark'||(root.dataset.theme==='auto'&&systemTheme.matches);
-    document.querySelector('.theme-toggle')?.addEventListener('click',()=>{root.dataset.theme=isDark()?'light':'dark';localStorage.setItem('valky-theme',root.dataset.theme)});
-    document.querySelector('.docs-copy')?.addEventListener('click',async event=>{const button=event.currentTarget as HTMLButtonElement;await navigator.clipboard.writeText(button.dataset.command||'');button.textContent=document.documentElement.lang==='pt-BR'?'Copiado':'Copied';setTimeout(()=>button.textContent=document.documentElement.lang==='pt-BR'?'Copiar':'Copy',1400)});
+    const root = document.documentElement;
+    const systemTheme = matchMedia('(prefers-color-scheme: dark)');
+    const isDark = () => root.dataset.theme === 'dark' || (root.dataset.theme === 'auto' && systemTheme.matches);
+    document.querySelector('.theme-toggle')?.addEventListener('click', () => {
+      root.dataset.theme = isDark() ? 'light' : 'dark';
+      localStorage.setItem('valky-theme', root.dataset.theme);
+    });
   </script>
 </BaseLayout>

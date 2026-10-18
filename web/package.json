@@ -6,11 +6,12 @@
   "packageManager": "pnpm@10.15.0",
   "scripts": {
     "sync-assets": "node scripts/sync-public-assets.mjs",
-    "dev": "pnpm sync-assets && astro dev",
-    "build": "pnpm sync-assets && astro check && astro build",
+    "dev": "pnpm sync-assets && pnpm sync-docs && astro dev",
+    "build": "pnpm sync-assets && pnpm sync-docs && astro check && astro build",
     "preview": "astro preview",
     "test": "pnpm build && pnpm build:viewer && node --test tests/*.test.mjs",
-    "build:viewer": "astro check --root . && astro build --config astro.viewer.config.mjs"
+    "build:viewer": "astro check --root . && astro build --config astro.viewer.config.mjs",
+    "sync-docs": "node scripts/sync-docs.mjs"
   },
   "dependencies": {
     "@astrojs/check": "^0.9.4",
