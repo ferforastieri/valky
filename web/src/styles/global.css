@@ -2678,68 +2678,84 @@ body {
   .dock-actions { margin: 0 auto; }
 }
 
-/* Navegação do celular: a marca sozinha no topo, centralizada, e as opções no
-   rodapé — sem nenhum card em volta (a base e as cascatas anteriores pintavam
-   fundo, borda e sombra, por isso esta regra vem por último). */
+/* Navegação do celular: uma barra só, com três itens, a marca maior no meio e
+   três itens do outro lado (as duas ações do topo entram na barra). */
 @media (max-width: 760px) {
   .floating-dock {
     position: fixed;
-    inset: 0;
-    left: 0;
-    top: 0;
-    transform: none;
-    width: 100%;
-    max-width: none;
-    height: auto;
+    left: 50%;
+    right: auto;
+    top: auto;
+    bottom: 14px;
+    transform: translateX(-50%);
+    width: calc(100% - 20px);
+    max-width: 460px;
     min-height: 0;
+    height: auto;
     padding: 0;
-    display: block;
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr)) auto repeat(3, minmax(0, 1fr));
+    align-items: center;
+    gap: 4px;
     border: 0;
     border-radius: 0;
     background: transparent;
     box-shadow: none;
     backdrop-filter: none;
-    /* A tela inteira não captura toque: só a marca e as opções. */
-    pointer-events: none;
+  }
+  /* display: contents deixa os filhos das listas virarem itens desta grade,
+     o que permite colocar a marca exatamente no meio. */
+  .dock-links,
+  .dock-actions {
+    display: contents;
   }
   .dock-brand {
-    display: flex;
-    position: absolute;
-    top: 14px;
-    left: 50%;
-    transform: translateX(-50%);
+    grid-column: 4;
+    justify-self: center;
     margin: 0;
-    pointer-events: auto;
   }
   .dock-brand .dock-identity {
     display: none;
   }
   .dock-brand .brand-mark {
-    width: 52px;
-    height: 38px;
+    /* Cresce com a tela, mas nunca espreme os itens ao lado. */
+    width: clamp(52px, 17vw, 68px);
+    height: auto;
+    aspect-ratio: 403 / 292;
   }
-  .dock-links {
-    position: absolute;
-    left: 50%;
-    bottom: 16px;
-    transform: translateX(-50%);
-    margin: 0;
-    pointer-events: auto;
+  .dock-link {
+    justify-self: center;
+    width: 100%;
+    max-width: 46px;
+    aspect-ratio: 1;
+    height: auto;
+    min-width: 0;
+    min-height: 0;
+    padding: 0;
+    gap: 0;
+    border-radius: 50%;
   }
-  .dock-actions {
-    display: flex;
-    position: absolute;
-    top: 12px;
-    right: 14px;
-    margin: 0;
-    pointer-events: auto;
+  .dock-actions .icon-button {
+    width: 100%;
+    max-width: 46px;
+    aspect-ratio: 1;
+    height: auto;
   }
-  /* Espaço para a marca fixa no topo: sem isso o herói e a documentação
-     ficavam por baixo do símbolo. */
-  .hero {
-    padding-top: 92px;
+  .dock-link span {
+    display: none;
   }
-  .docs-shell {
-    padding-top: 72px;
+  .dock-link svg {
+    width: 20px;
+    height: 20px;
   }
+  .dock-actions > * {
+    justify-self: center;
+  }
+  /* Ordem na barra: Início, App, Instalar, MARCA, Documentação, tema, GitHub. */
+  .dock-links > :nth-child(1) { grid-column: 1; }
+  .dock-links > :nth-child(2) { grid-column: 2; }
+  .dock-links > :nth-child(3) { grid-column: 3; }
+  .dock-links > :nth-child(4) { grid-column: 5; }
+  .dock-actions > :nth-child(1) { grid-column: 6; }
+  .dock-actions > :nth-child(2) { grid-column: 7; }
 }
