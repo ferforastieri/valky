@@ -197,10 +197,12 @@ func TestRefineCoughUsesShortWindowOnlyInGrayZone(t *testing.T) {
 		wantRefine bool
 		wantCalls  int
 	}{
-		{"short window confirms", .40, .98, .98, true, 5},
-		{"short window stays weak", .40, .60, .40, false, 5},
+		{"short window confirms", .60, .98, .98, true, 5},
+		{"short window stays weak", .60, .80, .60, false, 5},
 		{"strong full window skips refinement", .80, .99, .80, false, 0},
 		{"silence skips refinement", .01, .99, .01, false, 0},
+		{"quiet room noise stays quiet", .29, .99, .29, false, 0},
+		{"below refinement floor stays quiet", .54, .99, .54, false, 0},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
@@ -217,8 +219,8 @@ func TestRefineCoughUsesShortWindowOnlyInGrayZone(t *testing.T) {
 func TestRefineCoughKeepsFullWindowOnClassifierFailure(t *testing.T) {
 	classifier := &coughProbeClassifier{err: io.ErrUnexpectedEOF}
 	m := Monitor{Classifier: classifier, Logger: slog.New(slog.NewTextHandler(io.Discard, nil))}
-	got, refined := m.refineCough(context.Background(), "cam", make([]float32, audioSampleRate*audioWindowSeconds), .40)
-	if got != .40 || refined || classifier.calls != 1 {
+	got, refined := m.refineCough(context.Background(), "cam", make([]float32, audioSampleRate*audioWindowSeconds), .60)
+	if got != .60 || refined || classifier.calls != 1 {
 		t.Fatalf("got=%v refined=%v calls=%d", got, refined, classifier.calls)
 	}
 }

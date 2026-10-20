@@ -14,8 +14,9 @@ func AudioThreshold(kind string) float64 {
 		return .72
 	case "cough":
 		// A tosse curta raramente chega a 0,72 na janela de 4 s. O detector
-		// confirma transientes duvidosos em janelas de 2 s antes de entregar.
-		return .55
+		// confirma transientes entre 0,55 e 0,65 em janelas de 2 s antes de
+		// entregar; abaixo disso o risco de falso positivo é alto.
+		return .65
 	default:
 		return .70
 	}

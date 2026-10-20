@@ -17,12 +17,12 @@ const audioSampleRate = 16000
 const audioWindowSeconds = 4
 const audioHopSeconds = 2
 
-// A tosse é curta e fica diluída na janela de 4 s. Quando a pontuação da janela
-// inteira é baixa mas ainda plausível, uma segunda passada em janelas de 2 s
-// recupera o transiente sem aumentar o custo dos trechos silenciosos.
+// A tosse é curta e fica diluída na janela de 4 s. A segunda passada só vale
+// quando a janela longa já tem evidência razoável; sem esse piso, ruídos baixos
+// do quarto (0,10–0,29) eram promovidos a tosse por uma janela curta isolada.
 const coughRefinementWindowSeconds = 2
-const coughRefinementFloor = .05
-const coughRefinementThreshold = .93
+const coughRefinementFloor = .55
+const coughRefinementThreshold = .97
 
 type audioWindow struct {
 	samples    []float32
