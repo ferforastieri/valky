@@ -163,7 +163,11 @@
     <string name="view_event">Ver evento</string>
     <string name="back">Voltar</string>
     <string name="snapshot">Captura</string>
-    <string name="record_recent">Últimos 10 s</string>
+    <string name="record_recent">Últimos 30 s</string>
+    <string name="media_saved_snapshot">Captura salva na galeria</string>
+    <string name="media_saved_recording">Vídeo salvo na galeria</string>
+    <string name="media_save_failed">Não foi possível salvar na galeria</string>
+    <string name="media_permission_denied">Permita o acesso à galeria para salvar</string>
     <string name="fullscreen_camera">Abrir câmera em tela cheia</string>
     <string name="close_fullscreen">Fechar tela cheia</string>
     <string name="pinch_to_zoom">Use dois dedos para ampliar</string>

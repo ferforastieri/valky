@@ -6,6 +6,7 @@ import (
 	"encoding/binary"
 	sherpa "github.com/k2-fsa/sherpa-onnx-go/sherpa_onnx"
 	"io"
+	"log/slog"
 	"math"
 	"os"
 	"os/exec"
@@ -168,5 +169,56 @@ func TestAudioFFmpegRTSPOptions(t *testing.T) {
 	output, err := audioCommand(ctx, "rtsp://127.0.0.1:1/compatibility-test").CombinedOutput()
 	if err == nil || !strings.Contains(string(output), "Connection refused") {
 		t.Fatalf("FFmpeg did not reach RTSP connection: %v %s", err, output)
+	}
+}
+
+type coughProbeClassifier struct {
+	calls int
+	score float64
+	err   error
+}
+
+func (c *coughProbeClassifier) Classify(context.Context, []float32) ([]Result, error) {
+	c.calls++
+	if c.err != nil {
+		return nil, c.err
+	}
+	return []Result{{Type: "cough", Confidence: c.score}}, nil
+}
+
+func TestRefineCoughUsesShortWindowOnlyInGrayZone(t *testing.T) {
+	samples := make([]float32, audioSampleRate*audioWindowSeconds)
+	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
+	cases := []struct {
+		name       string
+		full       float64
+		short      float64
+		want       float64
+		wantRefine bool
+		wantCalls  int
+	}{
+		{"short window confirms", .40, .98, .98, true, 5},
+		{"short window stays weak", .40, .60, .40, false, 5},
+		{"strong full window skips refinement", .80, .99, .80, false, 0},
+		{"silence skips refinement", .01, .99, .01, false, 0},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			classifier := &coughProbeClassifier{score: tc.short}
+			m := Monitor{Classifier: classifier, Logger: logger}
+			got, refined := m.refineCough(context.Background(), "cam", samples, tc.full)
+			if got != tc.want || refined != tc.wantRefine || classifier.calls != tc.wantCalls {
+				t.Fatalf("got=%v refined=%v calls=%d, want=%v/%v/%d", got, refined, classifier.calls, tc.want, tc.wantRefine, tc.wantCalls)
+			}
+		})
+	}
+}
+
+func TestRefineCoughKeepsFullWindowOnClassifierFailure(t *testing.T) {
+	classifier := &coughProbeClassifier{err: io.ErrUnexpectedEOF}
+	m := Monitor{Classifier: classifier, Logger: slog.New(slog.NewTextHandler(io.Discard, nil))}
+	got, refined := m.refineCough(context.Background(), "cam", make([]float32, audioSampleRate*audioWindowSeconds), .40)
+	if got != .40 || refined || classifier.calls != 1 {
+		t.Fatalf("got=%v refined=%v calls=%d", got, refined, classifier.calls)
 	}
 }

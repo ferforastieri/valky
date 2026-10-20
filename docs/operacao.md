@@ -64,7 +64,7 @@ WHERE camera_id = :camera_id
 ORDER BY id DESC LIMIT 60;
 ```
 
-Motivos incluem `persistent_baby_cry`, `awaiting_independent_baby_evidence`, `overlapping_baby_evidence`, `below_baby_threshold`, `capture_interrupted`, `classification_failed` e `analysis_lag`; `accepted` indica aprovação pelo detector, não entrega de notificação. Não é possível determinar retroativamente a pontuação de uma noite anterior à instrumentação, sem gravação preservada.
+Motivos incluem `persistent_baby_cry`, `awaiting_independent_baby_evidence`, `overlapping_baby_evidence`, `below_baby_threshold`, `capture_interrupted`, `classification_failed` e `analysis_lag`; `accepted` indica aprovação pelo detector, não entrega de notificação. Uma janela de tosse confirmada pela segunda passada guarda também `cough_full`, com a pontuação original da janela de 4 s. Não é possível determinar retroativamente a pontuação de uma noite anterior à instrumentação, sem gravação preservada.
 
 **Notificação.** `GET /settings/push` informa apenas se o FCM está configurado. Se o backend envia e o celular não mostra, verifique a fila `push_deliveries` (tentativas e último erro), a permissão de notificações, o canal de alertas, o volume de alarme e as restrições de execução em segundo plano do fabricante (HyperOS/MIUI são conhecidos por limitar serviços). Testes automatizados não reproduzem essas restrições; valide em aparelho real, com a tela bloqueada e desbloqueada.
 

@@ -81,7 +81,7 @@ func TestConfigureCameraUsesMediaMTXPathPlaceholder(t *testing.T) {
 }
 
 func TestMaterializeRecentClipUsesPlaybackServer(t *testing.T) {
-	const content = "standard mp4"
+	content := testMP4("standard mp4")
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path != "/get" || r.URL.Query().Get("path") != "camera-abc" || r.URL.Query().Get("duration") != "10.000" || r.URL.Query().Get("format") != "mp4" {
 			t.Fatalf("unexpected playback request: %s", r.URL.String())
@@ -89,7 +89,7 @@ func TestMaterializeRecentClipUsesPlaybackServer(t *testing.T) {
 		if _, err := time.Parse(time.RFC3339Nano, r.URL.Query().Get("start")); err != nil {
 			t.Fatalf("invalid playback start: %v", err)
 		}
-		_, _ = io.WriteString(w, content)
+		_, _ = w.Write(content)
 	}))
 	defer server.Close()
 	output := t.TempDir() + "/recent.mp4"
@@ -98,9 +98,65 @@ func TestMaterializeRecentClipUsesPlaybackServer(t *testing.T) {
 		t.Fatal(err)
 	}
 	got, err := os.ReadFile(output)
-	if err != nil || string(got) != content {
+	if err != nil || string(got) != string(content) {
 		t.Fatalf("unexpected clip: %q err=%v", got, err)
 	}
+}
+
+func TestMaterializeRecentClipFallsBackToAvailableWindow(t *testing.T) {
+	content := testMP4("fallback clip")
+	gets := 0
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/get":
+			gets++
+			if gets == 1 {
+				w.WriteHeader(http.StatusNotFound)
+				return
+			}
+			_, _ = w.Write(content)
+		case "/list":
+			start := time.Now().UTC().Add(-20 * time.Second).Format(time.RFC3339Nano)
+			_, _ = io.WriteString(w, `[{"start":"`+start+`","duration":15}]`)
+		default:
+			t.Fatalf("unexpected path: %s", r.URL.Path)
+		}
+	}))
+	defer server.Close()
+	output := t.TempDir() + "/recent.mp4"
+	manager := New("http://api", "rtsp://media", "http://webrtc", server.URL, t.TempDir())
+	if err := manager.MaterializeRecentClip(context.Background(), "abc", 10*time.Second, output); err != nil {
+		t.Fatal(err)
+	}
+	if gets != 2 {
+		t.Fatalf("expected retry after empty playback, got %d requests", gets)
+	}
+	got, err := os.ReadFile(output)
+	if err != nil || string(got) != string(content) {
+		t.Fatalf("unexpected clip: %q err=%v", got, err)
+	}
+}
+
+func TestMaterializeRecentClipRejectsInvalidPlaybackBody(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/get" {
+			_, _ = io.WriteString(w, "not an mp4")
+			return
+		}
+		w.WriteHeader(http.StatusNotFound)
+	}))
+	defer server.Close()
+	output := t.TempDir() + "/recent.mp4"
+	manager := New("http://api", "rtsp://media", "http://webrtc", server.URL, t.TempDir())
+	if err := manager.MaterializeRecentClip(context.Background(), "abc", 10*time.Second, output); err == nil {
+		t.Fatal("expected invalid playback body to fail")
+	}
+}
+
+func testMP4(payload string) []byte {
+	head := make([]byte, 12)
+	copy(head[4:], "ftypisom")
+	return append(head, []byte(payload)...)
 }
 
 func TestConfigureCameraIncludesSafeMediaMTXError(t *testing.T) {

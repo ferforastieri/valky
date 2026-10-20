@@ -14,7 +14,9 @@ import com.ferforastieri.valky.core.media.DeviceMediaStore
 import com.ferforastieri.valky.core.network.ValkyApi
 import com.ferforastieri.valky.core.network.ValkyRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
@@ -179,6 +181,8 @@ class CameraLiveViewModel @Inject constructor(
     private val actionGate: MobileActionGate,
     saved: SavedStateHandle,
 ) : ViewModel() {
+    enum class MediaSaveResult { Snapshot, Recording, Failed, PermissionDenied }
+
     val id: String = checkNotNull(saved["id"])
     private val _camera = MutableStateFlow<Camera?>(null)
     val camera = _camera.asStateFlow()
@@ -186,6 +190,8 @@ class CameraLiveViewModel @Inject constructor(
     val snapshotLoading = _snapshotLoading.asStateFlow()
     private val _recordingLoading = MutableStateFlow(false)
     val recordingLoading = _recordingLoading.asStateFlow()
+    private val _mediaSave = MutableSharedFlow<MediaSaveResult>(extraBufferCapacity = 4)
+    val mediaSave = _mediaSave.asSharedFlow()
     private val _preview = MutableStateFlow<Bitmap?>(null)
     val preview = _preview.asStateFlow()
     private val _presets = MutableStateFlow<List<PTZPreset>>(emptyList())
@@ -309,8 +315,10 @@ class CameraLiveViewModel @Inject constructor(
         _snapshotLoading.value = true
         viewModelScope.launch {
             try {
-                val bytes = runCatching { api.downloadCameraSnapshot(id) }.getOrElse { return@launch }
-                runCatching { deviceMedia.savePhoto(bytes, mediaName("jpg")) }
+                val result = runCatching {
+                    deviceMedia.savePhoto(api.downloadCameraSnapshot(id), mediaName("jpg"))
+                }
+                _mediaSave.emit(if (result.isSuccess) MediaSaveResult.Snapshot else MediaSaveResult.Failed)
             } finally {
                 _snapshotLoading.value = false
                 actionGate.release()
@@ -323,8 +331,10 @@ class CameraLiveViewModel @Inject constructor(
         _recordingLoading.value = true
         viewModelScope.launch {
             try {
-                val bytes = runCatching { api.downloadRecentRecording(id) }.getOrElse { return@launch }
-                runCatching { deviceMedia.saveVideo(bytes, mediaName("mp4")) }
+                val result = runCatching {
+                    deviceMedia.saveVideo(api.downloadRecentRecording(id), mediaName("mp4"))
+                }
+                _mediaSave.emit(if (result.isSuccess) MediaSaveResult.Recording else MediaSaveResult.Failed)
             } finally {
                 _recordingLoading.value = false
                 actionGate.release()
@@ -332,7 +342,11 @@ class CameraLiveViewModel @Inject constructor(
         }
     }
 
-    fun storagePermissionDenied() = Unit
+    fun storagePermissionDenied() {
+        _mediaSave.tryEmit(MediaSaveResult.PermissionDenied)
+    }
+
+    fun notify(message: String, success: Boolean) = api.notify(message, success)
 
     private fun mediaName(extension: String): String {
         val cameraName = _camera.value?.name.orEmpty().replace(Regex("[^A-Za-z0-9_-]+"), "-").replace(Regex("^-+|-+$"), "").ifBlank { "camera" }

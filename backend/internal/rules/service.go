@@ -17,7 +17,7 @@ import (
 	"github.com/google/uuid"
 )
 
-var Catalog = []string{"motion", "person", "tamper", "baby_cry", "crying", "scream", "glass_break", "smoke_alarm", "fire_alarm", "siren", "doorbell", "knock", "dog_bark"}
+var Catalog = []string{"motion", "person", "tamper", "baby_cry", "crying", "scream", "glass_break", "smoke_alarm", "fire_alarm", "siren", "doorbell", "knock", "dog_bark", "cough"}
 
 type Service struct {
 	store         *store.Store

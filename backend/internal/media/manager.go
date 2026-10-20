@@ -269,7 +269,82 @@ func (m *Manager) MaterializeRecentClip(ctx context.Context, cameraID string, du
 	// that have already been finalized. Its playback server assembles those
 	// fMP4 fragments into a standard MP4, avoiding fragile filesystem concat.
 	end := time.Now().UTC().Add(-3 * time.Second)
-	return m.materializePlayback(ctx, cameraID, end.Add(-duration), duration, output)
+	err := m.materializePlayback(ctx, cameraID, end.Add(-duration), duration, output)
+	if err == nil {
+		return nil
+	}
+	// Depois de reiniciar o MediaMTX o buffer pode ter menos que a janela
+	// pedida. Nesse caso, usa o intervalo que realmente existe em vez de
+	// devolver um erro para o aplicativo.
+	start, availableEnd, ok := m.latestPlaybackWindow(ctx, cameraID)
+	if !ok {
+		return err
+	}
+	if availableEnd.Sub(start) < time.Second {
+		return err
+	}
+	clipStart := availableEnd.Add(-duration)
+	if clipStart.Before(start) {
+		clipStart = start
+	}
+	clipDuration := availableEnd.Sub(clipStart)
+	if clipDuration < time.Second {
+		return err
+	}
+	return m.materializePlayback(ctx, cameraID, clipStart, clipDuration, output)
+}
+
+type playbackInterval struct {
+	Start    time.Time `json:"start"`
+	Duration float64   `json:"duration"`
+}
+
+// latestPlaybackWindow reads the recording index instead of inferring it from
+// the wall clock, so a gap or a recent restart does not turn into an empty clip.
+func (m *Manager) latestPlaybackWindow(ctx context.Context, cameraID string) (time.Time, time.Time, bool) {
+	if !mediaPathID.MatchString(cameraID) {
+		return time.Time{}, time.Time{}, false
+	}
+	now := time.Now().UTC()
+	query := url.Values{
+		"path":  {"camera-" + cameraID},
+		"start": {now.Add(-2 * time.Minute).Format(time.RFC3339Nano)},
+		"end":   {now.Format(time.RFC3339Nano)},
+	}
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, m.playback+"/list?"+query.Encode(), nil)
+	if err != nil {
+		return time.Time{}, time.Time{}, false
+	}
+	resp, err := m.http.Do(req)
+	if err != nil {
+		return time.Time{}, time.Time{}, false
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode/100 != 2 {
+		return time.Time{}, time.Time{}, false
+	}
+	var intervals []playbackInterval
+	if err = json.NewDecoder(io.LimitReader(resp.Body, 1<<20)).Decode(&intervals); err != nil {
+		return time.Time{}, time.Time{}, false
+	}
+	var bestStart, bestEnd time.Time
+	for _, interval := range intervals {
+		if interval.Duration <= 0 {
+			continue
+		}
+		start := interval.Start.UTC()
+		end := start.Add(time.Duration(interval.Duration * float64(time.Second)))
+		if end.After(bestEnd) {
+			bestStart, bestEnd = start, end
+		}
+	}
+	if bestEnd.IsZero() {
+		return time.Time{}, time.Time{}, false
+	}
+	if bestEnd.After(now) {
+		bestEnd = now
+	}
+	return bestStart, bestEnd, true
 }
 
 // materializePlayback asks MediaMTX to assemble the recording timeline. It is
@@ -307,6 +382,21 @@ func (m *Manager) materializePlayback(ctx context.Context, cameraID string, star
 	file, err := os.OpenFile(output, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0o600)
 	if err != nil {
 		return err
+	}
+	// MediaMTX pode responder 200 com um corpo vazio quando a janela cai em um
+	// buraco do buffer. O cabeçalho ftyp evita servir um MP4 inválido ao app.
+	head := make([]byte, 12)
+	if _, readErr := io.ReadFull(resp.Body, head); readErr != nil {
+		_ = file.Close()
+		return fmt.Errorf("playback returned an empty clip: %w", readErr)
+	}
+	if string(head[4:8]) != "ftyp" {
+		_ = file.Close()
+		return fmt.Errorf("playback returned an invalid MP4")
+	}
+	if _, err = file.Write(head); err != nil {
+		_ = file.Close()
+		return fmt.Errorf("write recent clip: %w", err)
 	}
 	_, copyErr := io.Copy(file, resp.Body)
 	closeErr := file.Close()

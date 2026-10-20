@@ -163,7 +163,11 @@
     <string name="view_event">View event</string>
     <string name="back">Back</string>
     <string name="snapshot">Snapshot</string>
-    <string name="record_recent">Last 10 sec</string>
+    <string name="record_recent">Last 30 sec</string>
+    <string name="media_saved_snapshot">Snapshot saved to gallery</string>
+    <string name="media_saved_recording">Video saved to gallery</string>
+    <string name="media_save_failed">Could not save to the gallery</string>
+    <string name="media_permission_denied">Allow gallery access to save</string>
     <string name="fullscreen_camera">Open camera full screen</string>
     <string name="close_fullscreen">Close full screen</string>
     <string name="pinch_to_zoom">Pinch with two fingers to zoom</string>

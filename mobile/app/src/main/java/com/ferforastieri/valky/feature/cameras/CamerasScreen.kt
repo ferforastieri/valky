@@ -364,6 +364,20 @@ fun CameraLiveScreen(
     LifecycleResumeEffect(cameraId) { vm.setActive(true); onPauseOrDispose { vm.setActive(false) } }
     val camera by vm.camera.collectAsStateWithLifecycle()
     val context = androidx.compose.ui.platform.LocalContext.current
+    val snapshotSaved = stringResource(R.string.media_saved_snapshot)
+    val recordingSaved = stringResource(R.string.media_saved_recording)
+    val saveFailed = stringResource(R.string.media_save_failed)
+    val permissionDenied = stringResource(R.string.media_permission_denied)
+    LaunchedEffect(vm, snapshotSaved, recordingSaved, saveFailed, permissionDenied) {
+        vm.mediaSave.collect { result ->
+            when (result) {
+                CameraLiveViewModel.MediaSaveResult.Snapshot -> vm.notify(snapshotSaved, true)
+                CameraLiveViewModel.MediaSaveResult.Recording -> vm.notify(recordingSaved, true)
+                CameraLiveViewModel.MediaSaveResult.Failed -> vm.notify(saveFailed, false)
+                CameraLiveViewModel.MediaSaveResult.PermissionDenied -> vm.notify(permissionDenied, false)
+            }
+        }
+    }
     val activity = remember(context) { context.findActivity() }
     DisposableEffect(activity) {
         val previousOrientation = activity?.requestedOrientation

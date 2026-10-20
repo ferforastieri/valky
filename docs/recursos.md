@@ -9,7 +9,7 @@ O que o Valky faz e como usar cada parte.
 - **Ao vivo:** WebRTC autenticado por WHEP. O MediaMTX mantém uma única conexão RTSP por câmera; previews da lista e snapshots saem desse mesmo stream interno.
 - **PTZ:** movimento por pressionar e segurar, com zoom quando anunciado. Posições salvas ficam na própria câmera e podem ser aplicadas com um toque.
 - **Posição inicial:** uma posição salva pode ser fixada como inicial; o backend a aplica cerca de 15 segundos depois de subir, dando tempo ao ONVIF e à mídia.
-- **Extras:** favoritos na visão geral, estatísticas de eventos por câmera, snapshot, clipe sob demanda e edição que reconfigura o stream se o endereço mudar.
+- **Extras:** favoritos na visão geral, estatísticas de eventos por câmera, snapshot, clipe sob demanda dos últimos 30 segundos e edição que reconfigura o stream se o endereço mudar.
 
 ## Detecção
 
@@ -24,7 +24,7 @@ O que o Valky faz e como usar cada parte.
 
 **Limite por horário.** Permite selecionar dias, início, fim e fuso IANA. Segunda 22:00–06:00 inclui terça até 05:59; 06:00 está fora da janela. Sem horário, a regra vale o dia todo.
 
-**Áudio.** A análise usa janelas de 4 segundos a cada 2 segundos, com a fila guardando só a janela mais recente. Janelas sobrepostas não contam como confirmações independentes. Para choro de bebê, a pontuação precisa ser de pelo menos 0,50 em duas janelas sem sobreposição (pelo menos 8 segundos de áudio); depois de confirmada, a evidência continua válida enquanto a pontuação ficar acima de 0,50. `Crying, sobbing` é registrado à parte e não vira choro de bebê. Horários, confirmações adicionais e intervalo entre alertas continuam sendo aplicados pelo serviço de regras, e a detecção de som não classifica risco clínico.
+**Áudio.** A análise usa janelas de 4 segundos a cada 2 segundos, com a fila guardando só a janela mais recente. Janelas sobrepostas não contam como confirmações independentes. Para choro de bebê, a pontuação precisa ser de pelo menos 0,50 em duas janelas sem sobreposição (pelo menos 8 segundos de áudio); depois de confirmada, a evidência continua válida enquanto a pontuação ficar acima de 0,50. `Crying, sobbing` é registrado à parte e não vira choro de bebê. A tosse usa uma segunda passada em janelas de 2 segundos quando a pontuação da janela longa é baixa, o que recupera tosses curtas sem analisar áudio silencioso. Horários, confirmações adicionais e intervalo entre alertas continuam sendo aplicados pelo serviço de regras, e a detecção de som não classifica risco clínico.
 
 O sistema detecta movimento na região e sons; ele não identifica o bebê, não avalia postura, respiração, sufocamento, convulsões ou perigo médico. Adultos, cobertas e outros objetos podem gerar alertas. Não substitui supervisão nem práticas de sono seguro. Mantenha a câmera fixa, desative rastreamento automático/PTZ enquanto usa regiões e marque a região de novo após mudar o enquadramento.
 

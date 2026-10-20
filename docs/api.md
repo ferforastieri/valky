@@ -101,7 +101,7 @@ Todas sob `/api/v1`. "Autenticado" = qualquer token de dispositivo válido; "Adm
 | `PUT` | `/cameras/{id}/ptz/startup` | Autenticado | Define a posição aplicada quando a câmera inicia. |
 | `GET` | `/cameras/{id}/stats` | Autenticado | Estatísticas agregadas dos eventos da câmera. |
 | `GET` | `/cameras/{id}/snapshot` | Autenticado | Imagem do stream interno. |
-| `GET` | `/cameras/{id}/recording` | Autenticado | Clipe sob demanda dos últimos segundos do buffer. |
+| `GET` | `/cameras/{id}/recording` | Autenticado | Clipe sob demanda dos últimos 30 segundos do buffer. |
 | `POST` / `PATCH` / `DELETE` | `/cameras/{id}/live/webrtc/whep[/{session}]` | Autenticado | Negociação WHEP, candidatos ICE (PATCH) e encerramento da sessão de vídeo. |
 | `PUT` | `/favorites/{type}/{id}` | Autenticado | Marca ou desmarca câmera, lâmpada ou controle como favorito. |
 

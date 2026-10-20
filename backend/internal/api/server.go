@@ -691,9 +691,9 @@ func (s *Server) recentRecording(w http.ResponseWriter, r *http.Request) {
 	}
 	defer os.Remove(path)
 
-	clipContext, cancel := context.WithTimeout(r.Context(), 20*time.Second)
+	clipContext, cancel := context.WithTimeout(r.Context(), 30*time.Second)
 	defer cancel()
-	if err = s.media.MaterializeRecentClip(clipContext, cam.ID, 10*time.Second, path); err != nil {
+	if err = s.media.MaterializeRecentClip(clipContext, cam.ID, 30*time.Second, path); err != nil {
 		writeError(w, http.StatusBadGateway, fmt.Errorf("recent recording unavailable: %w", err))
 		return
 	}

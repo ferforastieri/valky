@@ -2,6 +2,7 @@ package com.ferforastieri.valky.core.media
 
 import android.content.ContentValues
 import android.content.Context
+import android.media.MediaScannerConnection
 import android.os.Build
 import android.os.Environment
 import android.provider.MediaStore
@@ -37,6 +38,7 @@ class DeviceMediaStore @Inject constructor(@param:ApplicationContext private val
         relativeDirectory: String,
         collection: android.net.Uri,
     ) = withContext(Dispatchers.IO) {
+        var legacyPath: String? = null
         val values = ContentValues().apply {
             put(MediaStore.MediaColumns.DISPLAY_NAME, name)
             put(MediaStore.MediaColumns.MIME_TYPE, mimeType)
@@ -49,8 +51,9 @@ class DeviceMediaStore @Inject constructor(@param:ApplicationContext private val
                     Environment.getExternalStoragePublicDirectory(relativeDirectory),
                     "Valky",
                 ).apply { mkdirs() }
+                legacyPath = File(directory, name).absolutePath
                 @Suppress("DEPRECATION")
-                put(MediaStore.MediaColumns.DATA, File(directory, name).absolutePath)
+                put(MediaStore.MediaColumns.DATA, legacyPath)
             }
         }
         val resolver = context.contentResolver
@@ -61,6 +64,11 @@ class DeviceMediaStore @Inject constructor(@param:ApplicationContext private val
             }
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
                 resolver.update(uri, ContentValues().apply { put(MediaStore.MediaColumns.IS_PENDING, 0) }, null, null)
+            }
+            // Antes do Android 10 o arquivo é gravado direto no diretório
+            // público; sem o scanner ele fica invisível na galeria.
+            legacyPath?.let { path ->
+                MediaScannerConnection.scanFile(context, arrayOf(path), arrayOf(mimeType), null)
             }
         } catch (error: Throwable) {
             resolver.delete(uri, null, null)

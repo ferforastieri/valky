@@ -17,6 +17,13 @@ const audioSampleRate = 16000
 const audioWindowSeconds = 4
 const audioHopSeconds = 2
 
+// A tosse é curta e fica diluída na janela de 4 s. Quando a pontuação da janela
+// inteira é baixa mas ainda plausível, uma segunda passada em janelas de 2 s
+// recupera o transiente sem aumentar o custo dos trechos silenciosos.
+const coughRefinementWindowSeconds = 2
+const coughRefinementFloor = .05
+const coughRefinementThreshold = .93
+
 type audioWindow struct {
 	samples    []float32
 	start, end time.Time
@@ -160,6 +167,12 @@ func (m *Monitor) classifyAudio(ctx context.Context, cameraID string, queue <-ch
 				scores[result.Type] = result.Confidence
 			}
 			decision.Scores = scores
+			fullCough := scores["cough"]
+			coughScore := fullCough
+			if refined, ok := m.refineCough(ctx, cameraID, window.samples, fullCough); ok {
+				coughScore = refined
+				scores["cough"] = refined
+			}
 			var sum float64
 			for _, v := range window.samples {
 				sum += float64(v) * float64(v)
@@ -178,11 +191,55 @@ func (m *Monitor) classifyAudio(ctx context.Context, cameraID string, queue <-ch
 				if !ready && !wasReady {
 					continue
 				}
-				m.submit(ctx, rules.Detection{Audio: &rules.AudioSample{Start: window.start, End: window.end, Session: window.session, TemporalAccepted: ready}, CameraID: cameraID, Type: kind, Confidence: score, OccurredAt: window.end, Metadata: map[string]any{"source": "sherpa-onnx", "audioWindowStart": window.start, "audioWindowEnd": window.end, "audioDecision": reason, "babyCryScore": scores["baby_cry"], "cryingScore": scores["crying"]}})
+				metadata := map[string]any{"source": "sherpa-onnx", "audioWindowStart": window.start, "audioWindowEnd": window.end, "audioDecision": reason, "babyCryScore": scores["baby_cry"], "cryingScore": scores["crying"]}
+				if kind == "cough" && coughScore != fullCough {
+					metadata["coughFullScore"] = fullCough
+					metadata["coughWindowScore"] = coughScore
+					metadata["coughRefined"] = true
+				}
+				m.submit(ctx, rules.Detection{Audio: &rules.AudioSample{Start: window.start, End: window.end, Session: window.session, TemporalAccepted: ready}, CameraID: cameraID, Type: kind, Confidence: score, OccurredAt: window.end, Metadata: metadata})
+			}
+			if coughScore != fullCough {
+				// O diagnóstico mantém as duas pontuações: a janela de 4 s que
+				// chegou ao motor e a janela curta que confirmou o transiente.
+				decision.Scores["cough_full"] = fullCough
 			}
 			m.recordAudio(ctx, decision)
 		}
 	}
+}
+
+// refineCough reclassifica apenas a faixa de pontuação em que a janela de
+// 4 s pode ter diluído uma tosse curta. O custo extra é irrelevante porque
+// poucas janelas por dia passam pelo piso, e o caminho silencioso continua
+// fazendo uma única inferência.
+func (m *Monitor) refineCough(ctx context.Context, cameraID string, samples []float32, full float64) (float64, bool) {
+	if full < coughRefinementFloor || full >= rules.AudioThreshold("cough") {
+		return full, false
+	}
+	size := audioSampleRate * coughRefinementWindowSeconds
+	if len(samples) < size {
+		return full, false
+	}
+	best := 0.0
+	for offset := 0; offset+size <= len(samples); offset += audioSampleRate / 2 {
+		results, err := m.Classifier.Classify(ctx, samples[offset:offset+size])
+		if err != nil {
+			if ctx.Err() == nil {
+				m.Logger.Warn("refine cough audio", "camera", cameraID, "error", err)
+			}
+			return full, false
+		}
+		for _, result := range results {
+			if result.Type == "cough" && result.Confidence > best {
+				best = result.Confidence
+			}
+		}
+	}
+	if best >= coughRefinementThreshold {
+		return best, true
+	}
+	return full, false
 }
 
 type cryEvidence struct {

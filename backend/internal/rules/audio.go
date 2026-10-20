@@ -10,8 +10,12 @@ func AudioThreshold(kind string) float64 {
 		return .78
 	case "glass_break", "smoke_alarm", "fire_alarm", "siren":
 		return .85
-	case "doorbell", "knock", "dog_bark", "cough":
+	case "doorbell", "knock", "dog_bark":
 		return .72
+	case "cough":
+		// A tosse curta raramente chega a 0,72 na janela de 4 s. O detector
+		// confirma transientes duvidosos em janelas de 2 s antes de entregar.
+		return .55
 	default:
 		return .70
 	}

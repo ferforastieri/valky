@@ -209,7 +209,7 @@ paths:
       responses: {'200': {description: JPEG image, content: {image/jpeg: {schema: {type: string, contentEncoding: binary}}}}}
   /cameras/{id}/recording:
     get:
-      summary: Download the latest 10 seconds from the rolling camera buffer
+      summary: Download the latest 30 seconds from the rolling camera buffer
       parameters: [{$ref: '#/components/parameters/id'}]
       responses:
         '200': {description: MP4 recording, content: {video/mp4: {schema: {type: string, contentEncoding: binary}}}}

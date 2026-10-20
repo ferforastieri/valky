@@ -45,6 +45,12 @@ class ValkyApi(
     private val json = Json { ignoreUnknownKeys = true; explicitNulls = false; coerceInputValues = true }
     private val _notices = MutableSharedFlow<ApiNotice>(extraBufferCapacity = 32)
     val notices = _notices.asSharedFlow()
+
+    // A camada de mídia (snapshot/clipe) roda no ViewModel e não tem acesso a
+    // strings; a tela injeta a mensagem já traduzida por este canal.
+    fun notify(message: String, success: Boolean) {
+        if (message.isNotBlank()) _notices.tryEmit(ApiNotice(message = message, success = success))
+    }
     private val apiClients = ConcurrentHashMap<String, HttpClient>()
     private val mediaClients = ConcurrentHashMap<String, okhttp3.OkHttpClient>()
     private val realtimeClients = ConcurrentHashMap<String, okhttp3.OkHttpClient>()

@@ -15,6 +15,7 @@ func TestResidentialAudioCatalogMappings(t *testing.T) {
 		"Doorbell":                    "doorbell",
 		"Knock":                       "knock",
 		"Bark":                        "dog_bark",
+		"Cough":                       "cough",
 	}
 	for label, want := range cases {
 		if got := AudioLabels[label]; got != want {
