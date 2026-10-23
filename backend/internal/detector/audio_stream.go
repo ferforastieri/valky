@@ -117,16 +117,30 @@ func (m *Monitor) monitorAudio(ctx context.Context, cameraID string) {
 	done := make(chan struct{})
 	go func() { defer close(done); m.classifyAudio(ctx, cameraID, queue) }()
 	defer func() { close(queue); <-done }()
+	// Uma câmera fora do ar não pode ser reconectada a cada dois segundos: além
+	// do custo de processo, a insistência atrapalha a própria câmera a voltar.
+	// O atraso cresce até um minuto e volta ao mínimo assim que a captura flui
+	// por um tempo. Só a primeira queda de cada sequência vira registro, para a
+	// atividade não encher de linhas repetidas.
+	delay := 2 * time.Second
 	for ctx.Err() == nil {
+		started := time.Now()
 		m.Logger.Info("audio capture started", "camera", cameraID, "windowSeconds", audioWindowSeconds, "hopSeconds", audioHopSeconds)
 		err := captureAudioStream(ctx, m.Media.RTSPURL(cameraID), queue)
 		if ctx.Err() != nil {
 			return
 		}
 		m.Logger.Warn("audio capture interrupted", "camera", cameraID, "error", err)
-		m.recordAudio(ctx, AudioDecision{CameraID: cameraID, End: time.Now().UTC(), Reason: "capture_interrupted"})
-		if !wait(ctx, 2*time.Second) {
+		if delay == 2*time.Second {
+			m.recordAudio(ctx, AudioDecision{CameraID: cameraID, End: time.Now().UTC(), Reason: "capture_interrupted"})
+		}
+		if !wait(ctx, delay) {
 			return
+		}
+		if time.Since(started) > 30*time.Second {
+			delay = 2 * time.Second
+		} else {
+			delay = min(delay*2, time.Minute)
 		}
 	}
 }

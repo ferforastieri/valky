@@ -6,7 +6,7 @@ Guia para quem vai contribuir no monorepo: ambiente, comandos, testes, convenç�
 
 | Ferramenta | Versão usada pelo projeto |
 | --- | --- |
-| Go | 1.26.x (o `go.mod` fixa 1.26.9; o build exige `CGO_ENABLED=1` por causa do sherpa-onnx). |
+| Go | 1.26.x (o `go.mod` fixa 1.26.10; o build exige `CGO_ENABLED=1` por causa do sherpa-onnx). |
 | Node | 22, com pnpm 10.15 (`corepack enable` resolve a versão do `packageManager`). |
 | JDK | 21 (Temurin) e Android SDK 36 com build-tools 36.0.0; o wrapper usa Gradle 9.5. |
 | Docker | Engine com Compose v2, para a stack local e para a imagem. |
