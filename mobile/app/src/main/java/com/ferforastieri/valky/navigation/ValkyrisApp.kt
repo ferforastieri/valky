@@ -58,6 +58,7 @@ private data class Destination(val route: String, val label: Int, val icon: Imag
 
 // A marca no meio leva aos dispositivos, a tela de uso mais frequente; a visão
 // geral voltou a ter item próprio, no lugar que era da localização.
+private const val BRAND_ROUTE = "devices"
 private val destinations = listOf(
     Destination("overview", R.string.overview, Lucide.House),
     Destination("people", R.string.location_screen, Lucide.MapPin),
@@ -123,9 +124,12 @@ private fun ConnectedValkyApp(main: MainViewModel) {
     val entry by nav.currentBackStackEntryAsState()
     val currentRoute = entry?.destination?.route
     val selectedIndex = destinations.indexOfFirst { it.route == currentRoute }
-    val showBottomBar = currentRoute == "overview" || selectedIndex >= 0 || currentRoute == "events" || currentRoute == "event/{id}" || currentRoute == "camera/{id}" || currentRoute == "lights" || currentRoute == "light/{id}" || currentRoute == "remote/{id}" || currentRoute == "person/{id}"
+    // A marca no meio é a entrada dos dispositivos: a tela não tem item na lista,
+    // então precisa ser citada para continuar com barra e cabeçalho iguais às
+    // outras (sem isto ela ficava sem a barra de navegação).
+    val showBottomBar = currentRoute == BRAND_ROUTE || currentRoute == "overview" || selectedIndex >= 0 || currentRoute == "events" || currentRoute == "event/{id}" || currentRoute == "camera/{id}" || currentRoute == "lights" || currentRoute == "light/{id}" || currentRoute == "remote/{id}" || currentRoute == "person/{id}"
     // Notificações não têm item na barra, mas continuam com cabeçalho próprio.
-    val showTopBar = currentRoute == "overview" || selectedIndex >= 0 || currentRoute == "events" || currentRoute == "event/{id}" || currentRoute == "lights"
+    val showTopBar = currentRoute == BRAND_ROUTE || currentRoute == "overview" || selectedIndex >= 0 || currentRoute == "events" || currentRoute == "event/{id}" || currentRoute == "lights"
     val pendingEvent by main.pendingEvent.collectAsStateWithLifecycle()
     val pendingCamera by main.pendingCamera.collectAsStateWithLifecycle()
     val pendingSection by main.pendingSection.collectAsStateWithLifecycle()
@@ -196,8 +200,8 @@ private fun ConnectedValkyApp(main: MainViewModel) {
                     items = labels,
                     selectedIndex = selectedIndex,
                     onSelect = { index -> nav.openTopLevel(destinations[index].route) },
-                    brandSelected = currentRoute == "devices",
-                    onBrand = { nav.openTopLevel("devices") },
+                    brandSelected = currentRoute == BRAND_ROUTE,
+                    onBrand = { nav.openTopLevel(BRAND_ROUTE) },
                 )
             }
         },
