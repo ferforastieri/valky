@@ -42,6 +42,26 @@ func (r *Repository) List(ctx context.Context) ([]Light, error) {
 	return out, rows.Err()
 }
 
+// Addresses lists the last known address of each light. Discovery uses it to
+// probe the house network even when the backend runs behind a container
+// bridge, where broadcasts never leave the host.
+func (r *Repository) Addresses(ctx context.Context) ([]string, error) {
+	rows, err := r.store.DB.QueryContext(ctx, `SELECT DISTINCT last_ip FROM lights WHERE last_ip <> ''`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	out := []string{}
+	for rows.Next() {
+		var address string
+		if err := rows.Scan(&address); err != nil {
+			return nil, err
+		}
+		out = append(out, address)
+	}
+	return out, rows.Err()
+}
+
 func (r *Repository) Get(ctx context.Context, id string) (Light, Credentials, error) {
 	row := r.store.DB.QueryRowContext(ctx, `SELECT `+lightColumns+`,local_key_enc,last_ip FROM lights WHERE id=?`, id)
 	return scanLightWithCredentials(row, r.vault)

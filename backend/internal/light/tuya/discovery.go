@@ -37,6 +37,10 @@ type ScanOptions struct {
 	Timeout time.Duration
 	// ListenPorts overrides the UDP ports to listen on (tests).
 	ListenPorts []int
+	// Networks lists /24 prefixes to probe even when the broadcast does not
+	// reach them — o caso de um backend atrás da rede de um container, onde o
+	// broadcast fica preso na bridge e nunca chega à rede da casa.
+	Networks []string
 }
 
 // Discover finds Tuya devices on the local network. It sends the same
@@ -64,7 +68,11 @@ func Discover(ctx context.Context, opts ScanOptions) ([]Device, error) {
 	found := map[string]*result{}
 	var mu sync.Mutex
 
-	ctx, cancel := context.WithTimeout(ctx, opts.Duration)
+	// A escuta termina quando o tempo de descoberta acaba; a sondagem de portas
+	// roda DEPOIS e precisa do contexto do chamador ainda vivo. Antes as duas
+	// usavam o mesmo prazo e a sondagem começava já expirada, sem nunca achar
+	// ninguém.
+	listenCtx, cancel := context.WithTimeout(ctx, opts.Duration)
 	defer cancel()
 
 	var listeners sync.WaitGroup
@@ -72,7 +80,7 @@ func Discover(ctx context.Context, opts ScanOptions) ([]Device, error) {
 		listeners.Add(1)
 		go func(port int) {
 			defer listeners.Done()
-			listenForDevices(ctx, port, func(address string, payload map[string]any) {
+			listenForDevices(listenCtx, port, func(address string, payload map[string]any) {
 				mu.Lock()
 				defer mu.Unlock()
 				entry, ok := found[address]
@@ -95,7 +103,7 @@ func Discover(ctx context.Context, opts ScanOptions) ([]Device, error) {
 		defer ticker.Stop()
 		for {
 			select {
-			case <-ctx.Done():
+			case <-listenCtx.Done():
 				return
 			case <-ticker.C:
 				sendDeviceInfoBroadcast(broadcasts, PortUDPApp, opts.Timeout)
@@ -112,7 +120,7 @@ func Discover(ctx context.Context, opts ScanOptions) ([]Device, error) {
 		devices = append(devices, device)
 	}
 	if opts.TCPProbe {
-		for _, candidate := range probeLocalNetworks(ctx, broadcasts, devices, opts.Timeout) {
+		for _, candidate := range probeLocalNetworks(ctx, broadcasts, opts.Networks, opts.Timeout) {
 			if !containsAddress(devices, candidate.Address) {
 				devices = append(devices, candidate)
 			}
@@ -372,10 +380,10 @@ func localAddresses() []string {
 	return out
 }
 
-// probeLocalNetworks looks for the local control port on every subnet this host
+// probeLocalNetworks looks for the local control port on the subnets this host
 // is attached to. It only reports the address: without a local key the device
 // does not reveal its identity.
-func probeLocalNetworks(ctx context.Context, broadcasts []string, known []Device, timeout time.Duration) []Device {
+func probeLocalNetworks(ctx context.Context, broadcasts, knownNetworks []string, timeout time.Duration) []Device {
 	networks := map[string]bool{}
 	for _, address := range broadcasts {
 		parts := strings.Split(address, ".")
@@ -383,11 +391,9 @@ func probeLocalNetworks(ctx context.Context, broadcasts []string, known []Device
 			networks[strings.Join(parts[:3], ".")] = true
 		}
 	}
-	// Skip networks where devices already broadcast.
-	for _, device := range known {
-		parts := strings.Split(device.Address, ".")
-		if len(parts) == 4 {
-			delete(networks, strings.Join(parts[:3], "."))
+	for _, prefix := range knownNetworks {
+		if prefix != "" {
+			networks[prefix] = true
 		}
 	}
 	var mu sync.Mutex

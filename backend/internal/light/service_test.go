@@ -42,7 +42,7 @@ type fakeScannerDriver struct {
 	candidates []Candidate
 }
 
-func (f *fakeScannerDriver) Scan(context.Context, time.Duration, bool) ([]Candidate, error) {
+func (f *fakeScannerDriver) Scan(context.Context, time.Duration, bool, []string) ([]Candidate, error) {
 	return f.candidates, nil
 }
 
@@ -144,3 +144,18 @@ func TestScanListsCandidatesFromTheAdapter(t *testing.T) {
 }
 
 func strptr(value string) *string { return &value }
+
+// A busca precisa saber onde procurar quando o broadcast fica preso na rede do
+// container: as faixas saem dos endereços já cadastrados.
+func TestNetworksComeFromTheRegisteredAddresses(t *testing.T) {
+	networks := networksOf([]string{
+		"192.168.15.101",
+		"192.168.15.102",
+		"10.0.0.7",
+		"",
+		"não-é-ip",
+	})
+	if len(networks) != 2 || networks[0] != "10.0.0" || networks[1] != "192.168.15" {
+		t.Fatalf("faixas inesperadas: %v", networks)
+	}
+}

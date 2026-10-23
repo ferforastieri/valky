@@ -6,6 +6,8 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"net"
+	"sort"
 	"strings"
 	"sync"
 	"time"
@@ -64,7 +66,37 @@ func (s *Service) Scan(ctx context.Context, in DiscoveryInput) ([]Candidate, err
 	if duration <= 0 || duration > 30*time.Second {
 		duration = 8 * time.Second
 	}
-	return scanner.Scan(ctx, duration, in.Probe)
+	return scanner.Scan(ctx, duration, in.Probe, s.knownNetworks(ctx))
+}
+
+// knownNetworks derives the /24 prefixes of the addresses already registered.
+// Um backend que roda atrás da rede de um container não alcança o broadcast da
+// casa: sem estas faixas, procurar lâmpadas (e reencontrar uma que trocou de
+// IP) só funcionaria fora do Docker.
+func (s *Service) knownNetworks(ctx context.Context) []string {
+	addresses, err := s.repo.Addresses(ctx)
+	if err != nil {
+		return nil
+	}
+	return networksOf(addresses)
+}
+
+// networksOf turns registered addresses into the /24 prefixes to probe.
+func networksOf(addresses []string) []string {
+	seen := map[string]bool{}
+	for _, address := range addresses {
+		ip := net.ParseIP(strings.TrimSpace(address)).To4()
+		if ip == nil {
+			continue
+		}
+		seen[fmt.Sprintf("%d.%d.%d", ip[0], ip[1], ip[2])] = true
+	}
+	out := make([]string, 0, len(seen))
+	for prefix := range seen {
+		out = append(out, prefix)
+	}
+	sort.Strings(out)
+	return out
 }
 
 // Update renames a light or stops polling it. The

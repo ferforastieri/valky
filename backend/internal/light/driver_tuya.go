@@ -303,7 +303,9 @@ type ProvisionResult struct {
 // Scanner is implemented by drivers that can enumerate candidate devices on the
 // local network and validate a device's credentials before it is registered.
 type Scanner interface {
-	Scan(ctx context.Context, duration time.Duration, probePorts bool) ([]Candidate, error)
+	// Scan procura lâmpadas; networks lista prefixos /24 a sondar mesmo quando
+	// o broadcast não chega até eles (backend atrás da bridge de um container).
+	Scan(ctx context.Context, duration time.Duration, probePorts bool, networks []string) ([]Candidate, error)
 	Provision(ctx context.Context, item Light, cred Credentials) (ProvisionResult, error)
 }
 
@@ -319,14 +321,15 @@ func (d *TuyaDriver) Available() bool { return true }
 // Scan enumerates candidate devices. A device that has never been paired
 // answers with its identity; a provisioned one answers with its address only,
 // because the firmware stops revealing the device ID on the plain broadcast.
-func (d *TuyaDriver) Scan(ctx context.Context, duration time.Duration, probePorts bool) ([]Candidate, error) {
-	// A sondagem de porta roda em todas as sub-redes locais: com um tempo curto
-	// ela cabe no ciclo do pareamento sem segurar a próxima tentativa.
+func (d *TuyaDriver) Scan(ctx context.Context, duration time.Duration, probePorts bool, networks []string) ([]Candidate, error) {
+	// A sondagem de porta roda nas sub-redes locais e nas faixas já conhecidas:
+	// com um tempo curto ela cabe no ciclo do pareamento sem segurar a próxima
+	// tentativa.
 	timeout := 3 * time.Second
 	if probePorts {
 		timeout = 250 * time.Millisecond
 	}
-	devices, err := tuya.Discover(ctx, tuya.ScanOptions{Duration: duration, TCPProbe: probePorts, Timeout: timeout})
+	devices, err := tuya.Discover(ctx, tuya.ScanOptions{Duration: duration, TCPProbe: probePorts, Timeout: timeout, Networks: networks})
 	if err != nil {
 		return nil, err
 	}
