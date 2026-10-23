@@ -53,14 +53,14 @@ import com.composables.icons.lucide.Settings
 import com.composables.icons.lucide.UserRound
 import com.composables.icons.lucide.MapPin
 import com.composables.icons.lucide.Video
-import com.composables.icons.lucide.MonitorSmartphone
 
 private data class Destination(val route: String, val label: Int, val icon: ImageVector)
 
-// A visão geral saiu da lista: quem leva para lá é a marca, no meio da barra.
+// A marca no meio leva aos dispositivos, a tela de uso mais frequente; a visão
+// geral voltou a ter item próprio, no lugar que era da localização.
 private val destinations = listOf(
+    Destination("overview", R.string.overview, Lucide.House),
     Destination("people", R.string.location_screen, Lucide.MapPin),
-    Destination("devices", R.string.devices, Lucide.MonitorSmartphone),
     Destination("profile", R.string.profile, Lucide.UserRound),
     Destination("settings", R.string.settings, Lucide.Settings),
 )
@@ -124,8 +124,7 @@ private fun ConnectedValkyApp(main: MainViewModel) {
     val currentRoute = entry?.destination?.route
     val selectedIndex = destinations.indexOfFirst { it.route == currentRoute }
     val showBottomBar = currentRoute == "overview" || selectedIndex >= 0 || currentRoute == "events" || currentRoute == "event/{id}" || currentRoute == "camera/{id}" || currentRoute == "lights" || currentRoute == "light/{id}" || currentRoute == "remote/{id}" || currentRoute == "person/{id}"
-    // A visão geral também tem cabeçalho: sem o item na barra, o índice dela é -1
-    // e a checagem antiga escondia o título e o sino dessa tela.
+    // Notificações não têm item na barra, mas continuam com cabeçalho próprio.
     val showTopBar = currentRoute == "overview" || selectedIndex >= 0 || currentRoute == "events" || currentRoute == "event/{id}" || currentRoute == "lights"
     val pendingEvent by main.pendingEvent.collectAsStateWithLifecycle()
     val pendingCamera by main.pendingCamera.collectAsStateWithLifecycle()
@@ -197,8 +196,8 @@ private fun ConnectedValkyApp(main: MainViewModel) {
                     items = labels,
                     selectedIndex = selectedIndex,
                     onSelect = { index -> nav.openTopLevel(destinations[index].route) },
-                    overviewSelected = currentRoute == "overview",
-                    onOverview = { nav.openTopLevel("overview") },
+                    brandSelected = currentRoute == "devices",
+                    onBrand = { nav.openTopLevel("devices") },
                 )
             }
         },

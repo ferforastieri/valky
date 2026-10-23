@@ -109,8 +109,8 @@ fun FloatingDock(
     selectedIndex: Int,
     onSelect: (Int) -> Unit,
     modifier: Modifier = Modifier,
-    overviewSelected: Boolean = false,
-    onOverview: (() -> Unit)? = null,
+    brandSelected: Boolean = false,
+    onBrand: (() -> Unit)? = null,
 ) {
     Surface(
         modifier = modifier,
@@ -126,7 +126,7 @@ fun FloatingDock(
             verticalAlignment = Alignment.CenterVertically,
         ) {
             // Metade dos destinos de cada lado, com a marca no meio: tocar nela
-            // volta para a visão geral, que deixou de ter item próprio.
+            // abre os dispositivos, a tela de uso mais frequente.
             val half = items.size / 2
             @Composable
             fun destination(index: Int) {
@@ -149,13 +149,13 @@ fun FloatingDock(
                 }
             }
             for (index in 0 until half) destination(index)
-            if (onOverview != null) {
+            if (onBrand != null) {
                 Box(
                     modifier = Modifier
                         .size(50.dp)
                         .clip(RoundedCornerShape(16.dp))
-                        .background(if (overviewSelected) MaterialTheme.colorScheme.secondaryContainer else Color.Transparent)
-                        .clickable(onClick = onOverview),
+                        .background(if (brandSelected) MaterialTheme.colorScheme.secondaryContainer else Color.Transparent)
+                        .clickable(onClick = onBrand),
                     contentAlignment = Alignment.Center,
                 ) {
                     ValkyMark(Modifier.size(38.dp))

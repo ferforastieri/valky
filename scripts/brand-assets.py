@@ -13,6 +13,7 @@ Uso (precisa de rsvg-convert):
 
 Cores da identidade: principal #806DF8, secundária #594DFC.
 """
+import math
 import pathlib
 import shutil
 import subprocess
@@ -172,11 +173,17 @@ def main():
     rsvg(svg, ROOT / 'web/public/favicon.png', 512)
     rsvg(svg, ROOT / 'web/public/apple-touch-icon.png', 180, DARK)
 
+    # A splash do Android 12 desenha o ícone dentro de um círculo (240dp sobre
+    # 288dp): a marca precisa caber inteira dentro dele, senão as asas aparecem
+    # cortadas. Por isso o PNG quadrado usa a diagonal do desenho, e não a
+    # largura, como medida de encaixe.
     square = out / 'valky-mark-square.svg'
-    altura = 512 * VH / VW
+    diagonal = math.hypot(VW, VH)
+    escala = 0.73 * 512 / diagonal
+    largura, altura = VW * escala, VH * escala
     square.write_text(f'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">'
-                      f'<image x="0" y="{512 / 2 - altura * MASS_RATIO:g}" width="512" height="{altura:g}"'
-                      f' href="{svg}"/></svg>')
+                      f'<image x="{(512 - largura) / 2:g}" y="{512 / 2 - altura * MASS_RATIO:g}"'
+                      f' width="{largura:g}" height="{altura:g}" href="{svg}"/></svg>')
     rsvg(square, ROOT / 'mobile/app/src/main/res/drawable-nodpi/valky_mark.png', 512)
 
     res = ROOT / 'mobile/app/src/main/res/drawable'
