@@ -46,7 +46,7 @@ func (a *lightAdapter) Apply(_ context.Context, _ light.Light, _ light.Credentia
 	return state, nil
 }
 
-func (a *lightAdapter) Scan(context.Context, time.Duration, bool) ([]light.Candidate, error) {
+func (a *lightAdapter) Scan(context.Context, time.Duration, bool, []string) ([]light.Candidate, error) {
 	return a.candidates, nil
 }
 
