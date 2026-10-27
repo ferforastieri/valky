@@ -1,6 +1,12 @@
 package remote
 
-import "testing"
+import (
+	"context"
+	"errors"
+	"net"
+	"testing"
+	"time"
+)
 
 func TestNormalizeAddress(t *testing.T) {
 	cases := []struct {
@@ -55,5 +61,63 @@ func TestAllowedKeys(t *testing.T) {
 	}
 	if validKey("KEY_DROP_TABLE") {
 		t.Fatal("unknown keys must be rejected")
+	}
+}
+
+func TestSameMAC(t *testing.T) {
+	if !sameMAC("80:8A:BD:0B:97:EC", "80-8a-bd-0b-97-ec") {
+		t.Fatal("separador e caixa não podem mudar a identidade da TV")
+	}
+	if sameMAC("80:8A:BD:0B:97:EC", "80:8A:BD:0B:97:ED") {
+		t.Fatal("MACs diferentes precisam ser rejeitados")
+	}
+	if sameMAC("", "80:8A:BD:0B:97:EC") {
+		t.Fatal("MAC vazio não pode casar")
+	}
+}
+
+func TestScanSubnetFindsOpenPort(t *testing.T) {
+	listener, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatalf("listener: %v", err)
+	}
+	defer listener.Close()
+	port := listener.Addr().(*net.TCPAddr).Port
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	found := scanSubnet(ctx, "127.0.0.1", []int{port}, 150*time.Millisecond)
+	if len(found) != 1 || found[0] != "127.0.0.1" {
+		t.Fatalf("scanSubnet = %v, want [127.0.0.1]", found)
+	}
+}
+
+func TestLockRespectsCancellation(t *testing.T) {
+	service := &Service{}
+	unlock, err := service.lock(context.Background(), "tv")
+	if err != nil {
+		t.Fatalf("primeiro lock: %v", err)
+	}
+	defer unlock()
+	ctx, cancel := context.WithTimeout(context.Background(), 40*time.Millisecond)
+	defer cancel()
+	if _, err := service.lock(ctx, "tv"); err == nil {
+		t.Fatal("espera pelo lock precisa respeitar o cancelamento do app")
+	}
+}
+
+func TestOfflineWindow(t *testing.T) {
+	service := &Service{}
+	service.markOffline("tv", errors.New("TV desligada"))
+	start := time.Now()
+	err, ok := service.offlineNow("tv")
+	if !ok || err.Error() != "TV desligada" {
+		t.Fatalf("offlineNow = %v, %v", err, ok)
+	}
+	if elapsed := time.Since(start); elapsed > 20*time.Millisecond {
+		t.Fatalf("resposta offline demorou %s", elapsed)
+	}
+	service.clearOffline("tv")
+	if _, ok := service.offlineNow("tv"); ok {
+		t.Fatal("clearOffline precisa liberar a próxima tentativa")
 	}
 }

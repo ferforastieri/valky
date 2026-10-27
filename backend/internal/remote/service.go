@@ -2,6 +2,7 @@ package remote
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log/slog"
 	"net"
@@ -24,10 +25,24 @@ type Service struct {
 	hub    Broadcaster
 	logger *slog.Logger
 	locks  sync.Map
+	// offline guarda o último erro de conexão por alguns segundos. Sem isso,
+	// cada toque numa TV desligada gastaria o tempo do dial e a fila inteira
+	// estouraria o limite do Cloudflare, que devolve uma página de erro enorme.
+	offline sync.Map
+	// scans evita varrer a rede a cada toque enquanto a TV continua sumida.
+	scans sync.Map
+	// scan é a varredura da faixa; fica no campo para o teste não tocar a rede.
+	scan func(context.Context, string, []int, time.Duration) []string
+}
+
+// offlineMark é a janela em que o backend responde na hora, sem tentar a TV.
+type offlineMark struct {
+	until   time.Time
+	message string
 }
 
 func NewService(repo *Repository, driver Driver, hub Broadcaster, logger *slog.Logger) *Service {
-	return &Service{repo: repo, driver: driver, hub: hub, logger: logger}
+	return &Service{repo: repo, driver: driver, hub: hub, logger: logger, scan: scanSubnet}
 }
 
 func (s *Service) Available() bool { return s.driver != nil && s.driver.Available() }
@@ -89,6 +104,7 @@ func (s *Service) Update(ctx context.Context, id string, in UpdateInput) (Device
 	if err != nil {
 		return Device{}, err
 	}
+	s.clearOffline(id)
 	s.broadcast("remote.updated", updated)
 	return updated, nil
 }
@@ -97,6 +113,7 @@ func (s *Service) Delete(ctx context.Context, id string) error {
 	if err := s.repo.Delete(ctx, id); err != nil {
 		return err
 	}
+	s.clearOffline(id)
 	s.broadcast("remote.deleted", map[string]string{"remoteId": id})
 	return nil
 }
@@ -104,7 +121,10 @@ func (s *Service) Delete(ctx context.Context, id string) error {
 // Pair asks the TV to authorize this controller. The user must accept the
 // on-screen prompt; the token returned afterwards is stored encrypted.
 func (s *Service) Pair(ctx context.Context, id string) (Device, error) {
-	unlock := s.lock(id)
+	unlock, err := s.lock(ctx, id)
+	if err != nil {
+		return Device{}, err
+	}
 	defer unlock()
 	item, _, err := s.repo.Get(ctx, id)
 	if err != nil {
@@ -132,6 +152,7 @@ func (s *Service) Pair(ctx context.Context, id string) (Device, error) {
 	macCancel()
 	updated, err := s.Get(ctx, id)
 	if err == nil {
+		s.clearOffline(id)
 		s.broadcast("remote.updated", updated)
 	}
 	return updated, err
@@ -142,7 +163,10 @@ func (s *Service) Send(ctx context.Context, id, key string) (Device, error) {
 	if !validKey(key) {
 		return Device{}, fmt.Errorf("comando não suportado: %s", key)
 	}
-	unlock := s.lock(id)
+	unlock, err := s.lock(ctx, id)
+	if err != nil {
+		return Device{}, err
+	}
 	defer unlock()
 	item, credentials, err := s.repo.Get(ctx, id)
 	if err != nil {
@@ -157,15 +181,31 @@ func (s *Service) Send(ctx context.Context, id, key string) (Device, error) {
 	if !s.Available() {
 		return Device{}, ErrNoRemoteAdapter
 	}
-	sendCtx, cancel := context.WithTimeout(ctx, 12*time.Second)
-	defer cancel()
-	if err = s.driver.Send(sendCtx, item, credentials.Token, key); err != nil {
-		_ = s.repo.SetStatus(ctx, id, "failed", err.Error(), false)
-		if updated, getErr := s.Get(ctx, id); getErr == nil {
-			s.broadcast("remote.updated", updated)
-		}
-		return Device{}, err
+	if offline, ok := s.offlineNow(id); ok {
+		return Device{}, offline
 	}
+	sendCtx, cancel := context.WithTimeout(ctx, 5*time.Second)
+	err = s.driver.Send(sendCtx, item, credentials.Token, key)
+	cancel()
+	if err != nil {
+		// O DHCP pode ter trocado o endereço da TV: procura pelo MAC antes de
+		// devolver o erro, como a lâmpada faz quando muda de IP.
+		if updated, moved := s.recoverAddress(ctx, item); moved {
+			item = updated
+			retryCtx, retryCancel := context.WithTimeout(ctx, 4*time.Second)
+			err = s.driver.Send(retryCtx, item, credentials.Token, key)
+			retryCancel()
+		}
+		if err != nil {
+			s.markOffline(id, err)
+			_ = s.repo.SetStatus(ctx, id, "failed", err.Error(), false)
+			if updated, getErr := s.Get(ctx, id); getErr == nil {
+				s.broadcast("remote.updated", updated)
+			}
+			return Device{}, err
+		}
+	}
+	s.clearOffline(id)
 	// Key presses are high frequency, so the success path stays free of database
 	// writes and broadcasts; the status is only persisted when it actually
 	// changes, which keeps the remote responsive.
@@ -188,7 +228,10 @@ func (s *Service) SendText(ctx context.Context, id, text string) (Device, error)
 	if len(text) > 64 {
 		return Device{}, fmt.Errorf("o texto é muito longo")
 	}
-	unlock := s.lock(id)
+	unlock, err := s.lock(ctx, id)
+	if err != nil {
+		return Device{}, err
+	}
 	defer unlock()
 	item, credentials, err := s.repo.Get(ctx, id)
 	if err != nil {
@@ -203,15 +246,29 @@ func (s *Service) SendText(ctx context.Context, id, text string) (Device, error)
 	if !s.Available() {
 		return Device{}, ErrNoRemoteAdapter
 	}
-	sendCtx, cancel := context.WithTimeout(ctx, 12*time.Second)
-	defer cancel()
-	if err = s.driver.SendText(sendCtx, item, credentials.Token, text); err != nil {
-		_ = s.repo.SetStatus(ctx, id, "failed", err.Error(), false)
-		if updated, getErr := s.Get(ctx, id); getErr == nil {
-			s.broadcast("remote.updated", updated)
-		}
-		return Device{}, err
+	if offline, ok := s.offlineNow(id); ok {
+		return Device{}, offline
 	}
+	sendCtx, cancel := context.WithTimeout(ctx, 5*time.Second)
+	err = s.driver.SendText(sendCtx, item, credentials.Token, text)
+	cancel()
+	if err != nil {
+		if updated, moved := s.recoverAddress(ctx, item); moved {
+			item = updated
+			retryCtx, retryCancel := context.WithTimeout(ctx, 4*time.Second)
+			err = s.driver.SendText(retryCtx, item, credentials.Token, text)
+			retryCancel()
+		}
+		if err != nil {
+			s.markOffline(id, err)
+			_ = s.repo.SetStatus(ctx, id, "failed", err.Error(), false)
+			if updated, getErr := s.Get(ctx, id); getErr == nil {
+				s.broadcast("remote.updated", updated)
+			}
+			return Device{}, err
+		}
+	}
+	s.clearOffline(id)
 	if item.SetupStatus != "ready" || item.SetupError != "" {
 		_ = s.repo.SetStatus(ctx, id, "ready", "", true)
 		item.SetupStatus = "ready"
@@ -222,7 +279,10 @@ func (s *Service) SendText(ctx context.Context, id, text string) (Device, error)
 
 // Wake sends a Wake-on-LAN magic packet so a standby TV powers on.
 func (s *Service) Wake(ctx context.Context, id string) (Device, error) {
-	unlock := s.lock(id)
+	unlock, err := s.lock(ctx, id)
+	if err != nil {
+		return Device{}, err
+	}
 	defer unlock()
 	item, _, err := s.repo.Get(ctx, id)
 	if err != nil {
@@ -235,7 +295,10 @@ func (s *Service) Wake(ctx context.Context, id string) (Device, error) {
 // a standby TV is woken over the network. The returned flag reports whether the
 // TV was turned on (true) or off (false).
 func (s *Service) Power(ctx context.Context, id string) (Device, bool, error) {
-	unlock := s.lock(id)
+	unlock, err := s.lock(ctx, id)
+	if err != nil {
+		return Device{}, false, err
+	}
 	defer unlock()
 	item, credentials, err := s.repo.Get(ctx, id)
 	if err != nil {
@@ -244,8 +307,15 @@ func (s *Service) Power(ctx context.Context, id string) (Device, bool, error) {
 	if !s.Available() {
 		return Device{}, false, ErrNoRemoteAdapter
 	}
+	if credentials.Token != "" && !s.driver.Reachable(ctx, item) {
+		// A TV pode ter mudado de endereço: se reencontrarmos pelo MAC, o botão
+		// desliga em vez de mandar um magic packet para o vazio.
+		if updated, moved := s.recoverAddress(ctx, item); moved {
+			item = updated
+		}
+	}
 	if credentials.Token != "" && s.driver.Reachable(ctx, item) {
-		sendCtx, cancel := context.WithTimeout(ctx, 12*time.Second)
+		sendCtx, cancel := context.WithTimeout(ctx, 5*time.Second)
 		defer cancel()
 		if err := s.driver.Send(sendCtx, item, credentials.Token, "KEY_POWER"); err != nil {
 			_ = s.repo.SetStatus(ctx, id, "failed", err.Error(), false)
@@ -308,11 +378,90 @@ func (s *Service) broadcast(kind string, payload any) {
 	}
 }
 
-func (s *Service) lock(id string) func() {
-	value, _ := s.locks.LoadOrStore(id, &sync.Mutex{})
-	mutex := value.(*sync.Mutex)
-	mutex.Lock()
-	return mutex.Unlock
+// offlineNow devolve o erro guardado se a TV falhou há poucos segundos. É o que
+// mantém uma rajada de toques instantânea em vez de enfileirar tentativas que
+// o Cloudflare corta com uma página de erro.
+func (s *Service) offlineNow(id string) (error, bool) {
+	value, ok := s.offline.Load(id)
+	if !ok {
+		return nil, false
+	}
+	mark := value.(offlineMark)
+	if time.Now().Before(mark.until) {
+		return errors.New(mark.message), true
+	}
+	s.offline.Delete(id)
+	return nil, false
+}
+
+func (s *Service) markOffline(id string, err error) {
+	if err == nil {
+		return
+	}
+	s.offline.Store(id, offlineMark{until: time.Now().Add(8 * time.Second), message: err.Error()})
+}
+
+func (s *Service) clearOffline(id string) {
+	s.offline.Delete(id)
+	s.scans.Delete(id)
+}
+
+// recoverAddress varre a faixa do endereço salvo atrás da TV e confere cada
+// candidato pelo MAC antes de gravar o novo IP. Roda só no caminho de falha,
+// com espera curta, para não atrasar o toque quando a TV está desligada.
+func (s *Service) recoverAddress(ctx context.Context, item Device) (Device, bool) {
+	mac := strings.TrimSpace(item.MAC)
+	if mac == "" {
+		return item, false
+	}
+	if value, ok := s.scans.Load(item.ID); ok {
+		if time.Since(value.(time.Time)) < 15*time.Second {
+			return item, false
+		}
+	}
+	s.scans.Store(item.ID, time.Now())
+	scan := s.scan
+	if scan == nil {
+		scan = scanSubnet
+	}
+	scanCtx, cancel := context.WithTimeout(ctx, 2500*time.Millisecond)
+	addresses := scan(scanCtx, item.Host, []int{LegacyPort, DefaultPort}, 250*time.Millisecond)
+	cancel()
+	for _, address := range addresses {
+		if address == item.Host {
+			continue
+		}
+		probeCtx, probeCancel := context.WithTimeout(ctx, 1500*time.Millisecond)
+		found, err := s.driver.DeviceMAC(probeCtx, Device{Host: address, Port: LegacyPort})
+		probeCancel()
+		if err != nil || !sameMAC(found, mac) {
+			continue
+		}
+		host := address
+		updated, err := s.repo.Update(ctx, item.ID, UpdateInput{Host: &host})
+		if err != nil {
+			return item, false
+		}
+		if s.logger != nil {
+			s.logger.Info("TV reencontrada na rede", "remote", item.Name, "de", item.Host, "para", address)
+		}
+		s.broadcast("remote.updated", updated)
+		return updated, true
+	}
+	return item, false
+}
+
+// lock serializa os comandos por aparelho, mas respeita o cancelamento do
+// cliente: um toque que o app já desistiu não fica na fila segurando os outros.
+func (s *Service) lock(ctx context.Context, id string) (func(), error) {
+	value, _ := s.locks.LoadOrStore(id, make(chan struct{}, 1))
+	slot := value.(chan struct{})
+	select {
+	case slot <- struct{}{}:
+		return func() { <-slot }, nil
+	case <-ctx.Done():
+		return nil, ctx.Err()
+	}
 }
 
 // normalizeAddress accepts an IPv4/IPv6/hostname, with or without a scheme or

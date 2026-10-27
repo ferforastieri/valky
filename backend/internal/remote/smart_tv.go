@@ -53,11 +53,13 @@ func NewSmartTVDriver(logger *slog.Logger) *SmartTVDriver {
 		logger = slog.Default()
 	}
 	// These TVs present a self-signed certificate on the secure channel, so the
-	// client validates reachability but not the certificate chain.
+	// client validates reachability but not the certificate chain. The waits are
+	// short on purpose: the TV is on the LAN, so a slow dial means it is off —
+	// waiting longer only makes the app queue key presses behind a dead socket.
 	transport := &http.Transport{
 		TLSClientConfig:       &tls.Config{InsecureSkipVerify: true},
-		ResponseHeaderTimeout: 10 * time.Second,
-		DialContext:           (&net.Dialer{Timeout: 6 * time.Second}).DialContext,
+		ResponseHeaderTimeout: 3 * time.Second,
+		DialContext:           (&net.Dialer{Timeout: 1500 * time.Millisecond}).DialContext,
 	}
 	return &SmartTVDriver{
 		applicationName: "Valky",
@@ -127,7 +129,7 @@ func (d *SmartTVDriver) writeKey(ctx context.Context, item *tvConn, key string) 
 			"TypeOfRemote": "SendRemoteKey",
 		},
 	})
-	writeCtx, cancel := context.WithTimeout(ctx, 4*time.Second)
+	writeCtx, cancel := context.WithTimeout(ctx, 2*time.Second)
 	defer cancel()
 	if err := item.conn.Write(writeCtx, websocket.MessageText, payload); err != nil {
 		return fmt.Errorf("não foi possível enviar o comando: %w", err)
@@ -155,7 +157,7 @@ func (d *SmartTVDriver) SendText(ctx context.Context, device Device, token, text
 			"Data":         base64.StdEncoding.EncodeToString([]byte(text)),
 		},
 	})
-	writeCtx, cancel := context.WithTimeout(ctx, 4*time.Second)
+	writeCtx, cancel := context.WithTimeout(ctx, 2*time.Second)
 	defer cancel()
 	if err := item.conn.Write(writeCtx, websocket.MessageText, emit); err != nil {
 		d.drop(item)
@@ -231,7 +233,7 @@ func (d *SmartTVDriver) connectReady(ctx context.Context, device Device, token s
 }
 
 func (d *SmartTVDriver) handshake(ctx context.Context, conn *websocket.Conn) error {
-	handshake, cancel := context.WithTimeout(ctx, 6*time.Second)
+	handshake, cancel := context.WithTimeout(ctx, 3*time.Second)
 	event, _, readErr := readEvent(handshake, conn)
 	cancel()
 	if event == "ms.channel.unauthorized" {
