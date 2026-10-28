@@ -366,21 +366,35 @@ func (d *SmartTVDriver) DeviceMAC(ctx context.Context, device Device) (string, e
 	}
 	var info struct {
 		Device struct {
-			WiFiMAC string `json:"wifiMac"`
-			MAC     string `json:"mac"`
+			NetworkType string `json:"networkType"`
+			WiFiMAC     string `json:"wifiMac"`
+			MAC         string `json:"mac"`
 		} `json:"device"`
 	}
 	if err := json.NewDecoder(io.LimitReader(resp.Body, 1<<20)).Decode(&info); err != nil {
 		return "", err
 	}
-	mac := strings.TrimSpace(info.Device.WiFiMAC)
-	if mac == "" {
-		mac = strings.TrimSpace(info.Device.MAC)
-	}
+	// O Wake-on-LAN precisa do MAC da interface que está ligada: uma TV no cabo
+	// não acorda com o magic packet endereçado ao MAC do Wi-Fi.
+	mac := pickMAC(info.Device.NetworkType, info.Device.WiFiMAC, info.Device.MAC)
 	if mac == "" {
 		return "", fmt.Errorf("a TV não informou o MAC")
 	}
 	return mac, nil
+}
+
+// pickMAC escolhe o MAC da interface ativa. Sem a informação de rede (modelos
+// antigos), mantém o comportamento anterior e prefere o Wi-Fi.
+func pickMAC(networkType, wifiMAC, ethernetMAC string) string {
+	wired := strings.EqualFold(strings.TrimSpace(networkType), "wired")
+	mac := strings.TrimSpace(ethernetMAC)
+	if !wired || mac == "" {
+		mac = strings.TrimSpace(wifiMAC)
+	}
+	if mac == "" {
+		mac = strings.TrimSpace(ethernetMAC)
+	}
+	return mac
 }
 
 const controlChannelPath = "/api/v2/channels/samsung.remote.control"

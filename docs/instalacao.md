@@ -42,6 +42,7 @@ curl -fsSL https://valkyris.vercel.app/install.sh | VALKY_VERSION=v4.3.4 sh
 - Confere o SHA-256 de `compose.yaml`, `mediamtx.yml` e `VERSION` antes de usar.
 - Cria ou atualiza os arquivos locais e o `.env`, preservando o que já existe.
 - Roda `docker compose pull` e `docker compose up -d --remove-orphans`, o que também remove o antigo container de atualização de instalações antigas.
+- Em instalações como root com systemd, instala o helper `valky-wol-broadcast` (script + timer) que habilita o broadcast dirigido nas bridges do Docker para o Wake-on-LAN das TVs.
 - Aguarda até 30 segundos o `/health` responder e imprime o endereço local e o código de instalação.
 
 O instalador é idempotente: rodar de novo atualiza a instalação sem apagar dados.

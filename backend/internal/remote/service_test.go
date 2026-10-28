@@ -76,6 +76,29 @@ func TestSameMAC(t *testing.T) {
 	}
 }
 
+func TestPickMACUsesActiveInterface(t *testing.T) {
+	const wifi = "80:8A:BD:0B:97:EC"
+	const wired = "80:8A:BD:0B:97:ED"
+	cases := []struct {
+		networkType string
+		wifiMAC     string
+		ethernetMAC string
+		want        string
+	}{
+		{"wired", wifi, wired, wired},
+		{"wireless", wifi, wired, wifi},
+		{"wired", wifi, "", wifi},
+		{"", wifi, wired, wifi},
+		{"", "", wired, wired},
+		{"", "", "", ""},
+	}
+	for _, tc := range cases {
+		if got := pickMAC(tc.networkType, tc.wifiMAC, tc.ethernetMAC); got != tc.want {
+			t.Fatalf("pickMAC(%q, %q, %q) = %q, want %q", tc.networkType, tc.wifiMAC, tc.ethernetMAC, got, tc.want)
+		}
+	}
+}
+
 func TestScanSubnetFindsOpenPort(t *testing.T) {
 	listener, err := net.Listen("tcp", "127.0.0.1:0")
 	if err != nil {

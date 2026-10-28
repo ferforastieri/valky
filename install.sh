@@ -106,9 +106,65 @@ if ! grep -Eq '^VALKY_WEBRTC_HOSTS=.+$' "$ENV_FILE"; then
 fi
 chmod 600 "$ENV_FILE"
 
+# O backend roda no container e manda o magic packet de Wake-on-LAN para o
+# broadcast da LAN. O kernel descarta broadcast dirigido que atravessa a bridge
+# do Docker (bc_forwarding=0), então a TV nunca acorda. O helper reaplica o
+# sysctl nas bridges e o timer cobre redes recriadas. Fora de root/systemd a
+# instalação segue sem ele: o resto não depende disso.
+install_wol_helper() {
+  [ "$(id -u)" = "0" ] || return 0
+  command -v systemctl >/dev/null 2>&1 || return 0
+  command -v sysctl >/dev/null 2>&1 || return 0
+  [ -d /sys/class/net ] || return 0
+  [ -d /etc/systemd/system ] || return 0
+  mkdir -p /usr/local/sbin
+
+  cat > /usr/local/sbin/valky-wol-broadcast.sh <<'SCRIPT'
+#!/bin/sh
+# Habilita o broadcast dirigido nas bridges Docker. Sem isto o magic packet de
+# Wake-on-LAN que sai do container para o broadcast da LAN é descartado.
+for path in /sys/class/net/br-*; do
+  [ -e "$path" ] || continue
+  name=${path##*/}
+  current=$(cat "/proc/sys/net/ipv4/conf/$name/bc_forwarding" 2>/dev/null || echo 1)
+  [ "$current" = "1" ] && continue
+  sysctl -w "net.ipv4.conf.$name.bc_forwarding=1" >/dev/null 2>&1 || true
+done
+SCRIPT
+  chmod 755 /usr/local/sbin/valky-wol-broadcast.sh
+
+  cat > /etc/systemd/system/valky-wol-broadcast.service <<'UNIT'
+[Unit]
+Description=Broadcast dirigido para Wake-on-LAN do Valky
+After=docker.service
+Wants=docker.service
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/sbin/valky-wol-broadcast.sh
+UNIT
+
+  cat > /etc/systemd/system/valky-wol-broadcast.timer <<'UNIT'
+[Unit]
+Description=Reaplica o broadcast de WoL do Valky
+
+[Timer]
+OnBootSec=20s
+OnUnitActiveSec=60s
+
+[Install]
+WantedBy=timers.target
+UNIT
+
+  systemctl daemon-reload >/dev/null 2>&1 || true
+  systemctl enable --now valky-wol-broadcast.timer >/dev/null 2>&1 || true
+  systemctl start valky-wol-broadcast.service >/dev/null 2>&1 || true
+}
+
 printf 'Valky: iniciando os serviços em %s...\n' "$INSTALL_ROOT"
 docker compose --project-directory "$INSTALL_ROOT" --env-file "$ENV_FILE" pull
 docker compose --project-directory "$INSTALL_ROOT" --env-file "$ENV_FILE" up -d --remove-orphans
+install_wol_helper
 
 PORT="$(awk -F= '$1 == "VALKY_PORT" { print substr($0, index($0, "=") + 1); exit }' "$ENV_FILE")"
 [ -n "$PORT" ] || PORT=8443
