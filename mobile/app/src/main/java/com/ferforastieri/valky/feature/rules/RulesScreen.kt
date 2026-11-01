@@ -150,7 +150,6 @@ fun RuleCard(rule: Rule, onEdit: () -> Unit, onDelete: () -> Unit, canEdit: Bool
                     if (canEdit) IconButton(onClick = onEdit) { Icon(Lucide.Pencil, stringResource(R.string.edit_rule)) }
                     if (canEdit) IconButton(onClick = onDelete) { Icon(Lucide.Trash2, stringResource(R.string.remove_rule), tint = MaterialTheme.colorScheme.error) }
                 }
-                RuleScheduleSummary(rule)
                 rule.motion?.let {
                     Spacer(Modifier.height(4.dp))
                     Text("Região selecionada · movimento por ${it.minDurationSeconds} s", style = MaterialTheme.typography.bodySmall)
@@ -364,45 +363,6 @@ private fun RuleSectionTitle(title: String, description: String) {
 }
 
 @Composable
-private fun RuleScheduleSummary(rule: Rule) {
-    val scheduled = rule.schedule.start.isNotBlank()
-    val zone = rule.schedule.timezone
-    val showZone = scheduled && zone.isNotBlank() && zone != ZoneId.systemDefault().id
-    val detail = listOfNotNull(
-        if (showZone) scheduleTimezoneLabel(zone) else null,
-        if (scheduled && rule.actions.alarm) stringResource(R.string.schedule_alarm_only_short) else null,
-    ).joinToString(" · ")
-    Surface(
-        modifier = Modifier.fillMaxWidth().padding(top = 6.dp),
-        shape = MaterialTheme.shapes.small,
-        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = .45f),
-    ) {
-        Row(Modifier.padding(horizontal = 10.dp, vertical = 7.dp), verticalAlignment = Alignment.CenterVertically) {
-            Icon(Lucide.AlarmClock, null, Modifier.size(16.dp), tint = MaterialTheme.colorScheme.secondary)
-            Spacer(Modifier.width(8.dp))
-            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(1.dp)) {
-                Text(
-                    if (scheduled) scheduleTitle(rule.schedule) else stringResource(R.string.schedule_always),
-                    style = MaterialTheme.typography.bodySmall,
-                    fontWeight = FontWeight.Medium,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
-                if (detail.isNotBlank()) {
-                    Text(
-                        detail,
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                    )
-                }
-            }
-        }
-    }
-}
-
-@Composable
 private fun ScheduleSummary(schedule: RuleSchedule) {
     Surface(
         modifier = Modifier.fillMaxWidth(),
@@ -463,17 +423,6 @@ private fun scheduleDaysLabel(days: List<Int>): String {
             else -> "${labels.getValue(run.first())}–${labels.getValue(run.last())}"
         }
     }
-}
-
-@Composable
-private fun scheduleTimezoneLabel(timezone: String): String {
-    val zone = timezone.ifBlank { ZoneId.systemDefault().id }
-    val name = if (zone == ZoneId.systemDefault().id) {
-        stringResource(R.string.schedule_local_timezone)
-    } else {
-        zone.substringAfterLast('/').replace('_', ' ')
-    }
-    return stringResource(R.string.schedule_timezone_value, name)
 }
 
 @Composable
