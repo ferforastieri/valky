@@ -15,6 +15,7 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import java.time.ZoneId
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.ferforastieri.valky.core.model.TrackedPerson
@@ -27,6 +28,7 @@ import com.ferforastieri.valky.core.model.MotionSettings
 import com.ferforastieri.valky.core.model.MotionRegion
 import com.ferforastieri.valky.core.model.RuleActions
 import com.ferforastieri.valky.core.model.detectorLabelRes
+import com.composables.icons.lucide.AlarmClock
 import com.composables.icons.lucide.Lucide
 import com.composables.icons.lucide.Mic
 import com.composables.icons.lucide.Pencil
@@ -38,6 +40,16 @@ import com.composables.icons.lucide.Video
 import androidx.compose.foundation.shape.CircleShape
 import com.ferforastieri.valky.core.design.SkeletonList
 import com.ferforastieri.valky.core.design.ValkySkeleton
+
+private val weekdayChips = listOf(
+    1 to R.string.day_mon_short,
+    2 to R.string.day_tue_short,
+    3 to R.string.day_wed_short,
+    4 to R.string.day_thu_short,
+    5 to R.string.day_fri_short,
+    6 to R.string.day_sat_short,
+    0 to R.string.day_sun_short,
+)
 
 @Composable
 fun CameraRulesSection(cameraId: String, vm: RulesViewModel = hiltViewModel()) {
@@ -137,8 +149,11 @@ fun RuleCard(rule: Rule, onEdit: () -> Unit, onDelete: () -> Unit, canEdit: Bool
                     if (canEdit) IconButton(onClick = onEdit) { Icon(Lucide.Pencil, stringResource(R.string.edit_rule)) }
                     if (canEdit) IconButton(onClick = onDelete) { Icon(Lucide.Trash2, stringResource(R.string.remove_rule), tint = MaterialTheme.colorScheme.error) }
                 }
-                if (rule.schedule.start.isNotBlank()) Text("${rule.schedule.start}–${rule.schedule.end} · ${rule.schedule.timezone}", style = MaterialTheme.typography.bodySmall)
-                rule.motion?.let { Text("Região selecionada · movimento por ${it.minDurationSeconds} s", style = MaterialTheme.typography.bodySmall) }
+                RuleScheduleSummary(rule)
+                rule.motion?.let {
+                    Spacer(Modifier.height(4.dp))
+                    Text("Região selecionada · movimento por ${it.minDurationSeconds} s", style = MaterialTheme.typography.bodySmall)
+                }
             }
         }
     }
@@ -167,7 +182,9 @@ fun RuleEditorDialog(cameras: List<Camera>, detectors: List<DetectorKind>, exist
     var days by remember(existing?.id) { mutableStateOf(existing?.schedule?.days?.takeIf { it.isNotEmpty() } ?: (0..6).toList()) }
     var start by remember(existing?.id) { mutableStateOf(existing?.schedule?.start?.ifBlank { "22:00" } ?: "22:00") }
     var end by remember(existing?.id) { mutableStateOf(existing?.schedule?.end?.ifBlank { "06:00" } ?: "06:00") }
-    var timezone by remember(existing?.id) { mutableStateOf(existing?.schedule?.timezone?.ifBlank { java.time.ZoneId.systemDefault().id } ?: java.time.ZoneId.systemDefault().id) }
+    var timezone by remember(existing?.id) { mutableStateOf(existing?.schedule?.timezone?.ifBlank { ZoneId.systemDefault().id } ?: ZoneId.systemDefault().id) }
+    var pickingStart by remember(existing?.id) { mutableStateOf(false) }
+    var pickingEnd by remember(existing?.id) { mutableStateOf(false) }
     var regionEnabled by remember(existing?.id) { mutableStateOf(existing?.motion != null) }
     var region by remember(existing?.id, fixedCameraID ?: camera?.id) { mutableStateOf(existing?.motion?.region?.takeIf { existing.cameraId == (fixedCameraID ?: camera?.id) }) }
     var duration by remember(existing?.id) { mutableStateOf((existing?.motion?.minDurationSeconds ?: 10).toString()) }
@@ -229,19 +246,25 @@ fun RuleEditorDialog(cameras: List<Camera>, detectors: List<DetectorKind>, exist
             RuleSectionTitle("Quando monitorar", "Monitore o dia todo ou escolha dias e horários.")
             RuleActionRow(scheduled, { scheduled = it }, "Limitar por horário")
             if (scheduled) {
-                Text("Dias de início do período", style = MaterialTheme.typography.labelLarge)
+                if (days.isNotEmpty() && timePattern.matches(start) && timePattern.matches(end)) {
+                    ScheduleSummary(RuleSchedule(days.sorted(), start, end, timezone))
+                }
+                Text(stringResource(R.string.schedule_days_start_hint), style = MaterialTheme.typography.labelLarge)
                 FlowRow(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                    listOf(1,2,3,4,5,6,0).forEach { day ->
-                        FilterChip(selected = day in days, onClick = { days = if (day in days) days - day else days + day }, label = { Text(listOf("Dom","Seg","Ter","Qua","Qui","Sex","Sáb")[day]) })
+                    weekdayChips.forEach { (day, label) ->
+                        FilterChip(
+                            selected = day in days,
+                            onClick = { days = if (day in days) days - day else days + day },
+                            label = { Text(stringResource(label)) },
+                        )
                     }
                 }
                 com.ferforastieri.valky.core.design.AdaptiveRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    OutlinedTextField(start, { start = it }, label = { Text("Início · HH:mm") }, singleLine = true, modifier = Modifier.weight(1f))
-                    OutlinedTextField(end, { end = it }, label = { Text("Fim · HH:mm") }, singleLine = true, modifier = Modifier.weight(1f))
+                    ScheduleTimeButton(stringResource(R.string.schedule_start), start, { pickingStart = true }, Modifier.weight(1f))
+                    ScheduleTimeButton(stringResource(R.string.schedule_end), end, { pickingEnd = true }, Modifier.weight(1f))
                 }
-                OutlinedTextField(timezone, { timezone = it }, label = { Text("Fuso horário") }, singleLine = true, modifier = Modifier.fillMaxWidth())
-                Text("Ex.: segunda, 22:00–06:00 inclui a madrugada de terça.", style = MaterialTheme.typography.bodySmall)
-                if (!validSchedule) Text("Selecione dias, horários distintos e um fuso válido (ex.: America/Sao_Paulo).", color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
+                TimezoneField(timezone) { timezone = it }
+                if (!validSchedule) Text(stringResource(R.string.schedule_invalid), color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
             }
             if (detector?.id == "motion") {
                 RuleSectionTitle("Onde detectar movimento", "Delimite a parte da imagem que deseja acompanhar.")
@@ -296,6 +319,12 @@ fun RuleEditorDialog(cameras: List<Camera>, detectors: List<DetectorKind>, exist
 
         }
     }
+    if (pickingStart) {
+        ScheduleTimePickerDialog(start, onDismiss = { pickingStart = false }) { start = it; pickingStart = false }
+    }
+    if (pickingEnd) {
+        ScheduleTimePickerDialog(end, onDismiss = { pickingEnd = false }) { end = it; pickingEnd = false }
+    }
 }
 
 @Composable
@@ -314,4 +343,201 @@ private fun RuleSectionTitle(title: String, description: String) {
         Text(title, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
         Text(description, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
     }
+}
+
+@Composable
+private fun RuleScheduleSummary(rule: Rule) {
+    val scheduled = rule.schedule.start.isNotBlank()
+    Surface(
+        modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
+        shape = MaterialTheme.shapes.medium,
+        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = .55f),
+    ) {
+        Row(Modifier.padding(horizontal = 12.dp, vertical = 9.dp), verticalAlignment = Alignment.CenterVertically) {
+            Icon(Lucide.AlarmClock, null, Modifier.size(18.dp), tint = MaterialTheme.colorScheme.secondary)
+            Spacer(Modifier.width(9.dp))
+            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                Text(
+                    if (scheduled) scheduleTitle(rule.schedule) else stringResource(R.string.schedule_always),
+                    style = MaterialTheme.typography.bodyMedium,
+                    fontWeight = FontWeight.Medium,
+                )
+                if (scheduled) {
+                    val behavior = if (rule.actions.alarm) stringResource(R.string.schedule_alarm_only_short) else ""
+                    val detail = listOf(scheduleTimezoneLabel(rule.schedule.timezone), behavior)
+                        .filter { it.isNotBlank() }
+                        .joinToString(" · ")
+                    Text(detail, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun ScheduleSummary(schedule: RuleSchedule) {
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        shape = MaterialTheme.shapes.large,
+        color = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = .65f),
+    ) {
+        Row(Modifier.padding(14.dp), verticalAlignment = Alignment.CenterVertically) {
+            Icon(Lucide.AlarmClock, null, Modifier.size(22.dp), tint = MaterialTheme.colorScheme.secondary)
+            Spacer(Modifier.width(12.dp))
+            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
+                Text(scheduleTitle(schedule), style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
+                Text(
+                    stringResource(R.string.schedule_behavior_hint),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun scheduleTitle(schedule: RuleSchedule): String {
+    val days = scheduleDaysLabel(schedule.days)
+    val time = when {
+        schedule.start.isBlank() || schedule.end.isBlank() -> stringResource(R.string.schedule_all_day)
+        schedule.start > schedule.end -> stringResource(R.string.schedule_overnight, schedule.start, schedule.end)
+        else -> stringResource(R.string.schedule_time_range, schedule.start, schedule.end)
+    }
+    return "$days · $time"
+}
+
+@Composable
+private fun scheduleDaysLabel(days: List<Int>): String {
+    val selected = days.toSet()
+    if (selected.isEmpty() || selected.size >= 7) return stringResource(R.string.schedule_every_day)
+    val labels = mapOf(
+        0 to stringResource(R.string.day_sun_short),
+        1 to stringResource(R.string.day_mon_short),
+        2 to stringResource(R.string.day_tue_short),
+        3 to stringResource(R.string.day_wed_short),
+        4 to stringResource(R.string.day_thu_short),
+        5 to stringResource(R.string.day_fri_short),
+        6 to stringResource(R.string.day_sat_short),
+    )
+    val runs = mutableListOf<MutableList<Int>>()
+    var previousIndex = -2
+    listOf(1, 2, 3, 4, 5, 6, 0).forEachIndexed { index, day ->
+        if (day in selected) {
+            if (index == previousIndex + 1) runs.last().add(day) else runs.add(mutableListOf(day))
+            previousIndex = index
+        }
+    }
+    if (runs.isEmpty()) return stringResource(R.string.schedule_every_day)
+    return runs.joinToString(", ") { run ->
+        when (run.size) {
+            1 -> labels.getValue(run.first())
+            2 -> "${labels.getValue(run[0])}, ${labels.getValue(run[1])}"
+            else -> "${labels.getValue(run.first())}–${labels.getValue(run.last())}"
+        }
+    }
+}
+
+@Composable
+private fun scheduleTimezoneLabel(timezone: String): String {
+    val zone = timezone.ifBlank { ZoneId.systemDefault().id }
+    val name = if (zone == ZoneId.systemDefault().id) {
+        stringResource(R.string.schedule_local_timezone)
+    } else {
+        zone.substringAfterLast('/').replace('_', ' ')
+    }
+    return stringResource(R.string.schedule_timezone_value, name)
+}
+
+@Composable
+private fun ScheduleTimeButton(label: String, value: String, onClick: () -> Unit, modifier: Modifier = Modifier) {
+    Surface(
+        onClick = onClick,
+        modifier = modifier,
+        shape = MaterialTheme.shapes.medium,
+        color = MaterialTheme.colorScheme.surface,
+        border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+    ) {
+        Row(Modifier.padding(horizontal = 14.dp, vertical = 10.dp), verticalAlignment = Alignment.CenterVertically) {
+            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                Text(label, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text(value, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+            }
+            Icon(Lucide.AlarmClock, null, Modifier.size(18.dp), tint = MaterialTheme.colorScheme.secondary)
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun TimezoneField(value: String, onValueChange: (String) -> Unit) {
+    var expanded by remember { mutableStateOf(false) }
+    val common = remember {
+        listOf(
+            "America/Sao_Paulo",
+            "America/Manaus",
+            "America/Belem",
+            "America/Fortaleza",
+            "America/Recife",
+            "America/Cuiaba",
+            "America/Porto_Velho",
+            "America/Rio_Branco",
+            "America/Noronha",
+            "UTC",
+        )
+    }
+    val options = (listOf(value) + common)
+        .filter { it.isNotBlank() && (value.isBlank() || it.contains(value, ignoreCase = true)) }
+        .distinct()
+    Column(Modifier.fillMaxWidth()) {
+        ExposedDropdownMenuBox(expanded, { expanded = it }) {
+            OutlinedTextField(
+                value = value,
+                onValueChange = { onValueChange(it); expanded = true },
+                label = { Text(stringResource(R.string.schedule_timezone)) },
+                supportingText = { Text(stringResource(R.string.schedule_timezone_hint)) },
+                trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded) },
+                singleLine = true,
+                modifier = Modifier.menuAnchor(MenuAnchorType.PrimaryEditable).fillMaxWidth(),
+            )
+            ExposedDropdownMenu(expanded, { expanded = false }) {
+                options.forEach { zone ->
+                    DropdownMenuItem(
+                        text = { Text(zone) },
+                        onClick = { onValueChange(zone); expanded = false },
+                    )
+                }
+            }
+        }
+        TextButton(onClick = { onValueChange(ZoneId.systemDefault().id) }, modifier = Modifier.align(Alignment.End)) {
+            Text(stringResource(R.string.schedule_use_device_timezone))
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun ScheduleTimePickerDialog(initial: String, onDismiss: () -> Unit, onConfirm: (String) -> Unit) {
+    val (hour, minute) = remember(initial) { parseClock(initial) }
+    val state = rememberTimePickerState(initialHour = hour, initialMinute = minute, is24Hour = true)
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(stringResource(R.string.schedule_choose_time)) },
+        text = { TimePicker(state = state) },
+        confirmButton = {
+            TextButton(onClick = {
+                onConfirm("${state.hour.toString().padStart(2, '0')}:${state.minute.toString().padStart(2, '0')}")
+            }) {
+                Text(stringResource(R.string.save))
+            }
+        },
+        dismissButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.cancel)) } },
+    )
+}
+
+private fun parseClock(value: String): Pair<Int, Int> {
+    val parts = value.split(':')
+    val hour = parts.getOrNull(0)?.toIntOrNull()?.coerceIn(0, 23) ?: 0
+    val minute = parts.getOrNull(1)?.toIntOrNull()?.coerceIn(0, 59) ?: 0
+    return hour to minute
 }

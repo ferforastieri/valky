@@ -299,7 +299,10 @@ func (s *Service) Match(ctx context.Context, d Detection) ([]Rule, error) {
 		if d.Motion == nil && r.Motion != nil {
 			continue
 		}
-		if !r.Enabled || !contains(r.DetectorTypes, d.Type) || !activeAt(r.Schedule, d.OccurredAt) {
+		// O horário não bloqueia a detecção: eventos, histórico e mídia
+		// continuam existindo fora da janela. Ele só limita o alarme, que é
+		// decidido no momento de criar o evento.
+		if !r.Enabled || !contains(r.DetectorTypes, d.Type) {
 			delete(s.motionPending, r.ID)
 			delete(s.audioPending, r.ID+":"+d.Type)
 			continue
@@ -417,8 +420,9 @@ func activeAt(s Schedule, at time.Time) bool {
 	return containsInt(s.Days, day)
 }
 
-// ActiveAt is shared with the frame worker to avoid capture outside a schedule.
-func ActiveAt(s Schedule, at time.Time) bool { return activeAt(s, at) }
+// AlarmAllowed reports whether the alarm may fire at at. Detection, history,
+// media and notifications are not limited by the schedule.
+func AlarmAllowed(s Schedule, at time.Time) bool { return activeAt(s, at) }
 func clockMinutes(v string) (int, bool) {
 	if len(v) != 5 || v[2] != ':' {
 		return 0, false

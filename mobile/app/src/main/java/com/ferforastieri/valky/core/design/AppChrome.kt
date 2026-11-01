@@ -121,7 +121,7 @@ fun FloatingDock(
         tonalElevation = 1.dp,
     ) {
         Row(
-            modifier = Modifier.padding(horizontal = 7.dp, vertical = 6.dp),
+            modifier = Modifier.padding(horizontal = 7.dp, vertical = 5.dp),
             horizontalArrangement = Arrangement.spacedBy(6.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
@@ -152,13 +152,13 @@ fun FloatingDock(
             if (onBrand != null) {
                 Box(
                     modifier = Modifier
-                        .size(50.dp)
+                        .size(46.dp)
                         .clip(RoundedCornerShape(16.dp))
                         .background(if (brandSelected) MaterialTheme.colorScheme.secondaryContainer else Color.Transparent)
                         .clickable(onClick = onBrand),
                     contentAlignment = Alignment.Center,
                 ) {
-                    ValkyMark(Modifier.size(38.dp))
+                    ValkyMark(Modifier.size(35.dp))
                 }
             }
             for (index in half until items.size) destination(index)

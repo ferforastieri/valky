@@ -878,7 +878,7 @@ components:
         radiusMeters: {type: number, minimum: 20, maximum: 5000}
     Schedule:
       type: object
-      description: Empty means always active. Otherwise days use Sunday=0 and identify the starting day of each interval; end is exclusive. Overnight intervals continue on the following day. Requires valid IANA timezone and distinct HH:mm start/end.
+      description: Empty means the alarm may fire at any time. Otherwise days use Sunday=0 and identify the starting day of each interval; end is exclusive. Overnight intervals continue on the following day. Requires valid IANA timezone and distinct HH:mm start/end. The schedule limits only the alarm: detection, event history, media and notifications continue outside the window.
       properties:
         days: {type: array, items: {type: integer, minimum: 0, maximum: 6}}
         start: {type: string, pattern: '^\\d{2}:\\d{2}$'}

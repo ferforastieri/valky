@@ -113,7 +113,9 @@ func (m *Monitor) monitorVisual(ctx context.Context, cameraID string, fallback b
 				continue
 			}
 			for _, r := range all {
-				if r.Enabled && r.Motion != nil && rules.ActiveAt(r.Schedule, time.Now()) {
+				// Regras de região continuam amostrando fora do horário para
+				// manter o histórico; o horário só restringe o alarme.
+				if r.Enabled && r.Motion != nil {
 					regionRules = append(regionRules, r)
 				}
 			}

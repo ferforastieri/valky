@@ -20,6 +20,36 @@ func TestActiveAtOvernight(t *testing.T) {
 	}
 }
 
+func TestDetectionOutsideScheduleStillMatches(t *testing.T) {
+	db, err := store.Open(t.TempDir() + "/rules.db")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db.Close()
+	nowText := time.Now().UTC().Format(time.RFC3339Nano)
+	if _, err = db.DB.Exec(`INSERT INTO cameras(id,name,host,username_enc,password_enc,rtsp_uri_enc,created_at,updated_at) VALUES('cam','Nursery','10.0.0.3',x'01',x'01',x'01',?,?)`, nowText, nowText); err != nil {
+		t.Fatal(err)
+	}
+	service := NewService(db)
+	schedule := Schedule{Days: []int{1}, Start: "22:00", End: "06:00", Timezone: "UTC"}
+	rule, err := service.Create(context.Background(), Rule{CameraID: "cam", Name: "Night", DetectorTypes: []string{"motion"}, CooldownSeconds: 60, Schedule: schedule})
+	if err != nil {
+		t.Fatal(err)
+	}
+	noon := time.Date(2026, 8, 31, 12, 0, 0, 0, time.UTC)
+	matched, err := service.Match(context.Background(), Detection{CameraID: "cam", Type: "motion", Confidence: 1, OccurredAt: noon})
+	if err != nil || len(matched) != 1 || matched[0].ID != rule.ID {
+		t.Fatalf("detection outside schedule was dropped: %#v err=%v", matched, err)
+	}
+	if AlarmAllowed(schedule, noon) {
+		t.Fatal("alarm should be disabled outside the schedule")
+	}
+	night := time.Date(2026, 8, 31, 23, 0, 0, 0, time.UTC)
+	if !AlarmAllowed(schedule, night) {
+		t.Fatal("alarm should be allowed inside the schedule")
+	}
+}
+
 func TestConfirmationsAndCooldown(t *testing.T) {
 	db, err := store.Open(t.TempDir() + "/rules.db")
 	if err != nil {

@@ -51,7 +51,10 @@ func (s *Service) Submit(ctx context.Context, d rules.Detection) ([]event.Event,
 		if d.Metadata == nil {
 			d.Metadata = map[string]any{}
 		}
-		d.Metadata["alarm"] = rule.Actions.Alarm
+		// Fora da janela de horário a regra continua detectando, gravando e
+		// notificando; apenas o alarme sonoro é silenciado.
+		alarm := rule.Actions.Alarm && rules.AlarmAllowed(rule.Schedule, d.OccurredAt)
+		d.Metadata["alarm"] = alarm
 		ruleID := rule.ID
 		clipStatus := "not_requested"
 		if rule.Actions.Record {
@@ -63,7 +66,7 @@ func (s *Service) Submit(ctx context.Context, d rules.Detection) ([]event.Event,
 		}
 		created = append(created, e)
 		s.Hub.Broadcast(map[string]any{"type": "event.created", "event": e})
-		if rule.Actions.Notify || rule.Actions.Alarm {
+		if rule.Actions.Notify || alarm {
 			if err := s.Notify.Enqueue(ctx, e); err != nil {
 				s.Logger.Error("enqueue event notification", "event", e.ID, "error", err)
 			}
