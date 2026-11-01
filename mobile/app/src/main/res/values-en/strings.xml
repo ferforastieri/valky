@@ -224,14 +224,12 @@
     <string name="schedule_timezone_value">Time zone: %1$s</string>
     <string name="schedule_local_timezone">local time</string>
     <string name="schedule_timezone">Time zone</string>
-    <string name="schedule_timezone_hint">IANA time zone. Example: America/Sao_Paulo.</string>
-    <string name="schedule_use_device_timezone">Use phone time zone</string>
     <string name="schedule_start">Start</string>
     <string name="schedule_end">End</string>
     <string name="schedule_choose_time">Choose time</string>
     <string name="schedule_days_start_hint">Start days of the period</string>
     <string name="schedule_behavior_hint">Notifications and history continue outside the window. The alarm only sounds inside it.</string>
-    <string name="schedule_alarm_only_short">alarm only in this window</string>
+    <string name="schedule_alarm_only_short">Alarm only in this window</string>
     <string name="schedule_invalid">Select at least one day, distinct times and a valid time zone.</string>
     <string name="day_sun_short">Sun</string>
     <string name="day_mon_short">Mon</string>

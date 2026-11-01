@@ -14,6 +14,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import java.time.ZoneId
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
@@ -250,13 +251,25 @@ fun RuleEditorDialog(cameras: List<Camera>, detectors: List<DetectorKind>, exist
                     ScheduleSummary(RuleSchedule(days.sorted(), start, end, timezone))
                 }
                 Text(stringResource(R.string.schedule_days_start_hint), style = MaterialTheme.typography.labelLarge)
-                FlowRow(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(3.dp)) {
                     weekdayChips.forEach { (day, label) ->
-                        FilterChip(
-                            selected = day in days,
-                            onClick = { days = if (day in days) days - day else days + day },
-                            label = { Text(stringResource(label)) },
-                        )
+                        val selected = day in days
+                        Surface(
+                            onClick = { days = if (selected) days - day else days + day },
+                            modifier = Modifier.weight(1f).height(38.dp),
+                            shape = MaterialTheme.shapes.small,
+                            color = if (selected) MaterialTheme.colorScheme.secondary else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = .55f),
+                            contentColor = if (selected) MaterialTheme.colorScheme.onSecondary else MaterialTheme.colorScheme.onSurfaceVariant,
+                        ) {
+                            Box(contentAlignment = Alignment.Center) {
+                                Text(
+                                    stringResource(label),
+                                    style = MaterialTheme.typography.labelMedium,
+                                    fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
+                                    maxLines = 1,
+                                )
+                            }
+                        }
                     }
                 }
                 com.ferforastieri.valky.core.design.AdaptiveRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -264,6 +277,11 @@ fun RuleEditorDialog(cameras: List<Camera>, detectors: List<DetectorKind>, exist
                     ScheduleTimeButton(stringResource(R.string.schedule_end), end, { pickingEnd = true }, Modifier.weight(1f))
                 }
                 TimezoneField(timezone) { timezone = it }
+                Text(
+                    stringResource(R.string.schedule_behavior_hint),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
                 if (!validSchedule) Text(stringResource(R.string.schedule_invalid), color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
             }
             if (detector?.id == "motion") {
@@ -348,26 +366,36 @@ private fun RuleSectionTitle(title: String, description: String) {
 @Composable
 private fun RuleScheduleSummary(rule: Rule) {
     val scheduled = rule.schedule.start.isNotBlank()
+    val zone = rule.schedule.timezone
+    val showZone = scheduled && zone.isNotBlank() && zone != ZoneId.systemDefault().id
+    val detail = listOfNotNull(
+        if (showZone) scheduleTimezoneLabel(zone) else null,
+        if (scheduled && rule.actions.alarm) stringResource(R.string.schedule_alarm_only_short) else null,
+    ).joinToString(" · ")
     Surface(
-        modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
-        shape = MaterialTheme.shapes.medium,
-        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = .55f),
+        modifier = Modifier.fillMaxWidth().padding(top = 6.dp),
+        shape = MaterialTheme.shapes.small,
+        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = .45f),
     ) {
-        Row(Modifier.padding(horizontal = 12.dp, vertical = 9.dp), verticalAlignment = Alignment.CenterVertically) {
-            Icon(Lucide.AlarmClock, null, Modifier.size(18.dp), tint = MaterialTheme.colorScheme.secondary)
-            Spacer(Modifier.width(9.dp))
-            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+        Row(Modifier.padding(horizontal = 10.dp, vertical = 7.dp), verticalAlignment = Alignment.CenterVertically) {
+            Icon(Lucide.AlarmClock, null, Modifier.size(16.dp), tint = MaterialTheme.colorScheme.secondary)
+            Spacer(Modifier.width(8.dp))
+            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(1.dp)) {
                 Text(
                     if (scheduled) scheduleTitle(rule.schedule) else stringResource(R.string.schedule_always),
-                    style = MaterialTheme.typography.bodyMedium,
+                    style = MaterialTheme.typography.bodySmall,
                     fontWeight = FontWeight.Medium,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
                 )
-                if (scheduled) {
-                    val behavior = if (rule.actions.alarm) stringResource(R.string.schedule_alarm_only_short) else ""
-                    val detail = listOf(scheduleTimezoneLabel(rule.schedule.timezone), behavior)
-                        .filter { it.isNotBlank() }
-                        .joinToString(" · ")
-                    Text(detail, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                if (detail.isNotBlank()) {
+                    Text(
+                        detail,
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
                 }
             }
         }
@@ -378,20 +406,19 @@ private fun RuleScheduleSummary(rule: Rule) {
 private fun ScheduleSummary(schedule: RuleSchedule) {
     Surface(
         modifier = Modifier.fillMaxWidth(),
-        shape = MaterialTheme.shapes.large,
+        shape = MaterialTheme.shapes.medium,
         color = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = .65f),
     ) {
-        Row(Modifier.padding(14.dp), verticalAlignment = Alignment.CenterVertically) {
-            Icon(Lucide.AlarmClock, null, Modifier.size(22.dp), tint = MaterialTheme.colorScheme.secondary)
-            Spacer(Modifier.width(12.dp))
-            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
-                Text(scheduleTitle(schedule), style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
-                Text(
-                    stringResource(R.string.schedule_behavior_hint),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
+        Row(Modifier.padding(horizontal = 12.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+            Icon(Lucide.AlarmClock, null, Modifier.size(18.dp), tint = MaterialTheme.colorScheme.secondary)
+            Spacer(Modifier.width(8.dp))
+            Text(
+                scheduleTitle(schedule),
+                style = MaterialTheme.typography.bodyMedium,
+                fontWeight = FontWeight.SemiBold,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
         }
     }
 }
@@ -474,6 +501,7 @@ private fun TimezoneField(value: String, onValueChange: (String) -> Unit) {
     var expanded by remember { mutableStateOf(false) }
     val common = remember {
         listOf(
+            ZoneId.systemDefault().id,
             "America/Sao_Paulo",
             "America/Manaus",
             "America/Belem",
@@ -489,28 +517,22 @@ private fun TimezoneField(value: String, onValueChange: (String) -> Unit) {
     val options = (listOf(value) + common)
         .filter { it.isNotBlank() && (value.isBlank() || it.contains(value, ignoreCase = true)) }
         .distinct()
-    Column(Modifier.fillMaxWidth()) {
-        ExposedDropdownMenuBox(expanded, { expanded = it }) {
-            OutlinedTextField(
-                value = value,
-                onValueChange = { onValueChange(it); expanded = true },
-                label = { Text(stringResource(R.string.schedule_timezone)) },
-                supportingText = { Text(stringResource(R.string.schedule_timezone_hint)) },
-                trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded) },
-                singleLine = true,
-                modifier = Modifier.menuAnchor(MenuAnchorType.PrimaryEditable).fillMaxWidth(),
-            )
-            ExposedDropdownMenu(expanded, { expanded = false }) {
-                options.forEach { zone ->
-                    DropdownMenuItem(
-                        text = { Text(zone) },
-                        onClick = { onValueChange(zone); expanded = false },
-                    )
-                }
+    ExposedDropdownMenuBox(expanded, { expanded = it }) {
+        OutlinedTextField(
+            value = value,
+            onValueChange = { onValueChange(it); expanded = true },
+            label = { Text(stringResource(R.string.schedule_timezone)) },
+            trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded) },
+            singleLine = true,
+            modifier = Modifier.menuAnchor(MenuAnchorType.PrimaryEditable).fillMaxWidth(),
+        )
+        ExposedDropdownMenu(expanded, { expanded = false }) {
+            options.forEach { zone ->
+                DropdownMenuItem(
+                    text = { Text(zone) },
+                    onClick = { onValueChange(zone); expanded = false },
+                )
             }
-        }
-        TextButton(onClick = { onValueChange(ZoneId.systemDefault().id) }, modifier = Modifier.align(Alignment.End)) {
-            Text(stringResource(R.string.schedule_use_device_timezone))
         }
     }
 }

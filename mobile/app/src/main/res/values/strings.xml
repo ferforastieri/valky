@@ -224,14 +224,12 @@
     <string name="schedule_timezone_value">Fuso: %1$s</string>
     <string name="schedule_local_timezone">horário local</string>
     <string name="schedule_timezone">Fuso horário</string>
-    <string name="schedule_timezone_hint">Fuso IANA. Ex.: America/Sao_Paulo.</string>
-    <string name="schedule_use_device_timezone">Usar fuso do celular</string>
     <string name="schedule_start">Início</string>
     <string name="schedule_end">Fim</string>
     <string name="schedule_choose_time">Escolher horário</string>
     <string name="schedule_days_start_hint">Dias de início do período</string>
     <string name="schedule_behavior_hint">Notificações e histórico continuam fora do horário. O alarme só toca dentro dele.</string>
-    <string name="schedule_alarm_only_short">alarme só neste horário</string>
+    <string name="schedule_alarm_only_short">Alarme só neste horário</string>
     <string name="schedule_invalid">Selecione ao menos um dia, horários diferentes e um fuso válido.</string>
     <string name="day_sun_short">Dom</string>
     <string name="day_mon_short">Seg</string>
