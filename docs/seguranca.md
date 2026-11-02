@@ -33,9 +33,9 @@ A credencial é revalidada a cada requisição: o backend resolve o token opaco 
 
 ## Cifra em repouso
 
-- Credenciais de câmera, URI RTSP, chave local da lâmpada, token da TV e a conta de serviço do FCM são cifrados com **AES-256-GCM** usando a chave mestra de `/data/secrets/master.key`.
+- Credenciais de câmera, URI RTSP, chave local da lâmpada, token da TV e a conta de serviço do FCM são cifrados com **AES-256-GCM** usando a chave mestra de `/data/secrets/master.key`. A única saída da chave local da lâmpada é o endpoint **admin-only** de credencial BLE, autenticado por HTTPS, para o app controlar a lâmpada por Bluetooth quando ela está sem IP.
 - A chave mestra é criada com permissão `0600`, revalidada a cada inicialização, e fica no volume `valky-data`, que só o container da aplicação monta.
-- Tokens de dispositivo, sessões de navegador e convites são gravados apenas como hash SHA-256; a API nunca devolve segredos.
+- Tokens de dispositivo, sessões de navegador e convites são gravados apenas como hash SHA-256; a API não devolve esses segredos. A exceção deliberada é a credencial BLE da lâmpada, entregue somente a administrador para o canal local por Bluetooth.
 - O AES-GCM não usa dados autenticados adicionais (AAD), o que exigiria migrar o conteúdo já cifrado — é um limite conhecido.
 
 ## Limites por minuto

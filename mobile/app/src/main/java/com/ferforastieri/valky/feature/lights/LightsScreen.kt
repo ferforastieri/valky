@@ -127,6 +127,7 @@ import com.ferforastieri.valky.core.design.ValkySkeleton
     var address by rememberSaveable{mutableStateOf("")}
     var deviceId by rememberSaveable{mutableStateOf("")}
     var localKey by rememberSaveable{mutableStateOf("")}
+    var productId by rememberSaveable{mutableStateOf("")}
     val ready=address.isNotBlank()&&deviceId.isNotBlank()&&localKey.trim().length==16&&!running
     ValkyBottomSheet(
         title=stringResource(R.string.add_light),
@@ -136,7 +137,7 @@ import com.ferforastieri.valky.core.design.ValkySkeleton
         actions={
             TextButton(onClick=onDismiss,enabled=!running){Text(stringResource(R.string.cancel))}
             Button(
-                onClick={onSubmit(LightRegistration(address=address.trim(),deviceId=deviceId.trim(),localKey=localKey.trim(),name=name.trim())){ok->if(ok)onDismiss()}},
+                onClick={onSubmit(LightRegistration(address=address.trim(),deviceId=deviceId.trim(),localKey=localKey.trim(),name=name.trim(),productId=productId.trim())){ok->if(ok)onDismiss()}},
                 enabled=ready,
             ){Text(stringResource(R.string.save))}
         },
@@ -152,7 +153,7 @@ import com.ferforastieri.valky.core.design.ValkySkeleton
                 }
             }
             state.candidates.forEach{candidate->
-                Surface(onClick={address=candidate.address;if(candidate.deviceId.isNotBlank())deviceId=candidate.deviceId},modifier=Modifier.fillMaxWidth(),shape=MaterialTheme.shapes.medium,color=MaterialTheme.colorScheme.surfaceVariant){
+                Surface(onClick={address=candidate.address;if(candidate.deviceId.isNotBlank())deviceId=candidate.deviceId;if(candidate.productKey.isNotBlank())productId=candidate.productKey},modifier=Modifier.fillMaxWidth(),shape=MaterialTheme.shapes.medium,color=MaterialTheme.colorScheme.surfaceVariant){
                     Row(Modifier.fillMaxWidth().padding(horizontal=14.dp,vertical=10.dp),verticalAlignment=Alignment.CenterVertically){
                         Icon(Lucide.Wifi,null,Modifier.size(18.dp),tint=MaterialTheme.colorScheme.secondary)
                         Spacer(Modifier.width(10.dp))

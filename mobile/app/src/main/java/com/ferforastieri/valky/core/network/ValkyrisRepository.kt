@@ -7,6 +7,8 @@ import com.ferforastieri.valky.core.model.ValkyEvent
 import com.ferforastieri.valky.core.model.TrackedPerson
 import com.ferforastieri.valky.core.model.TrackedPlace
 import com.ferforastieri.valky.core.model.*
+import com.ferforastieri.valky.core.ble.TuyaBleLight
+import java.util.concurrent.ConcurrentHashMap
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -43,6 +45,8 @@ class ValkyRepository @Inject constructor(
     val places = _places.asStateFlow()
     private val _lights = MutableStateFlow<List<LightDevice>>(emptyList())
     val lights = _lights.asStateFlow()
+    /** Chave/DP para o BLE, buscada no backend só quando o Wi-Fi falha. */
+    private val bleCredentials = ConcurrentHashMap<String, LightBle>()
     private val _remotes = MutableStateFlow<List<RemoteDevice>>(emptyList())
     val remotes = _remotes.asStateFlow()
 
@@ -106,9 +110,52 @@ class ValkyRepository @Inject constructor(
         runCatching { com.ferforastieri.valky.feature.widgets.WidgetBridge.publishLights(appContext, lights) }
     }
     suspend fun refreshRemotes() = api.remotes().also { _remotes.value = it }
-    suspend fun controlLight(id: String, patch: LightStatePatch) = api.controlLight(id, patch).also { updated ->
-        _lights.update { list -> list.map { if (it.id == id) updated else it } }
-        runCatching { com.ferforastieri.valky.feature.widgets.WidgetBridge.publishLights(appContext, _lights.value) }
+    suspend fun controlLight(id: String, patch: LightStatePatch): LightDevice {
+        val current = _lights.value.firstOrNull { it.id == id }
+        var failure: Throwable? = null
+
+        suspend fun viaApi(): LightDevice = api.controlLight(id, patch).also { updated ->
+            _lights.update { list -> list.map { if (it.id == id) updated else it } }
+            runCatching { com.ferforastieri.valky.feature.widgets.WidgetBridge.publishLights(appContext, _lights.value) }
+        }
+
+        suspend fun viaBle(): LightDevice {
+            val light = current ?: throw failure ?: IllegalStateException("Lâmpada não carregada")
+            val credential = bleCredentials[id] ?: api.lightBle(id).also { bleCredentials[id] = it }
+            val state = TuyaBleLight(appContext).control(light, credential, patch)
+            val updated = light.copy(state = state)
+            _lights.update { list -> list.map { if (it.id == id) updated else it } }
+            runCatching { com.ferforastieri.valky.feature.widgets.WidgetBridge.publishLights(appContext, _lights.value) }
+            return updated
+        }
+
+        // Estado online: o caminho normal é o backend. Offline: o celular tenta
+        // o Bluetooth primeiro. Em qualquer falha recuperável, o outro caminho
+        // ainda é tentado uma vez.
+        val preferBle = current?.state?.online == false
+        if (!preferBle) {
+            try {
+                return viaApi()
+            } catch (error: Throwable) {
+                failure = error
+                if (error is ApiException && error.status != null && error.status !in 500..599) throw error
+            }
+            try {
+                return viaBle()
+            } catch (error: Throwable) {
+                throw failure ?: error
+            }
+        }
+        try {
+            return viaBle()
+        } catch (error: Throwable) {
+            failure = error
+        }
+        try {
+            return viaApi()
+        } catch (error: Throwable) {
+            throw failure ?: error
+        }
     }
     suspend fun deleteLight(id: String) { api.deleteLight(id); _lights.update { list -> list.filterNot { it.id == id } } }
 

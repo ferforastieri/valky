@@ -37,6 +37,7 @@ CREATE TABLE IF NOT EXISTS lights (
   id TEXT PRIMARY KEY,
   name TEXT NOT NULL,
   device_id TEXT NOT NULL UNIQUE,
+  product_id TEXT NOT NULL DEFAULT '',
   local_key_enc BLOB NOT NULL,
   protocol_version REAL NOT NULL DEFAULT 3.3,
   last_ip TEXT NOT NULL DEFAULT '',

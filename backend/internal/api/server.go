@@ -158,6 +158,7 @@ func (s *Server) Handler() http.Handler {
 	protected.Handle("POST /lights", s.auth.RequireAdmin(http.HandlerFunc(s.registerLight)))
 	protected.Handle("POST /lights/discovery", s.auth.RequireAdmin(http.HandlerFunc(s.discoverLights)))
 	protected.HandleFunc("GET /lights/{id}", s.getLight)
+	protected.Handle("GET /lights/{id}/ble", s.auth.RequireAdmin(http.HandlerFunc(s.lightBLE)))
 	protected.Handle("PUT /lights/{id}", s.auth.RequireAdmin(http.HandlerFunc(s.updateLight)))
 	protected.Handle("DELETE /lights/{id}", s.auth.RequireAdmin(http.HandlerFunc(s.deleteLight)))
 	protected.HandleFunc("PUT /lights/{id}/state", s.controlLight)

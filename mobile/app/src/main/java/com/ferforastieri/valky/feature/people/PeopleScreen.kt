@@ -80,6 +80,8 @@ fun PeopleScreen(onPerson: (String) -> Unit = {}, vm: PeopleViewModel = hiltView
     var areasOpen by remember { mutableStateOf(false) }
     var alertsOpen by remember { mutableStateOf(false) }
     var deletingPlace by remember { mutableStateOf<TrackedPlace?>(null) }
+    var selectedPerson by remember { mutableStateOf<String?>(null) }
+    var focusRequest by remember { mutableStateOf(0) }
 
     Box(Modifier.fillMaxSize()) {
     Column(Modifier.fillMaxSize().padding(horizontal = 18.dp)) {
@@ -105,6 +107,9 @@ fun PeopleScreen(onPerson: (String) -> Unit = {}, vm: PeopleViewModel = hiltView
             FamilyMap(
                 users = users,
                 places = places,
+                selectedId = selectedPerson,
+                focusRequest = focusRequest,
+                onSelect = { selectedPerson = it },
                 modifier = Modifier.fillMaxSize().clip(MaterialTheme.shapes.extraLarge),
             )
         }
@@ -124,7 +129,11 @@ fun PeopleScreen(onPerson: (String) -> Unit = {}, vm: PeopleViewModel = hiltView
                 }
                 if (users.isEmpty()) item { EmptyUsers() }
                 items(users, key = { it.id }) { user ->
-                    UserCard(user) { onPerson(user.id) }
+                    UserCard(
+                        user = user,
+                        onClick = { selectedPerson = user.id; focusRequest += 1 },
+                        onHistory = { onPerson(user.id) },
+                    )
                 }
             }
         }
@@ -187,8 +196,17 @@ fun PeopleScreen(onPerson: (String) -> Unit = {}, vm: PeopleViewModel = hiltView
 }
 
 @Composable
-internal fun FamilyMap(users: List<TrackedPerson>, places: List<TrackedPlace>, modifier: Modifier = Modifier, route: List<PersonLocation> = emptyList()) {
-    var selectedId by remember { mutableStateOf<String?>(null) }
+internal fun FamilyMap(
+    users: List<TrackedPerson>,
+    places: List<TrackedPlace>,
+    selectedId: String?,
+    focusRequest: Int,
+    onSelect: (String?) -> Unit,
+    modifier: Modifier = Modifier,
+    route: List<PersonLocation> = emptyList(),
+) {
+    val currentOnSelect by rememberUpdatedState(onSelect)
+    val lastFocus = remember { arrayOfNulls<String>(1) }
     val mapStyle = currentMapVisualStyle()
     val surface = MaterialTheme.colorScheme.surface.toArgb()
     val foreground = MaterialTheme.colorScheme.onSurface.toArgb()
@@ -198,7 +216,7 @@ internal fun FamilyMap(users: List<TrackedPerson>, places: List<TrackedPlace>, m
         MapView(context).apply {
             setTileSource(valkyTileSource(mapStyle)); setMultiTouchControls(true); controller.setZoom(13.5); controller.setCenter(GeoPoint(-23.5505, -46.6333))
             overlays.add(MapEventsOverlay(object : MapEventsReceiver {
-                override fun singleTapConfirmedHelper(point: GeoPoint): Boolean { selectedId = null; return false }
+                override fun singleTapConfirmedHelper(point: GeoPoint): Boolean { currentOnSelect(null); return false }
                 override fun longPressHelper(point: GeoPoint) = false
             }))
         }
@@ -227,7 +245,7 @@ internal fun FamilyMap(users: List<TrackedPerson>, places: List<TrackedPlace>, m
         users.forEach { user ->
             val lat = user.lastLatitude ?: return@forEach; val lon = user.lastLongitude ?: return@forEach
             map.overlays.add(Marker(map).apply {
-                setOnMarkerClickListener { _, _ -> selectedId = if (selectedId == user.id) null else user.id; if (selectedId != null) map.controller.animateTo(position); true }
+                setOnMarkerClickListener { _, _ -> currentOnSelect(if (selectedId == user.id) null else user.id); true }
                 val density = map.resources.displayMetrics.density
                 val label = android.widget.TextView(map.context).apply {
                     text = "${user.name}\n${user.lastLocatedAt?.let { formatTime(it) } ?: "Sem atualização"}"
@@ -238,7 +256,7 @@ internal fun FamilyMap(users: List<TrackedPerson>, places: List<TrackedPlace>, m
                     elevation = 5*density
                     maxWidth = (240*density).toInt()
                     gravity = android.view.Gravity.CENTER
-                    setOnClickListener { selectedId = null }
+                    setOnClickListener { currentOnSelect(null) }
                 }
                 setInfoWindow(object : InfoWindow(label,map) { override fun onOpen(item: Any?) {} ; override fun onClose() {} })
                 setInfoWindowAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_TOP)
@@ -248,6 +266,20 @@ internal fun FamilyMap(users: List<TrackedPerson>, places: List<TrackedPlace>, m
                 setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_BOTTOM)
                 if (selectedId == user.id) showInfoWindow()
             })
+        }
+        val focusToken = selectedId?.let { "$it:$focusRequest" }
+        if (focusToken != null && lastFocus[0] != focusToken) {
+            lastFocus[0] = focusToken
+            users.firstOrNull { it.id == selectedId }?.let { user ->
+                val lat = user.lastLatitude
+                val lon = user.lastLongitude
+                if (lat != null && lon != null && lat.isFinite() && lon.isFinite()) {
+                    map.controller.setZoom(17.0)
+                    map.controller.animateTo(GeoPoint(lat, lon))
+                }
+            }
+        } else if (selectedId == null) {
+            lastFocus[0] = null
         }
         val located = users.filter { it.lastLatitude?.isFinite() == true && it.lastLongitude?.isFinite() == true }
         val participantIds = located.map { it.id }.sorted()
@@ -262,7 +294,7 @@ internal fun FamilyMap(users: List<TrackedPerson>, places: List<TrackedPlace>, m
                     map.zoomToBoundingBox(BoundingBox.fromGeoPoints(coordinates), false, padding, 18.0, null)
                 }
             }
-        } else if (located.isNotEmpty() && map.tag != participantIds) {
+        } else if (selectedId == null && located.isNotEmpty() && map.tag != participantIds) {
             map.tag = participantIds
             val coordinates = located.map { GeoPoint(it.lastLatitude!!, it.lastLongitude!!) }
             map.post {
@@ -455,8 +487,8 @@ private fun EmptyUsers() = Surface(shape = MaterialTheme.shapes.large, color = M
 }
 
 @Composable
-private fun UserCard(user: TrackedPerson, onHistory: () -> Unit) = Card(
-    modifier = Modifier.fillMaxWidth().clickable(onClick = onHistory),
+private fun UserCard(user: TrackedPerson, onClick: () -> Unit, onHistory: () -> Unit) = Card(
+    modifier = Modifier.fillMaxWidth().clickable(onClick = onClick),
     colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
     border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
 ) {
@@ -475,7 +507,9 @@ private fun UserCard(user: TrackedPerson, onHistory: () -> Unit) = Card(
                 modifier = Modifier.padding(end = 10.dp),
             )
         }
-        Icon(Lucide.History, "Abrir histórico", tint = MaterialTheme.colorScheme.onSurfaceVariant)
+        IconButton(onClick = onHistory) {
+            Icon(Lucide.History, "Abrir histórico", tint = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
     }
 }
 

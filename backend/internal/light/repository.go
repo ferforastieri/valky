@@ -23,7 +23,7 @@ func NewRepository(s *store.Store, v *appcrypto.Vault) *Repository {
 	return &Repository{store: s, vault: v}
 }
 
-const lightColumns = `id,name,capabilities_json,setup_status,setup_error,enabled,last_seen_at,created_at,updated_at,favorite,dp_mapping_json,protocol_version,device_id`
+const lightColumns = `id,name,capabilities_json,setup_status,setup_error,enabled,last_seen_at,created_at,updated_at,favorite,dp_mapping_json,protocol_version,device_id,product_id`
 
 func (r *Repository) List(ctx context.Context) ([]Light, error) {
 	rows, err := r.store.DB.QueryContext(ctx, `SELECT `+lightColumns+` FROM lights ORDER BY name COLLATE NOCASE`)
@@ -73,8 +73,8 @@ func (r *Repository) Create(ctx context.Context, item Light, credentials Credent
 		return Light{}, err
 	}
 	now := time.Now().UTC()
-	_, err = r.store.DB.ExecContext(ctx, `INSERT INTO lights(id,name,device_id,local_key_enc,protocol_version,last_ip,capabilities_json,dp_mapping_json,setup_status,setup_error,enabled,favorite,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
-		item.ID, item.Name, item.DeviceID, sealed, item.ProtocolVersion, credentials.Address,
+	_, err = r.store.DB.ExecContext(ctx, `INSERT INTO lights(id,name,device_id,product_id,local_key_enc,protocol_version,last_ip,capabilities_json,dp_mapping_json,setup_status,setup_error,enabled,favorite,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+		item.ID, item.Name, item.DeviceID, item.ProductID, sealed, item.ProtocolVersion, credentials.Address,
 		mustJSON(item.Capabilities), item.DPMapping, item.SetupStatus, item.SetupError, boolToInt(item.Enabled), boolToInt(item.Favorite),
 		now.Format(time.RFC3339Nano), now.Format(time.RFC3339Nano))
 	if err != nil {
@@ -136,7 +136,7 @@ func scanLight(s rowScanner) (Light, error) {
 	var lastSeen sql.NullString
 	var enabled, favorite int
 	var version float64
-	err := s.Scan(&item.ID, &item.Name, &capsJSON, &item.SetupStatus, &item.SetupError, &enabled, &lastSeen, &created, &updated, &favorite, &mapping, &version, &item.DeviceID)
+	err := s.Scan(&item.ID, &item.Name, &capsJSON, &item.SetupStatus, &item.SetupError, &enabled, &lastSeen, &created, &updated, &favorite, &mapping, &version, &item.DeviceID, &item.ProductID)
 	if err != nil {
 		return item, err
 	}
@@ -152,7 +152,7 @@ func scanLightWithCredentials(s rowScanner, vault *appcrypto.Vault) (Light, Cred
 	var version float64
 	var sealed []byte
 	var cred Credentials
-	err := s.Scan(&item.ID, &item.Name, &capsJSON, &item.SetupStatus, &item.SetupError, &enabled, &lastSeen, &created, &updated, &favorite, &mapping, &version, &item.DeviceID, &sealed, &cred.Address)
+	err := s.Scan(&item.ID, &item.Name, &capsJSON, &item.SetupStatus, &item.SetupError, &enabled, &lastSeen, &created, &updated, &favorite, &mapping, &version, &item.DeviceID, &item.ProductID, &sealed, &cred.Address)
 	if err != nil {
 		return item, cred, err
 	}

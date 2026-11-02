@@ -94,6 +94,7 @@ func Open(path string) (*Store, error) {
 		{"remotes", "mac", `ALTER TABLE remotes ADD COLUMN mac TEXT NOT NULL DEFAULT ''`, ""},
 		{"cameras", "favorite", `ALTER TABLE cameras ADD COLUMN favorite INTEGER NOT NULL DEFAULT 0`, ""},
 		{"lights", "favorite", `ALTER TABLE lights ADD COLUMN favorite INTEGER NOT NULL DEFAULT 0`, ""},
+		{"lights", "product_id", `ALTER TABLE lights ADD COLUMN product_id TEXT NOT NULL DEFAULT ''`, ""},
 		{"remotes", "favorite", `ALTER TABLE remotes ADD COLUMN favorite INTEGER NOT NULL DEFAULT 0`, ""},
 	} {
 		exists, migrationErr := columnExists(ctx, db, migration.table, migration.column)

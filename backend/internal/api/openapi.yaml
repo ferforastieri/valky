@@ -274,6 +274,13 @@ paths:
       summary: Remove a light from Valky (administrator only)
       parameters: [{$ref: '#/components/parameters/id'}]
       responses: {'200': {description: Removed}}
+  /lights/{id}/ble:
+    get:
+      summary: Local BLE credentials and data point layout (administrator only)
+      parameters: [{$ref: '#/components/parameters/id'}]
+      responses:
+        '200': {description: BLE credentials in APIResponse.data}
+        '404': {description: Light not found}
   /lights/{id}/state:
     put:
       summary: Control a light directly over the local network
@@ -678,6 +685,7 @@ components:
         id: {type: string, format: uuid}
         name: {type: string}
         deviceId: {type: string, readOnly: true, description: Identifier the device announces on the local network}
+        productId: {type: string, readOnly: true, description: Manufacturer product identifier used by the BLE channel}
         protocolVersion: {type: number, description: Local protocol version detected while registering}
         lastAddress: {type: string, readOnly: true, description: Last address that answered on the local network}
         capabilities: {$ref: '#/components/schemas/LightCapabilities'}
@@ -709,7 +717,18 @@ components:
         address: {type: string, description: Address of the lamp on the local network}
         deviceId: {type: string, description: Identifier the device announces on the local network}
         localKey: {type: string, minLength: 16, maxLength: 16, description: 16 character local key issued when the lamp was configured}
+        productId: {type: string, description: Optional; manufacturer product identifier used by the BLE channel}
         protocolVersion: {type: number, description: Optional; detected against the device when omitted}
+    LightBLECredential:
+      type: object
+      required: [deviceId, localKey, protocolVersion, dpMapping]
+      description: Local material the app uses to control the lamp over Bluetooth.
+      properties:
+        deviceId: {type: string}
+        productId: {type: string}
+        localKey: {type: string, description: 16 character local key; secret}
+        protocolVersion: {type: number}
+        dpMapping: {type: object, additionalProperties: true, description: Data point layout of the device}
     LightDiscoveryInput:
       type: object
       properties:

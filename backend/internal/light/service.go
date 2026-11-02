@@ -3,6 +3,7 @@ package light
 import (
 	"context"
 	"database/sql"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"log/slog"
@@ -161,6 +162,7 @@ func (s *Service) Register(ctx context.Context, in RegisterInput) (Light, error)
 		ID:              uuid.NewString(),
 		Name:            name,
 		DeviceID:        deviceID,
+		ProductID:       strings.TrimSpace(in.ProductID),
 		ProtocolVersion: result.Version,
 		Capabilities:    result.Capabilities,
 		DPMapping:       result.Mapping,
@@ -235,6 +237,26 @@ func (s *Service) Get(ctx context.Context, id string) (Light, error) {
 	item.State = s.states[id]
 	s.mu.RUnlock()
 	return item, nil
+}
+
+// BLE returns the local material the app needs to reach the light over
+// Bluetooth. The route is admin-only: the local key also authorizes control.
+func (s *Service) BLE(ctx context.Context, id string) (BLECredential, error) {
+	item, credentials, err := s.repo.Get(ctx, id)
+	if err != nil {
+		return BLECredential{}, err
+	}
+	mapping := json.RawMessage(item.DPMapping)
+	if len(mapping) == 0 || !json.Valid(mapping) {
+		mapping = json.RawMessage(`{}`)
+	}
+	return BLECredential{
+		DeviceID:        item.DeviceID,
+		ProductID:       item.ProductID,
+		LocalKey:        credentials.Secret,
+		ProtocolVersion: item.ProtocolVersion,
+		DPMapping:       mapping,
+	}, nil
 }
 
 func (s *Service) Delete(ctx context.Context, id string) error {

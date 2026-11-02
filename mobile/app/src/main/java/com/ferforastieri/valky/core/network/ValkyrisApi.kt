@@ -271,6 +271,7 @@ class ValkyApi(
     suspend fun discoverLights(): List<LightCandidate> = post("/lights/discovery", emptyMap<String, String>())
     suspend fun updateLight(id: String, input: LightUpdate): LightDevice = put("/lights/$id", input, announceBackend = true)
     suspend fun controlLight(id: String, patch: LightStatePatch): LightDevice = put("/lights/$id/state", patch)
+    suspend fun lightBle(id: String): LightBle = get("/lights/$id/ble")
     suspend fun deleteLight(id: String) {
         val current = requireNotNull(session())
         executeUnit(current.fingerprint, announceBackend = true) {

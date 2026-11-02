@@ -136,6 +136,7 @@ Todas sob `/api/v1`. "Autenticado" = qualquer token de dispositivo válido; "Adm
 | `POST` | `/lights` | Admin | Cadastra uma lâmpada Tuya (endereço, Device ID e chave local). |
 | `POST` | `/lights/discovery` | Admin | Procura lâmpadas na rede local. |
 | `GET` | `/lights/{id}` | Autenticado | Estado e capacidades da lâmpada. |
+| `GET` | `/lights/{id}/ble` | Admin | Chave local e data points para o controle BLE de reserva. |
 | `PUT` | `/lights/{id}` | Admin | Edita nome e configuração. |
 | `DELETE` | `/lights/{id}` | Admin | Remove a lâmpada. |
 | `PUT` | `/lights/{id}/state` | Autenticado | Liga/desliga, cor, branco e brilho. |

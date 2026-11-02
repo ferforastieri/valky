@@ -1,6 +1,9 @@
 package light
 
-import "time"
+import (
+	"encoding/json"
+	"time"
+)
 
 type Capabilities struct {
 	Brightness       bool `json:"brightness"`
@@ -43,6 +46,9 @@ type Light struct {
 	LastAddress string `json:"lastAddress,omitempty"`
 	// DeviceID is the identifier the device announces on the local network.
 	DeviceID string `json:"deviceId,omitempty"`
+	// ProductID is the Tuya product identifier. The BLE channel needs it to
+	// derive the device UUID from the advertisement.
+	ProductID string `json:"productId,omitempty"`
 	// ProtocolVersion is the local protocol version the device speaks. It is
 	// detected while pairing and can be corrected by the administrator.
 	ProtocolVersion float64 `json:"protocolVersion,omitempty"`
@@ -54,6 +60,17 @@ type Light struct {
 type Credentials struct {
 	Secret  string
 	Address string
+}
+
+// BLECredential is the local material the app needs to speak the Tuya BLE
+// channel directly. It is served only to administrators, over the authenticated
+// API, because the local key also authorizes local control.
+type BLECredential struct {
+	DeviceID        string          `json:"deviceId"`
+	ProductID       string          `json:"productId,omitempty"`
+	LocalKey        string          `json:"localKey"`
+	ProtocolVersion float64         `json:"protocolVersion"`
+	DPMapping       json.RawMessage `json:"dpMapping"`
 }
 
 type StatePatch struct {
@@ -89,5 +106,6 @@ type RegisterInput struct {
 	Address         string  `json:"address"`
 	DeviceID        string  `json:"deviceId"`
 	LocalKey        string  `json:"localKey"`
+	ProductID       string  `json:"productId,omitempty"`
 	ProtocolVersion float64 `json:"protocolVersion,omitempty"`
 }

@@ -1,5 +1,6 @@
 package com.ferforastieri.valky.core.model
 
+import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.JsonElement
 
@@ -18,10 +19,24 @@ import kotlinx.serialization.json.JsonElement
     @kotlinx.serialization.EncodeDefault val value:Int=100,
 )
 @Serializable data class LightState(val online:Boolean=false,val power:Boolean=false,val mode:String="white",val brightness:Int=100,val temperatureKelvin:Int=4000,val color:LightColor=LightColor(),val updatedAt:String="")
-@Serializable data class LightDevice(val id:String,val name:String,val capabilities:LightCapabilities=LightCapabilities(),val setupStatus:String="pending",val setupError:String="",val favorite:Boolean=false,val enabled:Boolean=true,val lastSeenAt:String?=null,val state:LightState=LightState(),val deviceId:String="",val protocolVersion:Double=0.0,val lastAddress:String="")
+@Serializable data class LightDevice(val id:String,val name:String,val capabilities:LightCapabilities=LightCapabilities(),val setupStatus:String="pending",val setupError:String="",val favorite:Boolean=false,val enabled:Boolean=true,val lastSeenAt:String?=null,val state:LightState=LightState(),val deviceId:String="",val productId:String="",val protocolVersion:Double=0.0,val lastAddress:String="")
 @Serializable data class LightStatePatch(val power:Boolean?=null,val mode:String?=null,val brightness:Int?=null,val temperatureKelvin:Int?=null,val color:LightColor?=null)
-@Serializable data class LightRegistration(val address:String,val deviceId:String,val localKey:String,val name:String="",val protocolVersion:Double=0.0)
+@Serializable data class LightRegistration(val address:String,val deviceId:String,val localKey:String,val name:String="",val productId:String="",val protocolVersion:Double=0.0)
 @Serializable data class LightCandidate(val address:String="",val deviceId:String="",val version:Double=0.0,val productKey:String="",val mac:String="")
+@Serializable data class LightBle(val deviceId:String,val productId:String="",val localKey:String,val protocolVersion:Double=0.0,val dpMapping:LightDpMapping=LightDpMapping())
+@Serializable data class LightDpMapping(
+    val name:String="modern",
+    @SerialName("switch") val switchDp:String="20",
+    val mode:String?=null,
+    val brightness:String?=null,
+    val temperature:String?=null,
+    val colour:String?=null,
+    val brightnessMin:Int=10,
+    val brightnessMax:Int=1000,
+    val temperatureMin:Int=0,
+    val temperatureMax:Int=1000,
+    val colourFormat:String="hsv16",
+)
 @Serializable data class LightUpdate(val name:String?=null,val enabled:Boolean?=null)
 @Serializable data class RemoteDevice(val id:String="",val name:String,val kind:String="smart_tv",val host:String,val port:Int=8002,val mac:String="",val setupStatus:String="pending",val setupError:String="",val tokenConfigured:Boolean=false,val favorite:Boolean=false,val enabled:Boolean=true,val lastSeenAt:String?=null,val createdAt:String="",val updatedAt:String="")
 @Serializable data class RemoteInput(val name:String,val kind:String="smart_tv",val host:String,val port:Int=8002)

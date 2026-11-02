@@ -77,7 +77,9 @@ Pegue o **User Code** no aplicativo (aba **Meu** → engrenagem → **Conta e Se
 
 Brilho é guardado em porcentagem e temperatura em Kelvin: o valor bruto do firmware nunca chega ao aplicativo, e a temperatura é mapeada linearmente entre 2700 K e 6500 K. A descoberta também pode ser conferida no servidor com `go run ./cmd/lightscan` (`-probe` testa a porta de controle).
 
-**Segurança:** a chave local é cifrada no SQLite com a chave mestra AES-256-GCM; a API nunca devolve a chave; todos os comandos passam pelo backend autenticado; só administradores cadastram, renomeiam, removem ou mudam a configuração, e qualquer usuário autenticado opera uma lâmpada já cadastrada. A descoberta só envia tráfego para as sub-redes locais do host, nunca para a internet.
+**Segurança:** a chave local é cifrada no SQLite com a chave mestra AES-256-GCM. A API só devolve a chave no endpoint **admin-only** de credencial BLE (`GET /lights/{id}/ble`), usado pelo celular do administrador para falar com a lâmpada quando ela está sem IP; os demais comandos continuam passando pelo backend autenticado. Só administradores cadastram, renomeiam, removem ou mudam a configuração, e qualquer usuário autenticado opera uma lâmpada já cadastrada. A descoberta só envia tráfego para as sub-redes locais do host, nunca para a internet.
+
+**Bluetooth (reserva):** quando a lâmpada perde o Wi-Fi, o aplicativo do administrador busca a chave e o layout de data points no endpoint acima e fala direto com o BLE da Tuya — sem nuvem, sem servidor no caminho. O celular precisa estar perto e ter a permissão de Bluetooth; o estado é atualizado localmente e o backend sincroniza quando a lâmpada volta para a rede. Não há botão novo: o BLE só entra quando o comando pelo backend falha ou a lâmpada está marcada como offline.
 
 ## Controle remoto de TVs
 

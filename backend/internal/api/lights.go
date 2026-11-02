@@ -30,6 +30,22 @@ func (s *Server) getLight(w http.ResponseWriter, r *http.Request) {
 	writeSuccess(w, http.StatusOK, "Light loaded", item)
 }
 
+// lightBLE entrega ao aplicativo a chave local e o layout de data points para
+// o controle direto por Bluetooth. Rota só de administrador: a mesma chave
+// autoriza o controle local da lâmpada.
+func (s *Server) lightBLE(w http.ResponseWriter, r *http.Request) {
+	credential, err := s.lights.BLE(r.Context(), r.PathValue("id"))
+	if errors.Is(err, sql.ErrNoRows) {
+		writeError(w, http.StatusNotFound, err)
+		return
+	}
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, err)
+		return
+	}
+	writeSuccess(w, http.StatusOK, "Light BLE credentials loaded", credential)
+}
+
 func (s *Server) deleteLight(w http.ResponseWriter, r *http.Request) {
 	id := r.PathValue("id")
 	if err := s.lights.Delete(r.Context(), id); errors.Is(err, sql.ErrNoRows) {

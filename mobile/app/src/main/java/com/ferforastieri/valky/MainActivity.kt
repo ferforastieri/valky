@@ -1,6 +1,9 @@
 package com.ferforastieri.valky
 
+import android.Manifest
 import android.content.Intent
+import android.content.pm.PackageManager
+import android.os.Build
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -23,6 +26,7 @@ class MainActivity : ComponentActivity() {
         installSplashScreen()
         super.onCreate(savedInstanceState)
         apkInstaller = ApkInstaller(this)
+        requestBlePermissions()
         viewModel.acceptLaunch(intent?.data, intent?.getStringExtra("eventId"), intent?.getStringExtra("cameraId"), intent?.getStringExtra("section"))
         enableEdgeToEdge()
         setContent {
@@ -34,6 +38,13 @@ class MainActivity : ComponentActivity() {
                 ValkyApp(viewModel)
             }
         }
+    }
+
+    private fun requestBlePermissions() {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.S) return
+        val missing = listOf(Manifest.permission.BLUETOOTH_SCAN, Manifest.permission.BLUETOOTH_CONNECT)
+            .filter { checkSelfPermission(it) != PackageManager.PERMISSION_GRANTED }
+        if (missing.isNotEmpty()) requestPermissions(missing.toTypedArray(), 0x42)
     }
 
     override fun onResume() {
