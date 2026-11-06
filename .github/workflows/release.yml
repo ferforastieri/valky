@@ -182,7 +182,10 @@ jobs:
   release:
     name: Publicar artefatos
     runs-on: ubuntu-latest
-    needs: [prepare, android]
+    # Depende do manifesto: a promoção de "latest" no fim referencia a tag
+    # multiarch, que só existe depois que o manifesto publica. Sem isso o job
+    # corre em paralelo e falha com "not found" ao promover.
+    needs: [prepare, android, manifest]
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
