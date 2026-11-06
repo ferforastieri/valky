@@ -42,26 +42,30 @@ type DetectionSubmitter interface {
 	Submit(context.Context, rules.Detection) ([]event.Event, error)
 }
 type Server struct {
-	viewerDir    string
-	setupToken   string
-	dataDir      string
-	auth         *auth.Manager
-	cameras      *camera.Repository
-	onvif        *camera.ONVIFClient
-	cameraScan   func(context.Context, string, int, time.Duration) []string
-	media        *media.Manager
-	rules        *rules.Service
-	events       *event.Service
-	notify       *notify.Service
-	hub          *Hub
-	logger       *slog.Logger
-	operationsMu sync.RWMutex
-	operations   map[string]CameraOperation
-	updates      *updates.Service
-	preferences  *preferences.Service
-	tracking     *tracking.Service
-	lights       *light.Service
-	remotes      *remote.Service
+	viewerDir  string
+	setupToken string
+	dataDir    string
+	auth       *auth.Manager
+	cameras    *camera.Repository
+	onvif      *camera.ONVIFClient
+	cameraScan func(context.Context, string, int, time.Duration) []string
+	// Pontos de injeção da descoberta, trocados nos testes para não tocar a rede.
+	cameraReachable  func(context.Context, string, int) bool
+	cameraIdentity   func(context.Context, string, int, string, string) (string, string)
+	cameraSpeaksRTSP func(context.Context, string) bool
+	media            *media.Manager
+	rules            *rules.Service
+	events           *event.Service
+	notify           *notify.Service
+	hub              *Hub
+	logger           *slog.Logger
+	operationsMu     sync.RWMutex
+	operations       map[string]CameraOperation
+	updates          *updates.Service
+	preferences      *preferences.Service
+	tracking         *tracking.Service
+	lights           *light.Service
+	remotes          *remote.Service
 }
 
 type CameraOperation struct {
@@ -419,6 +423,10 @@ func (s *Server) discoverCamera(w http.ResponseWriter, r *http.Request) {
 
 // recoverCameraAddress é a ronda em si. A sonda de rede roda em segundo plano
 // para que o app consiga seguir o progresso pelo mesmo canal das operações.
+// recoverCameraAddress procura a câmera e adota o endereço novo. Aproveita a
+// ronda para guardar o MAC e a série quando o cadastro ainda não os tem: sem
+// identidade a próxima troca de IP não teria como ser corrigida sozinha, e uma
+// câmera cadastrada antes desta versão nunca os ganharia.
 func (s *Server) recoverCameraAddress(ctx context.Context, cam camera.Camera, cred camera.Credentials) (bool, error) {
 	scan := s.cameraScan
 	if scan == nil {
@@ -427,6 +435,7 @@ func (s *Server) recoverCameraAddress(ctx context.Context, cam camera.Camera, cr
 	result := s.onvif.Discover(ctx, cam, cred, scan)
 	s.logger.Info("camera discovery finished", "camera", cam.ID, "host", cam.Host, "found", result.Found,
 		"match", result.Match, "candidates", result.Scanned)
+	s.captureCameraIdentity(ctx, cam, cred, result)
 	if !result.Found {
 		return false, nil
 	}
@@ -438,6 +447,46 @@ func (s *Server) recoverCameraAddress(ctx context.Context, cam camera.Camera, cr
 	}
 	s.reconfigureCameraStream(context.WithoutCancel(ctx), cam, cred)
 	return true, nil
+}
+
+// captureCameraIdentity guarda o MAC e a série da câmera quando ela ainda não
+// tem. Roda em segundo plano e só grava se esses campos estiverem vazios, para
+// não competir com o recover que acabou de gravar o endereço novo.
+func (s *Server) captureCameraIdentity(ctx context.Context, cam camera.Camera, cred camera.Credentials, result camera.Discovery) {
+	if camera.Identity(cam.MAC, cam.Serial) {
+		return
+	}
+	host := result.Host
+	if host == "" {
+		host = cam.Host
+	}
+	idCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), 20*time.Second)
+	defer cancel()
+	serial, mac := s.identify(idCtx, host, defaultPort(cam.Port), cred.Username, cred.Password)
+	if !camera.Identity(mac, serial) {
+		s.logger.Warn("camera identity unavailable", "camera", cam.ID, "host", host)
+		return
+	}
+	if err := s.cameras.SetIdentity(idCtx, cam.ID, mac, serial); err != nil {
+		s.logger.Warn("store camera identity", "camera", cam.ID, "error", err)
+		return
+	}
+	s.logger.Info("camera identity stored", "camera", cam.ID, "host", host, "mac", mac, "serial", serial)
+}
+
+// reachable e identify respeitam os pontos de injeção dos testes.
+func (s *Server) reachable(ctx context.Context, host string, port int) bool {
+	if s.cameraReachable != nil {
+		return s.cameraReachable(ctx, host, port)
+	}
+	return s.onvif.Reachable(ctx, host, port)
+}
+
+func (s *Server) identify(ctx context.Context, host string, port int, username, password string) (serial, mac string) {
+	if s.cameraIdentity != nil {
+		return s.cameraIdentity(ctx, host, port, username, password)
+	}
+	return s.onvif.Identity(ctx, host, port, username, password)
 }
 
 // reconfigureCameraStream refaz o caminho do MediaMTX com a URI RTSP nova. Sem
@@ -470,6 +519,9 @@ func (s *Server) RunCameraDiscovery(ctx context.Context, interval time.Duration)
 	if interval <= 0 {
 		interval = 5 * time.Minute
 	}
+	// A primeira ronda é logo na subida: esperar cinco minutos só adia a
+	// correção de uma câmera que já está sem imagem desde o boot.
+	s.discoverMissingCameras(ctx)
 	ticker := time.NewTicker(interval)
 	defer ticker.Stop()
 	for {
@@ -489,10 +541,18 @@ func (s *Server) discoverMissingCameras(ctx context.Context) {
 		return
 	}
 	for _, cam := range cameras {
-		if !cam.Enabled || !camera.Identity(cam.MAC, cam.Serial) {
+		if !cam.Enabled {
 			continue
 		}
-		if s.onvif.Reachable(ctx, cam.Host, defaultPort(cam.Port)) {
+		// Câmera sem identidade não tem como ser reconhecida em outro IP, mas
+		// não pode ser ignorada para sempre: uma ronda aproveita o endereço que
+		// ainda responde para guardar o MAC e a série, e daí em diante ela passa
+		// a se corrigir sozinha.
+		if !camera.Identity(cam.MAC, cam.Serial) {
+			s.captureMissingIdentity(ctx, cam)
+			continue
+		}
+		if s.reachable(ctx, cam.Host, defaultPort(cam.Port)) {
 			continue
 		}
 		cam, cred, err := s.cameras.Get(ctx, cam.ID)
@@ -509,6 +569,22 @@ func (s *Server) discoverMissingCameras(ctx context.Context) {
 			s.hub.Broadcast(map[string]any{"type": "camera.updated", "cameraId": cam.ID})
 		}
 	}
+}
+
+// captureMissingIdentity busca a identidade da câmera que ainda não tem MAC nem
+// série. É a ponte para o cadastro antigo: a partir da primeira captura a ronda
+// automática passa a valer para ela.
+func (s *Server) captureMissingIdentity(ctx context.Context, cam camera.Camera) {
+	credCtx, cancel := context.WithTimeout(ctx, 10*time.Second)
+	defer cancel()
+	_, cred, err := s.cameras.Get(credCtx, cam.ID)
+	if err != nil {
+		return
+	}
+	if !s.reachable(credCtx, cam.Host, defaultPort(cam.Port)) {
+		return
+	}
+	s.captureCameraIdentity(ctx, cam, cred, camera.Discovery{Host: cam.Host})
 }
 
 func (s *Server) completeCameraCreation(operationID string, in camera.CreateInput) {
