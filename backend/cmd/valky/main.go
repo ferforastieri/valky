@@ -95,6 +95,9 @@ func main() {
 	go trackingService.RunAddresses(ctx, cfg.GeocoderURL, logger)
 	go notifyService.Run(ctx)
 	go lightService.Run(ctx)
+	// A câmera não tem broadcast: a ronda espaçada é o que a traz de volta
+	// quando o roteador troca o IP dela depois de uma queda de energia.
+	go apiServer.RunCameraDiscovery(ctx, 5*time.Minute)
 	go application.RunRetention(ctx, cfg.RetentionAge, cfg.RetentionBytes)
 	go restoreMedia(ctx, cameraRepo, mediaManager, logger)
 	apiServer.ResumeCameraSetups(ctx)

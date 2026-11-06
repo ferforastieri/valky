@@ -50,6 +50,8 @@ docker compose logs -f mediamtx
 
 **Câmera.** O cadastro mostra `setupStatus`, `setupStep` e o erro persistido. Confira se o IP e a porta ONVIF (padrão 2020) respondem do servidor, se a credencial é a da câmera (não a do aplicativo do fabricante) e se o RTSP (porta 554) está acessível. Câmeras em VLAN isolada não são alcançadas pelo container.
 
+**Câmera com IP trocado.** Queda de energia com DHCP sem reserva muda o endereço da câmera e o cadastro continua apontando para o antigo. O backend guarda o MAC e a série ONVIF na primeira conexão boa e reencontra a câmera sozinho: há uma ronda a cada cinco minutos para quem parou de responder, e `POST /cameras/{id}/discovery` força a busca na hora. O endereço novo só é gravado quando a identidade confere, e o stream do MediaMTX é refeito com a URI RTSP nova. Para a correção ser definitiva, reserve o IP no roteador pelo MAC da câmera.
+
 **Stream.** No MediaMTX existem três caminhos por câmera: `camera-<id>-source` (fonte RTSP), `camera-<id>` (stream normalizado que o app usa) e `camera-<id>-browser` (perfil sob demanda do navegador). Vídeo que não abre quase sempre é a porta `8189` UDP/TCP bloqueada ou um endereço errado em `VALKY_WEBRTC_HOSTS`. Valide com `RTCPeerConnection.getStats()`: `connected` e `framesDecoded` aumentando. O painel só mostra "Ao vivo" após o evento `playing`.
 
 **Detecção.** Regras de região analisam quadros a cada ~2 segundos; movimentos entre amostras podem passar. Teste com movimentos conhecidos, com a visão noturna real, e confirme que a câmera está fixa (PTZ automático invalida a região). Para áudio, veja as pontuações em `audio_decisions` e o motivo da decisão:

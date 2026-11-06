@@ -188,7 +188,7 @@ func (r *Repository) CompleteSetup(ctx context.Context, id string, caps Capabili
 }
 
 func (r *Repository) List(ctx context.Context) ([]Camera, error) {
-	rows, err := r.store.DB.QueryContext(ctx, `SELECT alerts_json,id,name,icon,host,port,profile_token,capabilities_json,media_xaddr,events_xaddr,ptz_xaddr,startup_preset_token,setup_status,setup_step,setup_error,setup_updated_at,enabled,created_at,updated_at,favorite FROM cameras ORDER BY name`)
+	rows, err := r.store.DB.QueryContext(ctx, `SELECT alerts_json,id,name,icon,host,port,profile_token,capabilities_json,media_xaddr,events_xaddr,ptz_xaddr,mac,serial,startup_preset_token,setup_status,setup_step,setup_error,setup_updated_at,enabled,created_at,updated_at,favorite FROM cameras ORDER BY name`)
 	if err != nil {
 		return nil, err
 	}
@@ -205,13 +205,13 @@ func (r *Repository) List(ctx context.Context) ([]Camera, error) {
 }
 
 func (r *Repository) Get(ctx context.Context, id string) (Camera, Credentials, error) {
-	row := r.store.DB.QueryRowContext(ctx, `SELECT alerts_json,id,name,icon,host,port,profile_token,capabilities_json,media_xaddr,events_xaddr,ptz_xaddr,startup_preset_token,setup_status,setup_step,setup_error,setup_updated_at,enabled,created_at,updated_at,username_enc,password_enc,rtsp_uri_enc,favorite FROM cameras WHERE id=?`, id)
+	row := r.store.DB.QueryRowContext(ctx, `SELECT alerts_json,id,name,icon,host,port,profile_token,capabilities_json,media_xaddr,events_xaddr,ptz_xaddr,mac,serial,startup_preset_token,setup_status,setup_step,setup_error,setup_updated_at,enabled,created_at,updated_at,username_enc,password_enc,rtsp_uri_enc,favorite FROM cameras WHERE id=?`, id)
 	var c Camera
 	var caps, alertsJSON string
 	var enabled, favorite int
 	var setupUpdated, created, updated string
 	var user, pass, rtsp []byte
-	err := row.Scan(&alertsJSON, &c.ID, &c.Name, &c.Icon, &c.Host, &c.Port, &c.ProfileToken, &caps, &c.Services.Media, &c.Services.Events, &c.Services.PTZ, &c.StartupPreset, &c.SetupStatus, &c.SetupStep, &c.SetupError, &setupUpdated, &enabled, &created, &updated, &user, &pass, &rtsp, &favorite)
+	err := row.Scan(&alertsJSON, &c.ID, &c.Name, &c.Icon, &c.Host, &c.Port, &c.ProfileToken, &caps, &c.Services.Media, &c.Services.Events, &c.Services.PTZ, &c.MAC, &c.Serial, &c.StartupPreset, &c.SetupStatus, &c.SetupStep, &c.SetupError, &setupUpdated, &enabled, &created, &updated, &user, &pass, &rtsp, &favorite)
 	if err != nil {
 		return c, Credentials{}, err
 	}
@@ -274,6 +274,56 @@ func (r *Repository) SetFavorite(ctx context.Context, id string, favorite bool) 
 	return nil
 }
 
+// SetIdentity guarda o que identifica a câmera na rede (MAC e série OUI do
+// ONVIF). É o que permite reencontrá-la depois que o DHCP troca o endereço.
+func (r *Repository) SetIdentity(ctx context.Context, id, mac, serial string) error {
+	result, err := r.store.DB.ExecContext(ctx, `UPDATE cameras SET mac=?,serial=? WHERE id=?`, strings.TrimSpace(mac), strings.TrimSpace(serial), id)
+	if err != nil {
+		return err
+	}
+	if n, _ := result.RowsAffected(); n == 0 {
+		return sql.ErrNoRows
+	}
+	return nil
+}
+
+// SetHost grava o novo endereço encontrado e reconstrói a URI RTSP, porque ela
+// carrega o IP do equipamento. Mantém o estado de configuração intacto: a
+// próxima validação ONVIF só confirma o que já era conhecido.
+func (r *Repository) SetHost(ctx context.Context, id, host string, port int) (Camera, Credentials, error) {
+	cam, cred, err := r.Get(ctx, id)
+	if err != nil {
+		return cam, cred, err
+	}
+	host = strings.TrimSpace(host)
+	if host == "" {
+		return cam, cred, fmt.Errorf("host is required")
+	}
+	if port == 0 {
+		port = cam.Port
+	}
+	rtsp := defaultRTSPURI(host, cred.Username, cred.Password)
+	if cred.RTSPURI != "" {
+		if parsed, parseErr := url.Parse(cred.RTSPURI); parseErr == nil && parsed.Hostname() != "" {
+			parsed.Host = net.JoinHostPort(host, "554")
+			rtsp = parsed.String()
+		}
+	}
+	encryptedRTSP, err := r.vault.EncryptString(rtsp)
+	if err != nil {
+		return cam, cred, err
+	}
+	now := time.Now().UTC().Format(time.RFC3339Nano)
+	result, err := r.store.DB.ExecContext(ctx, `UPDATE cameras SET host=?,port=?,rtsp_uri_enc=?,updated_at=? WHERE id=?`, host, port, encryptedRTSP, now, id)
+	if err != nil {
+		return cam, cred, err
+	}
+	if n, _ := result.RowsAffected(); n == 0 {
+		return cam, cred, sql.ErrNoRows
+	}
+	return r.Get(ctx, id)
+}
+
 func boolToInt(value bool) int {
 	if value {
 		return 1
@@ -287,7 +337,7 @@ func scanCamera(s scanner) (Camera, error) {
 	var c Camera
 	var alertsJSON, caps, setupUpdated, created, updated string
 	var enabled, favorite int
-	err := s.Scan(&alertsJSON, &c.ID, &c.Name, &c.Icon, &c.Host, &c.Port, &c.ProfileToken, &caps, &c.Services.Media, &c.Services.Events, &c.Services.PTZ, &c.StartupPreset, &c.SetupStatus, &c.SetupStep, &c.SetupError, &setupUpdated, &enabled, &created, &updated, &favorite)
+	err := s.Scan(&alertsJSON, &c.ID, &c.Name, &c.Icon, &c.Host, &c.Port, &c.ProfileToken, &caps, &c.Services.Media, &c.Services.Events, &c.Services.PTZ, &c.MAC, &c.Serial, &c.StartupPreset, &c.SetupStatus, &c.SetupStep, &c.SetupError, &setupUpdated, &enabled, &created, &updated, &favorite)
 	if err != nil {
 		return c, err
 	}

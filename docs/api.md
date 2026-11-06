@@ -94,6 +94,7 @@ Todas sob `/api/v1`. "Autenticado" = qualquer token de dispositivo válido; "Adm
 | `POST` | `/cameras` | Admin | Cadastra câmera (nome, ícone, IP, porta, usuário, senha); responde na hora e conclui o ONVIF em segundo plano. |
 | `PUT` | `/cameras/{id}` | Admin | Edita a câmera e reconfigura o stream se a conexão mudar. |
 | `DELETE` | `/cameras/{id}` | Admin | Remove a câmera e seus caminhos de mídia. |
+| `POST` | `/cameras/{id}/discovery` | Admin | Procura a câmera na faixa do último endereço e adota o novo IP quando o MAC ou a série ONVIF conferem. |
 | `POST` | `/cameras/{id}/ptz` | Autenticado | Movimento PTZ e zoom. |
 | `GET` / `POST` | `/cameras/{id}/ptz/presets` | Autenticado | Lista e salva posições PTZ na própria câmera. |
 | `POST` | `/cameras/{id}/ptz/presets/{token}/goto` | Autenticado | Move para uma posição salva. |

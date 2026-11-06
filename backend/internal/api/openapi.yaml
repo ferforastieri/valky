@@ -147,6 +147,14 @@ paths:
       summary: Remove a camera
       parameters: [{$ref: '#/components/parameters/id'}]
       responses: {'200': {description: Removed with message envelope, content: {application/json: {schema: {$ref: '#/components/schemas/APIResponse'}}}}}
+  /cameras/{id}/discovery:
+    post:
+      summary: Look for the camera again on the local network and adopt its new address
+      description: Scans the subnet of the stored address and only accepts a candidate whose MAC or ONVIF serial number matches the registered camera.
+      parameters: [{$ref: '#/components/parameters/id'}]
+      responses:
+        '200': {description: Camera found and address updated, content: {application/json: {schema: {$ref: '#/components/schemas/CameraOperationResponse'}}}}
+        '404': {description: Camera was not found on the local network}
   /cameras/{id}/ptz:
     post:
       summary: Move or stop a PTZ camera

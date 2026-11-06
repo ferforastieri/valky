@@ -22,6 +22,10 @@ CREATE TABLE IF NOT EXISTS cameras (
   media_xaddr TEXT NOT NULL DEFAULT '',
   events_xaddr TEXT NOT NULL DEFAULT '',
   ptz_xaddr TEXT NOT NULL DEFAULT '',
+  -- Identidade da câmera. Sem ela não há como saber qual dos endereços da
+  -- faixa é a câmera certa quando o DHCP troca o IP dela.
+  mac TEXT NOT NULL DEFAULT '',
+  serial TEXT NOT NULL DEFAULT '',
   startup_preset_token TEXT NOT NULL DEFAULT '',
   setup_status TEXT NOT NULL DEFAULT 'ready',
   setup_step TEXT NOT NULL DEFAULT '',

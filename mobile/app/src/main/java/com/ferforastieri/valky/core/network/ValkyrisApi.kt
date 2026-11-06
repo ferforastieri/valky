@@ -265,6 +265,8 @@ class ValkyApi(
     )
 
     suspend fun lights(): List<LightDevice> = get("/lights")
+    /** Procura a câmera na faixa do último endereço conhecido e adota o novo IP. */
+    suspend fun rediscoverCamera(id: String): Camera = post("/cameras/$id/discovery", emptyMap<String, String>(), announceBackend = true)
     /** Adota uma lâmpada já pareada em outro aplicativo (chave local). */
     suspend fun registerLight(input: LightRegistration): LightDevice = post("/lights", input, announceBackend = true)
     /** Procura lâmpadas na rede local para preencher o cadastro. */

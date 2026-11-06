@@ -7,10 +7,13 @@ import (
 	"crypto/sha1"
 	"encoding/base64"
 	"encoding/xml"
+	"errors"
 	"fmt"
 	"io"
+	"net"
 	"net/http"
 	"strings"
+	"syscall"
 	"time"
 )
 
@@ -18,6 +21,22 @@ type ONVIFClient struct{ http *http.Client }
 
 func NewONVIFClient() *ONVIFClient {
 	return &ONVIFClient{http: &http.Client{Timeout: 30 * time.Second}}
+}
+
+// Identity lê a série e o endereço de rede da câmera. É a prova de que o
+// endereço novo encontrado é mesmo o equipamento cadastrado. A leitura usa a
+// credencial da câmera: um aparelho que aceita a senha é o aparelho certo.
+func (c *ONVIFClient) Identity(ctx context.Context, host string, port int, username, password string) (serial, mac string) {
+	endpoint := fmt.Sprintf("http://%s:%d/onvif/device_service", host, port)
+	body, err := c.call(ctx, endpoint, username, password, "http://www.onvif.org/ver10/device/wsdl/GetDeviceInformation", `<tds:GetDeviceInformation/>`)
+	if err == nil {
+		serial = elementText(body, "SerialNumber")
+	}
+	interfaces, err := c.call(ctx, endpoint, username, password, "http://www.onvif.org/ver10/device/wsdl/GetNetworkInterfaces", `<tds:GetNetworkInterfaces/>`)
+	if err == nil {
+		mac = elementText(interfaces, "HwAddress")
+	}
+	return strings.TrimSpace(serial), strings.TrimSpace(mac)
 }
 
 func (c *ONVIFClient) Probe(ctx context.Context, host string, port int, username, password string) (Capabilities, string, ServiceAddresses, error) {
@@ -305,7 +324,7 @@ func (c *ONVIFClient) call(ctx context.Context, endpoint, username, password, ac
 	req.Header.Set("Content-Type", `application/soap+xml; charset=utf-8; action="`+action+`"`)
 	resp, err := c.http.Do(req)
 	if err != nil {
-		return nil, fmt.Errorf("ONVIF request: %w", err)
+		return nil, fmt.Errorf("ONVIF request: %w%s", err, networkHint(err))
 	}
 	defer resp.Body.Close()
 	body, err := io.ReadAll(io.LimitReader(resp.Body, 4<<20))
@@ -393,4 +412,22 @@ func clamp(v float64) float64 {
 		return -1
 	}
 	return v
+}
+
+// networkHint traduz a falha de transporte do ONVIF, que é a mais confusa de
+// todas: o cadastro parece certo e a câmera está ligada, mas o pacote não sai.
+// O caso real foi um firewall de saída liberando o IP antigo da câmera e um
+// DROP na faixa inteira depois que o DHCP mudou o endereço.
+func networkHint(err error) string {
+	var netErr net.Error
+	if errors.As(err, &netErr) && netErr.Timeout() {
+		return " (sem resposta no tempo limite: confira se o firewall do servidor libera a saída para este IP e porta, e se a câmera está na mesma rede)"
+	}
+	if errors.Is(err, syscall.ECONNREFUSED) {
+		return " (conexão recusada: a câmera respondeu, mas não há ONVIF nesta porta; confira a porta do cadastro)"
+	}
+	if errors.Is(err, syscall.EHOSTUNREACH) || errors.Is(err, syscall.ENETUNREACH) {
+		return " (rede inalcançável: o servidor não tem rota até a câmera)"
+	}
+	return ""
 }

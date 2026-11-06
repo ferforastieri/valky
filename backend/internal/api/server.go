@@ -48,6 +48,7 @@ type Server struct {
 	auth         *auth.Manager
 	cameras      *camera.Repository
 	onvif        *camera.ONVIFClient
+	cameraScan   func(context.Context, string, int, time.Duration) []string
 	media        *media.Manager
 	rules        *rules.Service
 	events       *event.Service
@@ -79,7 +80,7 @@ type changePasswordInput struct {
 
 func NewServer(a *auth.Manager, c *camera.Repository, o *camera.ONVIFClient, m *media.Manager, r *rules.Service, e *event.Service, n *notify.Service, h *Hub, logger *slog.Logger) *Server {
 	internalErrorLogger = logger
-	return &Server{auth: a, cameras: c, onvif: o, media: m, rules: r, events: e, notify: n, hub: h, logger: logger, operations: make(map[string]CameraOperation)}
+	return &Server{auth: a, cameras: c, onvif: o, media: m, rules: r, events: e, notify: n, hub: h, logger: logger, operations: make(map[string]CameraOperation), cameraScan: camera.ScanPort}
 }
 func (s *Server) SetUpdates(service *updates.Service)         { s.updates = service }
 func (s *Server) SetPreferences(service *preferences.Service) { s.preferences = service }
@@ -145,6 +146,7 @@ func (s *Server) Handler() http.Handler {
 	protected.HandleFunc("GET /cameras", s.listCameras)
 	protected.Handle("POST /cameras", s.auth.RequireAdmin(http.HandlerFunc(s.createCamera)))
 	protected.Handle("PUT /cameras/{id}", s.auth.RequireAdmin(http.HandlerFunc(s.updateCamera)))
+	protected.Handle("POST /cameras/{id}/discovery", s.auth.RequireAdmin(http.HandlerFunc(s.discoverCamera)))
 	protected.Handle("DELETE /cameras/{id}", s.auth.RequireAdmin(http.HandlerFunc(s.deleteCamera)))
 	protected.HandleFunc("POST /cameras/{id}/ptz", s.ptz)
 	protected.HandleFunc("GET /cameras/{id}/ptz/presets", s.listPTZPresets)
@@ -380,6 +382,135 @@ func (s *Server) updateCamera(w http.ResponseWriter, r *http.Request) {
 	writeSuccess(w, http.StatusOK, "Camera updated successfully", cam)
 }
 
+// discoverCamera procura a câmera na faixa do último endereço conhecido, no
+// mesmo espírito da descoberta das lâmpadas e das TVs: quando o roteador troca
+// o IP depois de uma queda de energia, a câmera volta sozinha em vez de exigir
+// que alguém edite o cadastro à mão. Só grava o endereço novo quando a
+// identidade (MAC ou série) confere, para nunca apontar o cadastro para outra
+// câmera da mesma faixa.
+func (s *Server) discoverCamera(w http.ResponseWriter, r *http.Request) {
+	id := r.PathValue("id")
+	cam, cred, err := s.cameras.Get(r.Context(), id)
+	if err != nil {
+		respond(w, nil, err)
+		return
+	}
+	ctx, cancel := context.WithTimeout(r.Context(), 90*time.Second)
+	defer cancel()
+	found, err := s.recoverCameraAddress(ctx, cam, cred)
+	if err != nil {
+		writeError(w, http.StatusBadGateway, err)
+		return
+	}
+	if !found {
+		writeError(w, http.StatusNotFound, fmt.Errorf("camera was not found in the local network"))
+		return
+	}
+	updated, _, getErr := s.cameras.Get(r.Context(), id)
+	if getErr != nil {
+		respond(w, nil, getErr)
+		return
+	}
+	if s.hub != nil {
+		s.hub.Broadcast(map[string]any{"type": "camera.updated", "cameraId": id})
+	}
+	writeSuccess(w, http.StatusOK, "Camera found again on the local network", updated)
+}
+
+// recoverCameraAddress é a ronda em si. A sonda de rede roda em segundo plano
+// para que o app consiga seguir o progresso pelo mesmo canal das operações.
+func (s *Server) recoverCameraAddress(ctx context.Context, cam camera.Camera, cred camera.Credentials) (bool, error) {
+	scan := s.cameraScan
+	if scan == nil {
+		scan = camera.ScanPort
+	}
+	result := s.onvif.Discover(ctx, cam, cred, scan)
+	s.logger.Info("camera discovery finished", "camera", cam.ID, "host", cam.Host, "found", result.Found,
+		"match", result.Match, "candidates", result.Scanned)
+	if !result.Found {
+		return false, nil
+	}
+	if result.Host == cam.Host {
+		return true, nil
+	}
+	if _, _, err := s.cameras.SetHost(ctx, cam.ID, result.Host, cam.Port); err != nil {
+		return false, err
+	}
+	s.reconfigureCameraStream(context.WithoutCancel(ctx), cam, cred)
+	return true, nil
+}
+
+// reconfigureCameraStream refaz o caminho do MediaMTX com a URI RTSP nova. Sem
+// isso o banco aponta para o endereço certo e o vídeo continua no antigo.
+func (s *Server) reconfigureCameraStream(ctx context.Context, cam camera.Camera, cred camera.Credentials) {
+	if s.media == nil {
+		return
+	}
+	updated, newCredentials, err := s.cameras.Get(ctx, cam.ID)
+	if err != nil {
+		s.logger.Warn("reload camera after discovery", "camera", cam.ID, "error", err)
+		return
+	}
+	if newCredentials.RTSPURI == "" {
+		newCredentials = cred
+	}
+	if err = s.media.RemoveCamera(ctx, updated.ID); err != nil {
+		s.logger.Warn("remove previous camera stream", "camera", updated.ID, "error", err)
+	}
+	if err = s.media.ConfigureCamera(ctx, updated.ID, newCredentials.RTSPURI); err != nil {
+		s.logger.Warn("reconfigure camera stream", "camera", updated.ID, "error", err)
+	}
+}
+
+// RunCameraDiscovery reencontra sozinha as câmeras que sumiram da rede. A ronda
+// é espaçada porque cada varredura toca 254 endereços; só entra a câmera que
+// deixou de responder e que tem identidade guardada para provar que o endereço
+// novo é dela.
+func (s *Server) RunCameraDiscovery(ctx context.Context, interval time.Duration) {
+	if interval <= 0 {
+		interval = 5 * time.Minute
+	}
+	ticker := time.NewTicker(interval)
+	defer ticker.Stop()
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-ticker.C:
+			s.discoverMissingCameras(ctx)
+		}
+	}
+}
+
+func (s *Server) discoverMissingCameras(ctx context.Context) {
+	cameras, err := s.cameras.List(ctx)
+	if err != nil {
+		s.logger.Warn("list cameras for discovery", "error", err)
+		return
+	}
+	for _, cam := range cameras {
+		if !cam.Enabled || !camera.Identity(cam.MAC, cam.Serial) {
+			continue
+		}
+		if s.onvif.Reachable(ctx, cam.Host, defaultPort(cam.Port)) {
+			continue
+		}
+		cam, cred, err := s.cameras.Get(ctx, cam.ID)
+		if err != nil {
+			continue
+		}
+		roundCtx, cancel := context.WithTimeout(ctx, 90*time.Second)
+		found, err := s.recoverCameraAddress(roundCtx, cam, cred)
+		cancel()
+		if err != nil || !found {
+			continue
+		}
+		if s.hub != nil {
+			s.hub.Broadcast(map[string]any{"type": "camera.updated", "cameraId": cam.ID})
+		}
+	}
+}
+
 func (s *Server) completeCameraCreation(operationID string, in camera.CreateInput) {
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
 	defer cancel()
@@ -388,6 +519,14 @@ func (s *Server) completeCameraCreation(operationID string, in camera.CreateInpu
 	if err != nil {
 		s.failCameraOperation(operationID, in, err)
 		return
+	}
+	// Guarda a identidade na primeira conexão boa: é ela que permite reencontrar
+	// a câmera quando o DHCP troca o endereço dela depois de uma queda de luz.
+	serial, mac := s.onvif.Identity(ctx, in.Host, defaultPort(in.Port), in.Username, in.Password)
+	if serial != "" || mac != "" {
+		if err := s.cameras.SetIdentity(ctx, operationID, mac, serial); err != nil {
+			s.logger.Warn("persist camera identity", "camera", operationID, "error", err)
+		}
 	}
 	s.updateCameraOperation(ctx, operationID, "pending", "stream", "ONVIF connected; preparing the video stream", "")
 	_, credentials, err := s.cameras.Get(ctx, operationID)

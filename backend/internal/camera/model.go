@@ -23,6 +23,8 @@ type Camera struct {
 	Icon           string            `json:"icon"`
 	Host           string            `json:"host"`
 	Port           int               `json:"port"`
+	MAC            string            `json:"mac,omitempty"`
+	Serial         string            `json:"serial,omitempty"`
 	ProfileToken   string            `json:"profileToken"`
 	Capabilities   Capabilities      `json:"capabilities"`
 	Services       ServiceAddresses  `json:"-"`
