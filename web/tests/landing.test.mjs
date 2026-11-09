@@ -13,7 +13,7 @@ const stylesSource = await readFile(new URL('../src/styles/global.css', import.m
 test('publica as duas localizações com idioma correto', () => {
   assert.match(pt, /<html lang="pt-BR"/);
   assert.match(en, /<html lang="en"/);
-  assert.match(pt, /curl -fsSL https:\/\/valkyris\.vercel\.app\/install\.sh \| sh/);
+  assert.match(pt, /curl -fsSL https:\/\/valky\.vira\.ia\.br\/install\.sh \| sh/);
   assert.match(root, /navigator\.languages/);
   assert.match(root, /startsWith\('en'\)/);
 });
@@ -74,7 +74,7 @@ test('sincroniza os prints com o tema escolhido', () => {
 
 test('publica metadados sociais e SEO internacional', async () => {
   assert.match(pt, /<meta name="robots" content="index, follow, max-image-preview:large/);
-  assert.match(pt, /<meta property="og:image" content="https:\/\/valkyris\.vercel\.app\/og-image\.png"/);
+  assert.match(pt, /<meta property="og:image" content="https:\/\/valky\.vira\.ia\.br\/og-image\.png"/);
   assert.match(pt, /<meta name="twitter:card" content="summary_large_image"/);
   assert.match(pt, /<link rel="alternate" hreflang="x-default"/);
   assert.match(pt, /application\/ld\+json/);
@@ -84,10 +84,10 @@ test('publica metadados sociais e SEO internacional', async () => {
   assert.match(root, /name="robots" content="noindex, follow"/);
   const robots = await readFile(new URL('../dist/robots.txt', import.meta.url), 'utf8');
   const sitemap = await readFile(new URL('../dist/sitemap-0.xml', import.meta.url), 'utf8');
-  assert.match(robots, /Sitemap: https:\/\/valkyris\.vercel\.app\/sitemap-index\.xml/);
-  assert.match(sitemap, /https:\/\/valkyris\.vercel\.app\/pt-BR/);
-  assert.match(sitemap, /https:\/\/valkyris\.vercel\.app\/en/);
-  assert.doesNotMatch(sitemap, /<loc>https:\/\/valkyris\.vercel\.app\/<\/loc>/);
+  assert.match(robots, /Sitemap: https:\/\/valky\.vira\.ia\.br\/sitemap-index\.xml/);
+  assert.match(sitemap, /https:\/\/valky\.vira\.ia\.br\/pt-BR/);
+  assert.match(sitemap, /https:\/\/valky\.vira\.ia\.br\/en/);
+  assert.doesNotMatch(sitemap, /<loc>https:\/\/valky\.vira\.ia\.br\/<\/loc>/);
 });
 
 test('carrossel avança automaticamente sem controle visual redundante', () => {
@@ -122,11 +122,11 @@ test('documentação é uma rota separada e vem dos arquivos do repositório', a
   assert.match(ptDocs, /<h3/);
   // O inglês recebe o mesmo conteúdo com um aviso.
   assert.match(enDocs, /docs-notice/);
-  assert.match(ptDocs, /hreflang="en" href="https:\/\/valkyris\.vercel\.app\/en\/docs"/);
-  assert.match(enDocs, /hreflang="pt-BR" href="https:\/\/valkyris\.vercel\.app\/pt-BR\/docs"/);
+  assert.match(ptDocs, /hreflang="en" href="https:\/\/valky\.vira\.ia\.br\/en\/docs"/);
+  assert.match(enDocs, /hreflang="pt-BR" href="https:\/\/valky\.vira\.ia\.br\/pt-BR\/docs"/);
   const sitemap = await readFile(new URL('../dist/sitemap-0.xml', import.meta.url), 'utf8');
-  assert.match(sitemap, /https:\/\/valkyris\.vercel\.app\/pt-BR\/docs/);
-  assert.match(sitemap, /https:\/\/valkyris\.vercel\.app\/en\/docs/);
+  assert.match(sitemap, /https:\/\/valky\.vira\.ia\.br\/pt-BR\/docs/);
+  assert.match(sitemap, /https:\/\/valky\.vira\.ia\.br\/en\/docs/);
   assert.match(stylesSource, /@media \(max-width: 620px\)[\s\S]*\.endpoint-list article\s*\{[\s\S]*grid-template-columns: minmax\(0, auto\) minmax\(0, 1fr\)/);
 });
 
