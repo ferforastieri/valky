@@ -182,4 +182,4 @@ printf 'Endereço local: https://%s:%s\n' "$LAN_ADDRESS" "$PORT"
 printf 'Código de instalação: %s\n' "$SETUP_TOKEN"
 printf '\nO código acima só é pedido ao criar a PRIMEIRA conta; guarde-o com o seu .env.\n'
 printf 'Se você usa Caddy ou outro proxy, informe o domínio HTTPS no app no lugar do endereço local.\n'
-printf 'Para receber alertas nativos, configure a conta de serviço FCM conforme https://valkyris.vercel.app/pt-BR/docs\n'
+printf 'Para receber alertas nativos, configure a conta de serviço FCM conforme https://valky.vira.ia.br/pt-BR/docs\n'

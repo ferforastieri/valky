@@ -6,7 +6,7 @@ import Navigation from './Navigation.astro';
 interface Props { locale: Locale }
 const { locale } = Astro.props;
 const t = copy[locale];
-const command = 'curl -fsSL https://valkyris.vercel.app/install.sh | sh';
+const command = 'curl -fsSL https://valky.vira.ia.br/install.sh | sh';
 const heroLines = locale === 'pt-BR' ? ['Sua casa avisa.', 'Seus dados ficam.'] : ['Your home speaks.', 'Your data stays.'];
 ---
 <BaseLayout locale={locale} title={t.metaTitle} description={t.metaDescription}>

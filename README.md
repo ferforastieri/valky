@@ -9,8 +9,8 @@
   Vídeo, regras, eventos e comandos permanecem na sua casa; os alertas chegam a um app Android nativo.
 </p>
 <p align="center">
-  <a href="https://valkyris.vercel.app/">Site</a> ·
-  <a href="https://valkyris.vercel.app/pt-BR/docs">Documentação</a> ·
+  <a href="https://valky.vira.ia.br/">Site</a> ·
+  <a href="https://valky.vira.ia.br/pt-BR/docs">Documentação</a> ·
   <a href="https://github.com/ferforastieri/valky/releases/latest">Última release</a> ·
   <a href="LICENSE">Licença MIT</a>
 </p>
@@ -64,7 +64,7 @@ Não encaminhe no roteador as portas RTSP/ONVIF da câmera nem as portas interna
 No servidor, execute:
 
 ```bash
-curl -fsSL https://valkyris.vercel.app/install.sh | sh
+curl -fsSL https://valky.vira.ia.br/install.sh | sh
 ```
 
 O instalador baixa os artefatos da release, confere os checksums, cria os segredos, o código de instalação e o certificado TLS, e sobe `valky` e `mediamtx` de forma idempotente. Os arquivos ficam em `~/.local/share/valky`; o código de instalação (`VALKY_SETUP_TOKEN`) fica no `.env` e é impresso no fim da execução.
