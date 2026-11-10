@@ -9,19 +9,21 @@ interface Props {
 
 const { locale, current } = Astro.props;
 const t = copy[locale];
-const homePath = `/${locale}`;
+const base = import.meta.env.BASE_URL;
+const homePath = `${base}${locale}/`;
+const docsPath = `${base}${locale}/docs/`;
 const sectionPath = (section: string) => current === 'home' ? `#${section}` : `${homePath}#${section}`;
 ---
 <nav class="floating-dock" aria-label={locale === 'pt-BR' ? 'Navegação principal' : 'Main navigation'}>
   <a class="dock-brand" href={homePath} aria-label="Valky home">
-    <span class="brand-mark"><img src="/valky-mark.svg?v=7" alt="" /></span>
-    <span class="dock-identity"><strong>Valky</strong><small>© 2026 Fernando Forastieri · MIT · deploy-check-2026-11-09-2315</small></span>
+    <span class="brand-mark"><img src={`${base}valky-mark.svg?v=7`} alt="" /></span>
+    <span class="dock-identity"><strong>Valky</strong><small>© 2026 Fernando Forastieri · MIT</small></span>
   </a>
   <div class="dock-links">
     <a class="dock-link" href={homePath} aria-current={current === "home" ? "page" : undefined}><House size={17}/><span>{t.nav[0]}</span></a>
     <a class="dock-link" href={sectionPath('app')}><Smartphone size={17}/><span>{t.nav[1]}</span></a>
     <a class="dock-link" href={sectionPath('install')}><Download size={17}/><span>{t.nav[2]}</span></a>
-    <a class="dock-link" href={`/${locale}/docs`} aria-current={current === 'docs' ? 'page' : undefined}><BookOpen size={17}/><span>{t.nav[3]}</span></a>
+    <a class="dock-link" href={docsPath} aria-current={current === 'docs' ? 'page' : undefined}><BookOpen size={17}/><span>{t.nav[3]}</span></a>
   </div>
   <div class="dock-actions">
     <button class="icon-button theme-toggle" type="button" aria-label={locale === 'pt-BR' ? 'Alternar tema' : 'Toggle theme'}><Sun class="sun" size={18}/><Moon class="moon" size={18}/></button>

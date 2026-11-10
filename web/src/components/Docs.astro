@@ -8,6 +8,7 @@ import Navigation from './Navigation.astro';
 interface Props { locale: Locale }
 const { locale } = Astro.props;
 const pt = locale === 'pt-BR';
+const base = import.meta.env.BASE_URL;
 
 // Nada de texto próprio aqui: a página apresenta a documentação versionada em
 // docs/*.md (ver web/scripts/sync-docs.mjs). O português é a fonte; quem está em
@@ -40,7 +41,7 @@ const repository = 'https://github.com/ferforastieri/valky/blob/main';
       </div>
       <div class="docs-status" aria-label={pt ? 'Estado da documentação' : 'Documentation status'}>
         <span><i></i>{pt ? text.status : 'Documentation versioned in the repository'}</span>
-        <a href="/openapi.yaml" download>OpenAPI 3.1 <Download size={16}/></a>
+        <a href={`${base}openapi.yaml`} download>OpenAPI 3.1 <Download size={16}/></a>
       </div>
     </header>
 

@@ -6,9 +6,12 @@ import '../styles/global.css';
 import type { Locale } from '../content/copy';
 interface Props { locale: Locale; title: string; description: string; }
 const { locale, title, description } = Astro.props;
+const base = import.meta.env.BASE_URL;
+const siteRoot = new URL(base, Astro.site).href;
 const canonical = new URL(Astro.url.pathname, Astro.site);
-const localizedPath = Astro.url.pathname.endsWith('/docs') ? '/docs' : '';
-const socialImage = new URL('/og-image.png', Astro.site);
+const pathname = Astro.url.pathname.replace(/\/+$/, '');
+const localizedPath = pathname.endsWith('/docs') ? 'docs/' : '';
+const socialImage = new URL(`${base}og-image.png`, Astro.site);
 const isPortuguese = locale === 'pt-BR';
 const keywords = isPortuguese
   ? 'monitoramento residencial self-hosted, homelab, câmera ONVIF, câmera RTSP, segurança residencial open source, NVR local, detecção local, Tapo TC40, servidor doméstico, Android'
@@ -21,16 +24,16 @@ const structuredData = {
   '@graph': [
     {
       '@type': 'WebSite',
-      '@id': 'https://valky.vira.ia.br/#website',
-      url: 'https://valky.vira.ia.br/',
+      '@id': `${siteRoot}#website`,
+      url: siteRoot,
       name: 'Valky',
       description,
       inLanguage: ['pt-BR', 'en'],
-      publisher: { '@id': 'https://valky.vira.ia.br/#author' },
+      publisher: { '@id': `${siteRoot}#author` },
     },
     {
       '@type': 'SoftwareApplication',
-      '@id': 'https://valky.vira.ia.br/#application',
+      '@id': `${siteRoot}#application`,
       name: 'Valky',
       url: canonical.href,
       description,
@@ -44,7 +47,7 @@ const structuredData = {
       image: socialImage.href,
       keywords,
       inLanguage: locale,
-      author: { '@id': 'https://valky.vira.ia.br/#author' },
+      author: { '@id': `${siteRoot}#author` },
       offers: {
         '@type': 'Offer',
         price: 0,
@@ -54,7 +57,7 @@ const structuredData = {
     },
     {
       '@type': 'Person',
-      '@id': 'https://valky.vira.ia.br/#author',
+      '@id': `${siteRoot}#author`,
       name: 'Fernando Forastieri',
       url: 'https://github.com/ferforastieri',
       sameAs: ['https://github.com/ferforastieri'],
@@ -78,13 +81,13 @@ const structuredData = {
     <meta name="theme-color" content="#14121c" media="(prefers-color-scheme: dark)" />
     <meta name="theme-color" content="#F5F3FC" media="(prefers-color-scheme: light)" />
     <link rel="canonical" href={canonical} />
-    <link rel="alternate" hreflang="pt-BR" href={new URL(`/pt-BR${localizedPath}`, Astro.site)} />
-    <link rel="alternate" hreflang="en" href={new URL(`/en${localizedPath}`, Astro.site)} />
-    <link rel="alternate" hreflang="x-default" href={new URL(localizedPath ? `/pt-BR${localizedPath}` : '/', Astro.site)} />
-    <link rel="sitemap" href="/sitemap-index.xml" />
-    <link rel="icon" href="/valky-mark.svg?v=7" type="image/svg+xml" />
-    <link rel="icon" href="/favicon.png?v=6" type="image/png" sizes="64x64" />
-    <link rel="apple-touch-icon" href="/apple-touch-icon.png?v=6" sizes="180x180" />
+    <link rel="alternate" hreflang="pt-BR" href={new URL(`${base}pt-BR/${localizedPath}`, Astro.site)} />
+    <link rel="alternate" hreflang="en" href={new URL(`${base}en/${localizedPath}`, Astro.site)} />
+    <link rel="alternate" hreflang="x-default" href={new URL(`${base}${localizedPath ? `pt-BR/${localizedPath}` : ''}`, Astro.site)} />
+    <link rel="sitemap" href={`${base}sitemap-index.xml`} />
+    <link rel="icon" href={`${base}valky-mark.svg?v=7`} type="image/svg+xml" />
+    <link rel="icon" href={`${base}favicon.png?v=6`} type="image/png" sizes="64x64" />
+    <link rel="apple-touch-icon" href={`${base}apple-touch-icon.png?v=6`} sizes="180x180" />
     <meta property="og:type" content="website" />
     <meta property="og:site_name" content="Valky" />
     <meta property="og:title" content={title} />

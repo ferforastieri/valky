@@ -26,13 +26,13 @@ O Valky não altera configurações nativas da câmera: ele consome o stream RTS
 No servidor, execute:
 
 ```bash
-curl -fsSL https://valky.vira.ia.br/install.sh | sh
+curl -fsSL https://ferforastieri.github.io/valky/install.sh | sh
 ```
 
 Para instalar uma versão específica em vez da última:
 
 ```bash
-curl -fsSL https://valky.vira.ia.br/install.sh | VALKY_VERSION=v4.3.4 sh
+curl -fsSL https://ferforastieri.github.io/valky/install.sh | VALKY_VERSION=v4.3.4 sh
 ```
 
 ### O que o instalador faz

@@ -13,7 +13,7 @@ const stylesSource = await readFile(new URL('../src/styles/global.css', import.m
 test('publica as duas localizações com idioma correto', () => {
   assert.match(pt, /<html lang="pt-BR"/);
   assert.match(en, /<html lang="en"/);
-  assert.match(pt, /curl -fsSL https:\/\/valky\.vira\.ia\.br\/install\.sh \| sh/);
+  assert.match(pt, /curl -fsSL https:\/\/ferforastieri\.github\.io\/valky\/install\.sh \| sh/);
   assert.match(root, /navigator\.languages/);
   assert.match(root, /startsWith\('en'\)/);
 });
@@ -22,7 +22,7 @@ test('controles e navegação possuem nomes acessíveis', async () => {
   assert.match(pt, /aria-label="[^"]+"/);
   assert.doesNotMatch(pt, /class="language-menu"/);
   assert.doesNotMatch(pt, /language-popover/);
-  assert.match(pt, /href="\/pt-BR"/);
+  assert.match(pt, /href="\/valky\/pt-BR\/"/);
   assert.match(pt, /class="floating-dock"/);
   assert.doesNotMatch(pt, /<header[\s>]/);
   assert.doesNotMatch(pt, /<footer[\s>]/);
@@ -33,8 +33,8 @@ test('controles e navegação possuem nomes acessíveis', async () => {
   assert.match(pt, /screenshots\/settings-dark\.png/);
   assert.match(pt, /screenshots\/events-light\.png/);
   assert.match(pt, /class="app-carousel"/);
-  assert.match(pt, /href="\/pt-BR\/docs"/);
-  assert.match(en, /href="\/en\/docs"/);
+  assert.match(pt, /href="\/valky\/pt-BR\/docs\/"/);
+  assert.match(en, /href="\/valky\/en\/docs\/"/);
   assert.doesNotMatch(pt, /class="docs-shell"/);
   assert.match(pt, /Sua privacidade importa\./);
   // A seção dedicada de iluminação saiu da página; a menção ficou no topo.
@@ -44,8 +44,8 @@ test('controles e navegação possuem nomes acessíveis', async () => {
   assert.doesNotMatch(pt, /class="compatibility section"/);
   assert.doesNotMatch(pt, /class="detect section/);
   assert.doesNotMatch(pt, /Sinais que importam/);
-  assert.match(pt, /href="\/favicon\.png\?v=6"/);
-  assert.match(pt, /href="\/apple-touch-icon\.png\?v=6"/);
+  assert.match(pt, /href="\/valky\/favicon\.png\?v=6"/);
+  assert.match(pt, /href="\/valky\/apple-touch-icon\.png\?v=6"/);
 });
 
 test('respeita a preferência por movimento reduzido', async () => {
@@ -66,15 +66,15 @@ test('respeita a preferência por movimento reduzido', async () => {
 });
 
 test('sincroniza os prints com o tema escolhido', () => {
-  assert.match(pt, /class="theme-screenshot"[^>]+data-light-src="\/screenshots\/overview-light\.png(\\?v=\\d+)?"[^>]+data-dark-src="\/screenshots\/overview-dark\.png(\\?v=\\d+)?"/);
-  assert.match(pt, /class="theme-screenshot"[^>]+data-light-src="\/screenshots\/cameras-light\.png(\\?v=\\d+)?"[^>]+data-dark-src="\/screenshots\/cameras-dark\.png(\\?v=\\d+)?"/);
+  assert.match(pt, /class="theme-screenshot"[^>]+data-light-src="\/valky\/screenshots\/overview-light\.png(\\?v=\\d+)?"[^>]+data-dark-src="\/valky\/screenshots\/overview-dark\.png(\\?v=\\d+)?"/);
+  assert.match(pt, /class="theme-screenshot"[^>]+data-light-src="\/valky\/screenshots\/cameras-light\.png(\\?v=\\d+)?"[^>]+data-dark-src="\/valky\/screenshots\/cameras-dark\.png(\\?v=\\d+)?"/);
   assert.match(landingSource, /syncThemeScreenshots/);
   assert.match(landingSource, /systemTheme\.addEventListener\('change'/);
 });
 
 test('publica metadados sociais e SEO internacional', async () => {
   assert.match(pt, /<meta name="robots" content="index, follow, max-image-preview:large/);
-  assert.match(pt, /<meta property="og:image" content="https:\/\/valky\.vira\.ia\.br\/og-image\.png"/);
+  assert.match(pt, /<meta property="og:image" content="https:\/\/ferforastieri\.github\.io\/valky\/og-image\.png"/);
   assert.match(pt, /<meta name="twitter:card" content="summary_large_image"/);
   assert.match(pt, /<link rel="alternate" hreflang="x-default"/);
   assert.match(pt, /application\/ld\+json/);
@@ -84,10 +84,10 @@ test('publica metadados sociais e SEO internacional', async () => {
   assert.match(root, /name="robots" content="noindex, follow"/);
   const robots = await readFile(new URL('../dist/robots.txt', import.meta.url), 'utf8');
   const sitemap = await readFile(new URL('../dist/sitemap-0.xml', import.meta.url), 'utf8');
-  assert.match(robots, /Sitemap: https:\/\/valky\.vira\.ia\.br\/sitemap-index\.xml/);
-  assert.match(sitemap, /https:\/\/valky\.vira\.ia\.br\/pt-BR/);
-  assert.match(sitemap, /https:\/\/valky\.vira\.ia\.br\/en/);
-  assert.doesNotMatch(sitemap, /<loc>https:\/\/valky\.vira\.ia\.br\/<\/loc>/);
+  assert.match(robots, /Sitemap: https:\/\/ferforastieri\.github\.io\/valky\/sitemap-index\.xml/);
+  assert.match(sitemap, /https:\/\/ferforastieri\.github\.io\/valky\/pt-BR/);
+  assert.match(sitemap, /https:\/\/ferforastieri\.github\.io\/valky\/en/);
+  assert.doesNotMatch(sitemap, /<loc>https:\/\/ferforastieri\.github\.io\/valky\/<\/loc>/);
 });
 
 test('carrossel avança automaticamente sem controle visual redundante', () => {
@@ -108,11 +108,11 @@ test('documentação é uma rota separada e vem dos arquivos do repositório', a
   assert.match(enDocs, /<html lang="en"/);
   assert.match(ptDocs, /Documentação do Valky/);
   assert.match(enDocs, /Valky documentation/);
-  assert.match(ptDocs, /href="\/openapi.yaml"/);
-  assert.match(ptDocs, /href="\/pt-BR"/);
-  assert.match(ptDocs, /href="\/pt-BR#app"/);
-  assert.match(ptDocs, /href="\/pt-BR#install"/);
-  assert.match(ptDocs, /href="\/pt-BR\/docs" aria-current="page"/);
+  assert.match(ptDocs, /href="\/valky\/openapi.yaml"/);
+  assert.match(ptDocs, /href="\/valky\/pt-BR\/"/);
+  assert.match(ptDocs, /href="\/valky\/pt-BR\/#app"/);
+  assert.match(ptDocs, /href="\/valky\/pt-BR\/#install"/);
+  assert.match(ptDocs, /href="\/valky\/pt-BR\/docs\/" aria-current="page"/);
   assert.match(ptDocs, /© 2026 Fernando Forastieri · MIT/);
   // A página não tem texto próprio: cada seção vem de um arquivo em docs/.
   const sections = ptDocs.match(/class="docs-source"/g) || [];
@@ -122,11 +122,11 @@ test('documentação é uma rota separada e vem dos arquivos do repositório', a
   assert.match(ptDocs, /<h3/);
   // O inglês recebe o mesmo conteúdo com um aviso.
   assert.match(enDocs, /docs-notice/);
-  assert.match(ptDocs, /hreflang="en" href="https:\/\/valky\.vira\.ia\.br\/en\/docs"/);
-  assert.match(enDocs, /hreflang="pt-BR" href="https:\/\/valky\.vira\.ia\.br\/pt-BR\/docs"/);
+  assert.match(ptDocs, /hreflang="en" href="https:\/\/ferforastieri\.github\.io\/valky\/en\/docs\/"/);
+  assert.match(enDocs, /hreflang="pt-BR" href="https:\/\/ferforastieri\.github\.io\/valky\/pt-BR\/docs\/"/);
   const sitemap = await readFile(new URL('../dist/sitemap-0.xml', import.meta.url), 'utf8');
-  assert.match(sitemap, /https:\/\/valky\.vira\.ia\.br\/pt-BR\/docs/);
-  assert.match(sitemap, /https:\/\/valky\.vira\.ia\.br\/en\/docs/);
+  assert.match(sitemap, /https:\/\/ferforastieri\.github\.io\/valky\/pt-BR\/docs/);
+  assert.match(sitemap, /https:\/\/ferforastieri\.github\.io\/valky\/en\/docs/);
   assert.match(stylesSource, /@media \(max-width: 620px\)[\s\S]*\.endpoint-list article\s*\{[\s\S]*grid-template-columns: minmax\(0, auto\) minmax\(0, 1fr\)/);
 });
 

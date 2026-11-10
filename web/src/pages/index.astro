@@ -1,19 +1,25 @@
+---
+const base = import.meta.env.BASE_URL;
+const pt = new URL(`${base}pt-BR/`, Astro.site);
+const en = new URL(`${base}en/`, Astro.site);
+const xDefault = new URL(base, Astro.site);
+---
 <!doctype html>
 <html lang="pt-BR">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width" />
     <meta name="robots" content="noindex, follow" />
-    <meta http-equiv="refresh" content="0;url=/pt-BR" />
-    <link rel="canonical" href="https://valky.vira.ia.br/pt-BR" />
-    <link rel="alternate" hreflang="pt-BR" href="https://valky.vira.ia.br/pt-BR" />
-    <link rel="alternate" hreflang="en" href="https://valky.vira.ia.br/en" />
-    <link rel="alternate" hreflang="x-default" href="https://valky.vira.ia.br/" />
+    <meta http-equiv="refresh" content={`0;url=${base}pt-BR/`} />
+    <link rel="canonical" href={pt} />
+    <link rel="alternate" hreflang="pt-BR" href={pt} />
+    <link rel="alternate" hreflang="en" href={en} />
+    <link rel="alternate" hreflang="x-default" href={xDefault} />
     <title>Valky | Monitoramento residencial self-hosted</title>
-    <script is:inline>
+    <script is:inline define:vars={{ base }}>
       const preferred = navigator.languages?.[0] || navigator.language || '';
-      location.replace(preferred.toLowerCase().startsWith('en') ? '/en' : '/pt-BR');
+      location.replace(preferred.toLowerCase().startsWith('en') ? `${base}en/` : `${base}pt-BR/`);
     </script>
   </head>
-  <body><a href="/pt-BR">Valky em Português</a></body>
+  <body><a href={pt}>Valky em Português</a></body>
 </html>
