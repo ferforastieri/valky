@@ -9,6 +9,7 @@ import (
 	"log/slog"
 	"net"
 	"sort"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -67,7 +68,15 @@ func (s *Service) Scan(ctx context.Context, in DiscoveryInput) ([]Candidate, err
 	if duration <= 0 || duration > 30*time.Second {
 		duration = 8 * time.Second
 	}
-	return scanner.Scan(ctx, duration, in.Probe, s.knownNetworks(ctx))
+	requested, err := sanitizeNetworks(in.Networks)
+	if err != nil {
+		return nil, err
+	}
+	networks := mergeNetworks(s.knownNetworks(ctx), requested)
+	// Uma sub-rede pedida pelo app só faz sentido com a sondagem TCP: o
+	// broadcast do container não atravessa a bridge da casa.
+	probe := in.Probe || len(requested) > 0
+	return scanner.Scan(ctx, duration, probe, networks)
 }
 
 // knownNetworks derives the /24 prefixes of the addresses already registered.
@@ -95,6 +104,83 @@ func networksOf(addresses []string) []string {
 	out := make([]string, 0, len(seen))
 	for prefix := range seen {
 		out = append(out, prefix)
+	}
+	sort.Strings(out)
+	return out
+}
+
+// sanitizeNetworks normalizes the subnets the app sends. Only private IPv4 /24
+// prefixes are accepted, so a compromised or confused client cannot turn the
+// scanner into a probe of the internet.
+func sanitizeNetworks(values []string) ([]string, error) {
+	seen := map[string]bool{}
+	out := make([]string, 0, len(values))
+	for _, raw := range values {
+		prefix, ok := normalizeNetwork(raw)
+		if !ok {
+			return nil, fmt.Errorf("%w: %q", ErrInvalidDiscoveryNetwork, raw)
+		}
+		if seen[prefix] {
+			continue
+		}
+		seen[prefix] = true
+		out = append(out, prefix)
+		if len(out) > 8 {
+			return nil, fmt.Errorf("%w: no máximo 8 sub-redes", ErrInvalidDiscoveryNetwork)
+		}
+	}
+	sort.Strings(out)
+	return out, nil
+}
+
+func normalizeNetwork(raw string) (string, bool) {
+	value := strings.TrimSpace(raw)
+	if value == "" {
+		return "", false
+	}
+	var ip net.IP
+	if strings.Contains(value, "/") {
+		_, network, err := net.ParseCIDR(value)
+		if err != nil {
+			return "", false
+		}
+		ones, bits := network.Mask.Size()
+		if bits != 32 || ones != 24 {
+			return "", false
+		}
+		ip = network.IP.To4()
+	} else {
+		parts := strings.Split(value, ".")
+		if len(parts) != 3 && len(parts) != 4 {
+			return "", false
+		}
+		octets := make([]byte, 4)
+		for index, part := range parts {
+			number, err := strconv.Atoi(part)
+			if err != nil || number < 0 || number > 255 {
+				return "", false
+			}
+			octets[index] = byte(number)
+		}
+		ip = net.IPv4(octets[0], octets[1], octets[2], octets[3]).To4()
+	}
+	if ip == nil || !ip.IsPrivate() {
+		return "", false
+	}
+	return fmt.Sprintf("%d.%d.%d", ip[0], ip[1], ip[2]), true
+}
+
+func mergeNetworks(groups ...[]string) []string {
+	seen := map[string]bool{}
+	out := make([]string, 0)
+	for _, group := range groups {
+		for _, value := range group {
+			if value == "" || seen[value] {
+				continue
+			}
+			seen[value] = true
+			out = append(out, value)
+		}
 	}
 	sort.Strings(out)
 	return out

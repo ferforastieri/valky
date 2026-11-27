@@ -6,6 +6,7 @@ import (
 	"io"
 	"log/slog"
 	"path/filepath"
+	"slices"
 	"testing"
 	"time"
 
@@ -38,11 +39,15 @@ func (f *fakeDriver) Apply(_ context.Context, _ Light, _ Credentials, patch Stat
 // needs. The failure switch makes it reject a wrong local key.
 type fakeScannerDriver struct {
 	fakeDriver
-	reject     bool
-	candidates []Candidate
+	reject       bool
+	candidates   []Candidate
+	scanProbe    bool
+	scanNetworks []string
 }
 
-func (f *fakeScannerDriver) Scan(context.Context, time.Duration, bool, []string) ([]Candidate, error) {
+func (f *fakeScannerDriver) Scan(_ context.Context, _ time.Duration, probe bool, networks []string) ([]Candidate, error) {
+	f.scanProbe = probe
+	f.scanNetworks = networks
 	return f.candidates, nil
 }
 
@@ -147,6 +152,30 @@ func strptr(value string) *string { return &value }
 
 // A busca precisa saber onde procurar quando o broadcast fica preso na rede do
 // container: as faixas saem dos endereços já cadastrados.
+func TestScanUsesRequestedNetworks(t *testing.T) {
+	driver := &fakeScannerDriver{}
+	service, _, _ := newTestService(t, driver)
+	if _, err := service.Scan(context.Background(), DiscoveryInput{Networks: []string{"192.168.15.0/24", "10.0.0.42"}}); err != nil {
+		t.Fatal(err)
+	}
+	if !driver.scanProbe {
+		t.Fatal("uma sub-rede pedida pelo app precisa ligar a sondagem TCP")
+	}
+	want := []string{"10.0.0", "192.168.15"}
+	if !slices.Equal(driver.scanNetworks, want) {
+		t.Fatalf("faixas = %v, esperado %v", driver.scanNetworks, want)
+	}
+}
+
+func TestScanRejectsPublicOrWideNetworks(t *testing.T) {
+	service, _, _ := newTestService(t, &fakeScannerDriver{})
+	for _, network := range []string{"8.8.8.0/24", "192.168.15.0/16", "127.0.0.1", "0.0.0.0", "169.254.1.0/24"} {
+		if _, err := service.Scan(context.Background(), DiscoveryInput{Networks: []string{network}}); !errors.Is(err, ErrInvalidDiscoveryNetwork) {
+			t.Fatalf("%q deveria ser recusada, veio %v", network, err)
+		}
+	}
+}
+
 func TestNetworksComeFromTheRegisteredAddresses(t *testing.T) {
 	networks := networksOf([]string{
 		"192.168.15.101",

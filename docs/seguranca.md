@@ -19,6 +19,7 @@ O modelo de segurança do Valky e o histórico das revisões.
 | Sessão de navegador | Hash SHA-256 em `viewer_sessions` | Cookie `__Host-valky-viewer`, Secure, HttpOnly, SameSite=Strict, 30 dias renovados durante o uso (a renovação só escreve quando faltam menos de cinco dias). `DELETE /viewer-session` revoga. |
 | Convite de pareamento | Hash do código em `pairing_sessions` | 16 caracteres, uso único, expira em 10 minutos. |
 | Código de instalação | `VALKY_SETUP_TOKEN` no `.env` | Usado só na criação do primeiro administrador; atualizações o preservam. |
+| Token do updater | `VALKY_UPDATER_TOKEN` no `.env` e em `/etc/valky/updater.env` | Socket Unix local; só o updater no host aceita. O backend não tem Docker socket. |
 
 A credencial é revalidada a cada requisição: o backend resolve o token opaco pelo hash, confere se o dispositivo e o usuário estão ativos e lê o papel persistido. O canal em tempo real revalida a credencial a cada 15 segundos e é encerrado após revogação ou desativação; novas requisições são bloqueadas imediatamente. O `last_seen_at` é gravado no máximo a cada 5 minutos por dispositivo.
 
@@ -76,7 +77,7 @@ Todo o resto exige credencial. A matriz completa está no contrato e no teste de
 - O MediaMTX não vê `valky-data`: um problema nele ou no FFmpeg não alcança o banco, a chave-mestra nem os certificados. Ele recebe apenas o buffer temporário.
 - A API do MediaMTX autoriza somente `127.0.0.1`, `::1` e a sub-rede fixa `172.28.0.0/24` do projeto — não a faixa `172.16/12` inteira, que daria a qualquer container do host leitura, publicação e reconfiguração de caminhos.
 - Os dois serviços rodam com rootfs somente leitura, `cap_drop: ALL`, `no-new-privileges` e `/tmp` em tmpfs.
-- O backend não tem socket do Docker nem rota para executar atualizações do servidor. O instalador remove o antigo container de atualização (`--remove-orphans`).
+- O backend não tem socket do Docker. O `POST /system/update` (admin) fala com o `valky-updater` no host por um socket Unix com token; o updater só executa o instalador oficial. O antigo container de atualização continua removido.
 
 ## Revisões
 

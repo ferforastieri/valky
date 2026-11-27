@@ -167,7 +167,11 @@ class ValkyRepository @Inject constructor(
     }
 
     /** Procura lâmpadas na rede local para preencher o formulário de cadastro. */
-    suspend fun discoverLights(): List<LightCandidate> = api.discoverLights()
+    suspend fun discoverLights(subnet: String?): List<LightCandidate> = api.discoverLights(subnet)
+    suspend fun startTuyaImport(userCode: String): TuyaImportStart = api.startTuyaImport(userCode)
+    suspend fun tuyaImportStatus(session: String): TuyaImportStatus = api.tuyaImportStatus(session)
+    suspend fun applyTuyaImport(session: String, deviceIds: List<String>): TuyaImportResult = api.applyTuyaImport(session, deviceIds)
+    suspend fun cancelTuyaImport(session: String) = api.cancelTuyaImport(session)
 
     suspend fun updateLight(id: String, input: LightUpdate): LightDevice {
         return api.updateLight(id, input).also { updated ->

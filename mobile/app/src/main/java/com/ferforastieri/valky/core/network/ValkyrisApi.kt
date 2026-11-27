@@ -269,8 +269,26 @@ class ValkyApi(
     suspend fun rediscoverCamera(id: String): Camera = post("/cameras/$id/discovery", emptyMap<String, String>(), announceBackend = true)
     /** Adota uma lâmpada já pareada em outro aplicativo (chave local). */
     suspend fun registerLight(input: LightRegistration): LightDevice = post("/lights", input, announceBackend = true)
-    /** Procura lâmpadas na rede local para preencher o cadastro. */
-    suspend fun discoverLights(): List<LightCandidate> = post("/lights/discovery", emptyMap<String, String>())
+    /** Procura lâmpadas na rede local; a sub-rede vem do Wi-Fi do celular. */
+    suspend fun discoverLights(subnet: String?): List<LightCandidate> =
+        post("/lights/discovery", LightDiscoveryRequest(networks = listOfNotNull(subnet)))
+    /** Inicia a autorização por QR na conta Tuya (administrador). */
+    suspend fun startTuyaImport(userCode: String): TuyaImportStart =
+        post("/lights/import/tuya", TuyaImportStartRequest(userCode), announceBackend = true)
+    /** Consulta o QR/autorização e a lista de lâmpadas da conta Tuya. */
+    suspend fun tuyaImportStatus(sessionId: String): TuyaImportStatus = get("/lights/import/tuya/$sessionId")
+    /** Importa as lâmpadas selecionadas; a chave local fica no backend. */
+    suspend fun applyTuyaImport(sessionId: String, deviceIds: List<String>): TuyaImportResult =
+        post("/lights/import/tuya/$sessionId/apply", TuyaImportApplyRequest(deviceIds), announceBackend = true)
+    suspend fun cancelTuyaImport(sessionId: String) {
+        val current = requireNotNull(session())
+        executeUnit(current.fingerprint, announceBackend = false) {
+            it.delete(base() + "/lights/import/tuya/$sessionId") {
+                bearerAuth(current.token)
+                header(HttpHeaders.AcceptLanguage, Locale.getDefault().toLanguageTag())
+            }
+        }
+    }
     suspend fun updateLight(id: String, input: LightUpdate): LightDevice = put("/lights/$id", input, announceBackend = true)
     suspend fun controlLight(id: String, patch: LightStatePatch): LightDevice = put("/lights/$id/state", patch)
     suspend fun lightBle(id: String): LightBle = get("/lights/$id/ble")
@@ -318,6 +336,8 @@ class ValkyApi(
 
 
     suspend fun updateInfo(): UpdateInfo = get("/system/update?clientVersion=${BuildConfig.VERSION_NAME.encodeURLParameter()}")
+    /** Pede ao updater do servidor que rode o instalador oficial (admin). */
+    suspend fun triggerServerUpdate(): ServerUpdateAck = post("/system/update", emptyMap<String, String>(), announceBackend = true)
 
     suspend fun retention(): RetentionSettings = get("/settings/retention")
 

@@ -97,7 +97,9 @@ export interface Update {
   currentVersion: string;
   latestVersion: string;
   serverUpdateAvailable: boolean;
+  apkUpdateAvailable?: boolean;
   releaseUrl?: string;
+  apkUrl?: string;
 }
 export const labels: Record<string, string> = {
   motion: "Movimento",

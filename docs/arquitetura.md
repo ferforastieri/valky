@@ -20,7 +20,7 @@ Como o Valky funciona por dentro: componentes, fluxos, volumes, dados e onde fic
 3. Eventos ONVIF e os detectores locais entregam detecções normalizadas ao motor de regras.
 4. Regras que casam criam um evento, materializam um clipe de 5 segundos de pré-rolagem e 10 de pós-rolagem e enfileiram entregas por dispositivo. Eventos sobrepostos estendem e compartilham o mesmo clipe, mantendo cada snapshot.
 5. O Android recebe um sinal mínimo cifrado e busca o evento autenticado pela LAN ou VPN.
-6. Ao retomar, o app compara as versões do servidor e do cliente com a última release estável do GitHub por um endpoint de leitura. O Android bloqueia com um sheet obrigatório a cada APK novo; a web mostra um aviso persistente. O download do APK começa no sheet e a instalação exige confirmação do sistema. Atualização do servidor é manual, pelo instalador, nunca pela API.
+6. Ao retomar, o app compara as versões do servidor e do cliente com a última release estável do GitHub por um endpoint de leitura. O Android bloqueia com um sheet obrigatório a cada APK novo; a web mostra um aviso persistente. O download do APK começa no sheet e a instalação exige confirmação do sistema. O administrador pode disparar a atualização do servidor pelo aviso; o backend pede ao updater local, que roda o instalador oficial.
 
 Detalhes da detecção sonora:
 
@@ -75,7 +75,7 @@ As migrações rodam automaticamente em `store.Open`: o esquema (`schema.sql`) �
 - O MediaMTX é isolado: não vê `valky-data`, roda com rootfs somente leitura, `cap_drop: ALL` e `/tmp` em tmpfs; sua API aceita apenas loopback e a sub-rede fixa do projeto (`172.28.0.0/24`), não a faixa `172.16/12` inteira.
 - A rede do Compose é fixa (`172.28.0.0/24`) e apenas a porta `8189` UDP/TCP é publicada.
 - Validação no servidor, validação de caminho de mídia, autenticação de sessão e migrações de banco são fronteiras intencionais; não as remova para reduzir código.
-- O backend não tem socket do Docker nem endpoint para executar atualizações do servidor. O instalador remove o antigo container de atualização com `--remove-orphans`.
+- O backend não tem socket do Docker. A atualização é pedida a um updater local no host por um socket Unix autenticado, e o updater só executa o instalador oficial; o antigo container de atualização continua removido.
 
 ## Decisões de projeto
 
@@ -85,4 +85,4 @@ As migrações rodam automaticamente em `store.Open`: o esquema (`schema.sql`) �
 - **Orientado a capabilities:** o Valky mostra apenas o que a câmera anuncia por ONVIF/RTSP. Ausências degradam a interface sem impedir o resto.
 - **Sem gravação contínua:** só existe buffer curto em RAM e clipes de evento.
 - **Sem promessa de entrega absoluta:** energia, rede ou permissões do Android podem impedir um alarme; o sistema registra tentativas, mas não garante entrega.
-- **Atualização explícita:** servidor pelo instalador, app por sheet obrigatório; nada se atualiza sozinho.
+- **Atualização explícita:** app por sheet obrigatório; servidor pelo instalador, disparado por um administrador no app/painel via updater local; nada se atualiza sozinho.

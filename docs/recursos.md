@@ -54,18 +54,11 @@ O Valky controla lâmpadas Wi-Fi compatíveis com Tuya (protocolos locais 3.1 a 
 
 O domínio de iluminação não depende de conta de fabricante. O backend expõe uma fronteira de driver local com quatro operações (descoberta, validação e capacidades, leitura de estado e aplicação de mudança); `internal/light/tuya` implementa essa fronteira com implementação própria, verificada contra quadros de referência, sem bibliotecas de terceiros.
 
-**Cadastro:** pareie a lâmpada no aplicativo **Tuya Smart** ou **Smart Life**, obtenha o **Device ID** e a **chave local** e informe os dois em **Dispositivos → Iluminação → +** (apenas administradores). O botão **Buscar na rede** preenche o endereço e, quando a lâmpada anuncia, também o identificador. O backend valida a chave contra a lâmpada antes de gravar; se estiver errada, a mensagem explica. A chave local é fixa e só é necessária uma vez.
+**Cadastro:** pareie a lâmpada no aplicativo **Tuya Smart** ou **Smart Life** e abra **Dispositivos → Iluminação → + → Importar da Tuya** (apenas administradores). O Valky mostra um QR code; no app Tuya, informe o **User Code** (aba **Meu** → engrenagem → **Conta e Segurança** → **User Code**) e escaneie o QR. O backend lista as lâmpadas da conta, importa as escolhidas e valida a chave local contra cada lâmpada antes de gravar; a chave fica cifrada no SQLite e nunca volta para o aplicativo. Depois disso o controle é local. Também é possível cadastrar manualmente informando endereço, Device ID e chave local; o botão **Buscar na rede** preenche o endereço e o identificador. A chave local é fixa e só é necessária uma vez.
 
-Para obter a chave local, a via recomendada é o utilitário do repositório, que usa o SDK oficial da Tuya com autorização por QR code (o mesmo mecanismo do Home Assistant):
+A autorização da Tuya acontece uma única vez, pelo QR no próprio aplicativo; não é preciso Python, terminal nem o portal `iot.tuya.com`. O fluxo usa o mesmo mecanismo oficial de compartilhamento do Home Assistant, mas a chave nunca sai do backend.
 
-```bash
-python3 -m venv /tmp/tuya && /tmp/tuya/bin/pip install tuya-device-sharing-sdk cryptography qrcode
-/tmp/tuya/bin/python scripts/tuya-local-key.py
-```
-
-Pegue o **User Code** no aplicativo (aba **Meu** → engrenagem → **Conta e Segurança** → **User Code**), informe quando o script pedir, aponte o celular para o QR exibido no terminal e leia a lista com Device ID, chave local e IP. O painel `iot.tuya.com` (Cloud project → Link App Account → Query Device Details) também funciona quando acessível, mas pode ficar indisponível de algumas redes.
-
-**Descoberta de endereço:** o Valky guarda o último endereço funcional e procura de novo pelo identificador nos anúncios da rede quando a lâmpada não responde. Redes com isolamento entre clientes, VLANs ou firewall precisam permitir que o container alcance a lâmpada na porta TCP 6668; a descoberta usa UDP 6666, 6667 e 7000.
+**Descoberta de endereço:** o app envia a sub-rede `/24` do Wi-Fi junto com a busca, e o backend sonda a faixa na porta TCP 6668 — inclusive quando o container não recebe o broadcast da LAN. O Valky também guarda o último endereço funcional e procura de novo pelo identificador quando a lâmpada não responde. Redes com isolamento entre clientes, VLANs ou firewall precisam permitir que o container alcance a lâmpada na porta TCP 6668; a descoberta usa UDP 6666, 6667 e 7000.
 
 **Capacidades:** a lâmpada informa quais pontos de controle expõe; o adaptador detecta o layout e o guarda por dispositivo.
 
@@ -77,7 +70,7 @@ Pegue o **User Code** no aplicativo (aba **Meu** → engrenagem → **Conta e Se
 
 Brilho é guardado em porcentagem e temperatura em Kelvin: o valor bruto do firmware nunca chega ao aplicativo, e a temperatura é mapeada linearmente entre 2700 K e 6500 K. A descoberta também pode ser conferida no servidor com `go run ./cmd/lightscan` (`-probe` testa a porta de controle).
 
-**Segurança:** a chave local é cifrada no SQLite com a chave mestra AES-256-GCM. A API só devolve a chave no endpoint **admin-only** de credencial BLE (`GET /lights/{id}/ble`), usado pelo celular do administrador para falar com a lâmpada quando ela está sem IP; os demais comandos continuam passando pelo backend autenticado. Só administradores cadastram, renomeiam, removem ou mudam a configuração, e qualquer usuário autenticado opera uma lâmpada já cadastrada. A descoberta só envia tráfego para as sub-redes locais do host, nunca para a internet.
+**Segurança:** a chave local é cifrada no SQLite com a chave mestra AES-256-GCM. O importador guarda a chave apenas na sessão do backend e a API de status nunca a devolve. O único caminho que entrega a chave ao celular é o endpoint **admin-only** de credencial BLE (`GET /lights/{id}/ble`), usado para falar com a lâmpada quando ela está sem IP; os demais comandos continuam passando pelo backend autenticado. Só administradores cadastram, renomeiam, removem ou mudam a configuração, e qualquer usuário autenticado opera uma lâmpada já cadastrada. A descoberta só envia tráfego para as sub-redes locais do host, nunca para a internet.
 
 **Bluetooth (reserva):** quando a lâmpada perde o Wi-Fi, o aplicativo do administrador busca a chave e o layout de data points no endpoint acima e fala direto com o BLE da Tuya — sem nuvem, sem servidor no caminho. O celular precisa estar perto e ter a permissão de Bluetooth; o estado é atualizado localmente e o backend sincroniza quando a lâmpada volta para a rede. Não há botão novo: o BLE só entra quando o comando pelo backend falha ou a lâmpada está marcada como offline.
 
@@ -113,7 +106,7 @@ A permissão de localização durante o uso permite iniciar o serviço com o app
 
 Abra `/app/` no endereço do servidor e entre com seu usuário e senha. O painel consulta câmeras (previews e vídeo WebRTC), os últimos 200 eventos e suas mídias, família e histórico, áreas, regras e informações do servidor, atualizando a cada 15 segundos enquanto a aba está visível. A interface usa Astro, TypeScript e as fontes da landing; o build separado (`pnpm build:viewer`) gera `web/dist-viewer`, que o Dockerfile inclui em `/opt/valky/web` e o backend serve em `/app/`. Não há serviço Node adicional.
 
-A sessão usa o cookie `__Host-valky-viewer` e não cria usuários nem dispositivos. O painel permite as mutações autorizadas para a conta: gestão de usuários, convites e destinatários de regras, além de acender lâmpadas e usar o controle da TV. Reconhecimento de eventos, PTZ, localização e atualização do servidor continuam fora do navegador. Administradores também podem redefinir credenciais e ajustar permissões de regras. Sem permissão de visualização, o painel não pede nem mostra regras; com visualização apenas, os destinatários não são editáveis.
+A sessão usa o cookie `__Host-valky-viewer` e não cria usuários nem dispositivos. O painel permite as mutações autorizadas para a conta: gestão de usuários, convites e destinatários de regras, além de acender lâmpadas e usar o controle da TV. Reconhecimento de eventos, PTZ e localização continuam fora do navegador; administradores podem disparar a atualização do servidor pelo aviso, que chama o updater local. Administradores também podem redefinir credenciais e ajustar permissões de regras. Sem permissão de visualização, o painel não pede nem mostra regras; com visualização apenas, os destinatários não são editáveis.
 
 Convidar um usuário cria um QR gerado localmente no navegador, no formato `valky://pair?url=<origem do painel>&code=<código>`, com validade e uso único definidos pelo backend; também é possível copiar o link. Use o endereço HTTPS acessível pelo aparelho.
 

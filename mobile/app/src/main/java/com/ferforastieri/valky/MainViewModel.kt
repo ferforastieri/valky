@@ -3,6 +3,7 @@ package com.ferforastieri.valky
 import android.net.Uri
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.ferforastieri.valky.R
 import com.ferforastieri.valky.core.action.MobileActionGate
 import com.ferforastieri.valky.core.model.UpdateInfo
 import com.ferforastieri.valky.core.network.ValkyApi
@@ -64,6 +65,8 @@ class MainViewModel @Inject constructor(
     val updateInfo = _updateInfo.asStateFlow()
     private val _updating = MutableStateFlow(false)
     val updating = _updating.asStateFlow()
+    private val _updateMessage = MutableStateFlow<String?>(null)
+    val updateMessage = _updateMessage.asStateFlow()
     private val _apkDownloads = MutableSharedFlow<ApkDownload>(extraBufferCapacity = 1)
     val apkDownloads = _apkDownloads.asSharedFlow()
     private var lastUpdateCheck = 0L
@@ -158,7 +161,7 @@ class MainViewModel @Inject constructor(
         }
     }
 
-    fun signOut() { sessions.clear(); com.ferforastieri.valky.feature.people.LocationTrackingService.stop(context); api.clearPermissions(); _pairingLink.value = null; _admin.value = false; _paired.value = false; _updateInfo.value = null; _updating.value = false; lastUpdateCheck = 0L }
+    fun signOut() { sessions.clear(); com.ferforastieri.valky.feature.people.LocationTrackingService.stop(context); api.clearPermissions(); _pairingLink.value = null; _admin.value = false; _paired.value = false; _updateInfo.value = null; _updating.value = false; _updateMessage.value = null; lastUpdateCheck = 0L }
 
     fun refreshPushRegistration() {
         val current = sessions.get() ?: return
@@ -187,18 +190,31 @@ class MainViewModel @Inject constructor(
         viewModelScope.launch {
             runCatching { api.updateInfo() }.onSuccess { info ->
                 if (!_paired.value || sessions.get() != session) return@onSuccess
-                _updateInfo.value = info.takeIf { it.apkUpdateAvailable && it.apkUrl.isNotBlank() }
+                _updateInfo.value = info.takeIf { it.available }
             }
         }
     }
 
+    /**
+     * Atualiza o servidor (se houver versão nova e o usuário for admin) e o
+     * APK (se houver). No Android o download do APK continua pelo instalador
+     * do sistema; o updater do servidor roda no host e reinicia o stack.
+     */
     fun startUpdate() {
         val available = _updateInfo.value ?: return
-        if (!available.apkUpdateAvailable || available.apkUrl.isBlank() || !actionGate.tryAcquire()) return
+        if (_updating.value || !actionGate.tryAcquire()) return
         _updating.value = true
+        _updateMessage.value = null
         viewModelScope.launch {
             try {
-                _apkDownloads.emit(ApkDownload(available.apkUrl, available.latestVersion))
+                if (_admin.value && available.serverUpdateAvailable) {
+                    _updateMessage.value = context.getString(R.string.update_server_started)
+                    runCatching { api.triggerServerUpdate() }
+                        .onFailure { error -> _updateMessage.value = error.message ?: context.getString(R.string.update_server_started) }
+                }
+                if (available.apkUpdateAvailable && available.apkUrl.isNotBlank()) {
+                    _apkDownloads.emit(ApkDownload(available.apkUrl, available.latestVersion))
+                }
             } finally {
                 _updating.value = false
                 actionGate.release()

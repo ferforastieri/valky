@@ -72,7 +72,7 @@ Motivos incluem `persistent_baby_cry`, `awaiting_independent_baby_evidence`, `ov
 
 ## Atualização de APK
 
-O app bloqueia o uso com um sheet obrigatório quando há um APK novo, e o painel web mostra um aviso persistente. O download começa no próprio sheet e a instalação exige a confirmação do sistema: o servidor não instala aplicativos silenciosamente e não há atualização automática. Atualizar o servidor é rodar o instalador de novo (veja `instalacao.md`); atualizar pelo app troca apenas o backend e não migra o Compose de uma instalação antiga.
+O app bloqueia o uso com um sheet obrigatório quando há um APK novo, e o painel web mostra um aviso persistente. O download começa no próprio sheet e a instalação exige a confirmação do sistema: o servidor não instala aplicativos silenciosamente e não há atualização automática. O mesmo aviso permite que um administrador dispare a atualização do servidor: o backend chama o updater local, que roda o instalador oficial e atualiza o Compose/MediaMTX. Se o updater não estiver disponível, rode o instalador manualmente (veja `instalacao.md`).
 
 ## Capturas de tela da landing
 

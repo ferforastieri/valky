@@ -28,6 +28,10 @@ var (
 	// ErrInvalidRegistration marks input the administrator must fix (a missing
 	// address, a key that is not 16 characters, a duplicate device).
 	ErrInvalidRegistration = errors.New("invalid light registration")
+
+	// ErrInvalidDiscoveryNetwork marks a subnet outside the private /24 ranges
+	// the scanner is allowed to probe.
+	ErrInvalidDiscoveryNetwork = errors.New("invalid light discovery network")
 )
 
 // UnavailableDriver keeps the generic lighting API and UI stable while no

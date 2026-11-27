@@ -95,6 +95,10 @@ type DiscoveryInput struct {
 	Duration int `json:"duration,omitempty"`
 	// Probe also tries the control port on every address of the local subnets.
 	Probe bool `json:"probe,omitempty"`
+	// Networks lists private /24 prefixes to probe. The app sends the phone's
+	// Wi-Fi subnet because the backend container does not receive the LAN
+	// broadcast; asking for a network implies a TCP probe.
+	Networks []string `json:"networks,omitempty"`
 }
 
 // RegisterInput adopts a lamp that another application already configured. The

@@ -135,7 +135,11 @@ Todas sob `/api/v1`. "Autenticado" = qualquer token de dispositivo válido; "Adm
 | --- | --- | --- | --- |
 | `GET` | `/lights` | Autenticado | Lista as lâmpadas cadastradas. |
 | `POST` | `/lights` | Admin | Cadastra uma lâmpada Tuya (endereço, Device ID e chave local). |
-| `POST` | `/lights/discovery` | Admin | Procura lâmpadas na rede local. |
+| `POST` | `/lights/discovery` | Admin | Procura lâmpadas na rede local; o app envia a sub-rede /24 do Wi-Fi. |
+| `POST` | `/lights/import/tuya` | Admin | Inicia a autorização por QR na conta Tuya. |
+| `GET` | `/lights/import/tuya/{session}` | Admin | Consulta a autorização e as lâmpadas da conta. |
+| `POST` | `/lights/import/tuya/{session}/apply` | Admin | Importa as lâmpadas selecionadas, validando a chave local. |
+| `DELETE` | `/lights/import/tuya/{session}` | Admin | Cancela a sessão de importação. |
 | `GET` | `/lights/{id}` | Autenticado | Estado e capacidades da lâmpada. |
 | `GET` | `/lights/{id}/ble` | Admin | Chave local e data points para o controle BLE de reserva. |
 | `PUT` | `/lights/{id}` | Admin | Edita nome e configuração. |
@@ -184,7 +188,8 @@ Todas sob `/api/v1`. "Autenticado" = qualquer token de dispositivo válido; "Adm
 | `PUT` | `/settings/retention` | Admin | Ajusta a retenção (1 a 365 dias, 1 a 1000 GB). |
 | `GET` | `/settings/location-alerts` | Autenticado | Lê a apresentação dos alertas de localização e bateria. |
 | `PUT` | `/settings/location-alerts` | Admin | Ajusta textos, toque, vibração e tela cheia desses alertas. |
-| `GET` | `/system/update` | Autenticado | Consulta a última release estável; não executa atualização. |
+| `GET` | `/system/update` | Autenticado | Consulta a última release estável e o estado da atualização. |
+| `POST` | `/system/update` | Admin | Dispara o updater local, que roda o instalador oficial e reinicia Valky+MediaMTX. |
 | `GET` | `/realtime` | Autenticado | WebSocket de eventos em tempo real. |
 
 ## Exemplo autenticado

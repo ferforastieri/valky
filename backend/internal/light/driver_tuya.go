@@ -327,7 +327,9 @@ func (d *TuyaDriver) Scan(ctx context.Context, duration time.Duration, probePort
 	// tentativa.
 	timeout := 3 * time.Second
 	if probePorts {
-		timeout = 250 * time.Millisecond
+		// Wi-Fi residencial responde em ~200–400 ms; 250 ms perdia lâmpadas
+		// boas por pouco. A sondagem continua paralela e cabe no ciclo da tela.
+		timeout = 700 * time.Millisecond
 	}
 	devices, err := tuya.Discover(ctx, tuya.ScanOptions{Duration: duration, TCPProbe: probePorts, Timeout: timeout, Networks: networks})
 	if err != nil {

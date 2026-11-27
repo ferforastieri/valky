@@ -38,9 +38,10 @@ curl -fsSL https://ferforastieri.github.io/valky/install.sh | VALKY_VERSION=v4.3
 ### O que o instalador faz
 
 - Verifica `curl`, `docker`, `docker compose` v2 e `sha256sum`; sem eles, para com uma mensagem clara.
-- Baixa `compose.yaml`, `mediamtx.yml`, `VERSION` e `SHA256SUMS` da release, sempre por HTTPS (`--proto '=https' --proto-redir '=https'`) e com retentativas.
-- Confere o SHA-256 de `compose.yaml`, `mediamtx.yml` e `VERSION` antes de usar.
+- Baixa `compose.yaml`, `mediamtx.yml`, `VERSION`, `SHA256SUMS` e o binário do updater da arquitetura da release, sempre por HTTPS (`--proto '=https' --proto-redir '=https'`) e com retentativas.
+- Confere o SHA-256 de `compose.yaml`, `mediamtx.yml`, `VERSION` e do binário do updater da arquitetura antes de usar.
 - Cria ou atualiza os arquivos locais e o `.env`, preservando o que já existe.
+- Em root/systemd, instala e inicia o serviço local `valky-updater` (socket Unix + token) que permite a atualização pelo app/painel; o backend não recebe Docker socket.
 - Roda `docker compose pull` e `docker compose up -d --remove-orphans`, o que também remove o antigo container de atualização de instalações antigas.
 - Em instalações como root com systemd, instala o helper `valky-wol-broadcast` (script + timer) que habilita o broadcast dirigido nas bridges do Docker para o Wake-on-LAN das TVs.
 - Aguarda até 30 segundos o `/health` responder e imprime o endereço local e o código de instalação.
@@ -52,6 +53,7 @@ O instalador é idempotente: rodar de novo atualiza a instalação sem apagar da
 - `~/.local/share/valky` (ou `$VALKYRIS_HOME`, se definido): `compose.yaml`, `mediamtx.yml` e `.env`. As versões anteriores dos dois YAML ficam ao lado, com sufixo `.previous`.
 - Volume `valky-data`: banco SQLite, `secrets/master.key`, certificados em `tls/` e a mídia dos eventos. Só o container da aplicação enxerga.
 - Volume `recording-buffer`: buffer temporário de dez minutos em RAM (tmpfs, 384 MiB), compartilhado com o MediaMTX.
+- Em root/systemd: `/usr/local/bin/valky-updater`, `/etc/valky/updater.env` (token, modo 600) e o serviço `valky-updater`; o socket fica em `/run/valky-updater/updater.sock`.
 
 ### Código de instalação
 
@@ -93,9 +95,9 @@ Valide o vídeo com `RTCPeerConnection.getStats()`: a conexão precisa estar `co
 
 ## Atualizar
 
-Servidor e web: execute o instalador de novo, com o mesmo comando. Ele atualiza `compose.yaml`, `mediamtx.yml`, a versão no `.env` e recria **Valky e MediaMTX juntos** (o vídeo é interrompido por alguns segundos). Não remova volumes para atualizar e não use `docker compose down -v`.
+Servidor e web: o instalador continua sendo a fonte da atualização. Em instalações root com systemd, ele instala o `valky-updater` (serviço local com acesso ao Docker, socket Unix e token). O aviso no app/painel mostra a versão nova; um administrador toca em **Atualizar** e o backend pede ao updater que execute o instalador oficial, atualizando `compose.yaml`, `mediamtx.yml`, a versão e recriando **Valky e MediaMTX juntos**. O backend não recebe Docker socket. Para atualizar manualmente, rode o instalador de novo com o mesmo comando. Não remova volumes para atualizar e não use `docker compose down -v`.
 
-Android: o app bloqueia o uso com um sheet obrigatório quando há um APK novo e o painel web mostra um aviso persistente. O download começa no próprio sheet e a instalação exige a confirmação do sistema; não há atualização automática. O servidor não instala aplicativos silenciosamente.
+Android: o app mostra o mesmo aviso; o botão inicia o updater do servidor e baixa o APK. A instalação exige a confirmação do sistema; o servidor não instala aplicativos silenciosamente. Usuários comuns só atualizam o APK; a atualização do servidor é admin-only. A página mostra “Atualizando…” e volta quando o `/health` responde.
 
 Depois de atualizar, confira `docker compose ps`, o `/health` e uma reprodução real. Remova imagens antigas sem uso somente após validar.
 

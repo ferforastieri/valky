@@ -26,10 +26,27 @@ generate_setup_token() {
   fi
 }
 
+# Token do socket local do updater. Fica no .env (backend) e em
+# /etc/valky/updater.env (serviço), com permissão 600.
+generate_updater_token() {
+  if command -v openssl >/dev/null 2>&1; then
+    openssl rand -hex 32
+  else
+    head -c 64 /dev/urandom | sha256sum | cut -d ' ' -f 1
+  fi
+}
+
 command -v curl >/dev/null 2>&1 || fail "curl não foi encontrado."
 command -v docker >/dev/null 2>&1 || fail "Docker não foi encontrado. Instale-o antes de continuar."
 docker compose version >/dev/null 2>&1 || fail "Docker Compose v2 não foi encontrado."
 command -v sha256sum >/dev/null 2>&1 || fail "sha256sum não foi encontrado."
+
+case "$(uname -m)" in
+  x86_64|amd64) UPDATER_ARCH=amd64 ;;
+  aarch64|arm64) UPDATER_ARCH=arm64 ;;
+  *) fail "arquitetura não suportada: $(uname -m)." ;;
+esac
+UPDATER_ASSET="valky-updater-linux-${UPDATER_ARCH}"
 
 if [ "$REQUESTED_VERSION" = "latest" ]; then
   RELEASE_URL="https://github.com/${REPOSITORY}/releases/latest/download"
@@ -38,7 +55,7 @@ else
 fi
 
 printf 'Valky: baixando a release %s...\n' "$REQUESTED_VERSION"
-for asset in compose.yaml mediamtx.yml VERSION SHA256SUMS; do
+for asset in compose.yaml mediamtx.yml VERSION SHA256SUMS "$UPDATER_ASSET"; do
   curl -fsSL --retry 3 --proto '=https' --proto-redir '=https' --tlsv1.2 \
     "${RELEASE_URL}/${asset}" -o "${TEMP_ROOT}/${asset}" || fail "não foi possível baixar ${asset}."
 done
@@ -54,6 +71,7 @@ verify_asset() {
 verify_asset compose.yaml
 verify_asset mediamtx.yml
 verify_asset VERSION
+verify_asset "$UPDATER_ASSET"
 
 RELEASE_VERSION="$(tr -d '\r\n' < "${TEMP_ROOT}/VERSION")"
 [ -n "$RELEASE_VERSION" ] || fail "a release não informou uma versão."
@@ -83,7 +101,7 @@ if [ ! -f "$ENV_FILE" ]; then
 else
   # Também remove as variáveis da instalação antiga (VALKYRIS_*), que ficavam
   # no arquivo depois da troca de nome e confundiam a configuração.
-  sed '/^VALKY_PUBLIC_URL=/d; /^VALKY_SETUP_TOKEN=/d; /^VALKY_UPDATER_URL=/d; /^VALKY_UPDATER_TOKEN=/d; /^VALKYRIS_/d' "$ENV_FILE" > "${TEMP_ROOT}/env-clean"
+  sed '/^VALKY_PUBLIC_URL=/d; /^VALKY_SETUP_TOKEN=/d; /^VALKY_UPDATER_URL=/d; /^VALKYRIS_/d' "$ENV_FILE" > "${TEMP_ROOT}/env-clean"
   mv "${TEMP_ROOT}/env-clean" "$ENV_FILE"
   if grep -q '^VALKY_VERSION=' "$ENV_FILE"; then
     sed "s/^VALKY_VERSION=.*/VALKY_VERSION=${RELEASE_VERSION}/" "$ENV_FILE" > "${TEMP_ROOT}/env"
@@ -100,6 +118,11 @@ if ! grep -Eq '^VALKY_SETUP_TOKEN=.+$' "$ENV_FILE"; then
   printf '\nVALKY_SETUP_TOKEN=%s\n' "$(generate_setup_token)" >> "$ENV_FILE"
 fi
 SETUP_TOKEN="$(sed -n 's/^VALKY_SETUP_TOKEN=//p' "$ENV_FILE" | head -1)"
+if ! grep -Eq '^VALKY_UPDATER_TOKEN=.+$' "$ENV_FILE"; then
+  printf '\nVALKY_UPDATER_TOKEN=%s\n' "$(generate_updater_token)" >> "$ENV_FILE"
+fi
+UPDATER_TOKEN="$(sed -n 's/^VALKY_UPDATER_TOKEN=//p' "$ENV_FILE" | head -1)"
+[ -n "$UPDATER_TOKEN" ] || fail "não foi possível gerar o token do updater."
 # Preserve explicitly configured public/LAN candidates across upgrades.
 if ! grep -Eq '^VALKY_WEBRTC_HOSTS=.+$' "$ENV_FILE"; then
   printf '\nVALKY_WEBRTC_HOSTS=%s\n' "$LAN_ADDRESS" >> "$ENV_FILE"
@@ -161,6 +184,62 @@ UNIT
   systemctl start valky-wol-broadcast.service >/dev/null 2>&1 || true
 }
 
+# O updater roda no host (fora do container), com acesso ao Docker, e só executa
+# o instalador oficial. O backend fala com ele por um socket Unix local; o token
+# é o mesmo que o Compose passa ao backend. Em instalações sem root/systemd o
+# botão de atualização automática fica indisponível, mas o resto funciona.
+install_updater() {
+  if [ "$(id -u)" != "0" ]; then
+    printf 'Valky: atualização automática exige root e systemd; seguindo sem ela.\n' >&2
+    return 0
+  fi
+  command -v systemctl >/dev/null 2>&1 || return 0
+  [ -d /etc/systemd/system ] || return 0
+  install -m 0755 "${TEMP_ROOT}/${UPDATER_ASSET}" /usr/local/bin/valky-updater
+  mkdir -p /etc/valky /run/valky-updater
+  chmod 0755 /run/valky-updater
+  cat > /etc/valky/updater.env <<EOF
+VALKY_UPDATER_SOCKET=/run/valky-updater/updater.sock
+VALKY_UPDATER_TOKEN=${UPDATER_TOKEN}
+VALKYRIS_HOME=${INSTALL_ROOT}
+EOF
+  chmod 600 /etc/valky/updater.env
+  cat > /etc/systemd/system/valky-updater.service <<'UNIT'
+[Unit]
+Description=Atualizador local do Valky
+After=network-online.target docker.service
+Wants=network-online.target docker.service
+
+[Service]
+Type=simple
+EnvironmentFile=/etc/valky/updater.env
+Environment=HOME=/root
+ExecStart=/usr/local/bin/valky-updater
+Restart=always
+RestartSec=5
+RuntimeDirectory=valky-updater
+RuntimeDirectoryMode=0755
+
+[Install]
+WantedBy=multi-user.target
+UNIT
+  systemctl daemon-reload >/dev/null 2>&1 || true
+  systemctl enable valky-updater >/dev/null 2>&1 || true
+  # Não reinicie um updater já ativo: ele pode estar executando o próprio
+  # instalador neste momento. O binário novo entra no próximo restart/reboot.
+  if ! systemctl is-active --quiet valky-updater; then
+    systemctl start valky-updater >/dev/null 2>&1 || true
+  fi
+  for attempt in $(seq 1 10); do
+    [ -S /run/valky-updater/updater.sock ] && break
+    sleep 1
+  done
+  if [ ! -S /run/valky-updater/updater.sock ]; then
+    printf 'Valky: aviso: o updater não abriu o socket; a atualização pelo app ficará indisponível.\n' >&2
+  fi
+}
+
+install_updater
 printf 'Valky: iniciando os serviços em %s...\n' "$INSTALL_ROOT"
 docker compose --project-directory "$INSTALL_ROOT" --env-file "$ENV_FILE" pull
 docker compose --project-directory "$INSTALL_ROOT" --env-file "$ENV_FILE" up -d --remove-orphans

@@ -266,6 +266,47 @@ paths:
       responses:
         '200': {description: Candidates in APIResponse.data}
         '502': {description: Discovery could not run}
+  /lights/import/tuya:
+    post:
+      summary: Start a Tuya Cloud import session (administrator only)
+      description: |
+        Asks the Tuya cloud for a QR login token. The administrator scans the QR
+        in the Tuya app; the backend then lists the account devices. The local
+        key stays in the backend and is never returned to the app.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/TuyaImportStartInput'}
+      responses:
+        '201': {description: Session id and QR content in APIResponse.data}
+        '400': {description: Missing User Code}
+        '502': {description: The Tuya cloud refused or could not be reached}
+  /lights/import/tuya/{session}:
+    get:
+      summary: Poll a Tuya Cloud import session (administrator only)
+      parameters: [{$ref: '#/components/parameters/session'}]
+      responses:
+        '200': {description: Status and sanitized devices in APIResponse.data}
+        '404': {description: Session not found or already cleaned up}
+    delete:
+      summary: Cancel a Tuya Cloud import session (administrator only)
+      parameters: [{$ref: '#/components/parameters/session'}]
+      responses: {'200': {description: Session canceled}}
+  /lights/import/tuya/{session}/apply:
+    post:
+      summary: Import the selected Tuya devices (administrator only)
+      description: Validates each selected local key against the lamp before storing it. The local key is never part of the request or response.
+      parameters: [{$ref: '#/components/parameters/session'}]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/TuyaImportApplyInput'}
+      responses:
+        '200': {description: Per-device imported and failed lists in APIResponse.data}
+        '400': {description: No device selected, or the QR was not authorized yet}
+        '404': {description: Session not found or expired}
   /lights/{id}:
     get:
       summary: Get a locally controlled light
@@ -556,6 +597,16 @@ paths:
         - {name: clientVersion, in: query, required: false, schema: {type: string}}
       responses:
         '200': {description: Update state, content: {application/json: {schema: {$ref: '#/components/schemas/UpdateInfoResponse'}}}}
+    post:
+      summary: Start the complete server update (administrator only)
+      description: |
+        Asks the host-side updater to run the official installer. The backend
+        never receives Docker access; it only calls the updater over a local
+        Unix socket. The stack (Valky and MediaMTX) restarts.
+      responses:
+        '202': {description: Update accepted by the host updater, content: {application/json: {schema: {$ref: '#/components/schemas/UpdaterStatus'}}}}
+        '409': {description: An update is already running}
+        '503': {description: Automatic updates are not configured on this installation}
   /realtime:
     get:
       summary: WebSocket stream for event changes
@@ -742,6 +793,68 @@ components:
       properties:
         duration: {type: integer, minimum: 1, maximum: 30, default: 8, description: Seconds spent listening for device announcements}
         probe: {type: boolean, default: false, description: Also try the control port on every address of the local subnets}
+        networks:
+          type: array
+          maxItems: 8
+          description: Private IPv4 /24 prefixes to probe. The app sends the phone's Wi-Fi subnet because the backend container does not receive the LAN broadcast; a requested network enables the TCP probe.
+          items: {type: string, example: 192.168.15}
+    TuyaImportStartInput:
+      type: object
+      required: [userCode]
+      properties:
+        userCode: {type: string, description: User Code shown in the Tuya app (Me > Account and Security)}
+    TuyaImportStart:
+      type: object
+      properties:
+        sessionId: {type: string, format: uuid}
+        qrContent: {type: string, description: Content to render as a QR code for the Tuya app}
+        expiresAt: {type: string, format: date-time}
+    TuyaImportDevice:
+      type: object
+      properties:
+        deviceId: {type: string}
+        name: {type: string}
+        ip: {type: string}
+        online: {type: boolean}
+        category: {type: string}
+        productId: {type: string}
+        productName: {type: string}
+        sub: {type: boolean, description: True for Zigbee sub-devices, which cannot be controlled locally}
+        hasLocalKey: {type: boolean, description: Whether the cloud returned a 16 character local key}
+    TuyaImportStatus:
+      type: object
+      properties:
+        status: {type: string, enum: [pending, authorized, expired, error]}
+        devices:
+          type: array
+          items: {$ref: '#/components/schemas/TuyaImportDevice'}
+        error: {type: string}
+        expiresAt: {type: string, format: date-time}
+    TuyaImportApplyInput:
+      type: object
+      required: [deviceIds]
+      properties:
+        deviceIds:
+          type: array
+          minItems: 1
+          items: {type: string}
+    TuyaImportResult:
+      type: object
+      properties:
+        imported:
+          type: array
+          items:
+            type: object
+            properties:
+              deviceId: {type: string}
+              light: {$ref: '#/components/schemas/Light'}
+        failed:
+          type: array
+          items:
+            type: object
+            properties:
+              deviceId: {type: string}
+              error: {type: string}
     LightCandidate:
       type: object
       properties:
@@ -809,6 +922,14 @@ components:
         success: {type: boolean, const: true}
         message: {type: string}
         data: {$ref: '#/components/schemas/UpdateInfo'}
+    UpdaterStatus:
+      type: object
+      properties:
+        state: {type: string, enum: [idle, running, succeeded, failed]}
+        startedAt: {type: string, format: date-time}
+        finishedAt: {type: string, format: date-time}
+        error: {type: string}
+        output: {type: string}
     PTZCommand:
       type: object
       required: [action]
@@ -905,7 +1026,7 @@ components:
         radiusMeters: {type: number, minimum: 20, maximum: 5000}
     Schedule:
       type: object
-      description: Empty means the alarm may fire at any time. Otherwise days use Sunday=0 and identify the starting day of each interval; end is exclusive. Overnight intervals continue on the following day. Requires valid IANA timezone and distinct HH:mm start/end. The schedule limits only the alarm: detection, event history, media and notifications continue outside the window.
+      description: Empty means the alarm may fire at any time. Otherwise days use Sunday=0 and identify the starting day of each interval; end is exclusive. Overnight intervals continue on the following day. Requires valid IANA timezone and distinct HH:mm start/end. The schedule limits only the alarm; detection, event history, media and notifications continue outside the window.
       properties:
         days: {type: array, items: {type: integer, minimum: 0, maximum: 6}}
         start: {type: string, pattern: '^\\d{2}:\\d{2}$'}

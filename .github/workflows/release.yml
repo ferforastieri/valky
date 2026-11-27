@@ -190,6 +190,16 @@ jobs:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
           ref: ${{ needs.prepare.outputs.commit }}
+      - uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff # v5
+        with:
+          go-version-file: backend/go.mod
+          cache-dependency-path: backend/go.sum
+      - name: Compilar updater do host
+        run: |
+          mkdir -p release
+          cd backend
+          CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -trimpath -ldflags '-s -w' -o ../release/valky-updater-linux-amd64 ./cmd/valky-updater
+          CGO_ENABLED=0 GOOS=linux GOARCH=arm64 go build -trimpath -ldflags '-s -w' -o ../release/valky-updater-linux-arm64 ./cmd/valky-updater
       - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
         with:
           name: valky-release-apk
@@ -204,7 +214,7 @@ jobs:
           cp backend/internal/api/openapi.yaml release/openapi.yaml
           printf '%s\n' "$RELEASE_VERSION" > release/VERSION
           cd release
-          sha256sum valky-*.apk compose.yaml mediamtx.yml install.sh openapi.yaml VERSION > SHA256SUMS
+          sha256sum valky-*.apk compose.yaml mediamtx.yml install.sh openapi.yaml VERSION valky-updater-linux-amd64 valky-updater-linux-arm64 > SHA256SUMS
       - name: Publicar GitHub Release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}

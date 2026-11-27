@@ -1,6 +1,8 @@
 package com.ferforastieri.valky.feature.lights
 
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.Image
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -12,10 +14,13 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
+import com.google.zxing.BarcodeFormat
+import com.journeyapps.barcodescanner.BarcodeEncoder
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.LifecycleResumeEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -31,6 +36,7 @@ import com.ferforastieri.valky.core.design.ValkySkeleton
 @Composable fun LightsScreen(admin:Boolean,onLight:(String)->Unit,vm:LightsViewModel=hiltViewModel()){
     LifecycleResumeEffect(Unit){vm.setActive(true);onPauseOrDispose{vm.setActive(false)}}
     val state by vm.state.collectAsStateWithLifecycle()
+    val importState by vm.importState.collectAsStateWithLifecycle()
     var removing by remember{mutableStateOf<LightDevice?>(null)}
     var renaming by remember{mutableStateOf<LightDevice?>(null)}
     var adding by rememberSaveable{mutableStateOf(false)}
@@ -56,7 +62,16 @@ import com.ferforastieri.valky.core.design.ValkySkeleton
         state=state,
         onScan={vm.scanForLights()},
         onSubmit={input,done->vm.register(input,done)},
+        onImport={adding=false;vm.openImport()},
         onDismiss={adding=false;vm.clearRegistration()},
+    )
+    if(importState.open)TuyaImportSheet(
+        state=importState,
+        onUserCode=vm::setImportUserCode,
+        onStart=vm::startImport,
+        onToggle=vm::toggleImportDevice,
+        onApply=vm::applyImport,
+        onDismiss=vm::closeImport,
     )
     renaming?.let{light->LightNameSheet(light,{renaming=null}){name->vm.rename(light.id,name){renaming=null}}}
     removing?.let{light->AlertDialog(onDismissRequest={removing=null},title={Text(stringResource(R.string.remove_light_title))},text={Text(stringResource(R.string.remove_light_body,light.name))},dismissButton={TextButton(onClick={removing=null}){Text(stringResource(R.string.cancel))}},confirmButton={Button(onClick={vm.delete(light.id){removing=null}},colors=ButtonDefaults.buttonColors(containerColor=MaterialTheme.colorScheme.error)){Text(stringResource(R.string.remove))}})}
@@ -120,6 +135,7 @@ import com.ferforastieri.valky.core.design.ValkySkeleton
     state:LightsState,
     onScan:()->Unit,
     onSubmit:(LightRegistration,(Boolean)->Unit)->Unit,
+    onImport:()->Unit,
     onDismiss:()->Unit,
 ){
     val running=state.registering
@@ -144,6 +160,10 @@ import com.ferforastieri.valky.core.design.ValkySkeleton
     ){
         Column(Modifier.fillMaxWidth(),verticalArrangement=Arrangement.spacedBy(10.dp)){
             Text(stringResource(R.string.light_register_intro),style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant)
+            OutlinedButton(onClick=onImport,enabled=!running,modifier=Modifier.fillMaxWidth()){
+                Text(stringResource(R.string.tuya_import_open))
+            }
+            Text(stringResource(R.string.tuya_import_manual_hint),style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant)
             state.registrationError?.let{Text(it,color=MaterialTheme.colorScheme.error,style=MaterialTheme.typography.bodySmall)}
             OutlinedTextField(name,{name=it},Modifier.fillMaxWidth(),label={Text(stringResource(R.string.light_name))},singleLine=true,enabled=!running)
             Row(verticalAlignment=Alignment.CenterVertically){
@@ -168,6 +188,104 @@ import com.ferforastieri.valky.core.design.ValkySkeleton
             OutlinedTextField(deviceId,{deviceId=it},Modifier.fillMaxWidth(),label={Text(stringResource(R.string.light_register_device_id))},singleLine=true,enabled=!running)
             OutlinedTextField(localKey,{localKey=it},Modifier.fillMaxWidth(),label={Text(stringResource(R.string.light_register_key))},singleLine=true,enabled=!running)
             Text(stringResource(R.string.light_register_hint),style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+    }
+}
+
+/**
+ * Importa as lâmpadas que já estão na conta Tuya. O backend gera o QR, guarda a
+ * chave local e valida cada lâmpada antes de gravar; o app só escolhe quais
+ * importar.
+ */
+@Composable private fun TuyaImportSheet(
+    state:TuyaImportState,
+    onUserCode:(String)->Unit,
+    onStart:()->Unit,
+    onToggle:(String)->Unit,
+    onApply:()->Unit,
+    onDismiss:()->Unit,
+){
+    val authorized=state.status=="authorized"
+    val finished=state.imported.isNotEmpty()||state.failed.isNotEmpty()
+    val canRetry=state.sessionId.isNotBlank()&&(state.status=="expired"||state.status=="error")
+    val qrBitmap=remember(state.qrContent){
+        state.qrContent.takeIf{it.isNotBlank()}?.let{runCatching{BarcodeEncoder().encodeBitmap(it,BarcodeFormat.QR_CODE,720,720)}.getOrNull()}
+    }
+    ValkyBottomSheet(
+        title=stringResource(R.string.tuya_import_title),
+        onDismiss=onDismiss,
+        dismissEnabled=!state.applying,
+        dismissByOutsideTap=!state.applying,
+        actions={
+            TextButton(onClick=onDismiss,enabled=!state.applying){Text(stringResource(if(finished)R.string.close else R.string.cancel))}
+            when{
+                state.sessionId.isBlank()||canRetry->Button(onClick=onStart,enabled=!state.starting&&state.userCode.isNotBlank()&&!state.applying){
+                    Text(stringResource(if(state.starting)R.string.tuya_import_generating else if(canRetry)R.string.tuya_import_retry else R.string.tuya_import_generate_qr))
+                }
+                authorized&&!finished->Button(onClick=onApply,enabled=!state.applying&&state.selected.isNotEmpty()){
+                    Text(stringResource(R.string.tuya_import_apply,state.selected.size))
+                }
+            }
+        },
+    ){
+        Column(Modifier.fillMaxWidth(),verticalArrangement=Arrangement.spacedBy(12.dp)){
+            Text(stringResource(R.string.tuya_import_intro),style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant)
+            state.error?.let{Text(it,color=MaterialTheme.colorScheme.error,style=MaterialTheme.typography.bodySmall)}
+            when{
+                state.sessionId.isBlank()->{
+                    OutlinedTextField(state.userCode,onUserCode,Modifier.fillMaxWidth(),label={Text(stringResource(R.string.tuya_import_user_code))},singleLine=true,enabled=!state.starting)
+                    Text(stringResource(R.string.tuya_import_user_code_hint),style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+                !authorized->{
+                    if(qrBitmap!=null)Box(Modifier.fillMaxWidth(),contentAlignment=Alignment.Center){
+                        Image(qrBitmap.asImageBitmap(),contentDescription=stringResource(R.string.tuya_import_title),modifier=Modifier.size(260.dp).background(Color.White,MaterialTheme.shapes.medium).padding(12.dp))
+                    }
+                    Text(stringResource(R.string.tuya_import_qr_instruction),style=MaterialTheme.typography.bodyMedium)
+                    if(state.status=="pending"||state.status.isBlank()){
+                        Row(verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(8.dp)){
+                            CircularProgressIndicator(Modifier.size(18.dp),strokeWidth=2.dp)
+                            Text(stringResource(R.string.tuya_import_waiting),style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant)
+                        }
+                    }
+                    if(canRetry)Text(stringResource(R.string.tuya_import_expired),color=MaterialTheme.colorScheme.error,style=MaterialTheme.typography.bodySmall)
+                }
+                else->{
+                    if(state.devices.isEmpty()){
+                        Text(stringResource(R.string.tuya_import_empty),color=MaterialTheme.colorScheme.onSurfaceVariant)
+                    }else{
+                        Text(stringResource(R.string.tuya_import_authorized),fontWeight=FontWeight.SemiBold)
+                        state.devices.forEach{device->
+                            val eligible=device.online&&device.hasLocalKey&&!device.sub
+                            Row(Modifier.fillMaxWidth(),verticalAlignment=Alignment.CenterVertically){
+                                Checkbox(checked=device.deviceId in state.selected,onCheckedChange={if(eligible)onToggle(device.deviceId)},enabled=eligible&&!state.applying)
+                                Column(Modifier.weight(1f)){
+                                    Text(device.name.ifBlank{device.deviceId},fontWeight=FontWeight.Medium)
+                                    val details=listOfNotNull(
+                                        device.ip.takeIf{it.isNotBlank()},
+                                        when{
+                                            device.sub||!device.hasLocalKey->stringResource(R.string.tuya_import_no_key)
+                                            !device.online->stringResource(R.string.tuya_import_offline)
+                                            else->null
+                                        },
+                                    ).joinToString(" · ")
+                                    if(details.isNotBlank())Text(details,style=MaterialTheme.typography.bodySmall,color=if(!device.online||!device.hasLocalKey)MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant)
+                                }
+                            }
+                        }
+                    }
+                    if(finished){
+                        Text(stringResource(R.string.tuya_import_done),fontWeight=FontWeight.SemiBold)
+                        state.imported.forEach{item->Text("✓ ${item.light.name}")}
+                        state.failed.forEach{failure->Text("✗ ${failure.deviceId}: ${failure.error}",color=MaterialTheme.colorScheme.error,style=MaterialTheme.typography.bodySmall)}
+                    }
+                    if(state.applying){
+                        Row(verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(8.dp)){
+                            CircularProgressIndicator(Modifier.size(18.dp),strokeWidth=2.dp)
+                            Text(stringResource(R.string.tuya_import_applying),style=MaterialTheme.typography.bodySmall)
+                        }
+                    }
+                }
+            }
         }
     }
 }

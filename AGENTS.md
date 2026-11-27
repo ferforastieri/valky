@@ -10,7 +10,7 @@ Instruções para agentes de IA (Claude, Codex, OpenCode e afins) que trabalham 
 | `mobile/` | App Android em Kotlin/Compose (Hilt, Ktor/OkHttp, DataStore, Media3, osmdroid, FCM). Telas em `app/src/main/java/com/ferforastieri/valky/feature/`; textos em `res/values/strings.xml` (pt-BR) e `res/values-en/strings.xml`. |
 | `web/` | Landing e documentação Astro em `src/`. O painel servido em `/app/` vive em `viewer/` e é buildado por `astro.viewer.config.mjs` para `dist-viewer/`. `scripts/sync-docs.mjs` copia `docs/*.md` para o site; `scripts/sync-public-assets.mjs` copia `install.sh` e o OpenAPI para `public/`. |
 | `docs/` | Documentação versionada (7 arquivos) e fonte do site. |
-| `scripts/` | `brand-assets.py` gera símbolo, ícones, splash e favicon; `tuya-local-key.py` obtém a chave local da lâmpada. |
+| `scripts/` | `brand-assets.py` gera símbolo, ícones, splash e favicon. |
 | `.github/workflows/` | `ci.yml` (classifica caminhos alterados e roda a área afetada) e `release.yml` (versão automática, imagem GHCR, APK, artefatos). |
 | raiz | `compose.yaml`, `mediamtx.yml`, `install.sh`, `Makefile`, `.env.example`. |
 
@@ -53,7 +53,7 @@ curl -k https://localhost:8443/health
 - O APK inclui apenas `arm64-v8a` e `armeabi-v7a` (`mobile/app/build.gradle.kts`); não adicione ABIs de emulador.
 - A marca sai de `scripts/brand-assets.py`; não edite ícones gerados à mão.
 - Segredos nunca entram no repositório: `master.key`, `valky.db`, `google-services.json`, keystore e conta de serviço FCM ficam fora do Git ou em secrets do GitHub.
-- Atualização do servidor é manual, pelo instalador; não existe rota para o backend executar updates (a antiga `POST /system/update` foi removida de propósito).
+- O backend não executa updates e não recebe Docker socket: `POST /system/update` (admin) chama o `valky-updater` no host por um socket Unix com token; o updater só executa o instalador oficial.
 - Migrações SQLite rodam automaticamente em `store.Open`; nunca edite uma migração já publicada, adicione uma nova.
 - Mensagens de commit seguem a convenção que a pipeline lê (veja Entrega).
 

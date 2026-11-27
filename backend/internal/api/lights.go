@@ -100,6 +100,10 @@ func (s *Server) discoverLights(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	candidates, err := s.lights.Scan(r.Context(), in)
+	if errors.Is(err, light.ErrInvalidDiscoveryNetwork) {
+		writeError(w, http.StatusBadRequest, err)
+		return
+	}
 	if err != nil {
 		writeError(w, http.StatusBadGateway, err)
 		return

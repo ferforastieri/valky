@@ -11,7 +11,7 @@ Guia para quem vai contribuir no monorepo: ambiente, comandos, testes, convenç�
 | JDK | 21 (Temurin) e Android SDK 36 com build-tools 36.0.0; o wrapper usa Gradle 9.5. |
 | Docker | Engine com Compose v2, para a stack local e para a imagem. |
 
-O repositório não tem submódulos nem geração de código obrigatória. A marca sai de `python3 scripts/brand-assets.py` (precisa de `rsvg-convert`) e a chave local da Tuya de `scripts/tuya-local-key.py` — nenhum dos dois é necessário para compilar.
+O repositório não tem submódulos nem geração de código obrigatória. A marca sai de `python3 scripts/brand-assets.py` (precisa de `rsvg-convert`); a chave local da Tuya é obtida pelo app, em **Dispositivos → Iluminação → Importar da Tuya**, sem script.
 
 ## Rodar cada parte
 

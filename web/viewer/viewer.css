@@ -1270,6 +1270,26 @@ dialog::backdrop {
   font-weight: 600;
   white-space: nowrap;
 }
+.update-banner .update-note {
+  color: var(--muted, #a9a3bc);
+  font-size: 0.8rem;
+  max-width: 170px;
+}
+.update-action {
+  border: 0;
+  border-radius: 10px;
+  padding: 8px 14px;
+  background: var(--signal);
+  color: #fff;
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.update-action:disabled {
+  opacity: 0.65;
+  cursor: progress;
+}
 .update-dismiss {
   margin-left: auto;
   border: 0;

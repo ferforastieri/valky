@@ -26,12 +26,14 @@ import (
 	"github.com/ferforastieri/valky/backend/internal/detector"
 	"github.com/ferforastieri/valky/backend/internal/event"
 	"github.com/ferforastieri/valky/backend/internal/light"
+	"github.com/ferforastieri/valky/backend/internal/light/tuyaimport"
 	"github.com/ferforastieri/valky/backend/internal/media"
 	"github.com/ferforastieri/valky/backend/internal/notify"
 	"github.com/ferforastieri/valky/backend/internal/preferences"
 	"github.com/ferforastieri/valky/backend/internal/remote"
 	"github.com/ferforastieri/valky/backend/internal/rules"
 	"github.com/ferforastieri/valky/backend/internal/tracking"
+	"github.com/ferforastieri/valky/backend/internal/updater"
 	"github.com/ferforastieri/valky/backend/internal/updates"
 )
 
@@ -65,6 +67,8 @@ type Server struct {
 	preferences      *preferences.Service
 	tracking         *tracking.Service
 	lights           *light.Service
+	lightImport      lightImporter
+	updater          *updater.Client
 	remotes          *remote.Service
 }
 
@@ -87,10 +91,18 @@ func NewServer(a *auth.Manager, c *camera.Repository, o *camera.ONVIFClient, m *
 	return &Server{auth: a, cameras: c, onvif: o, media: m, rules: r, events: e, notify: n, hub: h, logger: logger, operations: make(map[string]CameraOperation), cameraScan: camera.ScanPort}
 }
 func (s *Server) SetUpdates(service *updates.Service)         { s.updates = service }
+func (s *Server) SetUpdater(client *updater.Client)           { s.updater = client }
 func (s *Server) SetPreferences(service *preferences.Service) { s.preferences = service }
 func (s *Server) SetTracking(service *tracking.Service)       { s.tracking = service }
-func (s *Server) SetLights(service *light.Service)            { s.lights = service }
-func (s *Server) SetRemotes(service *remote.Service)          { s.remotes = service }
+func (s *Server) SetLights(service *light.Service) {
+	s.lights = service
+	if service == nil {
+		s.lightImport = nil
+		return
+	}
+	s.lightImport = tuyaimport.NewManager(service)
+}
+func (s *Server) SetRemotes(service *remote.Service) { s.remotes = service }
 
 // SetSetupToken enables the installation code that the installer prints. With a
 // token configured, the first administrator can only be created by whoever has
@@ -163,6 +175,10 @@ func (s *Server) Handler() http.Handler {
 	protected.HandleFunc("GET /lights", s.listLights)
 	protected.Handle("POST /lights", s.auth.RequireAdmin(http.HandlerFunc(s.registerLight)))
 	protected.Handle("POST /lights/discovery", s.auth.RequireAdmin(http.HandlerFunc(s.discoverLights)))
+	protected.Handle("POST /lights/import/tuya", s.auth.RequireAdmin(http.HandlerFunc(s.startLightImport)))
+	protected.Handle("GET /lights/import/tuya/{session}", s.auth.RequireAdmin(http.HandlerFunc(s.lightImportStatus)))
+	protected.Handle("POST /lights/import/tuya/{session}/apply", s.auth.RequireAdmin(http.HandlerFunc(s.applyLightImport)))
+	protected.Handle("DELETE /lights/import/tuya/{session}", s.auth.RequireAdmin(http.HandlerFunc(s.cancelLightImport)))
 	protected.HandleFunc("GET /lights/{id}", s.getLight)
 	protected.Handle("GET /lights/{id}/ble", s.auth.RequireAdmin(http.HandlerFunc(s.lightBLE)))
 	protected.Handle("PUT /lights/{id}", s.auth.RequireAdmin(http.HandlerFunc(s.updateLight)))
@@ -218,6 +234,7 @@ func (s *Server) Handler() http.Handler {
 	protected.HandleFunc("GET /settings/location-alerts", s.getLocationAlerts)
 	protected.Handle("PUT /settings/location-alerts", s.auth.RequireAdmin(http.HandlerFunc(s.setLocationAlerts)))
 	protected.HandleFunc("GET /system/update", s.systemUpdate)
+	protected.Handle("POST /system/update", s.auth.RequireAdmin(http.HandlerFunc(s.startSystemUpdate)))
 	protected.Handle("/realtime", s.hub)
 	mux.Handle("/api/v1/", http.StripPrefix("/api/v1", s.auth.Middleware(protected)))
 	return requestLog(s.logger, securityHeaders(newRequestLimits().wrap(localizedResponses(outcomeHeaders(mux)))))

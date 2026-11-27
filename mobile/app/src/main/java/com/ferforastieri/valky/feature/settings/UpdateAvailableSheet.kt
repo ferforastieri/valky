@@ -26,21 +26,35 @@ import com.composables.icons.lucide.Lucide
 import com.composables.icons.lucide.Smartphone
 import com.ferforastieri.valky.R
 import com.ferforastieri.valky.core.design.ValkyBottomSheet
-import com.ferforastieri.valky.core.design.SkeletonList
-import com.ferforastieri.valky.core.design.ValkySkeleton
 
 /**
- * Update notice shown when a new signed APK is available. It is dismissible so
- * the app stays fully usable, but the caller re-opens it every time the app is
- * opened until the phone is updated.
+ * Aviso único de atualização: o mesmo texto no app e no painel. No Android o
+ * botão pede ao updater do servidor e baixa o APK; no painel ele só reinicia o
+ * servidor. O servidor é atualizado pelo instalador oficial, nunca pelo
+ * container do backend.
  */
 @Composable
 fun UpdateAvailableSheet(
     version: String,
+    serverUpdateAvailable: Boolean,
+    apkUpdateAvailable: Boolean,
+    admin: Boolean,
     updating: Boolean,
+    message: String?,
     onUpdate: () -> Unit,
     onDismiss: () -> Unit,
 ) {
+    val canUpdate = (admin && serverUpdateAvailable) || apkUpdateAvailable
+    val body = when {
+        serverUpdateAvailable && apkUpdateAvailable -> R.string.update_sheet_body_both
+        serverUpdateAvailable -> R.string.update_sheet_body_server
+        else -> R.string.update_sheet_body
+    }
+    val hint = when {
+        serverUpdateAvailable && apkUpdateAvailable -> R.string.update_hint_both
+        serverUpdateAvailable -> R.string.update_server_hint
+        else -> R.string.update_install_hint
+    }
     ValkyBottomSheet(
         title = stringResource(R.string.update_available),
         onDismiss = onDismiss,
@@ -50,10 +64,10 @@ fun UpdateAvailableSheet(
         actions = {
             Button(
                 onClick = onUpdate,
-                enabled = !updating,
+                enabled = !updating && canUpdate,
                 modifier = Modifier.fillMaxWidth(),
             ) {
-                Text(stringResource(if (updating) R.string.update_downloading else R.string.update_now))
+                Text(stringResource(if (updating) R.string.update_updating else R.string.update_now))
             }
         },
     ) {
@@ -63,17 +77,22 @@ fun UpdateAvailableSheet(
                     Icon(
                         Lucide.Smartphone,
                         contentDescription = null,
-                        // Sobre o círculo primário o ícone precisa ser onPrimary:
-                        // roxo sobre roxo sumia.
                         tint = MaterialTheme.colorScheme.onPrimary,
                         modifier = Modifier.padding(12.dp).size(24.dp),
                     )
                 }
                 Spacer(Modifier.width(12.dp))
                 Text(
-                    stringResource(R.string.update_sheet_body, version),
+                    stringResource(body, version),
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     style = MaterialTheme.typography.bodyMedium,
+                )
+            }
+            if (serverUpdateAvailable && !admin) {
+                Text(
+                    stringResource(R.string.update_admin_required),
+                    color = MaterialTheme.colorScheme.error,
+                    style = MaterialTheme.typography.bodySmall,
                 )
             }
             Surface(
@@ -85,11 +104,21 @@ fun UpdateAvailableSheet(
                     Icon(Lucide.Download, null, Modifier.size(20.dp), tint = MaterialTheme.colorScheme.onSecondaryContainer)
                     Spacer(Modifier.width(10.dp))
                     Text(
-                        stringResource(R.string.update_install_hint),
+                        stringResource(hint),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSecondaryContainer,
                         fontWeight = FontWeight.Medium,
                     )
+                }
+            }
+            if (updating) {
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    CircularProgressIndicator(Modifier.size(18.dp), strokeWidth = 2.dp)
+                    Text(message ?: stringResource(R.string.update_updating), style = MaterialTheme.typography.bodySmall)
+                }
+            } else {
+                message?.let {
+                    Text(it, color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodySmall)
                 }
             }
         }

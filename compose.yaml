@@ -25,10 +25,15 @@ services:
       VALKY_MEDIA_RECORDINGS: /data/recordings
       VALKY_FIREBASE_CREDENTIALS_FILE: ${VALKY_FIREBASE_CREDENTIALS_FILE:-/data/secrets/firebase-service-account.json}
       VALKY_SETUP_TOKEN: ${VALKY_SETUP_TOKEN:-}
+      VALKY_UPDATER_SOCKET: /run/valky-updater/updater.sock
+      VALKY_UPDATER_TOKEN: ${VALKY_UPDATER_TOKEN:-}
     ports:
       - "${VALKY_PORT:-8443}:8443"
     volumes:
       - valky-data:/data
+      - type: bind
+        source: /run/valky-updater
+        target: /run/valky-updater
       - type: volume
         source: recording-buffer
         target: /data/recordings

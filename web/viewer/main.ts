@@ -68,6 +68,8 @@ updateToast.hidden = true;
 document.body.append(updateToast);
 let lastUpdateCheck = 0;
 let announcedUpdate = "";
+let serverUpdatePoll: ReturnType<typeof setInterval> | null = null;
+
 async function checkForUpdates() {
   if (Date.now() - lastUpdateCheck < 15 * 60_000) return;
   lastUpdateCheck = Date.now();
@@ -75,19 +77,70 @@ async function checkForUpdates() {
   try {
     const update = await api.get<Update>("/system/update", connection.signal);
     if (connection !== alive || connection.signal.aborted || !api.token) return;
-    if (!update.serverUpdateAvailable || announcedUpdate === update.latestVersion) return;
-    announcedUpdate = update.latestVersion;
-    // A new server release is not applied automatically: keep a persistent,
-    // dismissible notice instead of a transient toast so nobody misses it.
+    const available = update.serverUpdateAvailable || update.apkUpdateAvailable === true;
+    if (!available) return;
+    const key = `${update.latestVersion}:${update.serverUpdateAvailable ? "server" : ""}:${update.apkUpdateAvailable ? "apk" : ""}`;
+    if (announcedUpdate === key) return;
+    announcedUpdate = key;
+    // O mesmo aviso do app: uma versão nova, um botão para aplicar e o link da
+    // release. O servidor só reinicia quando um administrador confirma.
     const release = update.releaseUrl
       ? `<a href="${e(update.releaseUrl)}" target="_blank" rel="noreferrer">Ver release</a>`
       : "";
-    updateToast.innerHTML = `<span class="update-banner-text"><strong>Nova versão ${e(update.latestVersion)} disponível</strong><small>Execute o instalador oficial para atualizar o servidor.</small></span>${release}<button type="button" class="update-dismiss" aria-label="Fechar aviso">×</button>`;
+    const action = update.serverUpdateAvailable
+      ? api.admin
+        ? `<button type="button" class="update-action">Atualizar</button>`
+        : `<small class="update-note">Peça ao administrador para atualizar o servidor.</small>`
+      : "";
+    const detail = update.serverUpdateAvailable
+      ? `A versão ${e(update.latestVersion)} do Valky está pronta. Atualize o servidor.`
+      : `A versão ${e(update.latestVersion)} do Valky está pronta. Atualize o app Android.`;
+    updateToast.innerHTML = `<span class="update-banner-text"><strong>Atualização disponível</strong><small>${detail}</small></span>${action}${release}<button type="button" class="update-dismiss" aria-label="Fechar aviso">×</button>`;
     updateToast.hidden = false;
     updateToast.querySelector(".update-dismiss")?.addEventListener("click", () => { updateToast.hidden = true; });
+    updateToast.querySelector<HTMLButtonElement>(".update-action")?.addEventListener("click", (event) => startServerUpdate(event.currentTarget as HTMLButtonElement));
   } catch {
     // Release checks must not interrupt normal use, including offline operation.
   }
+}
+
+async function startServerUpdate(button: HTMLButtonElement) {
+  if (!api.admin || serverUpdatePoll) return;
+  button.disabled = true;
+  button.textContent = "Atualizando…";
+  const detail = updateToast.querySelector(".update-banner-text small");
+  if (detail) detail.textContent = "Atualizando o servidor. A página volta sozinha quando terminar.";
+  try {
+    await api.mutate("/system/update", "POST");
+  } catch (error) {
+    button.disabled = false;
+    button.textContent = "Tentar de novo";
+    if (detail) detail.textContent = error instanceof Error ? error.message : "Não foi possível iniciar a atualização.";
+    return;
+  }
+  const started = Date.now();
+  let sawDown = false;
+  serverUpdatePoll = setInterval(async () => {
+    try {
+      const response = await fetch("/health", { cache: "no-store" });
+      if (!response.ok) { sawDown = true; return; }
+      if (sawDown) {
+        if (serverUpdatePoll) clearInterval(serverUpdatePoll);
+        serverUpdatePoll = null;
+        location.reload();
+        return;
+      }
+      if (Date.now() - started > 10 * 60_000) {
+        if (serverUpdatePoll) clearInterval(serverUpdatePoll);
+        serverUpdatePoll = null;
+        button.disabled = false;
+        button.textContent = "Tentar de novo";
+        if (detail) detail.textContent = "A atualização não confirmou o reinício. Verifique o servidor.";
+      }
+    } catch {
+      sawDown = true;
+    }
+  }, 2500);
 }
 let refreshing = false;
 let alive = new AbortController();

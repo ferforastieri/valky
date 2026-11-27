@@ -105,6 +105,7 @@ private fun ConnectedValkyApp(main: MainViewModel) {
     val unreadNotifications = events.count { it.acknowledgedAt == null }
     val update by main.updateInfo.collectAsStateWithLifecycle()
     val updating by main.updating.collectAsStateWithLifecycle()
+    val updateMessage by main.updateMessage.collectAsStateWithLifecycle()
     var updateDismissed by remember { mutableStateOf(false) }
     // The notice is dismissible but re-opens every time the app is opened.
     LifecycleEventEffect(Lifecycle.Event.ON_RESUME) {
@@ -116,8 +117,12 @@ private fun ConnectedValkyApp(main: MainViewModel) {
     update?.takeIf { !updateDismissed }?.let { info ->
         UpdateAvailableSheet(
             version = info.latestVersion,
+            serverUpdateAvailable = info.serverUpdateAvailable,
+            apkUpdateAvailable = info.apkUpdateAvailable,
+            admin = admin,
             updating = updating,
-            onUpdate = { updateDismissed = true; main.startUpdate() },
+            message = updateMessage,
+            onUpdate = { main.startUpdate() },
             onDismiss = { updateDismissed = true },
         )
     }
