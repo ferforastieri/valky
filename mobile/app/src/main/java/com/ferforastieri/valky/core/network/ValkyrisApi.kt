@@ -273,8 +273,8 @@ class ValkyApi(
     suspend fun discoverLights(subnet: String?): List<LightCandidate> =
         post("/lights/discovery", LightDiscoveryRequest(networks = listOfNotNull(subnet)))
     /** Inicia a autorização por QR na conta Tuya (administrador). */
-    suspend fun startTuyaImport(userCode: String): TuyaImportStart =
-        post("/lights/import/tuya", TuyaImportStartRequest(userCode), announceBackend = true)
+    suspend fun startTuyaImport(userCode: String, subnet: String?): TuyaImportStart =
+        post("/lights/import/tuya", TuyaImportStartRequest(userCode, listOfNotNull(subnet)), announceBackend = true)
     /** Consulta o QR/autorização e a lista de lâmpadas da conta Tuya. */
     suspend fun tuyaImportStatus(sessionId: String): TuyaImportStatus = get("/lights/import/tuya/$sessionId")
     /** Importa as lâmpadas selecionadas; a chave local fica no backend. */

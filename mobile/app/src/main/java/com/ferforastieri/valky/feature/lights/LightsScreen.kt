@@ -255,13 +255,14 @@ import com.ferforastieri.valky.core.design.ValkySkeleton
                     }else{
                         Text(stringResource(R.string.tuya_import_authorized),fontWeight=FontWeight.SemiBold)
                         state.devices.forEach{device->
-                            val eligible=device.online&&device.hasLocalKey&&!device.sub
+                            val eligible=device.hasLocalKey&&!device.sub
                             Row(Modifier.fillMaxWidth(),verticalAlignment=Alignment.CenterVertically){
                                 Checkbox(checked=device.deviceId in state.selected,onCheckedChange={if(eligible)onToggle(device.deviceId)},enabled=eligible&&!state.applying)
                                 Column(Modifier.weight(1f)){
                                     Text(device.name.ifBlank{device.deviceId},fontWeight=FontWeight.Medium)
                                     val details=listOfNotNull(
                                         device.ip.takeIf{it.isNotBlank()},
+                                        if(device.ip.isBlank()&&device.hasLocalKey&&!device.sub)stringResource(R.string.tuya_import_lookup)else null,
                                         when{
                                             device.sub||!device.hasLocalKey->stringResource(R.string.tuya_import_no_key)
                                             !device.online->stringResource(R.string.tuya_import_offline)

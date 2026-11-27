@@ -48,6 +48,7 @@
     <string name="tuya_import_authorized">Authorized. Choose the bulbs to import.</string>
     <string name="tuya_import_empty">No bulbs found in the Tuya account.</string>
     <string name="tuya_import_offline">Offline</string>
+    <string name="tuya_import_lookup">IP will be looked up on the local network</string>
     <string name="tuya_import_no_key">No local key (Zigbee)</string>
     <string name="tuya_import_apply">Import (%1$d)</string>
     <string name="tuya_import_applying">Importing…</string>

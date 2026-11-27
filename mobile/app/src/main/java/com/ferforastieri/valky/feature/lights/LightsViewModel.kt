@@ -163,7 +163,7 @@ class LightsViewModel @Inject constructor(
         }
         viewModelScope.launch {
             if (previous.isNotBlank()) runCatching { repository.cancelTuyaImport(previous) }
-            runCatching { repository.startTuyaImport(current.userCode.trim()) }
+            runCatching { repository.startTuyaImport(current.userCode.trim(), wifiSubnet()) }
                 .onSuccess { started ->
                     _import.update { it.copy(starting = false, sessionId = started.sessionId, qrContent = started.qrContent, status = "pending") }
                     pollImport(started.sessionId)
@@ -185,7 +185,7 @@ class LightsViewModel @Inject constructor(
                     return@launch
                 }
                 val status = result.getOrThrow()
-                val selectable = status.devices.filter { it.online && it.hasLocalKey && !it.sub }.map { it.deviceId }.toSet()
+                val selectable = status.devices.filter { it.hasLocalKey && !it.sub }.map { it.deviceId }.toSet()
                 _import.update {
                     it.copy(
                         status = status.status,

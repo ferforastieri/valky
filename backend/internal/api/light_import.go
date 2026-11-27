@@ -13,14 +13,15 @@ import (
 // QR session in memory; the interface exists so the API tests can drive it
 // without calling the vendor.
 type lightImporter interface {
-	Start(ctx context.Context, userCode string) (tuyaimport.StartResult, error)
+	Start(ctx context.Context, userCode string, networks []string) (tuyaimport.StartResult, error)
 	Poll(ctx context.Context, id string) (tuyaimport.Status, error)
 	Apply(ctx context.Context, id string, deviceIDs []string) (tuyaimport.ApplyResult, error)
 	Cancel(id string)
 }
 
 type tuyaImportStartInput struct {
-	UserCode string `json:"userCode"`
+	UserCode string   `json:"userCode"`
+	Networks []string `json:"networks,omitempty"`
 }
 
 type tuyaImportApplyInput struct {
@@ -43,7 +44,7 @@ func (s *Server) startLightImport(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, errors.New("informe o User Code do aplicativo Tuya"))
 		return
 	}
-	result, err := s.lightImport.Start(r.Context(), in.UserCode)
+	result, err := s.lightImport.Start(r.Context(), in.UserCode, in.Networks)
 	if err != nil {
 		writeError(w, http.StatusBadGateway, err)
 		return

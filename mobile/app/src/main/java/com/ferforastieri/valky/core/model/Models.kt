@@ -39,7 +39,7 @@ import kotlinx.serialization.json.JsonElement
 )
 @Serializable data class LightUpdate(val name:String?=null,val enabled:Boolean?=null)
 @Serializable data class LightDiscoveryRequest(val duration:Int=6,val probe:Boolean=true,val networks:List<String> = emptyList())
-@Serializable data class TuyaImportStartRequest(val userCode:String)
+@Serializable data class TuyaImportStartRequest(val userCode:String,val networks:List<String> = emptyList())
 @Serializable data class TuyaImportStart(val sessionId:String="",val qrContent:String="",val expiresAt:String="")
 @Serializable data class TuyaImportDevice(val deviceId:String="",val name:String="",val ip:String="",val online:Boolean=false,val category:String="",val productId:String="",val productName:String="",val sub:Boolean=false,val hasLocalKey:Boolean=false)
 @Serializable data class TuyaImportStatus(val status:String="pending",val devices:List<TuyaImportDevice> = emptyList(),val error:String="",val expiresAt:String="")

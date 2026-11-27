@@ -34,8 +34,10 @@ func (f *fakeCloud) ListDevices(context.Context, *tuya.CloudLogin) ([]tuya.Cloud
 }
 
 type fakeRegistrar struct {
-	calls []light.RegisterInput
-	err   error
+	calls      []light.RegisterInput
+	err        error
+	expected   map[string]string
+	candidates []light.Candidate
 }
 
 func (f *fakeRegistrar) Register(_ context.Context, in light.RegisterInput) (light.Light, error) {
@@ -43,7 +45,14 @@ func (f *fakeRegistrar) Register(_ context.Context, in light.RegisterInput) (lig
 	if f.err != nil {
 		return light.Light{}, f.err
 	}
+	if f.expected != nil && f.expected[in.DeviceID] != in.Address {
+		return light.Light{}, errors.New("endereço não confere")
+	}
 	return light.Light{ID: "light-" + in.DeviceID, Name: in.Name}, nil
+}
+
+func (f *fakeRegistrar) Scan(context.Context, light.DiscoveryInput) ([]light.Candidate, error) {
+	return f.candidates, nil
 }
 
 func TestImportFlow(t *testing.T) {
@@ -55,11 +64,11 @@ func TestImportFlow(t *testing.T) {
 			{ID: "dev-zigbee", Name: "Corredor", IP: "192.168.15.106", Online: true, LocalKey: "", Sub: true},
 		},
 	}
-	registrar := &fakeRegistrar{}
+	registrar := &fakeRegistrar{expected: map[string]string{"dev-online": "192.168.15.107"}}
 	manager := NewManagerWithCloud(registrar, cloud)
 	ctx := context.Background()
 
-	start, err := manager.Start(ctx, "123456")
+	start, err := manager.Start(ctx, "123456", nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -88,7 +97,13 @@ func TestImportFlow(t *testing.T) {
 	if len(result.Imported) != 1 || len(result.Failed) != 2 {
 		t.Fatalf("resultado inesperado: %#v", result)
 	}
-	if len(registrar.calls) != 1 || registrar.calls[0].DeviceID != "dev-online" || registrar.calls[0].Address != "192.168.15.107" || registrar.calls[0].LocalKey != "0123456789abcdef" {
+	var onlineCall *light.RegisterInput
+	for index := range registrar.calls {
+		if registrar.calls[index].DeviceID == "dev-online" {
+			onlineCall = &registrar.calls[index]
+		}
+	}
+	if len(registrar.calls) != 2 || onlineCall == nil || onlineCall.Address != "192.168.15.107" || onlineCall.LocalKey != "0123456789abcdef" {
 		t.Fatalf("cadastro inesperado: %#v", registrar.calls)
 	}
 	if result.Failed[0].Error == "" || result.Failed[1].Error == "" {
@@ -96,9 +111,42 @@ func TestImportFlow(t *testing.T) {
 	}
 }
 
+func TestApplyDiscoversMissingIP(t *testing.T) {
+	cloud := &fakeCloud{
+		login: &tuya.CloudLogin{AccessToken: "token"},
+		devices: []tuya.CloudDevice{
+			{ID: "dev-1", Name: "Sala", IP: "", Online: true, LocalKey: "0123456789abcdef"},
+		},
+	}
+	registrar := &fakeRegistrar{
+		expected:   map[string]string{"dev-1": "192.168.15.107"},
+		candidates: []light.Candidate{{Address: "192.168.15.105"}, {Address: "192.168.15.107"}},
+	}
+	manager := NewManagerWithCloud(registrar, cloud)
+	ctx := context.Background()
+	start, err := manager.Start(ctx, "123456", []string{"192.168.15"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	cloud.authorized = true
+	if _, err := manager.Poll(ctx, start.SessionID); err != nil {
+		t.Fatal(err)
+	}
+	result, err := manager.Apply(ctx, start.SessionID, []string{"dev-1"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(result.Imported) != 1 || len(result.Failed) != 0 {
+		t.Fatalf("resultado = %#v", result)
+	}
+	if len(registrar.calls) != 2 || registrar.calls[0].Address != "192.168.15.105" || registrar.calls[1].Address != "192.168.15.107" {
+		t.Fatalf("tentativas = %#v", registrar.calls)
+	}
+}
+
 func TestApplyBeforeAuthorization(t *testing.T) {
 	manager := NewManagerWithCloud(&fakeRegistrar{}, &fakeCloud{})
-	start, err := manager.Start(context.Background(), "123456")
+	start, err := manager.Start(context.Background(), "123456", nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -111,7 +159,7 @@ func TestCancelAndExpiry(t *testing.T) {
 	now := time.Date(2026, 11, 27, 12, 0, 0, 0, time.UTC)
 	manager := NewManagerWithCloud(&fakeRegistrar{}, &fakeCloud{})
 	manager.now = func() time.Time { return now }
-	start, err := manager.Start(context.Background(), "123456")
+	start, err := manager.Start(context.Background(), "123456", nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -120,7 +168,7 @@ func TestCancelAndExpiry(t *testing.T) {
 		t.Fatalf("erro após cancelar = %v", err)
 	}
 
-	start, err = manager.Start(context.Background(), "123456")
+	start, err = manager.Start(context.Background(), "123456", nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -134,7 +182,7 @@ func TestCancelAndExpiry(t *testing.T) {
 func TestListErrorBecomesStatusError(t *testing.T) {
 	cloud := &fakeCloud{authorized: true, login: &tuya.CloudLogin{AccessToken: "token"}, listErr: errors.New("sem rede")}
 	manager := NewManagerWithCloud(&fakeRegistrar{}, cloud)
-	start, err := manager.Start(context.Background(), "123456")
+	start, err := manager.Start(context.Background(), "123456", nil)
 	if err != nil {
 		t.Fatal(err)
 	}

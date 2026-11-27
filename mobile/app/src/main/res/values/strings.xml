@@ -46,6 +46,7 @@
     <string name="tuya_import_authorized">Autorizado. Escolha as lâmpadas para importar.</string>
     <string name="tuya_import_empty">Nenhuma lâmpada encontrada na conta Tuya.</string>
     <string name="tuya_import_offline">Offline</string>
+    <string name="tuya_import_lookup">IP será procurado na rede local</string>
     <string name="tuya_import_no_key">Sem chave local (Zigbee)</string>
     <string name="tuya_import_apply">Importar (%1$d)</string>
     <string name="tuya_import_applying">Importando…</string>

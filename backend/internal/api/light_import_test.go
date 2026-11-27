@@ -21,7 +21,7 @@ type fakeLightImporter struct {
 	lastDevices []string
 }
 
-func (f *fakeLightImporter) Start(context.Context, string) (tuyaimport.StartResult, error) {
+func (f *fakeLightImporter) Start(context.Context, string, []string) (tuyaimport.StartResult, error) {
 	return f.start, f.startErr
 }
 func (f *fakeLightImporter) Poll(context.Context, string) (tuyaimport.Status, error) {

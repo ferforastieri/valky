@@ -41,9 +41,17 @@ type Registrar interface {
 	Register(ctx context.Context, in light.RegisterInput) (light.Light, error)
 }
 
+// Scanner is the optional local discovery used when the Tuya cloud does not
+// report the lamp IP. The light service implements it; the import tries the
+// local key against each candidate address.
+type Scanner interface {
+	Scan(ctx context.Context, in light.DiscoveryInput) ([]light.Candidate, error)
+}
+
 type Manager struct {
 	cloud     Cloud
 	registrar Registrar
+	scanner   Scanner
 	now       func() time.Time
 
 	mu       sync.Mutex
@@ -55,6 +63,7 @@ type session struct {
 	id        string
 	userCode  string
 	qrToken   string
+	networks  []string
 	createdAt time.Time
 	expiresAt time.Time
 	login     *tuya.CloudLogin
@@ -110,15 +119,17 @@ func NewManager(registrar Registrar) *Manager {
 }
 
 func NewManagerWithCloud(registrar Registrar, cloud Cloud) *Manager {
+	scanner, _ := registrar.(Scanner)
 	return &Manager{
 		cloud:     cloud,
 		registrar: registrar,
+		scanner:   scanner,
 		now:       time.Now,
 		sessions:  map[string]*session{},
 	}
 }
 
-func (m *Manager) Start(ctx context.Context, userCode string) (StartResult, error) {
+func (m *Manager) Start(ctx context.Context, userCode string, networks []string) (StartResult, error) {
 	userCode = strings.TrimSpace(userCode)
 	if userCode == "" {
 		return StartResult{}, errors.New("informe o User Code do aplicativo Tuya")
@@ -132,6 +143,7 @@ func (m *Manager) Start(ctx context.Context, userCode string) (StartResult, erro
 		id:        uuid.NewString(),
 		userCode:  userCode,
 		qrToken:   token,
+		networks:  append([]string(nil), networks...),
 		createdAt: now,
 		expiresAt: now.Add(SessionTTL),
 	}
@@ -216,6 +228,7 @@ func (m *Manager) Apply(ctx context.Context, id string, deviceIDs []string) (App
 	}
 	item.applying = true
 	devices := append([]tuya.CloudDevice(nil), item.devices...)
+	networks := append([]string(nil), item.networks...)
 	item.mu.Unlock()
 	defer func() {
 		item.mu.Lock()
@@ -227,6 +240,7 @@ func (m *Manager) Apply(ctx context.Context, id string, deviceIDs []string) (App
 	for _, device := range devices {
 		byID[device.ID] = device
 	}
+	candidates, scanErr := m.discoverCandidates(ctx, devices, selected, networks)
 	result := ApplyResult{Imported: []Imported{}, Failed: []Failed{}}
 	for deviceID := range selected {
 		device, ok := byID[deviceID]
@@ -238,15 +252,42 @@ func (m *Manager) Apply(ctx context.Context, id string, deviceIDs []string) (App
 			result.Failed = append(result.Failed, Failed{DeviceID: deviceID, Error: reason})
 			continue
 		}
-		created, err := m.registrar.Register(ctx, light.RegisterInput{
-			Name:      device.Name,
-			Address:   strings.TrimSpace(device.IP),
-			DeviceID:  device.ID,
-			LocalKey:  device.LocalKey,
-			ProductID: device.ProductID,
-		})
-		if err != nil {
-			result.Failed = append(result.Failed, Failed{DeviceID: deviceID, Error: err.Error()})
+		addresses := []string{}
+		if ip := localIPv4(device.IP); ip != "" {
+			addresses = append(addresses, ip)
+		}
+		for _, candidate := range candidates {
+			if candidate != "" && !containsAddress(addresses, candidate) {
+				addresses = append(addresses, candidate)
+			}
+		}
+		if len(addresses) == 0 {
+			message := "a lâmpada está sem IP local; ligue-a no Wi-Fi e tente de novo"
+			switch {
+			case scanErr != nil:
+				message = "não foi possível procurar a lâmpada na rede local: " + scanErr.Error()
+			case len(networks) > 0 && m.scanner != nil:
+				message = "não encontrei a lâmpada na rede local; confira se ela está ligada e no mesmo Wi-Fi"
+			}
+			result.Failed = append(result.Failed, Failed{DeviceID: deviceID, Error: message})
+			continue
+		}
+		var created light.Light
+		var lastErr error
+		for _, address := range addresses {
+			created, lastErr = m.registrar.Register(ctx, light.RegisterInput{
+				Name:      device.Name,
+				Address:   address,
+				DeviceID:  device.ID,
+				LocalKey:  device.LocalKey,
+				ProductID: device.ProductID,
+			})
+			if lastErr == nil {
+				break
+			}
+		}
+		if lastErr != nil {
+			result.Failed = append(result.Failed, Failed{DeviceID: deviceID, Error: lastErr.Error()})
 			continue
 		}
 		result.Imported = append(result.Imported, Imported{DeviceID: deviceID, Light: created})
@@ -324,14 +365,54 @@ func importBlocker(device tuya.CloudDevice) string {
 	if len(strings.TrimSpace(device.LocalKey)) != 16 {
 		return "a Tuya não devolveu chave local para esta lâmpada (provavelmente Zigbee)"
 	}
-	ip := net.ParseIP(strings.TrimSpace(device.IP)).To4()
-	if ip == nil || !ip.IsPrivate() {
-		return "a lâmpada está sem IP local; ligue-a no Wi-Fi e tente de novo"
-	}
-	if !device.Online {
-		return "a lâmpada está offline no aplicativo da Tuya"
-	}
 	return ""
+}
+
+// discoverCandidates procura endereços locais quando a nuvem não informou o IP.
+// A varredura usa a sub-rede que o app enviou (o container não recebe o
+// broadcast da LAN) e tenta a chave de cada lâmpada em cada candidato.
+func (m *Manager) discoverCandidates(ctx context.Context, devices []tuya.CloudDevice, selected map[string]bool, networks []string) ([]string, error) {
+	if m.scanner == nil || len(networks) == 0 {
+		return nil, nil
+	}
+	needed := false
+	for _, device := range devices {
+		if selected[device.ID] && localIPv4(device.IP) == "" {
+			needed = true
+			break
+		}
+	}
+	if !needed {
+		return nil, nil
+	}
+	found, err := m.scanner.Scan(ctx, light.DiscoveryInput{Duration: 6, Probe: true, Networks: networks})
+	if err != nil {
+		return nil, err
+	}
+	addresses := make([]string, 0, len(found))
+	for _, candidate := range found {
+		if candidate.Address != "" {
+			addresses = append(addresses, candidate.Address)
+		}
+	}
+	return addresses, nil
+}
+
+func localIPv4(raw string) string {
+	ip := net.ParseIP(strings.TrimSpace(raw)).To4()
+	if ip == nil || !ip.IsPrivate() {
+		return ""
+	}
+	return ip.String()
+}
+
+func containsAddress(addresses []string, value string) bool {
+	for _, address := range addresses {
+		if address == value {
+			return true
+		}
+	}
+	return false
 }
 
 // Compile-time check that the local light service is a valid registrar.
